@@ -164,10 +164,10 @@ const Alunos = () => {
         observacoes: ''
       }
     });
-    setIsNew(true);
-    setEditOpen(true);
-    setFormError('');
-    setFormStep(1);
+  setIsNew(true);
+  setEditOpen(true);
+  setFormError('');
+  setFormStep(1);
   };
 
   const handleFormChange = e => {
@@ -190,8 +190,8 @@ const Alunos = () => {
         val = val.replace(/\D/g, '');
         if (val) {
           let num = parseInt(val, 10);
-            if (num < 1) num = 1;
-            if (num > 31) num = 31;
+          if (num < 1) num = 1;
+          if (num > 31) num = 31;
           val = String(num);
         }
       }
@@ -212,6 +212,7 @@ const Alunos = () => {
       setEditForm(prev => ({ ...prev, [name]: value }));
     }
   };
+
 
   // Validação por passo
   const isStep1Valid = () => (
@@ -349,7 +350,7 @@ const Alunos = () => {
                           <ListItemText
                             primary={aluno.nome}
                             secondary={
-                              <>
+                              <>  
                                 <Typography variant="body2">Matrícula: {aluno.matricula || '--'}</Typography>
                                 <Typography variant="body2">Turma: {getTurmaNome(aluno.turmaId)}</Typography>
                                 {aluno.dataNascimento && (

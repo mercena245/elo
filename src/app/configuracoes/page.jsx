@@ -1,12 +1,36 @@
 "use client";
 import SidebarMenu from '../../components/SidebarMenu';
+import AdminClaimChecker from '../../components/AdminClaimChecker';
+import DevClaimsAccordion from '../../components/DevClaimsAccordion';
 import { Box, Typography, Card, CardContent, List, ListItem, ListItemText, CircularProgress, Button, FormControl, InputLabel, Select, MenuItem, Dialog, DialogTitle, DialogContent, DialogActions, TextField } from '@mui/material';
 import { useEffect, useState } from 'react';
-import { db, ref, get, set, push, remove, auth } from '../../firebase';
+import { db, ref, get, set, push, remove, auth, deleteUserFunction } from '../../firebase';
 import UserApprovalDialog from '../../components/UserApprovalDialog';
 import { useRouter } from 'next/navigation';
 
 export default function Configuracoes() {
+  // Função para recusar usuário (excluir do banco e do Auth)
+  async function rejectUser(uid) {
+    // Remove do banco
+    const userRef = ref(db, `usuarios/${uid}`);
+    await set(userRef, null);
+    // Excluir do Auth (apenas se admin, normalmente via backend)
+    try {
+      // Se for possível usar admin SDK, aqui seria feito
+      // No client, só é possível se o usuário estiver logado
+      if (auth.currentUser && auth.currentUser.uid === uid) {
+        await auth.currentUser.delete();
+      }
+    } catch (e) {
+      // Se não conseguir, ignora
+    }
+    await fetchUsuarios();
+  }
+
+  // Torna a função acessível globalmente para o dialog
+  if (typeof window !== 'undefined') {
+    window.rejectUser = rejectUser;
+  }
   // Estado para DEV
   const [devClickCount, setDevClickCount] = useState(0);
   const [devModalOpen, setDevModalOpen] = useState(false);
@@ -72,19 +96,25 @@ export default function Configuracoes() {
     }
   };
 
-  // Exclui usuário do banco e do Auth
+  // Exclui usuário do banco e do Auth via Cloud Function
   const handleDeleteUser = async () => {
     if (!editUser) return;
-    const userRef = ref(db, `usuarios/${editUser.uid}`);
-    await set(userRef, null); // Remove do banco
     try {
-      // Excluir do Auth requer privilégio de admin, normalmente feito via backend
-      // Aqui apenas remove do banco, para excluir do Auth é necessário função cloud ou admin SDK
-    } catch (e) {}
-    setConfirmDeleteOpen(false);
-    setEditDialogOpen(false);
-    setEditUser(null);
-    await fetchUsuarios();
+      // Força refresh do token para garantir claims atualizados
+      if (auth.currentUser) {
+        const token = await auth.currentUser.getIdTokenResult(true);
+        console.log('Token claims antes da exclusão:', token.claims);
+      }
+      await deleteUserFunction({ uid: editUser.uid });
+      setConfirmDeleteOpen(false);
+      setEditDialogOpen(false);
+      setEditUser(null);
+      await fetchUsuarios();
+    } catch (e) {
+      // Mostra detalhes completos do erro
+      console.error(e);
+      alert('Erro ao excluir usuário: ' + (e.details || e.message || JSON.stringify(e)));
+    }
   };
   const [pendentes, setPendentes] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -268,6 +298,10 @@ export default function Configuracoes() {
                 <Button variant="contained" color="info" onClick={handleBackupBanco} sx={{ display: 'block', mx: 'auto', mt: 2 }}>
                   Fazer backup do banco (JSON)
                 </Button>
+                {/* Menu recolhido para claims do usuário logado */}
+                <Box sx={{ mt: 3 }}>
+                  <DevClaimsAccordion />
+                </Box>
               </CardContent>
             </Card>
           )}
@@ -287,7 +321,7 @@ export default function Configuracoes() {
                   {pendentes.map(user => (
                     <ListItem key={user.uid} divider button onClick={() => { setSelectedUser(user); setDialogOpen(true); }}>
                       <ListItemText primary={user.nome || user.email} secondary={user.email} />
-                      <Button variant="outlined" color="primary" onClick={() => { setSelectedUser(user); setDialogOpen(true); }}>Aprovar</Button>
+                      <Button variant="outlined" color="primary" onClick={() => { setSelectedUser(user); setDialogOpen(true); }}>Validar acesso</Button>
                     </ListItem>
                   ))}
                 </List>

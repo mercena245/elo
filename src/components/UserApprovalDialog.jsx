@@ -1,6 +1,10 @@
 "use client";
 import React, { useState } from 'react';
 import { Dialog, DialogTitle, DialogContent, DialogActions, Button, FormControl, InputLabel, Select, MenuItem, Typography } from '@mui/material';
+import { deleteUserFunction } from '../firebase';
+import { getFunctions, httpsCallable } from "firebase/functions";
+
+
 
 export default function UserApprovalDialog({ open, onClose, user, onApprove }) {
   const [selectedRole, setSelectedRole] = useState('');
@@ -9,6 +13,25 @@ export default function UserApprovalDialog({ open, onClose, user, onApprove }) {
     if (selectedRole) {
       onApprove(user.uid, selectedRole);
       onClose();
+    }
+  };
+
+  const handleReject = async () => {
+    if (user.uid) {
+      if (window.confirm('Tem certeza que deseja recusar este usuário? Ele será excluído do sistema.')) {
+        try {
+          // Força refresh do token para garantir claims atualizados
+          if (typeof window !== 'undefined' && window.firebaseAuth && window.firebaseAuth.currentUser) {
+            await window.firebaseAuth.currentUser.getIdToken(true);
+          }
+          await deleteUserFunction({ uid: user.uid });
+          onClose();
+        } catch (e) {
+          // Mostra detalhes completos do erro
+          console.error(e);
+          alert('Erro ao excluir usuário: ' + (e.details || e.message || JSON.stringify(e)));
+        }
+      }
     }
   };
 
@@ -35,7 +58,8 @@ export default function UserApprovalDialog({ open, onClose, user, onApprove }) {
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose} color="secondary">Cancelar</Button>
-        <Button onClick={handleApprove} color="primary" disabled={!selectedRole}>Aprovar</Button>
+  <Button onClick={handleApprove} color="primary" disabled={!selectedRole}>Validar acesso</Button>
+        <Button onClick={handleReject} color="error">Recusar</Button>
       </DialogActions>
     </Dialog>
   );

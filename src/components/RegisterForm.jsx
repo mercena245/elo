@@ -33,13 +33,18 @@ const RegisterForm = () => {
       <Typography variant="h5" component="h1" gutterBottom>
         Criar Conta
       </Typography>
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <TextField label="Nome" variant="outlined" fullWidth margin="normal" value={nome} onChange={e => setNome(e.target.value)} />
         <TextField label="E-mail" variant="outlined" fullWidth margin="normal" value={email} onChange={e => setEmail(e.target.value)} />
         <TextField label="Senha" type="password" variant="outlined" fullWidth margin="normal" value={senha} onChange={e => setSenha(e.target.value)} />
-        <Button variant="contained" color="primary" fullWidth type="submit" disabled={loading}>
-          {loading ? "Registrando..." : "Registrar"}
-        </Button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <Button variant="contained" color="primary" type="submit" disabled={loading} style={{ flex: 1 }}>
+            {loading ? "Registrando..." : "Registrar"}
+          </Button>
+          <Button variant="outlined" color="primary" style={{ flex: 1 }} onClick={() => window.location.href = '/login'}>
+            Entrar
+          </Button>
+        </div>
       </form>
     </Paper>
   );

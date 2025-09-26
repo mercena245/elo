@@ -2,16 +2,20 @@
 import React, { useEffect, useState } from 'react';
 import SidebarMenu from '../../components/SidebarMenu';
 import ProtectedRoute from '../../components/ProtectedRoute';
-import { Card, CardContent, Typography, Box, Avatar, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField, CircularProgress } from '@mui/material';
+import { Card, CardContent, Typography, Box, Avatar, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField, CircularProgress, FormControl, InputLabel, Select, MenuItem } from '@mui/material';
+import { fetchDisciplinas } from './disciplinasHelpers';
 import { FaUsers } from 'react-icons/fa';
 import { db, ref, get, set, auth } from '../../firebase';
 
 const Colaboradores = () => {
+  const [disciplinas, setDisciplinas] = useState([]);
+  const [editColabDisciplinas, setEditColabDisciplinas] = useState([]);
   const [colaboradores, setColaboradores] = useState([]);
   const [loading, setLoading] = useState(true);
   const [openColabModal, setOpenColabModal] = useState(false);
   const [editColab, setEditColab] = useState(null);
-  const [editColabForm, setEditColabForm] = useState({ nome: '', cargo: '', email: '' });
+  const [editColabTurmas, setEditColabTurmas] = useState([]);
+  const [turmas, setTurmas] = useState([]);
   const [savingColab, setSavingColab] = useState(false);
   const [isNewColab, setIsNewColab] = useState(false);
   const [userRole, setUserRole] = useState('');
@@ -21,13 +25,15 @@ const Colaboradores = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const colabSnap = await get(ref(db, 'colaboradores'));
-      let colabArr = [];
-      if (colabSnap.exists()) {
-        const colabData = colabSnap.val();
-        colabArr = Object.entries(colabData).map(([id, colab]) => ({ ...colab, id }));
+      const usuariosSnap = await get(ref(db, 'usuarios'));
+      let profArr = [];
+      if (usuariosSnap.exists()) {
+        const usuariosData = usuariosSnap.val();
+        profArr = Object.entries(usuariosData)
+          .filter(([_, u]) => u.role === 'professora')
+          .map(([id, prof]) => ({ ...prof, id }));
       }
-      setColaboradores(colabArr);
+      setColaboradores(profArr);
     } catch {
       setColaboradores([]);
     }
@@ -35,7 +41,27 @@ const Colaboradores = () => {
   };
 
   useEffect(() => {
+    // Buscar disciplinas do banco
+    const fetchAllDisciplinas = async () => {
+      const lista = await fetchDisciplinas();
+      setDisciplinas(lista);
+    };
+    fetchAllDisciplinas();
     fetchData();
+    // Buscar turmas do banco
+    const fetchTurmas = async () => {
+      const turmasRef = ref(db, 'turmas');
+      const snap = await get(turmasRef);
+      if (snap.exists()) {
+        const all = snap.val();
+        // Se turmas for objeto, transforma em array de nomes
+        const listaTurmas = Object.entries(all).map(([id, t]) => ({ id, nome: t.nome || t }));
+        setTurmas(listaTurmas);
+      } else {
+        setTurmas([]);
+      }
+    };
+    fetchTurmas();
   }, []);
 
   useEffect(() => {
@@ -67,8 +93,8 @@ const Colaboradores = () => {
 
   const handleEditColab = colab => {
     setEditColab(colab);
-    setEditColabForm({ nome: colab.nome || '', cargo: colab.cargo || '', email: colab.email || '' });
-    setIsNewColab(false);
+    setEditColabTurmas(colab.turmas || []);
+  setEditColabDisciplinas(colab.disciplinas || []);
     setOpenColabModal(true);
   };
 
@@ -80,16 +106,17 @@ const Colaboradores = () => {
   const handleSaveColab = async () => {
     setSavingColab(true);
     try {
-      if (isNewColab) {
-        const novoId = `id_colab_${editColabForm.nome.replace(/\s/g, '').toLowerCase()}`;
-        await set(ref(db, `colaboradores/${novoId}`), editColabForm);
-      } else if (editColab && editColab.id) {
-        await set(ref(db, `colaboradores/${editColab.id}`), editColabForm);
+      if (editColab && editColab.id) {
+        // Atualiza apenas as turmas da professora
+        await set(ref(db, `usuarios/${editColab.id}`), {
+          ...editColab,
+          turmas: editColabTurmas,
+          disciplinas: editColabDisciplinas
+        });
       }
       setOpenColabModal(false);
       await fetchData();
-    } catch (err) {
-    }
+    } catch (err) {}
     setSavingColab(false);
   };
 
@@ -120,8 +147,7 @@ const Colaboradores = () => {
         <main className="dashboard-main">
           <Box sx={{ maxWidth: 700, mx: 'auto', mt: 4 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-              <Typography variant="h5" color="primary" gutterBottom>Lista de Colaboradores</Typography>
-              <Button variant="contained" color="primary" onClick={handleAddColab}>Adicionar Colaborador</Button>
+              <Typography variant="h5" color="primary" gutterBottom>Professores(as) do Sistema</Typography>
             </Box>
             <Card>
               <CardContent>
@@ -131,26 +157,60 @@ const Colaboradores = () => {
                   </Box>
                 ) : colaboradores.length === 0 ? (
                   <Typography variant="body2" color="text.secondary" align="center">
-                    Nenhum colaborador encontrado.
+                    Nenhuma professora cadastrada.
                   </Typography>
                 ) : (
-                  colaboradores.map(colab => (
-                    <Box key={colab.id} sx={{ mb: 2, p: 2, borderRadius: 2, bgcolor: '#f5f5f5', textAlign: 'center', cursor: 'pointer' }} onClick={() => handleEditColab(colab)}>
+                  colaboradores.map(prof => (
+                    <Box key={prof.id} sx={{ mb: 2, p: 2, borderRadius: 2, bgcolor: '#f5f5f5', textAlign: 'center', cursor: 'pointer' }} onClick={() => handleEditColab(prof)}>
                       <Avatar sx={{ bgcolor: '#388e3c', mx: 'auto', mb: 1 }}><FaUsers /></Avatar>
-                      <Typography variant="subtitle1" fontWeight={600}>{colab.nome}</Typography>
-                      <Typography variant="body2">Cargo: {colab.cargo || '-'}</Typography>
-                      <Typography variant="body2">Email: {colab.email || '-'}</Typography>
+                      <Typography variant="subtitle1" fontWeight={600}>{prof.nome || prof.email}</Typography>
+                      <Typography variant="body2">Email: {prof.email || '-'}</Typography>
+                      <Typography variant="body2">Função: Professora</Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                        Disciplinas: {prof.disciplinas && prof.disciplinas.length > 0
+                          ? prof.disciplinas.map(id => (disciplinas.find(d => d.id === id)?.nome || id)).join(', ')
+                          : 'Nenhuma'}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                        Turmas: {prof.turmas && prof.turmas.length > 0
+                          ? prof.turmas.map(id => (turmas.find(t => t.id === id)?.nome || id)).join(', ')
+                          : 'Nenhuma'}
+                      </Typography>
                     </Box>
                   ))
                 )}
-                <Dialog open={openColabModal} onClose={() => setOpenColabModal(false)} maxWidth="sm" fullWidth>
-                  <DialogTitle>{isNewColab ? 'Incluir Colaborador' : 'Editar Colaborador'}</DialogTitle>
+                <Dialog open={openColabModal} onClose={() => setOpenColabModal(false)} maxWidth="xs" fullWidth>
+                  <DialogTitle>Atribuir turmas e disciplinas à professora</DialogTitle>
                   <DialogContent>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                      <TextField label="Nome" name="nome" value={editColabForm.nome || ''} onChange={handleColabFormChange} fullWidth />
-                      <TextField label="Cargo" name="cargo" value={editColabForm.cargo || ''} onChange={handleColabFormChange} fullWidth />
-                      <TextField label="Email" name="email" value={editColabForm.email || ''} onChange={handleColabFormChange} fullWidth />
-                    </Box>
+                    <Typography variant="subtitle1" gutterBottom>{editColab?.nome || editColab?.email}</Typography>
+                    <FormControl fullWidth sx={{ mt: 2 }}>
+                      <InputLabel id="turmas-label">Turmas</InputLabel>
+                      <Select
+                        labelId="turmas-label"
+                        multiple
+                        value={editColabTurmas}
+                        onChange={e => setEditColabTurmas(e.target.value)}
+                        renderValue={selected => selected.map(id => turmas.find(t => t.id === id)?.nome || id).join(', ')}
+                      >
+                        {turmas.map(turma => (
+                          <MenuItem key={turma.id} value={turma.id}>{turma.nome}</MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                    <FormControl fullWidth sx={{ mt: 2 }}>
+                      <InputLabel id="disciplinas-label">Disciplinas</InputLabel>
+                      <Select
+                        labelId="disciplinas-label"
+                        multiple
+                        value={editColabDisciplinas}
+                        onChange={e => setEditColabDisciplinas(e.target.value)}
+                        renderValue={selected => selected.map(id => disciplinas.find(d => d.id === id)?.nome || id).join(', ')}
+                      >
+                        {disciplinas.map(disc => (
+                          <MenuItem key={disc.id} value={disc.id}>{disc.nome}</MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
                   </DialogContent>
                   <DialogActions>
                     <Button onClick={() => setOpenColabModal(false)} color="secondary">Cancelar</Button>

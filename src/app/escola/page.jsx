@@ -31,6 +31,10 @@ import { ExpandMore, ExpandLess, Edit, Delete } from '@mui/icons-material';
 import { FaTrash } from 'react-icons/fa';
 import { FaUsers, FaChalkboardTeacher } from 'react-icons/fa';
 import { db, ref, get, set, remove, auth } from '../../firebase';
+import DisciplinaCard from "../components/escola/DisciplinaCard";
+import GestaoEscolarCard from "../components/escola/GestaoEscolarCard";
+import TurmaCard from "../components/escola/TurmaCard";
+import PeriodoCard from "../components/escola/PeriodoCard";
 
 // Helpers
 function formatDateBR(dateStr) {
@@ -39,64 +43,7 @@ function formatDateBR(dateStr) {
   return `${d}/${m}/${y}`;
 }
 
-// Card expansivo Gestão Escolar
-function GestaoEscolarCard({ turmasContent, periodosContent }) {
-  const [openTurmas, setOpenTurmas] = React.useState(false);
-  const [openPeriodos, setOpenPeriodos] = React.useState(false);
-  return (
-    <Card sx={{ mb: 4 }}>
-      <CardContent>
-        <Typography variant="h6" color="primary" fontWeight={700} sx={{ mb: 2 }}>
-          Gestão Escolar
-        </Typography>
-        {/* Botão expansivo de Turmas */}
-        <Box
-          sx={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 2,
-            cursor: 'pointer',
-            mb: 1
-          }}
-          onClick={() => setOpenTurmas(v => !v)}
-        >
-          <Avatar sx={{ bgcolor: '#1976d2' }}>
-            <FaChalkboardTeacher />
-          </Avatar>
-          <Typography variant="h6">Turmas</Typography>
-          <IconButton>{openTurmas ? <ExpandLess /> : <ExpandMore />}</IconButton>
-        </Box>
-        <Collapse in={openTurmas} timeout="auto" unmountOnExit>
-          <Box sx={{ mt: 2 }}>{turmasContent}</Box>
-        </Collapse>
-        {/* Botão expansivo de Períodos */}
-        <Box
-          sx={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 2,
-            cursor: 'pointer',
-            mb: 1
-          }}
-          onClick={() => setOpenPeriodos(v => !v)}
-        >
-          <Avatar sx={{ bgcolor: '#7b1fa2' }}>
-            <Typography fontWeight={700} color="white">
-              P
-            </Typography>
-          </Avatar>
-          <Typography variant="h6">Períodos</Typography>
-          <IconButton>
-            {openPeriodos ? <ExpandLess /> : <ExpandMore />}
-          </IconButton>
-        </Box>
-        <Collapse in={openPeriodos} timeout="auto" unmountOnExit>
-          <Box sx={{ mt: 2 }}>{periodosContent}</Box>
-        </Collapse>
-      </CardContent>
-    </Card>
-  );
-}
+
 
 const Escola = () => {
   // TURMAS
@@ -126,7 +73,7 @@ const Escola = () => {
   const [colaboradores, setColaboradores] = useState([]);
   const [openColabModal, setOpenColabModal] = useState(false);
   const [editColab, setEditColab] = useState(null);
-  const [editColabForm, setEditColabForm] = useState({ nome: '', cargo: '', email: '' });
+  const [editColabForm, setEditColabForm] = useState({ nome: '', cargo: '', email: '', disciplinas: [] });
   const [savingColab, setSavingColab] = useState(false);
   const [isNewColab, setIsNewColab] = useState(false);
 
@@ -362,7 +309,9 @@ const Escola = () => {
     setEditColabForm({
       nome: colab.nome || '',
       cargo: colab.cargo || '',
-      email: colab.email || ''
+      email: colab.email || '',
+      disciplinas: colab.disciplinas || [],
+      role: colab.role || ''
     });
     setIsNewColab(false);
     setOpenColabModal(true);
@@ -373,20 +322,73 @@ const Escola = () => {
     setEditColabForm(prev => ({ ...prev, [name]: value }));
   };
 
+  const handleColabDisciplinasChange = e => {
+    const { value } = e.target;
+    setEditColabForm(prev => ({ ...prev, disciplinas: typeof value === 'string' ? value.split(',') : value }));
+  };
+
   const handleSaveColab = async () => {
     setSavingColab(true);
     try {
+      const colabData = { ...editColabForm };
+      if (colabData.cargo !== 'professora') {
+        colabData.disciplinas = [];
+      }
       if (isNewColab) {
         const novoId = `id_colab_${editColabForm.nome.replace(/\s/g, '').toLowerCase()}`;
-        await set(ref(db, `colaboradores/${novoId}`), editColabForm);
+        await set(ref(db, `colaboradores/${novoId}`), colabData);
       } else if (editColab && editColab.id) {
-        await set(ref(db, `colaboradores/${editColab.id}`), editColabForm);
+        await set(ref(db, `colaboradores/${editColab.id}`), colabData);
       }
       setOpenColabModal(false);
       await fetchData();
     } catch (err) {}
     setSavingColab(false);
   };
+  {/* Modal de cadastro/edição de colaborador */}
+  <Dialog open={openColabModal} onClose={() => setOpenColabModal(false)} maxWidth="sm" fullWidth>
+    <DialogTitle>{isNewColab ? 'Incluir Colaborador(a)' : 'Editar Colaborador(a)'}</DialogTitle>
+    <DialogContent>
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
+        <TextField label="Nome" name="nome" value={editColabForm.nome} onChange={handleColabFormChange} fullWidth required />
+        <FormControl fullWidth required>
+          <InputLabel id="cargo-select-label">Cargo</InputLabel>
+          <Select labelId="cargo-select-label" name="cargo" value={editColabForm.cargo} label="Cargo" onChange={handleColabFormChange}>
+            <MenuItem value="professora">Professora</MenuItem>
+            <MenuItem value="coordenadora">Coordenadora</MenuItem>
+            <MenuItem value="funcionario">Funcionário(a)</MenuItem>
+          </Select>
+        </FormControl>
+        <TextField label="Email" name="email" value={editColabForm.email} onChange={handleColabFormChange} fullWidth />
+  {((editColabForm.cargo && editColabForm.cargo.toLowerCase().includes('professor')) ||
+    (editColabForm.role && editColabForm.role.toLowerCase().includes('professor'))) && (
+          <FormControl fullWidth>
+            <InputLabel id="disciplinas-select-label">Disciplinas</InputLabel>
+            <Select
+              labelId="disciplinas-select-label"
+              multiple
+              name="disciplinas"
+              value={editColabForm.disciplinas}
+              onChange={handleColabDisciplinasChange}
+              renderValue={selected =>
+                disciplinas.filter(d => selected.includes(d.id)).map(d => d.nome).join(', ')
+              }
+            >
+              {disciplinas.map(disc => (
+                <MenuItem key={disc.id} value={disc.id}>
+                  {disc.nome}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        )}
+      </Box>
+    </DialogContent>
+    <DialogActions>
+      <Button onClick={() => setOpenColabModal(false)} color="secondary">Cancelar</Button>
+      <Button onClick={handleSaveColab} color="primary" disabled={savingColab}>Salvar</Button>
+    </DialogActions>
+  </Dialog>
 
   // PERÍODO CRUD
   const handlePeriodoFormChange = e => {
@@ -511,49 +513,57 @@ const Escola = () => {
     }
   }
 
-  const fetchData = async () => {
-    setLoading(true);
+  // DISCIPLINAS
+  const [disciplinas, setDisciplinas] = useState([]);
+  const [loadingDisciplinas, setLoadingDisciplinas] = useState(false);
+  const [openDisciplinaModal, setOpenDisciplinaModal] = useState(false);
+  const [novaDisciplina, setNovaDisciplina] = useState("");
+
+  // Funções de CRUD de disciplinas (exemplo, ajuste conforme sua lógica real)
+  const handleAddDisciplina = async () => {
+    if (!novaDisciplina.trim()) return;
+    setLoadingDisciplinas(true);
     try {
-      const colabSnap = await get(ref(db, 'colaboradores'));
-      const turmasSnap = await get(ref(db, 'turmas'));
-      const avisosSnap = await get(ref(db, 'avisos'));
-      let colabArr = [];
-      let turmasArr = [];
-      let avisosArr = [];
-      if (colabSnap.exists()) {
-        const colabData = colabSnap.val();
-        colabArr = Object.entries(colabData).map(([id, colab]) => ({
-          ...colab,
-          id
-        }));
-      }
-      if (turmasSnap.exists()) {
-        const turmasData = turmasSnap.val();
-        turmasArr = Object.entries(turmasData).map(([id, turma]) => ({
-          ...turma,
-          id
-        }));
-      }
-      if (avisosSnap.exists()) {
-        const avisosData = avisosSnap.val();
-        avisosArr = Object.entries(avisosData).map(([id, aviso]) => ({
-          id,
-          ...aviso
-        }));
-      }
-      setColaboradores(colabArr);
-      setTurmas(turmasArr);
-      setAvisos(avisosArr);
-    } catch {
-      setColaboradores([]);
-      setTurmas([]);
-      setAvisos([]);
+      const disciplinaId = `disciplina_${Date.now()}`;
+      await set(ref(db, `disciplinas/${disciplinaId}`), { nome: novaDisciplina });
+      setNovaDisciplina("");
+      await fetchDataDisciplinas();
+    } catch (err) {
+      alert("Erro ao adicionar disciplina!");
     }
-    setLoading(false);
+    setLoadingDisciplinas(false);
+  };
+
+  const handleExcluirDisciplina = async (disciplina) => {
+    setLoadingDisciplinas(true);
+    try {
+      await remove(ref(db, `disciplinas/${disciplina.id}`));
+      await fetchDataDisciplinas();
+    } catch (err) {
+      alert("Erro ao excluir disciplina!");
+    }
+    setLoadingDisciplinas(false);
+  };
+
+  const fetchDataDisciplinas = async () => {
+    setLoadingDisciplinas(true);
+    try {
+      const snap = await get(ref(db, 'disciplinas'));
+      if (snap.exists()) {
+        const data = snap.val();
+        const listaDisciplinas = Object.entries(data).map(([id, val]) => ({ id, ...val }));
+        setDisciplinas(listaDisciplinas);
+      } else {
+        setDisciplinas([]);
+      }
+    } catch (err) {
+      setDisciplinas([]);
+    }
+    setLoadingDisciplinas(false);
   };
 
   useEffect(() => {
-    fetchData();
+    fetchDataDisciplinas();
   }, []);
 
   useEffect(() => {
@@ -661,586 +671,79 @@ const Escola = () => {
           </Card>
           <GestaoEscolarCard
             turmasContent={
-              <Grid container spacing={2} justifyContent="center">
-                <Grid
-                  item
-                  xs={12}
-                  md={6}
-                  sx={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    height: '100%'
-                  }}
-                >
-                  <Card
-                    sx={{
-                      width: '100%',
-                      height: '100%',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      justifyContent: 'flex-start'
-                    }}
-                  >
-                    <CardContent sx={{ height: '100%' }}>
-                      <Box
-                        sx={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 2,
-                          mb: 2,
-                          justifyContent: 'center'
-                        }}
-                      >
-                        <Button
-                          variant="contained"
-                          color="primary"
-                          size="small"
-                          sx={{ ml: 2 }}
-                          onClick={handleAddTurma}
-                        >
-                          Incluir Turma
-                        </Button>
-                      </Box>
-                      <Box
-                        sx={{
-                          mb: 2,
-                          display: 'flex',
-                          justifyContent: 'center',
-                          gap: 2
-                        }}
-                      >
-                        <FormControl sx={{ minWidth: 120 }} size="small">
-                          <InputLabel id="filtro-turno-label">
-                            Filtrar por turno
-                          </InputLabel>
-                          <Select
-                            labelId="filtro-turno-label"
-                            value={filtroTurno || ''}
-                            label="Filtrar por turno"
-                            onChange={e => setFiltroTurno(e.target.value)}
-                          >
-                            <MenuItem value="">Todos</MenuItem>
-                            <MenuItem value="Manhã">Manhã</MenuItem>
-                            <MenuItem value="Tarde">Tarde</MenuItem>
-                            <MenuItem value="Noite">Noite</MenuItem>
-                          </Select>
-                        </FormControl>
-                        <TextField
-                          label="Filtrar por nome"
-                          variant="outlined"
-                          size="small"
-                          value={filtroNomeTurma}
-                          onChange={e => setFiltroNomeTurma(e.target.value)}
-                          sx={{ minWidth: 180 }}
-                        />
-                      </Box>
-                      {loading ? (
-                        <Typography variant="body2" color="text.secondary">
-                          Carregando...
-                        </Typography>
-                      ) : turmas.length === 0 ? (
-                        <Typography variant="body2" color="text.secondary">
-                          Nenhuma turma encontrada.
-                        </Typography>
-                      ) : (
-                        turmas
-                          .filter(
-                            turma =>
-                              (!filtroTurno || turma.turnoId === filtroTurno) &&
-                              (!filtroNomeTurma || turma.nome.toLowerCase().includes(filtroNomeTurma.toLowerCase()))
-                          )
-                          .map(turma => (
-                            <Box
-                              key={turma.id}
-                              sx={{
-                                mb: 2,
-                                p: 1,
-                                borderRadius: 2,
-                                bgcolor: '#f5f5f5',
-                                textAlign: 'center',
-                                cursor: 'pointer',
-                                position: 'relative'
-                              }}
-                              onClick={e => {
-                                // Evita abrir modal se clicar nos ícones de editar/excluir
-                                if (e.target.closest('.turma-action-btn')) return;
-                                handleOpenGestaoTurma(turma);
-                              }}
-                            >
-                              <Box
-                                sx={{
-                                  position: 'absolute',
-                                  right: 8,
-                                  top: 8,
-                                  display: 'flex',
-                                  gap: 1
-                                }}
-                              >
-                                <IconButton
-                                  className="turma-action-btn"
-                                  color="primary"
-                                  size="small"
-                                  onClick={e => { e.stopPropagation(); handleEditTurma(turma); }}
-                                >
-                                  <Edit />
-                                </IconButton>
-                                <IconButton
-                                  className="turma-action-btn"
-                                  color="error"
-                                  size="small"
-                                  onClick={e => { e.stopPropagation(); handleExcluirTurma(turma); }}
-                                >
-                                  <Delete />
-                                </IconButton>
-                              </Box>
-                              <Typography variant="subtitle1" fontWeight={600}>
-                                {turma.nome}
-                              </Typography>
-                              <Typography variant="body2">
-                                Status: {turma.status || '-'}
-                              </Typography>
-                              <Typography variant="body2">
-                                Turno: {turma.turnoId || '-'}
-                              </Typography>
-                              <Typography variant="body2">
-                                Período: {periodosAtivos.find(p => p.id === turma.periodoId)?.label || turma.periodoId || "-"}
-                              </Typography>
-                            </Box>
-                          ))
-                        )}
-                      {/* Modal de Gestão da Turma */}
-                      <Dialog open={gestaoTurmaOpen} onClose={handleCloseGestaoTurma} maxWidth="md" fullWidth>
-                        <DialogTitle>Gestão da Turma: {gestaoTurma?.nome}</DialogTitle>
-                        <DialogContent>
-                          <Typography variant="subtitle1" sx={{ mb: 2 }}>Alunos vinculados</Typography>
-                          {alunosTurma.length === 0 ? (
-                            <Typography color="text.secondary">Nenhum aluno vinculado a esta turma.</Typography>
-                          ) : (
-                            <List>
-                              {alunosTurma.map((aluno, idx) => (
-                                <ListItem key={aluno.id || idx} divider>
-                                  <ListItemText
-                                    primary={<>
-                                      <b>{aluno.nome}</b> (Matrícula: {aluno.matricula || '--'})
-                                    </>}
-                                    secondary={<>
-                                      <Typography variant="body2">Pai: {aluno.nomePai || '--'}</Typography>
-                                      <Typography variant="body2">Mãe: {aluno.nomeMae || '--'}</Typography>
-                                      <Typography variant="body2">Idade: {calcularIdade(aluno.dataNascimento)}</Typography>
-                                    </>}
-                                  />
-                                </ListItem>
-                              ))}
-                            </List>
-                          )}
-                        </DialogContent>
-                        <DialogActions>
-                          <Button onClick={handleCloseGestaoTurma} color="primary">Fechar</Button>
-                        </DialogActions>
-                      </Dialog>
-                      <Dialog
-                        open={openTurmaModal}
-                        onClose={() => setOpenTurmaModal(false)}
-                        maxWidth="sm"
-                        fullWidth
-                      >
-                        <DialogTitle>
-                          {isNewTurma ? 'Incluir Turma' : 'Editar Turma'}
-                        </DialogTitle>
-                        <DialogContent>
-                          <Box
-                            sx={{
-                              display: 'flex',
-                              flexDirection: 'column',
-                              gap: 2
-                            }}
-                          >
-                            <TextField
-                              label="Nome"
-                              name="nome"
-                              value={editTurmaForm.nome || ''}
-                              onChange={handleTurmaFormChange}
-                              fullWidth
-                              required
-                            />
-                            <TextField
-                              label="Status"
-                              name="status"
-                              value={editTurmaForm.status || ''}
-                              onChange={handleTurmaFormChange}
-                              fullWidth
-                            />
-                            <FormControl fullWidth>
-                              <InputLabel id="turno-select-label">
-                                Turno
-                              </InputLabel>
-                              <Select
-                                labelId="turno-select-label"
-                                name="turnoId"
-                                value={editTurmaForm.turnoId || ''}
-                                label="Turno"
-                                onChange={handleTurmaFormChange}
-                                required
-                              >
-                                <MenuItem value="Manhã">Manhã</MenuItem>
-                                <MenuItem value="Tarde">Tarde</MenuItem>
-                                <MenuItem value="Noite">Noite</MenuItem>
-                              </Select>
-                            </FormControl>
-                            <FormControl fullWidth required>
-                              <InputLabel id="periodo-select-label-turma">
-                                Período
-                              </InputLabel>
-                              <Select
-                                labelId="periodo-select-label-turma"
-                                name="periodoId"
-                                value={editTurmaForm.periodoId || ''}
-                                label="Período"
-                                onChange={handleTurmaFormChange}
-                                required
-                                disabled={loadingPeriodosAtivos}
-                              >
-                                {loadingPeriodosAtivos ? (
-                                  <MenuItem value="">
-                                    <CircularProgress size={20} />
-                                  </MenuItem>
-                                ) : periodosAtivos.length === 0 ? (
-                                  <MenuItem value="">
-                                    Nenhum período ativo disponível
-                                  </MenuItem>
-                                ) : (
-                                  periodosAtivos.map(periodo => (
-                                    <MenuItem key={periodo.id} value={periodo.id}>
-                                      {periodo.label}
-                                    </MenuItem>
-                                  ))
-                                )}
-                              </Select>
-                            </FormControl>
-                          </Box>
-                        </DialogContent>
-                        <DialogActions>
-                          <Button
-                            onClick={() => setOpenTurmaModal(false)}
-                            color="secondary"
-                          >
-                            Cancelar
-                          </Button>
-                          <Button
-                            onClick={handleSaveTurma}
-                            color="primary"
-                            disabled={savingTurma}
-                          >
-                            Salvar
-                          </Button>
-                        </DialogActions>
-                      </Dialog>
-                      {/* Modal de vínculos */}
-                      <Dialog open={modalVinculosOpen} onClose={() => setModalVinculosOpen(false)} maxWidth="sm" fullWidth>
-                        <DialogTitle>Não é possível excluir a turma</DialogTitle>
-                        <DialogContent>
-                          <Typography variant="body1" color="error" gutterBottom>
-                            Existem os seguintes vínculos registrados nesta turma:
-                          </Typography>
-                          {vinculosTurma.map((vinc, i) => (
-                            <Box key={i} sx={{ mb: 2 }}>
-                              <Typography variant="subtitle2" fontWeight={700}>{vinc.tipo}:</Typography>
-                              <List dense>
-                                {vinc.lista.map((nome, idx) => (<ListItem key={idx}><ListItemText primary={nome} /></ListItem>))}
-                              </List>
-                            </Box>
-                          ))}
-                        </DialogContent>
-                        <DialogActions>
-                          <Button onClick={() => setModalVinculosOpen(false)} color="primary">Fechar</Button>
-                        </DialogActions>
-                      </Dialog>
-                      {/* Modal de confirmação de exclusão */}
-                      <Dialog open={modalConfirmExcluirOpen} onClose={() => setModalConfirmExcluirOpen(false)} maxWidth="sm" fullWidth>
-                        <DialogTitle>Confirma exclusão da turma?</DialogTitle>
-                        <DialogContent>
-                          <Typography variant="body1" gutterBottom>
-                            Tem certeza que deseja excluir a turma <b>{turmaExcluir?.nome}</b>?
-                          </Typography>
-                        </DialogContent>
-                        <DialogActions>
-                          <Button onClick={() => setModalConfirmExcluirOpen(false)} color="secondary">Não</Button>
-                          <Button onClick={handleConfirmExcluirTurma} color="error" disabled={excluindoTurma}>
-                            {excluindoTurma ? "Excluindo..." : "Sim, excluir"}
-                          </Button>
-                        </DialogActions>
-                      </Dialog>
-                    </CardContent>
-                  </Card>
-                </Grid>
-              </Grid>
+              <TurmaCard
+                turmas={turmas}
+                loading={loading}
+                filtroTurno={filtroTurno}
+                setFiltroTurno={setFiltroTurno}
+                filtroNomeTurma={filtroNomeTurma}
+                setFiltroNomeTurma={setFiltroNomeTurma}
+                handleAddTurma={handleAddTurma}
+                handleEditTurma={handleEditTurma}
+                handleExcluirTurma={handleExcluirTurma}
+                periodosAtivos={periodosAtivos}
+                openTurmaModal={openTurmaModal}
+                setOpenTurmaModal={setOpenTurmaModal}
+                editTurma={editTurma}
+                editTurmaForm={editTurmaForm}
+                setEditTurmaForm={setEditTurmaForm}
+                isNewTurma={isNewTurma}
+                savingTurma={savingTurma}
+                handleTurmaFormChange={handleTurmaFormChange}
+                handleSaveTurma={handleSaveTurma}
+                gestaoTurmaOpen={gestaoTurmaOpen}
+                gestaoTurma={gestaoTurma}
+                handleOpenGestaoTurma={handleOpenGestaoTurma}
+                handleCloseGestaoTurma={handleCloseGestaoTurma}
+                alunosTurma={alunosTurma}
+                calcularIdade={calcularIdade}
+                modalVinculosOpen={modalVinculosOpen}
+                setModalVinculosOpen={setModalVinculosOpen}
+                vinculosTurma={vinculosTurma}
+                modalConfirmExcluirOpen={modalConfirmExcluirOpen}
+                setModalConfirmExcluirOpen={setModalConfirmExcluirOpen}
+                turmaExcluir={turmaExcluir}
+                handleConfirmExcluirTurma={handleConfirmExcluirTurma}
+                excluindoTurma={excluindoTurma}
+                loadingPeriodosAtivos={loadingPeriodosAtivos}
+              />
             }
             periodosContent={
-              <Box
-                sx={{
-                  maxWidth: 400,
-                  mx: 'auto',
-                  p: 2,
-                  borderRadius: 2,
-                  bgcolor: '#f5f5f5'
-                }}
-              >
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-                  <Typography variant="subtitle1" fontWeight={600}>
-                    Cadastrar Período
-                  </Typography>
-                  <Typography
-                    variant="body2"
-                    sx={{
-                      color: abaPeriodo === "consulta" ? "#1976d2" : "text.secondary",
-                      textDecoration: "underline",
-                      cursor: "pointer",
-                      fontWeight: 500
-                    }}
-                    onClick={() => handleTrocarAbaPeriodo(abaPeriodo === "consulta" ? "cadastro" : "consulta")}
-                  >
-                    {abaPeriodo === "consulta" ? "← Voltar ao Cadastro" : "Consultar Período"}
-                  </Typography>
-                </Box>
-                <Divider sx={{ mb: 2 }} />
-                {abaPeriodo === "cadastro" ? (
-                  <Box
-                    component="form"
-                    sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}
-                    onSubmit={handleSalvarPeriodo}
-                  >
-                    <Box sx={{ display: 'flex', gap: 2 }}>
-                      <FormControl fullWidth>
-                        <InputLabel id="ano-select-label">Ano</InputLabel>
-                        <Select
-                          labelId="ano-select-label"
-                          name="ano"
-                          value={periodoForm.ano}
-                          label="Ano"
-                          onChange={handlePeriodoFormChange}
-                          required
-                        >
-                          {[2023, 2024, 2025, 2026].map(ano => (
-                            <MenuItem key={ano} value={ano}>
-                              {ano}
-                            </MenuItem>
-                          ))}
-                        </Select>
-                      </FormControl>
-                      <FormControl fullWidth>
-                        <InputLabel id="periodo-select-label">Período</InputLabel>
-                        <Select
-                          labelId="periodo-select-label"
-                          name="periodo"
-                          value={periodoForm.periodo}
-                          label="Período"
-                          onChange={handlePeriodoFormChange}
-                          required
-                        >
-                          <MenuItem value={1}>1</MenuItem>
-                          <MenuItem value={2}>2</MenuItem>
-                        </Select>
-                      </FormControl>
-                    </Box>
-                    <FormControl fullWidth>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                        <Typography>Status:</Typography>
-                        <Switch
-                          checked={periodoForm.ativo}
-                          onChange={e =>
-                            setPeriodoForm(prev => ({
-                              ...prev,
-                              ativo: e.target.checked
-                            }))
-                          }
-                          color="primary"
-                        />
-                        <Typography>
-                          {periodoForm.ativo ? 'Ativo' : 'Inativo'}
-                        </Typography>
-                      </Box>
-                    </FormControl>
-                    <TextField
-                      label="Data de Início"
-                      type="date"
-                      name="dataInicio"
-                      value={periodoForm.dataInicio}
-                      onChange={handlePeriodoFormChange}
-                      InputLabelProps={{ shrink: true }}
-                      fullWidth
-                      required
-                    />
-                    <TextField
-                      label="Data de Fim"
-                      type="date"
-                      name="dataFim"
-                      value={periodoForm.dataFim}
-                      onChange={handlePeriodoFormChange}
-                      InputLabelProps={{ shrink: true }}
-                      fullWidth
-                      required
-                    />
-                    <Button variant="contained" color="primary" type="submit" disabled={salvandoPeriodo}>
-                      {salvandoPeriodo ? "Salvando..." : "Salvar Período"}
-                    </Button>
-                    {msgPeriodo && (
-                      <Typography
-                        color={msgPeriodo.includes("sucesso") ? "primary" : "error"}
-                        variant="body2"
-                        align="center"
-                        mt={1}
-                      >
-                        {msgPeriodo}
-                      </Typography>
-                    )}
-                  </Box>
-                ) : (
-                  <Box>
-                    {loadingConsulta ? (
-                      <Box sx={{ textAlign: "center", py: 2 }}>
-                        <CircularProgress size={32} />
-                      </Box>
-                    ) : periodosCadastrados.length === 0 ? (
-                      <Typography color="text.secondary" align="center">
-                        Nenhum período cadastrado.
-                      </Typography>
-                    ) : (
-                      <List>
-                        {periodosCadastrados.map(periodo => (
-                          <ListItem
-                            key={periodo.id}
-                            sx={{
-                              mb: 1,
-                              bgcolor: "#f8f8f8",
-                              borderRadius: 2,
-                              display: "flex",
-                              alignItems: "center"
-                            }}
-                            secondaryAction={
-                              <Box>
-                                <IconButton
-                                  edge="end"
-                                  color="primary"
-                                  sx={{ mr: 1 }}
-                                  onClick={() => handleEditarPeriodoClick(periodo)}
-                                >
-                                  <Edit />
-                                </IconButton>
-                                <IconButton
-                                  edge="end"
-                                  color="error"
-                                  onClick={() => handleExcluirPeriodo(periodo.id)}
-                                >
-                                  <Delete />
-                                </IconButton>
-                              </Box>
-                            }
-                          >
-                            <ListItemText
-                              primary={`Ano: ${periodo.ano} | Período: ${periodo.periodo} | ${periodo.ativo ? "Ativo" : "Inativo"}`}
-                              secondary={
-                                <>
-                                  Início: {formatDateBR(periodo.dataInicio)} • Fim: {formatDateBR(periodo.dataFim)}
-                                </>
-                              }
-                            />
-                          </ListItem>
-                        ))}
-                      </List>
-                    )}
-                    {/* Modal de edição */}
-                    <Dialog open={editDialogOpen} onClose={() => setEditDialogOpen(false)} maxWidth="sm" fullWidth>
-                      <DialogTitle>Editar Período</DialogTitle>
-                      <DialogContent>
-                        <Box component="form" sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                          <Box sx={{ display: 'flex', gap: 2 }}>
-                            <FormControl fullWidth>
-                              <InputLabel id="edit-ano-label">Ano</InputLabel>
-                              <Select
-                                labelId="edit-ano-label"
-                                name="ano"
-                                value={editPeriodoForm.ano}
-                                label="Ano"
-                                onChange={handleEditPeriodoFormChange}
-                                required
-                              >
-                                {[2023, 2024, 2025, 2026].map(ano => (
-                                  <MenuItem key={ano} value={ano}>
-                                    {ano}
-                                  </MenuItem>
-                                ))}
-                              </Select>
-                            </FormControl>
-                            <FormControl fullWidth>
-                              <InputLabel id="edit-periodo-label">Período</InputLabel>
-                              <Select
-                                labelId="edit-periodo-label"
-                                name="periodo"
-                                value={editPeriodoForm.periodo}
-                                label="Período"
-                                onChange={handleEditPeriodoFormChange}
-                                required
-                              >
-                                <MenuItem value={1}>1</MenuItem>
-                                <MenuItem value={2}>2</MenuItem>
-                              </Select>
-                            </FormControl>
-                          </Box>
-                          <FormControl fullWidth>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                              <Typography>Status:</Typography>
-                              <Switch
-                                checked={editPeriodoForm.ativo}
-                                onChange={e =>
-                                  setEditPeriodoForm(prev => ({
-                                    ...prev,
-                                    ativo: e.target.checked
-                                  }))
-                                }
-                                color="primary"
-                              />
-                              <Typography>
-                                {editPeriodoForm.ativo ? 'Ativo' : 'Inativo'}
-                              </Typography>
-                            </Box>
-                          </FormControl>
-                          <TextField
-                            label="Data de Início"
-                            type="date"
-                            name="dataInicio"
-                            value={editPeriodoForm.dataInicio}
-                            onChange={handleEditPeriodoFormChange}
-                            InputLabelProps={{ shrink: true }}
-                            fullWidth
-                            required
-                          />
-                          <TextField
-                            label="Data de Fim"
-                            type="date"
-                            name="dataFim"
-                            value={editPeriodoForm.dataFim}
-                            onChange={handleEditPeriodoFormChange}
-                            InputLabelProps={{ shrink: true }}
-                            fullWidth
-                            required
-                          />
-                          {editMsg && (
-                            <Typography color={editMsg.includes("sucesso") ? "primary" : "error"} variant="body2" align="center" mt={1}>
-                              {editMsg}
-                            </Typography>
-                          )}
-                        </Box>
-                      </DialogContent>
-                      <DialogActions>
-                        <Button onClick={() => setEditDialogOpen(false)} color="secondary">Cancelar</Button>
-                        <Button onClick={handleSalvarEdicaoPeriodo} color="primary" disabled={editLoading}>
-                          {editLoading ? "Salvando..." : "Salvar Alterações"}
-                        </Button>
-                      </DialogActions>
-                    </Dialog>
-                  </Box>
-                )}
-              </Box>
+              <PeriodoCard
+                periodoForm={periodoForm}
+                salvandoPeriodo={salvandoPeriodo}
+                msgPeriodo={msgPeriodo}
+                abaPeriodo={abaPeriodo}
+                setAbaPeriodo={setAbaPeriodo}
+                handlePeriodoFormChange={handlePeriodoFormChange}
+                handleSalvarPeriodo={handleSalvarPeriodo}
+                loadingConsulta={loadingConsulta}
+                periodosCadastrados={periodosCadastrados}
+                carregarPeriodosCadastrados={carregarPeriodosCadastrados}
+                handleTrocarAbaPeriodo={handleTrocarAbaPeriodo}
+                editDialogOpen={editDialogOpen}
+                setEditDialogOpen={setEditDialogOpen}
+                editPeriodoForm={editPeriodoForm}
+                handleEditPeriodoFormChange={handleEditPeriodoFormChange}
+                handleSalvarEdicaoPeriodo={handleSalvarEdicaoPeriodo}
+                editMsg={editMsg}
+                editLoading={editLoading}
+                handleEditarPeriodoClick={handleEditarPeriodoClick}
+                handleExcluirPeriodo={handleExcluirPeriodo}
+                formatDateBR={formatDateBR}
+              />
+            }
+            disciplinasContent={
+              <DisciplinaCard
+                disciplinas={disciplinas}
+                loadingDisciplinas={loadingDisciplinas}
+                openDisciplinaModal={openDisciplinaModal}
+                novaDisciplina={novaDisciplina}
+                setOpenDisciplinaModal={setOpenDisciplinaModal}
+                setNovaDisciplina={setNovaDisciplina}
+                handleAddDisciplina={handleAddDisciplina}
+                handleExcluirDisciplina={handleExcluirDisciplina}
+              />
             }
           />
         </Box>

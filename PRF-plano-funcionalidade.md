@@ -73,4 +73,85 @@ Consolidar e finalizar as principais funcionalidades do sistema escolar, garanti
 
 ---
 
+# Análise de Funcionalidades e Melhorias para o Sistema Escolar
+
+## Funcionalidades já implementadas
+
+- **Gestão de Alunos**
+  - Cadastro, edição e exclusão de alunos
+  - Formulário multi-etapas (dados pessoais, financeiros, anexos)
+  - Upload e gerenciamento de anexos/documentos dos alunos
+  - Visualização e marcação para exclusão de anexos
+  - Filtros por turma, nome e matrícula
+
+- **Gestão de Turmas**
+  - Cadastro e vinculação de alunos a turmas
+  - Visualização de turmas
+
+- **Gestão Financeira**
+  - Controle de status financeiro do aluno (ativo/inadimplente)
+  - Campos para valor de mensalidade, desconto, vencimento
+
+- **Gestão de Usuários do Sistema**
+  - Cadastro, edição e exclusão de usuários (coordenadora, professora, pai, inativo)
+  - Aprovação de novos usuários
+  - Filtro por tipo e por nome
+
+- **Controle de Acesso**
+  - Diferenciação de permissões por perfil (coordenadora, professora, pai)
+  - Tela de acesso restrito
+
+- **Alertas e Feedback Visual**
+  - Mensagens de erro e alerta bem destacadas
+  - Feedback visual para ações importantes
+
+---
+
+## O que falta ou pode ser melhorado para uso real em escola
+
+1. **Gestão de Professores e Funcionários**
+   - Cadastro e gerenciamento de professores e outros funcionários
+   - Vinculação de professores a turmas e disciplinas
+
+2. **Gestão de Disciplinas e Horários**
+   - Cadastro de disciplinas/matérias
+   - Montagem de horários de aulas por turma e professor
+
+3. **Lançamento e Consulta de Notas/Frequência**
+   - Lançamento de notas e faltas por disciplina
+   - Consulta de boletim pelo responsável/aluno
+
+4. **Comunicação Escola-Família**
+   - Envio de avisos, comunicados e mensagens para responsáveis
+   - Histórico de comunicados
+
+5. **Gestão de Matrículas e Rematrículas**
+   - Processo de matrícula e rematrícula online
+   - Controle de vagas por turma
+
+6. **Relatórios e Exportações**
+   - Relatórios de alunos por turma, inadimplentes, frequência, notas etc.
+   - Exportação para PDF/Excel
+
+7. **Aprimoramento da Experiência do Usuário**
+   - Melhorias de usabilidade e acessibilidade
+   - Layout responsivo para uso em celular/tablet
+   - Ajuda/contexto para usuários leigos
+
+8. **Segurança e Auditoria**
+   - Logs de ações importantes (quem fez o quê e quando)
+   - Permissões mais granulares (ex: só coordenadora pode excluir aluno)
+
+9. **Integração com Pagamentos**
+   - Integração com sistemas de cobrança/boleto/pagamento online
+
+10. **Backup e Recuperação**
+   - Rotina de backup automático dos dados
+
+---
+
+Essas melhorias são recomendadas para tornar o sistema mais completo, seguro e prático para o dia a dia escolar.
+
+---
+
 > Para gerar o PDF: abra este arquivo no VS Code, clique com o botão direito e escolha "Export as PDF" ou use a opção de imprimir para PDF.

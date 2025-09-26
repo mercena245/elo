@@ -123,6 +123,7 @@ export default function Configuracoes() {
   const [usuarios, setUsuarios] = useState([]);
   const [roleFiltro, setRoleFiltro] = useState('todos');
   const [loadingUsuarios, setLoadingUsuarios] = useState(true);
+  const [filtroNomeUsuario, setFiltroNomeUsuario] = useState('');
   const [turmas, setTurmas] = useState([]);
   const router = useRouter();
   const [userRole, setUserRole] = useState(null);
@@ -355,6 +356,16 @@ export default function Configuracoes() {
                   <MenuItem value="inativo">Inativo</MenuItem>
                 </Select>
               </FormControl>
+              <TextField
+                 label="Filtrar por nome"
+                 value={filtroNomeUsuario}
+                 onChange={e => setFiltroNomeUsuario(e.target.value)}
+                 placeholder="Digite o nome do usuário"
+                 variant="outlined"
+                 size="small"
+                 fullWidth
+                 sx={{ mb: 2 }}
+               />
               {loadingUsuarios ? (
                 <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
                   <CircularProgress />
@@ -365,6 +376,11 @@ export default function Configuracoes() {
                 <List>
                   {usuarios
                     .filter(u => roleFiltro === 'todos' ? true : u.role === roleFiltro)
+                    .filter(u =>
+                      !filtroNomeUsuario ||
+                      (u.nome && u.nome.toLowerCase().includes(filtroNomeUsuario.toLowerCase())) ||
+                      (u.email && u.email.toLowerCase().includes(filtroNomeUsuario.toLowerCase()))
+                    )
                     .map(user => (
                       <ListItem key={user.uid} divider button onClick={() => {
                         setEditUser(user);

@@ -1,14 +1,32 @@
+
 "use client";
-import React, { useEffect, useState } from 'react';
+
+import React, { useEffect, useState, useRef } from 'react';
 import SidebarMenu from '../../components/SidebarMenu';
 import { Card, CardContent, Typography, List, ListItem, ListItemText, Box, CircularProgress, Select, MenuItem, InputLabel, FormControl, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Alert } from '@mui/material';
+import IconButton from '@mui/material/IconButton';
+import DeleteIcon from '@mui/icons-material/Delete';
 import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs from 'dayjs';
 import { db, ref, get, auth } from '../../firebase';
+import { storage } from '../../firebase-storage';
+import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
+import { deleteObject } from "firebase/storage";
+
 import { set } from 'firebase/database';
 
 const Alunos = () => {
+  // Marcar/desmarcar anexo para exclusão (por nome)
+  const handleMarcarParaExcluir = (nome) => {
+    setAnexosParaExcluir(prev =>
+      prev.includes(nome) ? prev.filter(n => n !== nome) : [...prev, nome]
+    );
+  };
+  // Estado para anexos marcados para exclusão
+  const [anexosParaExcluir, setAnexosParaExcluir] = useState([]);
+  // Estado para dialog de anexos enviados
+  const [dialogAnexosOpen, setDialogAnexosOpen] = useState(false);
   const [alunos, setAlunos] = useState([]);
   const [turmas, setTurmas] = useState({});
   const [loading, setLoading] = useState(true);
@@ -27,18 +45,48 @@ const Alunos = () => {
   const [financeiroError, setFinanceiroError] = useState('');
   const [inativarDialogOpen, setInativarDialogOpen] = useState(false);
   const [inativarMotivo, setInativarMotivo] = useState('');
+  // Estado para anexos temporários
+  const [anexosSelecionados, setAnexosSelecionados] = useState([]);
+  const inputFileRef = useRef(null);
+
+  // Remover anexo do Storage e do registro do aluno
+  const handleRemoverAnexo = async (anexo, idx) => {
+    if (!editForm.anexos || !editForm.anexos.length) return;
+    try {
+      // Remove do Storage
+      const alunoId = isNew
+        ? `id_aluno_${editForm.nome.replace(/\s/g, '').toLowerCase()}_${editForm.matricula}`
+        : editAluno.id;
+  const matricula = editForm.matricula || (editAluno && editAluno.matricula) || '';
+  const fileRef = storageRef(storage, `anexos_alunos/${alunoId}_${matricula}/${anexo.name}`);
+      await deleteObject(fileRef);
+      // Remove do registro do aluno
+      const novosAnexos = editForm.anexos.filter((_, i) => i !== idx);
+      const dadosAtualizados = { ...editForm, anexos: novosAnexos };
+      if (isNew) {
+        const novoId = alunoId;
+        await set(ref(db, `alunos/${novoId}`), dadosAtualizados);
+      } else if (editAluno && editAluno.id) {
+        await set(ref(db, `alunos/${editAluno.id}`), dadosAtualizados);
+      }
+      setEditForm(dadosAtualizados);
+    } catch (err) {
+      setFormError('Erro ao remover anexo.');
+    }
+  };
   // Função para tentar inativar aluno
   const handleInativarAluno = async () => {
     // Só pode inativar se não estiver em turma e status financeiro não for inadimplente
-    let impedimentos = [];
+    let motivoTurma = '';
+    let motivoFinanceiro = '';
     if (editForm.turmaId && editForm.turmaId !== '') {
-      impedimentos.push('O aluno está vinculado a uma turma.');
+      motivoTurma = `O aluno está vinculado à turma: "${getTurmaNome(editForm.turmaId)}".`;
     }
     if (editForm.financeiro?.status === 'inadimplente') {
-      impedimentos.push('O status financeiro do aluno está como inadimplente.');
+      motivoFinanceiro = 'O status financeiro do aluno está como inadimplente.';
     }
-    if (impedimentos.length > 0) {
-      setInativarMotivo(impedimentos.join(' '));
+    if (motivoTurma || motivoFinanceiro) {
+      setInativarMotivo(`${motivoTurma}${motivoTurma && motivoFinanceiro ? '\n\n' : ''}${motivoFinanceiro}`);
       setInativarDialogOpen(true);
       return;
     }
@@ -248,14 +296,56 @@ const Alunos = () => {
     setSaving(true);
     setFormError('');
     try {
+      let anexosUrls = editForm.anexos ? [...editForm.anexos] : [];
+      const alunoId = isNew
+        ? `id_aluno_${editForm.nome.replace(/\s/g, '').toLowerCase()}_${editForm.matricula}`
+        : editAluno.id;
+      // Excluir anexos marcados (por nome, tratamento extra)
+      if (anexosParaExcluir.length > 0 && editForm.anexos) {
+        let erroExclusao = false;
+        for (const anexo of editForm.anexos) {
+          // Normaliza nome para comparação
+          const nomeAnexo = anexo.name.trim().toLowerCase();
+          if (anexosParaExcluir.map(n => n.trim().toLowerCase()).includes(nomeAnexo)) {
+            const matricula = editForm.matricula || (editAluno && editAluno.matricula) || '';
+            const fileRef = storageRef(storage, `anexos_alunos/${alunoId}_${matricula}/${anexo.name}`);
+            try {
+              await deleteObject(fileRef);
+            } catch (err) {
+              erroExclusao = true;
+              console.error('Erro ao excluir anexo do Storage:', anexo.name, err);
+            }
+          }
+        }
+        anexosUrls = anexosUrls.filter(anexo => !anexosParaExcluir.map(n => n.trim().toLowerCase()).includes(anexo.name.trim().toLowerCase()));
+        if (erroExclusao) {
+          setFormError('Um ou mais anexos não puderam ser excluídos do Storage. Tente novamente ou contate o suporte.');
+        }
+      }
+      // Upload de novos anexos
+      if (anexosSelecionados.length > 0) {
+        for (const file of anexosSelecionados) {
+          const matricula = editForm.matricula || (editAluno && editAluno.matricula) || '';
+          const fileRef = storageRef(storage, `anexos_alunos/${alunoId}_${matricula}/${file.name}`);
+          await uploadBytes(fileRef, file);
+          const url = await getDownloadURL(fileRef);
+          anexosUrls.push({ name: file.name, url });
+        }
+      }
+      const dadosParaSalvar = {
+        ...editForm,
+        anexos: anexosUrls
+      };
       if (isNew) {
-        const novoId = `id_aluno_${editForm.nome.replace(/\s/g, '').toLowerCase()}_${editForm.matricula}`;
-        await set(ref(db, `alunos/${novoId}`), editForm);
+        const novoId = alunoId;
+        await set(ref(db, `alunos/${novoId}`), dadosParaSalvar);
       } else if (editAluno && editAluno.id) {
-        await set(ref(db, `alunos/${editAluno.id}`), editForm);
+        await set(ref(db, `alunos/${editAluno.id}`), dadosParaSalvar);
       }
       setEditOpen(false);
       await fetchData();
+      setAnexosSelecionados([]);
+      setAnexosParaExcluir([]);
     } catch (err) {
       setFormError("Erro ao salvar. Tente novamente.");
     }
@@ -378,7 +468,12 @@ const Alunos = () => {
                     </List>
                   )}
                   <Dialog open={editOpen} onClose={() => setEditOpen(false)} maxWidth="sm" fullWidth>
-                    <DialogTitle>{isNew ? "Nova Matrícula" : "Editar Aluno"} {formStep === 2 && ' - Dados Financeiros'}</DialogTitle>
+                    <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pr: 1 }}>
+                      <span>{isNew ? "Nova Matrícula" : "Editar Aluno"} {formStep === 2 && ' - Dados Financeiros'}</span>
+                      <IconButton aria-label="fechar" onClick={() => setEditOpen(false)} size="small" sx={{ ml: 2 }}>
+                        <span style={{ fontSize: 22, fontWeight: 'bold' }}>&times;</span>
+                      </IconButton>
+                    </DialogTitle>
                     <DialogContent>
                       {formError && <Box sx={{ mb: 2 }}><Alert severity="error">{formError}</Alert></Box>}
                       {formStep === 1 && (
@@ -507,28 +602,105 @@ const Alunos = () => {
                             </Select>
                           </FormControl>
                           <TextField
-                            label="Observações"
-                            name="financeiro.observacoes"
-                            value={editForm.financeiro?.observacoes}
-                            onChange={handleFormChange}
-                            fullWidth
-                            multiline
-                            minRows={3}
+                              label="Observações"
+                              name="financeiro.observacoes"
+                              value={editForm.financeiro?.observacoes}
+                              onChange={handleFormChange}
+                              fullWidth
+                              multiline
+                              minRows={3}
                           />
+                          {/* Campo de anexos estilizado */}
+                          <Box sx={{ mt: 2 }}>
+                            <Typography variant="subtitle2">Anexos do Aluno</Typography>
+                            <input
+                              type="file"
+                              multiple
+                              accept="image/*,application/pdf"
+                              style={{ display: 'none' }}
+                              ref={inputFileRef}
+                              onChange={e => {
+                                const novos = Array.from(e.target.files);
+                                setAnexosSelecionados(prev => [...prev, ...novos]);
+                                e.target.value = '';
+                              }}
+                            />
+                            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mb: 1 }}>
+                              <Button
+                                variant="outlined"
+                                onClick={() => inputFileRef.current && inputFileRef.current.click()}
+                              >
+                                Selecionar arquivos
+                              </Button>
+                              <Button
+                                variant="outlined"
+                                color="info"
+                                onClick={() => setDialogAnexosOpen(true)}
+                                disabled={!editForm.anexos || editForm.anexos.length === 0}
+                              >
+                                Visualizar anexos
+                              </Button>
+                            </Box>
+                            {anexosSelecionados.length > 0 && (
+                              <Box sx={{ mt: 1 }}>
+                                <Typography variant="body2">Arquivos selecionados:</Typography>
+                                <ul>
+                                  {anexosSelecionados.map((file, idx) => (
+                                    <li key={idx}>{file.name}</li>
+                                  ))}
+                                </ul>
+                              </Box>
+                            )}
+                            {/* Dialog para visualizar anexos já enviados */}
+                            <Dialog open={dialogAnexosOpen || false} onClose={() => setDialogAnexosOpen(false)}>
+                              <DialogTitle>Anexos enviados</DialogTitle>
+                              <DialogContent>
+                                {editForm.anexos && editForm.anexos.length > 0 ? (
+                                  <ul>
+                                    {editForm.anexos.map((anexo, idx) => (
+                                      <li key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                        <span style={{ textDecoration: anexosParaExcluir.includes(anexo.name) ? 'line-through' : 'none', color: anexosParaExcluir.includes(anexo.name) ? '#888' : 'inherit' }}>
+                                          <a href={anexo.url} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', pointerEvents: anexosParaExcluir.includes(anexo.name) ? 'none' : 'auto' }}>{anexo.name}</a>
+                                        </span>
+                                        <IconButton aria-label="remover" size="small" color={anexosParaExcluir.includes(anexo.name) ? 'default' : 'error'} onClick={() => handleMarcarParaExcluir(anexo.name)}>
+                                          <DeleteIcon fontSize="small" />
+                                        </IconButton>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                ) : (
+                                  <Typography>Nenhum anexo enviado.</Typography>
+                                )}
+                              </DialogContent>
+                              <DialogActions>
+                                <Button onClick={() => setDialogAnexosOpen(false)} color="primary">Fechar</Button>
+                              </DialogActions>
+                            </Dialog>
+                          </Box>
                         </Box>
                       )}
                     </DialogContent>
                     <DialogActions>
-                      <Button onClick={() => setEditOpen(false)} color="secondary">Cancelar</Button>
                       {formStep === 2 && (
-                        <Button onClick={() => setFormStep(1)} color="inherit">Voltar</Button>
+                        <IconButton onClick={() => setFormStep(1)} color="inherit" size="small" sx={{ mr: 1 }} aria-label="voltar">
+                          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M12 15L7 10L12 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        </IconButton>
                       )}
                       {formStep === 1 && (
                         <Button onClick={() => { if (isStep1Valid()) { setFormError(''); setFormStep(2); } else { setFormError('Preencha os campos obrigatórios do passo 1.'); } }} color="primary" variant="contained">Avançar</Button>
                       )}
                       {formStep === 2 && !isNew && editForm.turmaId && editForm.turmaId !== '' && (
-                        <Button onClick={() => setEditForm(prev => ({ ...prev, turmaId: '' }))} color="info" variant="outlined" size="small" disabled={saving}>
-                          Desvincular da Turma
+                        <Button
+                          onClick={() => setEditForm(prev => ({ ...prev, turmaId: '' }))}
+                          color="info"
+                          variant="outlined"
+                          size="small"
+                          disabled={saving}
+                          sx={{ fontSize: '0.80rem', textTransform: 'none', py: 0.5, px: 1.2 }}
+                        >
+                          Desvincular Turma
                         </Button>
                       )}
                       {formStep === 2 && !isNew && editForm.status === 'inativo' && (
@@ -558,7 +730,11 @@ const Alunos = () => {
                   <Dialog open={inativarDialogOpen} onClose={() => setInativarDialogOpen(false)}>
                     <DialogTitle>Não é possível inativar o aluno</DialogTitle>
                     <DialogContent>
-                      <Typography>{inativarMotivo}</Typography>
+                      <Alert severity="warning" sx={{ whiteSpace: 'pre-line', fontSize: '1rem', mb: 1 }}>
+                        {inativarMotivo.split('\n').map((linha, idx) => (
+                          <span key={idx}>{linha}{idx < inativarMotivo.split('\n').length - 1 ? <br /> : null}</span>
+                        ))}
+                      </Alert>
                     </DialogContent>
                     <DialogActions>
                       <Button onClick={() => setInativarDialogOpen(false)} color="primary">OK</Button>

@@ -34,4 +34,4 @@ const deleteUserFunction = httpsCallable(functions, "deleteUser");
 
 
 // Exporta os módulos principais para uso em todo o projeto
-export { auth, provider, signInWithPopup, db, ref, get, set, push, remove, deleteUserFunction };
+export { app, auth, provider, signInWithPopup, db, ref, get, set, push, remove, deleteUserFunction };

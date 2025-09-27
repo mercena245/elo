@@ -1,4 +1,4 @@
-
+﻿
 "use client";
 
 import React, { useEffect, useState, useRef } from 'react';
@@ -377,11 +377,29 @@ const Alunos = () => {
       <SidebarMenu />
       <main className="dashboard-main">
         <Box sx={{ maxWidth: 700, mx: 'auto', mt: 4 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-            <Typography variant="h5" color="primary" gutterBottom>Lista de Alunos</Typography>
-            <Button variant="contained" color="primary" onClick={handleAddAluno}>Nova Matrícula</Button>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, p: 3, borderRadius: 3, background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)', color: 'white', boxShadow: '0 8px 32px rgba(99, 102, 241, 0.2)' }}>
+            <Typography variant="h4" fontWeight="bold" gutterBottom={false}>👥 Gestão de Alunos</Typography>
+            <Button 
+              variant="contained" 
+              sx={{ 
+                bgcolor: 'rgba(255,255,255,0.15)', 
+                color: 'white',
+                backdropFilter: 'blur(10px)',
+                border: '1px solid rgba(255,255,255,0.2)',
+                borderRadius: 2,
+                '&:hover': { 
+                  bgcolor: 'rgba(255,255,255,0.25)',
+                  transform: 'translateY(-2px)',
+                  boxShadow: '0 8px 25px rgba(0,0,0,0.15)'
+                },
+                transition: 'all 0.3s ease'
+              }} 
+              onClick={handleAddAluno}
+            >
+              + Nova Matrícula
+            </Button>
           </Box>
-          <Card>
+          <Card sx={{ borderRadius: 4, boxShadow: '0 4px 20px rgba(0,0,0,0.08)', border: '1px solid #f1f5f9' }}>
             <CardContent>
               {loading ? (
                 <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
@@ -389,8 +407,26 @@ const Alunos = () => {
                 </Box>
               ) : (
                 <>
-                  <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
-                    <FormControl sx={{ minWidth: 160 }}>
+                  <Box sx={{ 
+                    display: 'flex', 
+                    gap: 2, 
+                    mb: 3, 
+                    p: 2, 
+                    borderRadius: 3, 
+                    bgcolor: '#f8fafc',
+                    border: '1px solid #e2e8f0'
+                  }}>
+                    <FormControl sx={{ 
+                      minWidth: 160,
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: 2,
+                        '&:hover': {
+                          '& > fieldset': {
+                            borderColor: '#6366f1'
+                          }
+                        }
+                      }
+                    }}>
                       <InputLabel id="turma-select-label">Turma</InputLabel>
                       <Select
                         labelId="turma-select-label"
@@ -414,6 +450,16 @@ const Alunos = () => {
                       variant="outlined"
                       fullWidth
                       disabled={turmaSelecionada === ""}
+                      sx={{
+                        '& .MuiOutlinedInput-root': {
+                          borderRadius: 2,
+                          '&:hover': {
+                            '& > fieldset': {
+                              borderColor: '#6366f1'
+                            }
+                          }
+                        }
+                      }}
                     />
                     <TextField
                       label="Matrícula"
@@ -423,6 +469,16 @@ const Alunos = () => {
                       variant="outlined"
                       fullWidth
                       disabled={turmaSelecionada === ""}
+                      sx={{
+                        '& .MuiOutlinedInput-root': {
+                          borderRadius: 2,
+                          '&:hover': {
+                            '& > fieldset': {
+                              borderColor: '#6366f1'
+                            }
+                          }
+                        }
+                      }}
                     />
                   </Box>
                   {turmaSelecionada === '' ? (
@@ -436,31 +492,53 @@ const Alunos = () => {
                   ) : (
                     <List>
                       {alunosFiltrados.map((aluno, idx) => (
-                        <ListItem key={idx} divider alignItems="flex-start" button onClick={() => handleEditAluno(aluno)}>
+                        <ListItem 
+                          key={idx} 
+                          divider 
+                          alignItems="flex-start" 
+                          button 
+                          onClick={() => handleEditAluno(aluno)}
+                          sx={{
+                            borderRadius: 2,
+                            mb: 1,
+                            transition: 'all 0.3s ease',
+                            '&:hover': {
+                              bgcolor: '#f8fafc',
+                              transform: 'translateX(8px)',
+                              boxShadow: '0 4px 12px rgba(99, 102, 241, 0.1)',
+                              borderColor: '#e0e7ff'
+                            }
+                          }}
+                        >
                           <ListItemText
-                            primary={aluno.nome}
+                            primary={
+                              <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b', mb: 0.5 }}>
+                                {aluno.nome}
+                              </Typography>
+                            }
                             secondary={
-                              <>  
-                                <Typography variant="body2">Matrícula: {aluno.matricula || '--'}</Typography>
-                                <Typography variant="body2">Turma: {getTurmaNome(aluno.turmaId)}</Typography>
+                              <Box sx={{ mt: 1 }}>  
+                                <Typography variant="body2" sx={{ color: '#6366f1', fontWeight: 500, mb: 0.5 }}>📋 Matrícula: {aluno.matricula || '--'}</Typography>
+                                <Typography variant="body2" sx={{ color: '#059669', mb: 0.5 }}>🏫 Turma: {getTurmaNome(aluno.turmaId)}</Typography>
                                 {aluno.dataNascimento && (
-                                  <Typography variant="body2">Nascimento: {aluno.dataNascimento}</Typography>
+                                  <Typography variant="body2" sx={{ color: '#64748b', mb: 0.5 }}>🎂 Nascimento: {aluno.dataNascimento}</Typography>
                                 )}
                                 {aluno.nomePai && (
-                                  <Typography variant="body2">Pai: {aluno.nomePai}</Typography>
+                                  <Typography variant="body2" sx={{ color: '#64748b', mb: 0.5 }}>👨 Pai: {aluno.nomePai}</Typography>
                                 )}
                                 {aluno.nomeMae && (
-                                  <Typography variant="body2">Mãe: {aluno.nomeMae}</Typography>
+                                  <Typography variant="body2" sx={{ color: '#64748b', mb: 0.5 }}>👩 Mãe: {aluno.nomeMae}</Typography>
                                 )}
                                 {aluno.contatoEmergencia && (
-                                  <Typography variant="body2">
-                                    Contato Emergência: {aluno.contatoEmergencia.nome} ({aluno.contatoEmergencia.telefone})
-                                  </Typography>
+                                  <Typography variant="body2" sx={{ color: '#dc2626', mb: 0.5 }}>🚨 Contato Emergência: {aluno.contatoEmergencia.nome} ({aluno.contatoEmergencia.telefone})</Typography>
                                 )}
                                 {aluno.financeiro?.status && (
-                                  <Typography variant="body2">Status Financeiro: {aluno.financeiro.status}</Typography>
+                                  <Typography variant="body2" sx={{ 
+                                    color: aluno.financeiro.status === 'ativo' ? '#059669' : aluno.financeiro.status === 'inadimplente' ? '#d97706' : '#dc2626',
+                                    fontWeight: 500 
+                                  }}>💰 Status Financeiro: {aluno.financeiro.status}</Typography>
                                 )}
-                              </>
+                              </Box>
                             }
                           />
                         </ListItem>
@@ -468,7 +546,15 @@ const Alunos = () => {
                     </List>
                   )}
                   <Dialog open={editOpen} onClose={() => setEditOpen(false)} maxWidth="sm" fullWidth>
-                    <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pr: 1 }}>
+                    <DialogTitle sx={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'space-between', 
+                      pr: 1,
+                      background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                      color: 'white',
+                      borderRadius: '4px 4px 0 0'
+                    }}>
                       <span>{isNew ? "Nova Matrícula" : "Editar Aluno"} {formStep === 2 && ' - Dados Financeiros'}</span>
                       <IconButton aria-label="fechar" onClick={() => setEditOpen(false)} size="small" sx={{ ml: 2 }}>
                         <span style={{ fontSize: 22, fontWeight: 'bold' }}>&times;</span>
@@ -485,6 +571,21 @@ const Alunos = () => {
                             onChange={handleFormChange}
                             fullWidth
                             required
+                            sx={{
+                              '& .MuiOutlinedInput-root': {
+                                borderRadius: 2,
+                                '&:hover': {
+                                  '& > fieldset': {
+                                    borderColor: '#6366f1'
+                                  }
+                                },
+                                '&.Mui-focused': {
+                                  '& > fieldset': {
+                                    borderColor: '#6366f1'
+                                  }
+                                }
+                              }
+                            }}
                           />
                           <TextField
                             label="Matrícula"
@@ -493,6 +594,12 @@ const Alunos = () => {
                             fullWidth
                             InputProps={{ readOnly: true }}
                             required
+                            sx={{
+                              '& .MuiOutlinedInput-root': {
+                                borderRadius: 2,
+                                bgcolor: '#f8fafc'
+                              }
+                            }}
                           />
                           <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="pt-br">
                             <DatePicker
@@ -510,6 +617,21 @@ const Alunos = () => {
                             onChange={handleFormChange}
                             fullWidth
                             required
+                            sx={{
+                              '& .MuiOutlinedInput-root': {
+                                borderRadius: 2,
+                                '&:hover': {
+                                  '& > fieldset': {
+                                    borderColor: '#6366f1'
+                                  }
+                                },
+                                '&.Mui-focused': {
+                                  '& > fieldset': {
+                                    borderColor: '#6366f1'
+                                  }
+                                }
+                              }
+                            }}
                           />
                           <TextField
                             label="Nome da Mãe"
@@ -518,6 +640,21 @@ const Alunos = () => {
                             onChange={handleFormChange}
                             fullWidth
                             required
+                            sx={{
+                              '& .MuiOutlinedInput-root': {
+                                borderRadius: 2,
+                                '&:hover': {
+                                  '& > fieldset': {
+                                    borderColor: '#6366f1'
+                                  }
+                                },
+                                '&.Mui-focused': {
+                                  '& > fieldset': {
+                                    borderColor: '#6366f1'
+                                  }
+                                }
+                              }
+                            }}
                           />
                           <FormControl fullWidth required>
                             <InputLabel id="turma-modal-select-label">Turma</InputLabel>
@@ -541,6 +678,21 @@ const Alunos = () => {
                             onChange={handleFormChange}
                             fullWidth
                             required
+                            sx={{
+                              '& .MuiOutlinedInput-root': {
+                                borderRadius: 2,
+                                '&:hover': {
+                                  '& > fieldset': {
+                                    borderColor: '#6366f1'
+                                  }
+                                },
+                                '&.Mui-focused': {
+                                  '& > fieldset': {
+                                    borderColor: '#6366f1'
+                                  }
+                                }
+                              }
+                            }}
                           />
                           <TextField
                             label="Contato Emergência (Telefone)"
@@ -549,6 +701,21 @@ const Alunos = () => {
                             onChange={handleFormChange}
                             fullWidth
                             required
+                            sx={{
+                              '& .MuiOutlinedInput-root': {
+                                borderRadius: 2,
+                                '&:hover': {
+                                  '& > fieldset': {
+                                    borderColor: '#6366f1'
+                                  }
+                                },
+                                '&.Mui-focused': {
+                                  '& > fieldset': {
+                                    borderColor: '#6366f1'
+                                  }
+                                }
+                              }
+                            }}
                           />
                         </Box>
                       )}
@@ -689,7 +856,22 @@ const Alunos = () => {
                         </IconButton>
                       )}
                       {formStep === 1 && (
-                        <Button onClick={() => { if (isStep1Valid()) { setFormError(''); setFormStep(2); } else { setFormError('Preencha os campos obrigatórios do passo 1.'); } }} color="primary" variant="contained">Avançar</Button>
+                        <Button 
+                          onClick={() => { if (isStep1Valid()) { setFormError(''); setFormStep(2); } else { setFormError('Preencha os campos obrigatórios do passo 1.'); } }} 
+                          sx={{
+                            bgcolor: '#6366f1',
+                            color: 'white',
+                            borderRadius: 2,
+                            '&:hover': {
+                              bgcolor: '#5b59f0',
+                              transform: 'translateY(-1px)',
+                              boxShadow: '0 4px 12px rgba(99, 102, 241, 0.3)'
+                            },
+                            transition: 'all 0.3s ease'
+                          }}
+                        >
+                          Avançar →
+                        </Button>
                       )}
                       {formStep === 2 && !isNew && editForm.turmaId && editForm.turmaId !== '' && (
                         <Button
@@ -717,13 +899,65 @@ const Alunos = () => {
                             setFormError('Erro ao ativar aluno.');
                           }
                           setSaving(false);
-                        }} color="success" variant="outlined" disabled={saving}>Ativar</Button>
+                        }} 
+                        sx={{
+                          borderColor: '#059669',
+                          color: '#059669',
+                          borderRadius: 2,
+                          '&:hover': {
+                            bgcolor: '#f0fdf4',
+                            borderColor: '#047857',
+                            color: '#047857'
+                          }
+                        }}
+                        variant="outlined" 
+                        disabled={saving}
+                        >
+                          ✓ Ativar
+                        </Button>
                       )}
                       {formStep === 2 && !isNew && editForm.status !== 'inativo' && (
-                        <Button onClick={handleInativarAluno} color="warning" variant="outlined" disabled={saving}>Inativar</Button>
+                        <Button 
+                          onClick={handleInativarAluno} 
+                          sx={{
+                            borderColor: '#d97706',
+                            color: '#d97706',
+                            borderRadius: 2,
+                            '&:hover': {
+                              bgcolor: '#fffbeb',
+                              borderColor: '#b45309',
+                              color: '#b45309'
+                            }
+                          }}
+                          variant="outlined" 
+                          disabled={saving}
+                        >
+                          ⚠ Inativar
+                        </Button>
                       )}
                       {formStep === 2 && (
-                        <Button onClick={handleSaveEdit} color="primary" variant="contained" disabled={saving || !isFinalFormValid()}>Salvar</Button>
+                        <Button 
+                          onClick={handleSaveEdit} 
+                          sx={{
+                            bgcolor: '#059669',
+                            color: 'white',
+                            borderRadius: 2,
+                            minWidth: 100,
+                            '&:hover': {
+                              bgcolor: '#047857',
+                              transform: 'translateY(-1px)',
+                              boxShadow: '0 4px 12px rgba(5, 150, 105, 0.3)'
+                            },
+                            '&:disabled': {
+                              bgcolor: '#94a3b8',
+                              color: 'white'
+                            },
+                            transition: 'all 0.3s ease'
+                          }}
+                          disabled={saving || !isFinalFormValid()}
+                        >
+                          {saving ? '💾 Salvando...' : '✓ Salvar'}
+                        </Button>
                       )}
                     </DialogActions>
                   {/* Modal de impedimento para inativação */}

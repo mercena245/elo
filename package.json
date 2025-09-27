@@ -1,13 +1,14 @@
 {
   "name": "elo",
   "version": "0.1.0",
-  "private": true,"scripts": {
-  "dev": "next dev --turbopack",
-  "build": "next build --turbopack",
-  "export": "next export",
-  "start": "next start",
-  "lint": "eslint ."
-},
+  "private": true,
+  "scripts": {
+    "dev": "next dev --turbopack",
+    "build": "next build --turbopack",
+    "export": "next export",
+    "start": "next start",
+    "lint": "eslint ."
+  },
   "dependencies": {
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
@@ -20,7 +21,9 @@
     "next": "15.5.3",
     "react": "19.1.0",
     "react-dom": "19.1.0",
-    "react-icons": "^5.5.0"
+    "react-firebase-hooks": "^5.1.1",
+    "react-icons": "^5.5.0",
+    "swiper": "^12.0.2"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

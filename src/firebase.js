@@ -4,6 +4,7 @@ import { initializeApp } from "firebase/app"; // Inicialização do app
 import { getAuth, GoogleAuthProvider, signInWithPopup } from "firebase/auth"; // Autenticação
 import { getDatabase, ref, get, set, push, remove } from "firebase/database"; // Realtime Database
 import { getFunctions, httpsCallable } from "firebase/functions"; // Cloud Functions
+import { getStorage, ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage"; // Firebase Storage
 
 
 // Configuração do Firebase do projeto (NUNCA expor em repositórios públicos)
@@ -28,10 +29,30 @@ const provider = new GoogleAuthProvider();
 // Inicializa o Realtime Database
 const db = getDatabase(app);
 
+// Inicializa o Firebase Storage
+const storage = getStorage(app);
+
 // Inicializa as Cloud Functions e define função callable para exclusão de usuário
 const functions = getFunctions(app);
 const deleteUserFunction = httpsCallable(functions, "deleteUser");
 
 
 // Exporta os módulos principais para uso em todo o projeto
-export { app, auth, provider, signInWithPopup, db, ref, get, set, push, remove, deleteUserFunction };
+export { 
+  app, 
+  auth, 
+  provider, 
+  signInWithPopup, 
+  db, 
+  ref, 
+  get, 
+  set, 
+  push, 
+  remove, 
+  deleteUserFunction,
+  storage,
+  storageRef,
+  uploadBytes,
+  getDownloadURL,
+  deleteObject
+};

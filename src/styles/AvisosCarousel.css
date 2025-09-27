@@ -1,0 +1,125 @@
+/* Estilos customizados para o carrossel de avisos */
+.avisos-carousel {
+  width: 100%;
+  padding-bottom: 40px;
+}
+
+.avisos-carousel .swiper {
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.avisos-carousel .swiper-slide {
+  height: auto;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+}
+
+.avisos-carousel .swiper-pagination {
+  position: relative;
+  margin-top: 20px;
+}
+
+.avisos-carousel .swiper-pagination-bullet {
+  background-color: #3B82F6;
+  opacity: 0.4;
+  width: 10px;
+  height: 10px;
+  margin: 0 4px;
+  transition: all 0.3s ease;
+}
+
+.avisos-carousel .swiper-pagination-bullet-active {
+  background-color: #3B82F6;
+  opacity: 1;
+  transform: scale(1.2);
+}
+
+.avisos-carousel .swiper-button-prev,
+.avisos-carousel .swiper-button-next {
+  color: #3B82F6;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  margin-top: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  transition: all 0.3s ease;
+}
+
+.avisos-carousel .swiper-button-prev:hover,
+.avisos-carousel .swiper-button-next:hover {
+  background: rgba(255, 255, 255, 1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  transform: translateY(-50%) scale(1.1);
+}
+
+.avisos-carousel .swiper-button-prev:after,
+.avisos-carousel .swiper-button-next:after {
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.avisos-carousel .swiper-button-prev {
+  left: -20px;
+}
+
+.avisos-carousel .swiper-button-next {
+  right: -20px;
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+  .avisos-carousel .swiper-button-prev,
+  .avisos-carousel .swiper-button-next {
+    display: none;
+  }
+  
+  .avisos-carousel {
+    padding-bottom: 30px;
+  }
+}
+
+@media (max-width: 640px) {
+  .avisos-carousel .swiper-pagination-bullet {
+    width: 8px;
+    height: 8px;
+    margin: 0 3px;
+  }
+}
+
+/* Animação suave para os cards */
+.aviso-card {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.aviso-card:hover {
+  transform: translateY(-4px);
+}
+
+/* Indicador de loading */
+.avisos-loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 200px;
+}
+
+.avisos-loading::after {
+  content: '';
+  width: 40px;
+  height: 40px;
+  border: 3px solid #f3f3f3;
+  border-top: 3px solid #3B82F6;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}

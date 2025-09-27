@@ -135,9 +135,9 @@ const SidebarMenu = () => {
               <ListItemIcon><FaCashRegister /></ListItemIcon>
               <ListItemText primary="Caixa (Financeiro)" />
             </ListItem>
-            <ListItem button>
+            <ListItem button onClick={() => go('/avisos')}>
               <ListItemIcon><FaEnvelope /></ListItemIcon>
-              <ListItemText primary="Mensageria" />
+              <ListItemText primary="Avisos" />
             </ListItem>
             <ListItem button>
               <ListItemIcon><FaPrint /></ListItemIcon>

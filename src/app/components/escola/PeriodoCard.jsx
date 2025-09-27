@@ -28,6 +28,8 @@ const PeriodoCard = ({
   msgPeriodo,
   abaPeriodo,
   setAbaPeriodo,
+  modalCadastroPeriodoOpen,
+  setModalCadastroPeriodoOpen,
   handlePeriodoFormChange,
   handleSalvarPeriodo,
   loadingConsulta,
@@ -47,43 +49,46 @@ const PeriodoCard = ({
 }) => {
   return (
     <Box>
-      <Button variant="contained" color="primary" size="small" sx={{ mb: 2 }} onClick={() => setAbaPeriodo('cadastro')}>
+      <Button variant="contained" color="primary" size="small" sx={{ mb: 2 }} onClick={() => setModalCadastroPeriodoOpen(true)}>
         Novo Período
       </Button>
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-        <Typography variant="subtitle1" fontWeight={600}>Cadastrar Período</Typography>
-        <Typography variant="body2" sx={{ color: abaPeriodo === "consulta" ? "#1976d2" : "text.secondary", textDecoration: "underline", cursor: "pointer", fontWeight: 500 }} onClick={() => handleTrocarAbaPeriodo(abaPeriodo === "consulta" ? "cadastro" : "consulta")}>{abaPeriodo === "consulta" ? "← Voltar ao Cadastro" : "Consultar Período"}</Typography>
-      </Box>
-      {abaPeriodo === "cadastro" ? (
-        <Box component="form" sx={{ display: 'flex', flexDirection: 'column', gap: 2 }} onSubmit={handleSalvarPeriodo}>
-          <Box sx={{ display: 'flex', gap: 2 }}>
-            <FormControl fullWidth>
-              <InputLabel id="ano-select-label">Ano</InputLabel>
-              <Select labelId="ano-select-label" name="ano" value={periodoForm.ano} label="Ano" onChange={handlePeriodoFormChange} required>
-                {[2023, 2024, 2025, 2026].map(ano => (<MenuItem key={ano} value={ano}>{ano}</MenuItem>))}
-              </Select>
-            </FormControl>
-            <FormControl fullWidth>
-              <InputLabel id="periodo-select-label">Período</InputLabel>
-              <Select labelId="periodo-select-label" name="periodo" value={periodoForm.periodo} label="Período" onChange={handlePeriodoFormChange} required>
-                <MenuItem value={1}>1</MenuItem>
-                <MenuItem value={2}>2</MenuItem>
-              </Select>
-            </FormControl>
-          </Box>
-          <FormControl fullWidth>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <Typography>Status:</Typography>
-              <Switch checked={periodoForm.ativo} onChange={e => handlePeriodoFormChange({ target: { name: 'ativo', type: 'checkbox', checked: e.target.checked } })} color="primary" />
-              <Typography>{periodoForm.ativo ? 'Ativo' : 'Inativo'}</Typography>
+      <Dialog open={modalCadastroPeriodoOpen} onClose={() => setModalCadastroPeriodoOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Novo Período</DialogTitle>
+        <DialogContent>
+          <Box component="form" sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }} onSubmit={handleSalvarPeriodo}>
+            <Box sx={{ display: 'flex', gap: 2 }}>
+              <FormControl fullWidth>
+                <InputLabel id="ano-select-label">Ano</InputLabel>
+                <Select labelId="ano-select-label" name="ano" value={periodoForm.ano} label="Ano" onChange={handlePeriodoFormChange} required>
+                  {[2023, 2024, 2025, 2026].map(ano => (<MenuItem key={ano} value={ano}>{ano}</MenuItem>))}
+                </Select>
+              </FormControl>
+              <FormControl fullWidth>
+                <InputLabel id="periodo-select-label">Período</InputLabel>
+                <Select labelId="periodo-select-label" name="periodo" value={periodoForm.periodo} label="Período" onChange={handlePeriodoFormChange} required>
+                  <MenuItem value={1}>1</MenuItem>
+                  <MenuItem value={2}>2</MenuItem>
+                </Select>
+              </FormControl>
             </Box>
-          </FormControl>
-          <TextField label="Data de Início" type="date" name="dataInicio" value={periodoForm.dataInicio} onChange={handlePeriodoFormChange} InputLabelProps={{ shrink: true }} fullWidth required />
-          <TextField label="Data de Fim" type="date" name="dataFim" value={periodoForm.dataFim} onChange={handlePeriodoFormChange} InputLabelProps={{ shrink: true }} fullWidth required />
-          <Button variant="contained" color="primary" type="submit" disabled={salvandoPeriodo}>{salvandoPeriodo ? "Salvando..." : "Salvar Período"}</Button>
-          {msgPeriodo && (<Typography color={msgPeriodo.includes("sucesso") ? "primary" : "error"} variant="body2" align="center" mt={1}>{msgPeriodo}</Typography>)}
-        </Box>
-      ) : (
+            <FormControl fullWidth>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Typography>Status:</Typography>
+                <Switch checked={periodoForm.ativo} onChange={e => handlePeriodoFormChange({ target: { name: 'ativo', type: 'checkbox', checked: e.target.checked } })} color="primary" />
+                <Typography>{periodoForm.ativo ? 'Ativo' : 'Inativo'}</Typography>
+              </Box>
+            </FormControl>
+            <TextField label="Data de Início" type="date" name="dataInicio" value={periodoForm.dataInicio} onChange={handlePeriodoFormChange} InputLabelProps={{ shrink: true }} fullWidth required />
+            <TextField label="Data de Fim" type="date" name="dataFim" value={periodoForm.dataFim} onChange={handlePeriodoFormChange} InputLabelProps={{ shrink: true }} fullWidth required />
+            {msgPeriodo && (<Typography color={msgPeriodo.includes("sucesso") ? "primary" : "error"} variant="body2" align="center" mt={1}>{msgPeriodo}</Typography>)}
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setModalCadastroPeriodoOpen(false)} color="secondary">Cancelar</Button>
+          <Button onClick={handleSalvarPeriodo} color="primary" disabled={salvandoPeriodo} type="submit">{salvandoPeriodo ? "Salvando..." : "Salvar Período"}</Button>
+        </DialogActions>
+      </Dialog>
+        <Box>
         <Box>
           {loadingConsulta ? (
             <Box sx={{ textAlign: "center", py: 2 }}><CircularProgress size={32} /></Box>
@@ -141,7 +146,7 @@ const PeriodoCard = ({
             </DialogActions>
           </Dialog>
         </Box>
-      )}
+      </Box>
     </Box>
   );
 };

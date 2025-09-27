@@ -35,6 +35,7 @@ import DisciplinaCard from "../components/escola/DisciplinaCard";
 import GestaoEscolarCard from "../components/escola/GestaoEscolarCard";
 import TurmaCard from "../components/escola/TurmaCard";
 import PeriodoCard from "../components/escola/PeriodoCard";
+import GradeHorariaCard from "../components/escola/GradeHorariaCard";
 
 // Helpers
 function formatDateBR(dateStr) {
@@ -82,6 +83,37 @@ const Escola = () => {
   const [roleChecked, setRoleChecked] = useState(false);
   const userId = auth.currentUser ? auth.currentUser.uid : null;
 
+  // Função para carregar dados iniciais (turmas e avisos)
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      // Carregar turmas
+      const turmasSnap = await get(ref(db, 'turmas'));
+      if (turmasSnap.exists()) {
+        const turmasData = turmasSnap.val();
+        const turmasArray = Object.entries(turmasData).map(([id, turma]) => ({ ...turma, id }));
+        setTurmas(turmasArray);
+      } else {
+        setTurmas([]);
+      }
+
+      // Carregar avisos
+      const avisosSnap = await get(ref(db, 'avisos'));
+      if (avisosSnap.exists()) {
+        const avisosData = avisosSnap.val();
+        const avisosArray = Object.entries(avisosData).map(([id, aviso]) => ({ ...aviso, id }));
+        setAvisos(avisosArray);
+      } else {
+        setAvisos([]);
+      }
+    } catch (err) {
+      console.error('Erro ao carregar dados:', err);
+      setTurmas([]);
+      setAvisos([]);
+    }
+    setLoading(false);
+  };
+
   // PERÍODOS
   const [periodoForm, setPeriodoForm] = useState({
     ano: "",
@@ -92,7 +124,8 @@ const Escola = () => {
   });
   const [salvandoPeriodo, setSalvandoPeriodo] = useState(false);
   const [msgPeriodo, setMsgPeriodo] = useState("");
-  const [abaPeriodo, setAbaPeriodo] = useState("cadastro");
+  const [abaPeriodo, setAbaPeriodo] = useState("consulta");
+  const [modalCadastroPeriodoOpen, setModalCadastroPeriodoOpen] = useState(false);
   const [periodosCadastrados, setPeriodosCadastrados] = useState([]);
   const [loadingConsulta, setLoadingConsulta] = useState(false);
 
@@ -420,7 +453,9 @@ const Escola = () => {
         dataInicio: "",
         dataFim: ""
       });
-      if (abaPeriodo === "consulta") carregarPeriodosCadastrados();
+      setAbaPeriodo('consulta');
+      setModalCadastroPeriodoOpen(false);
+      carregarPeriodosCadastrados();
     } catch (err) {
       setMsgPeriodo("Falha ao salvar período!");
     }
@@ -564,6 +599,9 @@ const Escola = () => {
 
   useEffect(() => {
     fetchDataDisciplinas();
+    carregarPeriodosCadastrados();
+    fetchData();
+    fetchPeriodosAtivos();
   }, []);
 
   useEffect(() => {
@@ -715,6 +753,8 @@ const Escola = () => {
                 msgPeriodo={msgPeriodo}
                 abaPeriodo={abaPeriodo}
                 setAbaPeriodo={setAbaPeriodo}
+                modalCadastroPeriodoOpen={modalCadastroPeriodoOpen}
+                setModalCadastroPeriodoOpen={setModalCadastroPeriodoOpen}
                 handlePeriodoFormChange={handlePeriodoFormChange}
                 handleSalvarPeriodo={handleSalvarPeriodo}
                 loadingConsulta={loadingConsulta}
@@ -744,6 +784,9 @@ const Escola = () => {
                 handleAddDisciplina={handleAddDisciplina}
                 handleExcluirDisciplina={handleExcluirDisciplina}
               />
+            }
+            gradeHorariaContent={
+              <GradeHorariaCard />
             }
           />
         </Box>

@@ -12,10 +12,11 @@ import {
 import { ExpandMore, ExpandLess, MenuBook } from "@mui/icons-material";
 import { FaChalkboardTeacher } from "react-icons/fa";
 
-export default function GestaoEscolarCard({ turmasContent, periodosContent, disciplinasContent }) {
+export default function GestaoEscolarCard({ turmasContent, periodosContent, disciplinasContent, gradeHorariaContent }) {
   const [openTurmas, setOpenTurmas] = useState(false);
   const [openPeriodos, setOpenPeriodos] = useState(false);
   const [openDisciplinas, setOpenDisciplinas] = useState(false);
+  const [openGradeHoraria, setOpenGradeHoraria] = useState(false);
 
   return (
     <Card sx={{ mb: 4 }}>
@@ -127,6 +128,41 @@ export default function GestaoEscolarCard({ turmasContent, periodosContent, disc
         </Box>
         <Collapse in={openDisciplinas} timeout="auto" unmountOnExit>
           <Box sx={{ mt: 2 }}>{disciplinasContent}</Box>
+        </Collapse>
+        {/* Grade Horária */}
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 2,
+            cursor: 'pointer',
+            mb: 1,
+            borderRadius: 2,
+            px: 1.5,
+            py: 1,
+            transition: 'background 0.2s',
+            bgcolor: openGradeHoraria ? '#f3e5f5' : 'transparent',
+            '&:hover': {
+              bgcolor: '#e1bee7',
+              boxShadow: 2
+            }
+          }}
+          onClick={() => setOpenGradeHoraria(v => !v)}
+        >
+          <Avatar sx={{ bgcolor: openGradeHoraria ? '#6a1b9a' : '#8e24aa', transition: 'background 0.2s' }}>
+            <Typography fontWeight={700} color="white">📅</Typography>
+          </Avatar>
+          <Typography variant="h6" sx={{ fontWeight: 700, color: openGradeHoraria ? '#6a1b9a' : '#8e24aa', transition: 'color 0.2s' }}>
+            Grade Horária
+          </Typography>
+          <Tooltip title={openGradeHoraria ? 'Recolher' : 'Expandir'}>
+            <IconButton size="small" sx={{ color: openGradeHoraria ? '#6a1b9a' : '#8e24aa' }}>
+              {openGradeHoraria ? <ExpandLess /> : <ExpandMore />}
+            </IconButton>
+          </Tooltip>
+        </Box>
+        <Collapse in={openGradeHoraria} timeout="auto" unmountOnExit>
+          <Box sx={{ mt: 2 }}>{gradeHorariaContent}</Box>
         </Collapse>
       </CardContent>
     </Card>

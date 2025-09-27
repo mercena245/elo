@@ -33,6 +33,7 @@ import { FaUsers, FaChalkboardTeacher } from 'react-icons/fa';
 import { db, ref, get, set, remove, auth } from '../../firebase';
 import DisciplinaCard from "../components/escola/DisciplinaCard";
 import GestaoEscolarCard from "../components/escola/GestaoEscolarCard";
+import NotasFrequenciaCard from "../components/escola/NotasFrequenciaCard";
 import TurmaCard from "../components/escola/TurmaCard";
 import PeriodoCard from "../components/escola/PeriodoCard";
 import GradeHorariaCard from "../components/escola/GradeHorariaCard";
@@ -787,6 +788,9 @@ const Escola = () => {
             }
             gradeHorariaContent={
               <GradeHorariaCard />
+            }
+            notasFrequenciaContent={
+              <NotasFrequenciaCard />
             }
           />
         </Box>

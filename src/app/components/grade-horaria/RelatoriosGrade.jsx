@@ -99,6 +99,14 @@ const RelatoriosGrade = () => {
       }
 
       const gradeHoraria = gradeSnap.exists() ? gradeSnap.val() : {};
+      
+      console.log('📊 Debug Relatórios - Dados carregados:', {
+        turmas: turmas.length,
+        disciplinas: disciplinas.length,
+        professores: professores.length,
+        periodosAula: periodosAula.length,
+        horariosNaGrade: Object.keys(gradeHoraria).length
+      });
 
       setDadosRelatorio({
         turmas,
@@ -125,15 +133,12 @@ const RelatoriosGrade = () => {
     let horariosOcupados = 0;
     let totalHorariosDisponiveis = turmas.length * 5 * periodosAula.length; // turmas * dias * períodos
 
-    Object.entries(gradeHoraria).forEach(([turmaId, diasData]) => {
-      Object.entries(diasData).forEach(([dia, periodosData]) => {
-        Object.entries(periodosData).forEach(([periodoId, aulaData]) => {
-          totalAulas++;
-          horariosOcupados++;
-          if (aulaData.professorId) professoresAtivos.add(aulaData.professorId);
-          if (aulaData.disciplinaId) disciplinasEmUso.add(aulaData.disciplinaId);
-        });
-      });
+    // Como os dados estão salvos como array plano, não estrutura aninhada
+    Object.values(gradeHoraria).forEach((aula) => {
+      totalAulas++;
+      horariosOcupados++;
+      if (aula.professorId) professoresAtivos.add(aula.professorId);
+      if (aula.disciplinaId) disciplinasEmUso.add(aula.disciplinaId);
     });
 
     return {
@@ -161,21 +166,17 @@ const RelatoriosGrade = () => {
       };
     });
 
-    // Contar aulas
-    Object.entries(gradeHoraria).forEach(([turmaId, diasData]) => {
-      Object.entries(diasData).forEach(([dia, periodosData]) => {
-        Object.entries(periodosData).forEach(([periodoId, aulaData]) => {
-          const profId = aulaData.professorId;
-          if (profId && cargaPorProfessor[profId]) {
-            cargaPorProfessor[profId].totalAulas++;
-            cargaPorProfessor[profId].porDia[dia]++;
-            cargaPorProfessor[profId].turmas.add(turmaId);
-            if (aulaData.disciplinaId) {
-              cargaPorProfessor[profId].disciplinas.add(aulaData.disciplinaId);
-            }
-          }
-        });
-      });
+    // Contar aulas - dados estão salvos como array plano
+    Object.values(gradeHoraria).forEach((aula) => {
+      const profId = aula.professorId;
+      if (profId && cargaPorProfessor[profId]) {
+        cargaPorProfessor[profId].totalAulas++;
+        cargaPorProfessor[profId].porDia[aula.diaSemana]++;
+        cargaPorProfessor[profId].turmas.add(aula.turmaId);
+        if (aula.disciplinaId) {
+          cargaPorProfessor[profId].disciplinas.add(aula.disciplinaId);
+        }
+      }
     });
 
     return Object.values(cargaPorProfessor)
@@ -210,20 +211,16 @@ const RelatoriosGrade = () => {
       });
     });
 
-    // Contar distribuição
-    Object.entries(gradeHoraria).forEach(([turmaId, diasData]) => {
-      Object.entries(diasData).forEach(([dia, periodosData]) => {
-        Object.entries(periodosData).forEach(([periodoId, aulaData]) => {
-          const discId = aulaData.disciplinaId;
-          if (discId && distPorDisciplina[discId]) {
-            distPorDisciplina[discId].totalAulas++;
-            distPorDisciplina[discId].porDia[dia]++;
-            if (distPorDisciplina[discId].porTurma[turmaId]) {
-              distPorDisciplina[discId].porTurma[turmaId].aulas++;
-            }
-          }
-        });
-      });
+    // Contar distribuição - dados estão salvos como array plano
+    Object.values(gradeHoraria).forEach((aula) => {
+      const discId = aula.disciplinaId;
+      if (discId && distPorDisciplina[discId]) {
+        distPorDisciplina[discId].totalAulas++;
+        distPorDisciplina[discId].porDia[aula.diaSemana]++;
+        if (distPorDisciplina[discId].porTurma[aula.turmaId]) {
+          distPorDisciplina[discId].porTurma[aula.turmaId].aulas++;
+        }
+      }
     });
 
     return Object.values(distPorDisciplina)

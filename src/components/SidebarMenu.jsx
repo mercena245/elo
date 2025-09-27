@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FaBars, FaHome, FaUserFriends, FaSchool, FaSignOutAlt, FaStore, FaUsers, FaCalendarAlt, FaCashRegister, FaEnvelope, FaPrint, FaImages, FaUserCircle, FaCog } from 'react-icons/fa';
+import { FaBars, FaHome, FaUserFriends, FaSchool, FaSignOutAlt, FaStore, FaUsers, FaCalendarAlt, FaCashRegister, FaEnvelope, FaPrint, FaImages, FaUserCircle, FaCog, FaGraduationCap } from 'react-icons/fa';
 import { auth, db } from '../firebase';
 import { signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
@@ -103,6 +103,12 @@ const SidebarMenu = () => {
               <ListItem button onClick={() => go('/alunos')}>
                 <ListItemIcon><FaUserFriends /></ListItemIcon>
                 <ListItemText primary="Alunos" />
+              </ListItem>
+            )}
+            {userRole === 'professora' && (
+              <ListItem button onClick={() => go('/notas-frequencia')}>
+                <ListItemIcon><FaGraduationCap /></ListItemIcon>
+                <ListItemText primary="Notas & Frequência" />
               </ListItem>
             )}
             {userRole === 'coordenadora' && (

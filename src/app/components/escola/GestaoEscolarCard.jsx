@@ -12,11 +12,12 @@ import {
 import { ExpandMore, ExpandLess, MenuBook } from "@mui/icons-material";
 import { FaChalkboardTeacher } from "react-icons/fa";
 
-export default function GestaoEscolarCard({ turmasContent, periodosContent, disciplinasContent, gradeHorariaContent }) {
+export default function GestaoEscolarCard({ turmasContent, periodosContent, disciplinasContent, gradeHorariaContent, notasFrequenciaContent }) {
   const [openTurmas, setOpenTurmas] = useState(false);
   const [openPeriodos, setOpenPeriodos] = useState(false);
   const [openDisciplinas, setOpenDisciplinas] = useState(false);
   const [openGradeHoraria, setOpenGradeHoraria] = useState(false);
+  const [openNotasFrequencia, setOpenNotasFrequencia] = useState(false);
 
   return (
     <Card sx={{ mb: 4 }}>
@@ -163,6 +164,42 @@ export default function GestaoEscolarCard({ turmasContent, periodosContent, disc
         </Box>
         <Collapse in={openGradeHoraria} timeout="auto" unmountOnExit>
           <Box sx={{ mt: 2 }}>{gradeHorariaContent}</Box>
+        </Collapse>
+
+        {/* Notas & Frequência */}
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 2,
+            cursor: 'pointer',
+            mb: 1,
+            borderRadius: 2,
+            px: 1.5,
+            py: 1,
+            transition: 'background 0.2s',
+            bgcolor: openNotasFrequencia ? '#f3e5f5' : 'transparent',
+            '&:hover': {
+              bgcolor: '#e1bee7',
+              boxShadow: 2
+            }
+          }}
+          onClick={() => setOpenNotasFrequencia(v => !v)}
+        >
+          <Avatar sx={{ bgcolor: openNotasFrequencia ? '#6a1b9a' : '#9c27b0', transition: 'background 0.2s' }}>
+            📊
+          </Avatar>
+          <Typography variant="h6" sx={{ fontWeight: 700, color: openNotasFrequencia ? '#6a1b9a' : '#9c27b0', transition: 'color 0.2s' }}>
+            Notas & Frequência
+          </Typography>
+          <Tooltip title={openNotasFrequencia ? 'Recolher' : 'Expandir'}>
+            <IconButton size="small" sx={{ color: openNotasFrequencia ? '#6a1b9a' : '#9c27b0' }}>
+              {openNotasFrequencia ? <ExpandLess /> : <ExpandMore />}
+            </IconButton>
+          </Tooltip>
+        </Box>
+        <Collapse in={openNotasFrequencia} timeout="auto" unmountOnExit>
+          <Box sx={{ mt: 2 }}>{notasFrequenciaContent}</Box>
         </Collapse>
       </CardContent>
     </Card>

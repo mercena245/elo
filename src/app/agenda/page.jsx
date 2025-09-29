@@ -15,7 +15,6 @@ import {
   Avatar,
   Chip,
   IconButton,
-  Fab,
   Divider,
   Paper,
   Alert
@@ -69,7 +68,7 @@ const Agenda = () => {
         
         if (userSnap.exists()) {
           const data = userSnap.val();
-          setUserData(data);
+          setUserData({ ...data, id: userId });
           setUserRole(data.role?.toLowerCase() || '');
         }
       } catch (error) {
@@ -188,37 +187,6 @@ const Agenda = () => {
               </Box>
             </Paper>
 
-            {/* Resumo de Notificações */}
-            <Grid container spacing={2} sx={{ mb: 3 }}>
-              {filteredTabs.map((tab, index) => (
-                <Grid item xs={6} sm={4} md={2} key={index}>
-                  <Card 
-                    sx={{ 
-                      cursor: 'pointer',
-                      transition: 'all 0.2s',
-                      borderLeft: `4px solid ${tab.color}`,
-                      '&:hover': {
-                        transform: 'translateY(-2px)',
-                        boxShadow: 3
-                      }
-                    }}
-                    onClick={() => setActiveTab(index)}
-                  >
-                    <CardContent sx={{ textAlign: 'center', py: 2 }}>
-                      <Badge badgeContent={tab.badge} color="error" max={99}>
-                        <Avatar sx={{ bgcolor: tab.color, mx: 'auto', mb: 1 }}>
-                          {tab.icon}
-                        </Avatar>
-                      </Badge>
-                      <Typography variant="body2" fontWeight={600}>
-                        {tab.label}
-                      </Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
-              ))}
-            </Grid>
-
             {/* Abas de Navegação */}
             <Paper sx={{ mb: 3 }}>
               <Tabs 
@@ -253,7 +221,11 @@ const Agenda = () => {
 
             {/* Conteúdo das Abas */}
             <TabPanel value={activeTab} index={0}>
-              <MensagensSection userRole={userRole} userData={userData} />
+              {userData ? (
+                <MensagensSection userRole={userRole} userData={userData} />
+              ) : (
+                <Typography>Carregando dados do usuário...</Typography>
+              )}
             </TabPanel>
             <TabPanel value={activeTab} index={1}>
               <AgendaMedicaSection userRole={userRole} userData={userData} />
@@ -270,23 +242,6 @@ const Agenda = () => {
             <TabPanel value={activeTab} index={5}>
               <DiarioSection userRole={userRole} userData={userData} />
             </TabPanel>
-
-            {/* FAB para nova ação */}
-            <Fab 
-              color="primary" 
-              sx={{ 
-                position: 'fixed', 
-                bottom: 24, 
-                right: 24,
-                background: 'linear-gradient(45deg, #667eea, #764ba2)'
-              }}
-              onClick={() => {
-                // Ação baseada na aba ativa
-                console.log('Nova ação para aba:', filteredTabs[activeTab]?.label);
-              }}
-            >
-              <Add />
-            </Fab>
           </Box>
         </main>
       </div>

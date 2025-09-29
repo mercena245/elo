@@ -127,7 +127,7 @@ const SidebarMenu = () => {
                 <ListItemText primary="Colaboradores" />
               </ListItem>
             )}
-            <ListItem button>
+            <ListItem button onClick={() => go('/agenda')}>
               <ListItemIcon><FaCalendarAlt /></ListItemIcon>
               <ListItemText primary="Agenda" />
             </ListItem>

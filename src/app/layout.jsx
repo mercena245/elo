@@ -30,7 +30,14 @@ export default function RootLayout({ children }) {
     <html lang="pt-BR">
       <head>
         <title>ELO - Sistema Educacional</title>
-        <meta name="description" content="Sistema completo de gestão escolar" />
+        <meta name="description" content="Sistema completo de gestão escolar conectando escola e família" />
+        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+        <link rel="icon" href="/icon.svg" type="image/svg+xml" sizes="32x32" />
+        <link rel="icon" href="/favicon.ico" sizes="any" />
+        <link rel="apple-touch-icon" href="/icon.svg" />
+        <link rel="manifest" href="/manifest.json" />
+        <meta name="theme-color" content="#667eea" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
       </head>
       <body className={inter.className}>
         <LoadingProvider>

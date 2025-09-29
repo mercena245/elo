@@ -1,0 +1,21 @@
+{
+  "name": "ELO - Sistema Educacional",
+  "short_name": "ELO",
+  "description": "Sistema completo de gestão escolar conectando escola e família",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#667eea",
+  "theme_color": "#667eea",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "/favicon.svg",
+      "sizes": "16x16",
+      "type": "image/svg+xml"
+    }
+  ]
+}

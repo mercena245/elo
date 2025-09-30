@@ -43,7 +43,19 @@ import {
   Dashboard as DashboardIcon,
   Grade,
   EventBusy,
-  Assessment
+  Assessment,
+  MedicalServices,
+  MenuBook,
+  Announcement,
+  AccountCircle,
+  Settings,
+  Schedule,
+  Assignment,
+  Group,
+  PersonAdd,
+  History,
+  LocalHospital,
+  Chat
 } from '@mui/icons-material';
 import '../../styles/Dashboard.css';
 import '../../styles/AvisosCarousel.css';
@@ -86,26 +98,35 @@ const Dashboard = () => {
   const getQuickActions = () => {
     const roleActions = {
       coordenadora: [
-        { titulo: 'Gerenciar Alunos', icon: People, rota: '/alunos', cor: '#3B82F6' },
-        { titulo: 'Notas & Frequência', icon: Assessment, rota: '/notas-frequencia', cor: '#10B981' },
-        { titulo: 'Galeria de Fotos', icon: PhotoLibrary, rota: '/galeriafotos', cor: '#F59E0B' },
-        { titulo: 'Colaboradores', icon: School, rota: '/colaboradores', cor: '#8B5CF6' }
+        { titulo: 'Gerenciar Alunos', icon: PersonAdd, rota: '/alunos', cor: '#3B82F6' },
+        { titulo: 'Colaboradores', icon: Group, rota: '/colaboradores', cor: '#8B5CF6' },
+        { titulo: 'Relatórios & Notas', icon: Assessment, rota: '/notas-frequencia', cor: '#10B981' },
+        { titulo: 'Configurações', icon: Settings, rota: '/configuracoes', cor: '#EF4444' },
+        { titulo: 'Grade Horária', icon: Schedule, rota: '/grade-horaria', cor: '#F59E0B' },
+        { titulo: 'Galeria de Fotos', icon: PhotoLibrary, rota: '/galeriafotos', cor: '#06B6D4' }
       ],
       professora: [
+        { titulo: 'Agenda da Turma', icon: CalendarToday, rota: '/agenda', cor: '#3B82F6' },
         { titulo: 'Lançar Notas', icon: Grade, rota: '/notas-frequencia', cor: '#10B981' },
-        { titulo: 'Registrar Frequência', icon: EventBusy, rota: '/notas-frequencia', cor: '#3B82F6' },
-        { titulo: 'Meus Alunos', icon: People, rota: '/alunos', cor: '#F59E0B' },
-        { titulo: 'Boletins', icon: Assessment, rota: '/notas-frequencia', cor: '#8B5CF6' }
+        { titulo: 'Controle Médico', icon: LocalHospital, rota: '/agenda', cor: '#EF4444' },
+        { titulo: 'Frequência', icon: EventBusy, rota: '/notas-frequencia', cor: '#F59E0B' },
+        { titulo: 'Meus Alunos', icon: People, rota: '/alunos', cor: '#8B5CF6' },
+        { titulo: 'Criar Aviso', icon: Announcement, rota: '/avisos', cor: '#06B6D4' }
       ],
       pai: [
+        { titulo: 'Agenda Médica', icon: MedicalServices, rota: '/agenda', cor: '#EF4444' },
         { titulo: 'Boletim do Filho', icon: Assessment, rota: '/notas-frequencia', cor: '#10B981' },
         { titulo: 'Galeria de Fotos', icon: PhotoLibrary, rota: '/galeriafotos', cor: '#F59E0B' },
-        { titulo: 'Avisos', icon: Notifications, rota: '/dashboard', cor: '#3B82F6' }
+        { titulo: 'Avisos da Escola', icon: Notifications, rota: '/avisos', cor: '#3B82F6' },
+        { titulo: 'Cardápio', icon: MenuBook, rota: '/escola', cor: '#8B5CF6' },
+        { titulo: 'Contato Escola', icon: Chat, rota: '/escola', cor: '#06B6D4' }
       ],
       aluno: [
         { titulo: 'Minhas Notas', icon: Grade, rota: '/notas-frequencia', cor: '#10B981' },
+        { titulo: 'Minha Agenda', icon: CalendarToday, rota: '/agenda', cor: '#3B82F6' },
         { titulo: 'Galeria de Fotos', icon: PhotoLibrary, rota: '/galeriafotos', cor: '#F59E0B' },
-        { titulo: 'Avisos', icon: Notifications, rota: '/dashboard', cor: '#3B82F6' }
+        { titulo: 'Avisos', icon: Notifications, rota: '/avisos', cor: '#8B5CF6' },
+        { titulo: 'Meu Perfil', icon: AccountCircle, rota: '/profile', cor: '#06B6D4' }
       ]
     };
     return roleActions[userRole] || [];
@@ -346,7 +367,7 @@ const Dashboard = () => {
                   <Box sx={{ position: 'relative', px: { xs: 0, sm: 1 } }}>
                     <Swiper
                       modules={[Navigation, Pagination]}
-                      spaceBetween={20}
+                      spaceBetween={16}
                       navigation={{
                         enabled: getQuickActions().length > 4,
                         nextEl: '.swiper-button-next-actions',
@@ -359,30 +380,30 @@ const Dashboard = () => {
                       }}
                       breakpoints={{
                         320: {
-                          slidesPerView: 1.8,
+                          slidesPerView: 2.2,
                           spaceBetween: 12
                         },
                         480: {
-                          slidesPerView: 2.5,
-                          spaceBetween: 16
+                          slidesPerView: 3,
+                          spaceBetween: 14
                         },
                         768: {
-                          slidesPerView: 3,
-                          spaceBetween: 20
+                          slidesPerView: 4,
+                          spaceBetween: 16
                         },
                         1024: {
-                          slidesPerView: Math.min(4, getQuickActions().length),
-                          spaceBetween: 24
+                          slidesPerView: Math.min(5, getQuickActions().length),
+                          spaceBetween: 18
                         },
                         1280: {
-                          slidesPerView: Math.min(getQuickActions().length, 6),
-                          spaceBetween: 24
+                          slidesPerView: Math.min(getQuickActions().length, 7),
+                          spaceBetween: 20
                         }
                       }}
                       style={{
-                        paddingLeft: '8px',
-                        paddingRight: '8px',
-                        paddingBottom: getQuickActions().length > 4 ? '40px' : '10px'
+                        paddingLeft: '6px',
+                        paddingRight: '6px',
+                        paddingBottom: getQuickActions().length > 4 ? '35px' : '8px'
                       }}
                     >
                       {getQuickActions().map((acao, idx) => (
@@ -395,13 +416,13 @@ const Dashboard = () => {
                                 border: `2px solid ${acao.cor}25`,
                                 borderRadius: 3,
                                 transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-                                width: { xs: 160, sm: 180, md: 200 },
-                                height: { xs: 120, sm: 140, md: 160 },
+                                width: { xs: 130, sm: 140, md: 150 },
+                                height: { xs: 90, sm: 100, md: 110 },
                                 position: 'relative',
                                 overflow: 'hidden',
                                 '&:hover': {
-                                  transform: 'translateY(-8px) scale(1.02)',
-                                  boxShadow: `0 20px 40px ${acao.cor}30`,
+                                  transform: 'translateY(-6px) scale(1.02)',
+                                  boxShadow: `0 15px 30px ${acao.cor}30`,
                                   '& .action-icon': {
                                     transform: 'scale(1.2) rotate(5deg)'
                                   },
@@ -418,10 +439,10 @@ const Dashboard = () => {
                                 className="action-bg"
                                 sx={{
                                   position: 'absolute',
-                                  top: -20,
-                                  right: -20,
-                                  width: 80,
-                                  height: 80,
+                                  top: -15,
+                                  right: -15,
+                                  width: 60,
+                                  height: 60,
                                   borderRadius: '50%',
                                   background: `linear-gradient(135deg, ${acao.cor}20, ${acao.cor}10)`,
                                   transition: 'all 0.4s ease',
@@ -432,7 +453,7 @@ const Dashboard = () => {
                               <CardActionArea sx={{ height: '100%' }}>
                                 <CardContent sx={{ 
                                   textAlign: 'center', 
-                                  p: { xs: 2, sm: 2.5, md: 3 },
+                                  p: { xs: 1, sm: 1.5, md: 2 },
                                   height: '100%',
                                   display: 'flex',
                                   flexDirection: 'column',
@@ -446,17 +467,17 @@ const Dashboard = () => {
                                       display: 'flex',
                                       alignItems: 'center',
                                       justifyContent: 'center',
-                                      width: { xs: 48, sm: 56, md: 64 },
-                                      height: { xs: 48, sm: 56, md: 64 },
+                                      width: { xs: 32, sm: 38, md: 44 },
+                                      height: { xs: 32, sm: 38, md: 44 },
                                       borderRadius: '16px',
                                       background: `linear-gradient(135deg, ${acao.cor}, ${acao.cor}dd)`,
-                                      mb: { xs: 1.5, sm: 2 },
+                                      mb: { xs: 1, sm: 1.5 },
                                       boxShadow: `0 8px 20px ${acao.cor}40`,
                                       transition: 'all 0.4s ease'
                                     }}
                                   >
                                     <acao.icon sx={{ 
-                                      fontSize: { xs: 24, sm: 28, md: 32 }, 
+                                      fontSize: { xs: 16, sm: 20, md: 24 }, 
                                       color: 'white'
                                     }} />
                                   </Box>
@@ -465,8 +486,8 @@ const Dashboard = () => {
                                     variant="subtitle1" 
                                     fontWeight={600} 
                                     sx={{ 
-                                      fontSize: { xs: '0.85rem', sm: '0.95rem', md: '1rem' },
-                                      lineHeight: 1.2,
+                                      fontSize: { xs: '0.7rem', sm: '0.75rem', md: '0.8rem' },
+                                      lineHeight: 1.1,
                                       textAlign: 'center',
                                       color: '#374151',
                                       letterSpacing: '0.5px'
@@ -762,107 +783,224 @@ const Dashboard = () => {
               {userRole === 'coordenadora' && (
                 <Grid item xs={12}>
                   <Fade in timeout={1000}>
-                    <Typography variant="h6" fontWeight={600} gutterBottom sx={{ mb: 2, color: '#374151', fontSize: { xs: '1.1rem', md: '1.25rem' } }}>
+                    <Typography variant="h6" fontWeight={600} gutterBottom sx={{ mb: 3, color: '#374151', fontSize: { xs: '1.1rem', md: '1.25rem' } }}>
                       📊 Visão Geral da Escola
                     </Typography>
                   </Fade>
-                  <Grid container spacing={{ xs: 1.5, sm: 2 }} sx={{ mb: 3 }}>
-                    {[
-                      { titulo: 'Total de Alunos', valor: stats.totalAlunos, icon: People, cor: '#3B82F6', rota: '/alunos' },
-                      { titulo: 'Professores', valor: stats.totalProfessores, icon: School, cor: '#10B981', rota: '/colaboradores' },
-                      { titulo: 'Turmas Ativas', valor: stats.totalTurmas, icon: CalendarToday, cor: '#F59E0B', rota: '/turmas' },
-                      { titulo: 'Notas Lançadas', valor: stats.notasLancadas, icon: Grade, cor: '#8B5CF6', rota: '/notas-frequencia' }
-                    ].map((item, idx) => (
-                      <Grid item xs={6} sm={6} md={3} key={idx}>
-                        <Zoom in timeout={1000 + (idx * 200)}>
-                          <Card 
-                            sx={{ 
-                              cursor: 'pointer',
-                              transition: 'all 0.3s ease',
-                              height: { xs: 120, sm: 140, md: 160 },
-                              '&:hover': {
-                                transform: 'translateY(-4px)',
-                                boxShadow: '0 8px 25px rgba(0,0,0,0.15)'
-                              }
-                            }}
-                            onClick={() => router.push(item.rota)}
-                          >
-                            <CardContent sx={{ 
-                              textAlign: 'center', 
-                              py: { xs: 1.5, sm: 2, md: 3 },
-                              px: { xs: 1, sm: 2 },
-                              height: '100%',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              justifyContent: 'center'
-                            }}>
-                              <Avatar 
+                  
+                  {/* Container Centralizado para Grid de Estatísticas */}
+                  <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3 }}>
+                    <Card 
+                      sx={{ 
+                        background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
+                        borderRadius: 4,
+                        border: '1px solid rgba(148, 163, 184, 0.2)',
+                        boxShadow: '0 10px 25px rgba(0, 0, 0, 0.08)',
+                        p: { xs: 2, sm: 3 },
+                        width: '100%',
+                        maxWidth: { xs: '100%', sm: 600, md: 700 },
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center'
+                      }}
+                    >
+                      <Box sx={{ width: '100%', maxWidth: { xs: '100%', sm: 500, md: 600 } }}>
+                        <Grid container spacing={{ xs: 2, sm: 3 }} sx={{ justifyContent: 'center' }}>
+                        {[
+                          { titulo: 'Total de Alunos', valor: stats.totalAlunos, icon: People, cor: '#3B82F6', rota: '/alunos' },
+                          { titulo: 'Professores', valor: stats.totalProfessores, icon: School, cor: '#10B981', rota: '/colaboradores' },
+                          { titulo: 'Turmas Ativas', valor: stats.totalTurmas, icon: CalendarToday, cor: '#F59E0B', rota: '/turmas' },
+                          { titulo: 'Notas Lançadas', valor: stats.notasLancadas, icon: Grade, cor: '#8B5CF6', rota: '/notas-frequencia' }
+                        ].map((item, idx) => (
+                          <Grid item xs={6} key={idx}>
+                            <Zoom in timeout={1000 + (idx * 200)}>
+                              <Card 
                                 sx={{ 
-                                  bgcolor: item.cor, 
-                                  width: { xs: 40, sm: 50, md: 60 }, 
-                                  height: { xs: 40, sm: 50, md: 60 }, 
-                                  mx: 'auto', 
-                                  mb: { xs: 1, md: 2 }
+                                  cursor: 'pointer',
+                                  background: `linear-gradient(135deg, ${item.cor}15, ${item.cor}08)`,
+                                  border: `2px solid ${item.cor}25`,
+                                  borderRadius: 3,
+                                  transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                                  height: { xs: 140, sm: 150, md: 160 },
+                                  width: '100%',
+                                  minHeight: { xs: 140, sm: 150, md: 160 },
+                                  maxHeight: { xs: 140, sm: 150, md: 160 },
+                                  position: 'relative',
+                                  overflow: 'hidden',
+                                  aspectRatio: '1',
+                                  '&:hover': {
+                                    transform: 'translateY(-6px) scale(1.02)',
+                                    boxShadow: `0 15px 30px ${item.cor}30`,
+                                    '& .stat-icon': {
+                                      transform: 'scale(1.15) rotate(5deg)'
+                                    },
+                                    '& .stat-bg': {
+                                      transform: 'scale(1.1)',
+                                      opacity: 0.3
+                                    }
+                                  }
                                 }}
+                                onClick={() => router.push(item.rota)}
                               >
-                                <item.icon sx={{ fontSize: { xs: 20, sm: 24, md: 28 } }} />
-                              </Avatar>
-                              <Typography variant="h4" fontWeight={700} color="primary" sx={{ fontSize: { xs: '1.5rem', sm: '2rem', md: '2.125rem' } }}>
-                                {item.valor}
-                              </Typography>
-                              <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
-                                {item.titulo}
-                              </Typography>
-                            </CardContent>
-                          </Card>
-                        </Zoom>
+                                {/* Background decorativo */}
+                                <Box 
+                                  className="stat-bg"
+                                  sx={{
+                                    position: 'absolute',
+                                    top: -15,
+                                    right: -15,
+                                    width: 60,
+                                    height: 60,
+                                    borderRadius: '50%',
+                                    background: `linear-gradient(135deg, ${item.cor}20, ${item.cor}10)`,
+                                    transition: 'all 0.4s ease',
+                                    opacity: 0.2
+                                  }}
+                                />
+                                
+                                <CardActionArea sx={{ height: '100%' }}>
+                                  <CardContent sx={{ 
+                                    textAlign: 'center', 
+                                    p: { xs: 1.5, sm: 2, md: 2.5 },
+                                    height: '100%',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    justifyContent: 'center',
+                                    alignItems: 'center',
+                                    position: 'relative'
+                                  }}>
+                                    <Box 
+                                      className="stat-icon"
+                                      sx={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        width: { xs: 36, sm: 42, md: 48 },
+                                        height: { xs: 36, sm: 42, md: 48 },
+                                        borderRadius: '16px',
+                                        background: `linear-gradient(135deg, ${item.cor}, ${item.cor}dd)`,
+                                        mb: { xs: 1, sm: 1.5 },
+                                        boxShadow: `0 8px 20px ${item.cor}40`,
+                                        transition: 'all 0.4s ease'
+                                      }}
+                                    >
+                                      <item.icon sx={{ 
+                                        fontSize: { xs: 18, sm: 22, md: 26 }, 
+                                        color: 'white'
+                                      }} />
+                                    </Box>
+                                    
+                                    <Typography 
+                                      variant="h5" 
+                                      fontWeight={700} 
+                                      sx={{ 
+                                        fontSize: { xs: '1.25rem', sm: '1.5rem', md: '1.75rem' },
+                                        lineHeight: 1,
+                                        color: item.cor,
+                                        mb: { xs: 0.5, sm: 1 }
+                                      }}
+                                    >
+                                      {item.valor}
+                                    </Typography>
+                                    
+                                    <Typography 
+                                      variant="body2" 
+                                      sx={{ 
+                                        fontSize: { xs: '0.75rem', sm: '0.85rem', md: '0.9rem' },
+                                        lineHeight: 1.2,
+                                        textAlign: 'center',
+                                        color: '#6B7280',
+                                        letterSpacing: '0.3px',
+                                        fontWeight: 500
+                                      }}
+                                    >
+                                      {item.titulo}
+                                    </Typography>
+                                  </CardContent>
+                                </CardActionArea>
+                              </Card>
+                            </Zoom>
+                          </Grid>
+                        ))}
                       </Grid>
-                    ))}
-                  </Grid>
+                      </Box>
+                    </Card>
+                  </Box>
                   
                   {/* Métricas de Performance */}
-                  <Grid container spacing={{ xs: 1.5, sm: 2 }} sx={{ mb: 4 }}>
-                    <Grid item xs={12} md={6}>
-                      <Card sx={{ p: { xs: 2, sm: 3 }, height: '100%' }}>
-                        <Typography variant="h6" gutterBottom color="primary" sx={{ fontSize: { xs: '1rem', md: '1.25rem' } }}>
-                          📈 Média Geral das Notas
-                        </Typography>
-                        <Box sx={{ display: 'flex', alignItems: 'center', mt: 2, flexDirection: { xs: 'column', sm: 'row' } }}>
-                          <Box sx={{ width: '100%', mr: { xs: 0, sm: 2 }, mb: { xs: 1, sm: 0 } }}>
-                            <LinearProgress 
-                              variant="determinate" 
-                              value={(stats.mediaGeral / 10) * 100} 
-                              sx={{ height: { xs: 8, sm: 10 }, borderRadius: 5 }}
-                              color={stats.mediaGeral >= 7 ? 'success' : stats.mediaGeral >= 5 ? 'warning' : 'error'}
-                            />
-                          </Box>
-                          <Typography variant="h6" color="primary" fontWeight={600} sx={{ fontSize: { xs: '1.25rem', md: '1.5rem' } }}>
-                            {stats.mediaGeral.toFixed(1)}
-                          </Typography>
-                        </Box>
-                      </Card>
-                    </Grid>
-                    <Grid item xs={12} md={6}>
-                      <Card sx={{ p: { xs: 2, sm: 3 }, height: '100%' }}>
-                        <Typography variant="h6" gutterBottom color="primary" sx={{ fontSize: { xs: '1rem', md: '1.25rem' } }}>
-                          📅 Frequência Média
-                        </Typography>
-                        <Box sx={{ display: 'flex', alignItems: 'center', mt: 2, flexDirection: { xs: 'column', sm: 'row' } }}>
-                          <Box sx={{ width: '100%', mr: { xs: 0, sm: 2 }, mb: { xs: 1, sm: 0 } }}>
-                            <LinearProgress 
-                              variant="determinate" 
-                              value={stats.frequenciaMedia} 
-                              sx={{ height: { xs: 8, sm: 10 }, borderRadius: 5 }}
-                              color={stats.frequenciaMedia >= 75 ? 'success' : 'warning'}
-                            />
-                          </Box>
-                          <Typography variant="h6" color="primary" fontWeight={600} sx={{ fontSize: { xs: '1.25rem', md: '1.5rem' } }}>
-                            {stats.frequenciaMedia.toFixed(1)}%
-                          </Typography>
-                        </Box>
-                      </Card>
-                    </Grid>
-                  </Grid>
+                  <Box sx={{ display: 'flex', justifyContent: 'center', mb: 4 }}>
+                    <Box sx={{ width: '100%', maxWidth: { xs: '100%', sm: 550, md: 650 } }}>
+                      <Grid container spacing={{ xs: 2, sm: 3 }} sx={{ justifyContent: 'center' }}>
+                        <Grid item xs={12} sm={6}>
+                          <Card 
+                            sx={{ 
+                              p: { xs: 2.5, sm: 3.5 }, 
+                              height: '100%',
+                              background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
+                              border: '1px solid rgba(148, 163, 184, 0.15)',
+                              borderRadius: 3,
+                              transition: 'all 0.3s ease',
+                              '&:hover': {
+                                transform: 'translateY(-2px)',
+                                boxShadow: '0 8px 25px rgba(0,0,0,0.1)'
+                              }
+                            }}
+                          >
+                            <Typography variant="h6" gutterBottom color="primary" sx={{ fontSize: { xs: '1rem', md: '1.1rem' }, fontWeight: 600 }}>
+                              📈 Média Geral das Notas
+                            </Typography>
+                            <Box sx={{ display: 'flex', alignItems: 'center', mt: 3, flexDirection: { xs: 'column', sm: 'row' } }}>
+                              <Box sx={{ width: '100%', mr: { xs: 0, sm: 2 }, mb: { xs: 2, sm: 0 } }}>
+                                <LinearProgress 
+                                  variant="determinate" 
+                                  value={(stats.mediaGeral / 10) * 100} 
+                                  sx={{ height: 10, borderRadius: 8 }}
+                                  color={stats.mediaGeral >= 7 ? 'success' : stats.mediaGeral >= 5 ? 'warning' : 'error'}
+                                />
+                              </Box>
+                              <Typography variant="h5" color="primary" fontWeight={700} sx={{ fontSize: { xs: '1.5rem', md: '1.75rem' } }}>
+                                {stats.mediaGeral.toFixed(1)}
+                              </Typography>
+                            </Box>
+                          </Card>
+                        </Grid>
+                        
+                        <Grid item xs={12} sm={6}>
+                          <Card 
+                            sx={{ 
+                              p: { xs: 2.5, sm: 3.5 }, 
+                              height: '100%',
+                              background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
+                              border: '1px solid rgba(148, 163, 184, 0.15)',
+                              borderRadius: 3,
+                              transition: 'all 0.3s ease',
+                              '&:hover': {
+                                transform: 'translateY(-2px)',
+                                boxShadow: '0 8px 25px rgba(0,0,0,0.1)'
+                              }
+                            }}
+                          >
+                            <Typography variant="h6" gutterBottom color="primary" sx={{ fontSize: { xs: '1rem', md: '1.1rem' }, fontWeight: 600 }}>
+                              📅 Frequência Média
+                            </Typography>
+                            <Box sx={{ display: 'flex', alignItems: 'center', mt: 3, flexDirection: { xs: 'column', sm: 'row' } }}>
+                              <Box sx={{ width: '100%', mr: { xs: 0, sm: 2 }, mb: { xs: 2, sm: 0 } }}>
+                                <LinearProgress 
+                                  variant="determinate" 
+                                  value={stats.frequenciaMedia} 
+                                  sx={{ height: 10, borderRadius: 8 }}
+                                  color={stats.frequenciaMedia >= 75 ? 'success' : 'warning'}
+                                />
+                              </Box>
+                              <Typography variant="h5" color="primary" fontWeight={700} sx={{ fontSize: { xs: '1.5rem', md: '1.75rem' } }}>
+                                {stats.frequenciaMedia.toFixed(1)}%
+                              </Typography>
+                            </Box>
+                          </Card>
+                        </Grid>
+                      </Grid>
+                    </Box>
+                  </Box>
                 </Grid>
               )}
 
@@ -925,176 +1063,7 @@ const Dashboard = () => {
                 </Grid>
               </Grid>
 
-              {/* Galeria de Fotos */}
-              <Grid item xs={12} md={4} order={{ xs: 1, md: 2 }}>
-                <Card sx={{ 
-                  height: '100%', 
-                  cursor: 'pointer',
-                  position: 'relative',
-                  overflow: 'hidden',
-                  transition: 'all 0.3s ease-in-out',
-                  boxShadow: '0 4px 12px rgba(139, 92, 246, 0.1)',
-                  border: '1px solid rgba(139, 92, 246, 0.1)',
-                  background: 'linear-gradient(145deg, #ffffff 0%, #fafbff 100%)',
-                  '&:hover': {
-                    transform: 'translateY(-8px)',
-                    boxShadow: '0 20px 40px rgba(139, 92, 246, 0.2)',
-                    borderColor: '#8B5CF6'
-                  }
-                }} onClick={() => router.push('/galeriafotos')}>
-                  {/* Elemento decorativo */}
-                  <Box 
-                    sx={{ 
-                      position: 'absolute', 
-                      top: 0, 
-                      right: 0, 
-                      width: { xs: 50, md: 70 }, 
-                      height: { xs: 50, md: 70 }, 
-                      background: 'linear-gradient(135deg, #8B5CF6, #7C3AED)', 
-                      borderRadius: '0 0 0 100%',
-                      opacity: 0.9
-                    }} 
-                  />
-                  
-                  <CardContent sx={{ 
-                    p: { xs: 2.5, sm: 3, md: 3.5 }, 
-                    position: 'relative', 
-                    zIndex: 1,
-                    height: '100%',
-                    display: 'flex',
-                    flexDirection: 'column'
-                  }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-                      <Avatar sx={{ 
-                        bgcolor: 'rgba(139, 92, 246, 0.1)', 
-                        color: '#8B5CF6',
-                        mr: 1.5,
-                        width: { xs: 32, md: 40 },
-                        height: { xs: 32, md: 40 }
-                      }}>
-                        <PhotoLibrary sx={{ fontSize: { xs: 18, md: 22 } }} />
-                      </Avatar>
-                      <Typography variant="h6" fontWeight={700} sx={{ 
-                        fontSize: { xs: '1.1rem', md: '1.3rem' },
-                        background: 'linear-gradient(45deg, #8B5CF6, #7C3AED)',
-                        backgroundClip: 'text',
-                        WebkitBackgroundClip: 'text',
-                        WebkitTextFillColor: 'transparent',
-                        letterSpacing: '0.5px'
-                      }}>
-                        📸 Galeria de Fotos
-                      </Typography>
-                    </Box>
-                    
-                    {/* Container do carrossel centralizado */}
-                    <Box sx={{ 
-                      position: 'relative', 
-                      borderRadius: 3, 
-                      overflow: 'hidden', 
-                      height: { xs: 180, sm: 220, md: 250 },
-                      mb: 3,
-                      mx: 'auto',
-                      width: '100%',
-                      maxWidth: '100%',
-                      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
-                      border: '2px solid rgba(139, 92, 246, 0.1)',
-                      background: '#ffffff'
-                    }}>
-                      {fotosVisiveis.length > 0 ? (
-                        <SimpleCarousel images={fotosVisiveis.map(f => f.url)} />
-                      ) : (
-                        <Box 
-                          sx={{ 
-                            height: '100%', 
-                            display: 'flex', 
-                            alignItems: 'center', 
-                            justifyContent: 'center',
-                            bgcolor: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-                            flexDirection: 'column',
-                            border: '2px dashed rgba(139, 92, 246, 0.3)',
-                            borderRadius: 2
-                          }}
-                        >
-                          <PhotoLibrary sx={{ 
-                            fontSize: { xs: 48, md: 56 }, 
-                            color: '#8B5CF6', 
-                            mb: 2, 
-                            opacity: 0.7 
-                          }} />
-                          <Typography variant="h6" color="text.primary" sx={{ 
-                            mb: 1, 
-                            fontSize: { xs: '1rem', md: '1.1rem' },
-                            fontWeight: 600 
-                          }}>
-                            Galeria Vazia
-                          </Typography>
-                          <Typography variant="body2" color="text.secondary" sx={{ 
-                            fontSize: { xs: '0.85rem', sm: '0.9rem' },
-                            textAlign: 'center',
-                            px: 2
-                          }}>
-                            As fotos da escola aparecerão aqui
-                          </Typography>
-                        </Box>
-                      )}
-                    </Box>
-                    
-                    {/* Informações adicionais */}
-                    {fotosVisiveis.length > 0 && (
-                      <Box sx={{ 
-                        display: 'flex', 
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        mb: 2,
-                        p: 1.5,
-                        bgcolor: 'rgba(139, 92, 246, 0.05)',
-                        borderRadius: 2,
-                        border: '1px solid rgba(139, 92, 246, 0.1)'
-                      }}>
-                        <Avatar sx={{ 
-                          bgcolor: '#10B981', 
-                          width: 24, 
-                          height: 24, 
-                          mr: 1 
-                        }}>
-                          <Typography variant="caption" fontWeight={700} sx={{ fontSize: '0.7rem' }}>
-                            {fotosVisiveis.length}
-                          </Typography>
-                        </Avatar>
-                        <Typography variant="body2" color="text.secondary" fontWeight={600}>
-                          {fotosVisiveis.length === 1 ? 'foto disponível' : 'fotos disponíveis'}
-                        </Typography>
-                      </Box>
-                    )}
-                    
-                    {/* Botão melhorado */}
-                    <Button 
-                      fullWidth 
-                      variant="contained" 
-                      size="large"
-                      sx={{ 
-                        mt: 'auto',
-                        fontSize: { xs: '0.9rem', sm: '1rem' },
-                        py: { xs: 1.2, sm: 1.5 },
-                        background: 'linear-gradient(45deg, #8B5CF6, #7C3AED)',
-                        boxShadow: '0 4px 15px rgba(139, 92, 246, 0.3)',
-                        borderRadius: 2.5,
-                        fontWeight: 700,
-                        letterSpacing: '0.5px',
-                        textTransform: 'none',
-                        '&:hover': {
-                          background: 'linear-gradient(45deg, #7C3AED, #6D28D9)',
-                          boxShadow: '0 8px 25px rgba(139, 92, 246, 0.4)',
-                          transform: 'translateY(-2px)'
-                        }
-                      }}
-                      endIcon={<ChevronRight sx={{ fontSize: { xs: 20, md: 24 } }} />}
-                    >
-                      {fotosVisiveis.length > 0 ? 'Explorar Galeria' : 'Ver Galeria'}
-                    </Button>
-                  </CardContent>
-                </Card>
-              </Grid>
+
 
             </Grid>
           </Box>

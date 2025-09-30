@@ -114,7 +114,7 @@ const SidebarMenu = () => {
 
   const menuItems = [
     { icon: FaHome, label: 'Início', path: '/dashboard', color: '#10B981' },
-    { icon: FaUserCircle, label: 'Perfil', path: '/profile', color: '#3B82F6' },
+    // { icon: FaUserCircle, label: 'Perfil', path: '/profile', color: '#3B82F6' }, // Desativado temporariamente
     ...(userRole === 'coordenadora' || userRole === 'professora' ? [
       { icon: FaUserFriends, label: 'Alunos', path: '/alunos', color: '#F59E0B' }
     ] : []),

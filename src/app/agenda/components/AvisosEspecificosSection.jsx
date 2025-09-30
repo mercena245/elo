@@ -111,17 +111,19 @@ const AvisosEspecificosSection = ({ userRole, userData }) => {
         // Filtrar baseado na role
         let avisosFiltrados = avisosList;
         if (userRole === 'pai') {
+          const alunosVinculados = userData?.filhosVinculados || userData?.alunosVinculados || (userData?.alunoVinculado ? [userData.alunoVinculado] : []);
+          
           avisosFiltrados = avisosList.filter(aviso => {
             if (aviso.tipoDestinatario === 'todos') return true;
             if (aviso.tipoDestinatario === 'aluno') {
-              return userData?.filhos?.some(filho => 
+              return alunosVinculados.some(filho => 
                 aviso.destinatarios.includes(filho)
               );
             }
             if (aviso.tipoDestinatario === 'turma') {
-              return userData?.filhos?.some(filho => {
+              return alunosVinculados.some(filho => {
                 const aluno = alunos.find(a => a.id === filho);
-                return aluno && aviso.destinatarios.includes(aluno.turma);
+                return aluno && aviso.destinatarios.includes(aluno.turmaId);
               });
             }
             return false;
@@ -137,7 +139,7 @@ const AvisosEspecificosSection = ({ userRole, userData }) => {
             if (aviso.tipoDestinatario === 'aluno') {
               return aviso.destinatarios.some(alunoId => {
                 const aluno = alunos.find(a => a.id === alunoId);
-                return aluno && userData?.turmas?.includes(aluno.turma);
+                return aluno && userData?.turmas?.includes(aluno.turmaId);
               });
             }
             return false;
@@ -167,7 +169,21 @@ const AvisosEspecificosSection = ({ userRole, userData }) => {
           ...aluno
         }));
         
-        setAlunos(alunosList);
+        // Filtrar alunos baseado na role
+        let alunosFiltrados = alunosList;
+        if (userRole === 'pai') {
+          const alunosVinculados = userData?.filhosVinculados || userData?.alunosVinculados || (userData?.alunoVinculado ? [userData.alunoVinculado] : []);
+          alunosFiltrados = alunosList.filter(aluno => 
+            alunosVinculados.includes(aluno.id)
+          );
+        } else if (userRole === 'professora') {
+          // Professoras veem alunos das suas turmas
+          alunosFiltrados = alunosList.filter(aluno => 
+            userData?.turmas?.includes(aluno.turmaId)
+          );
+        }
+        
+        setAlunos(alunosFiltrados);
       }
     } catch (error) {
       console.error('Erro ao buscar alunos:', error);
@@ -186,7 +202,18 @@ const AvisosEspecificosSection = ({ userRole, userData }) => {
           ...turma
         }));
         
-        setTurmas(turmasList);
+        // Filtrar turmas baseado na role
+        let turmasFiltradas = turmasList;
+        if (userRole === 'professora') {
+          // Professoras veem apenas suas turmas
+          turmasFiltradas = turmasList.filter(turma => 
+            userData?.turmas?.includes(turma.id)
+          );
+        }
+        // Pais não precisam ver turmas para criar avisos
+        // Coordenadoras veem todas as turmas
+        
+        setTurmas(turmasFiltradas);
       }
     } catch (error) {
       console.error('Erro ao buscar turmas:', error);
@@ -587,7 +614,9 @@ const AvisosEspecificosSection = ({ userRole, userData }) => {
                   >
                     <MenuItem value="aluno">Alunos Específicos</MenuItem>
                     <MenuItem value="turma">Turmas</MenuItem>
-                    <MenuItem value="todos">Todos</MenuItem>
+                    {userRole === 'coordenadora' && (
+                      <MenuItem value="todos">Todos</MenuItem>
+                    )}
                   </Select>
                 </FormControl>
               </Grid>

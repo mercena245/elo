@@ -90,6 +90,13 @@ const Agenda = () => {
 
   const tabsConfig = [
     {
+      label: 'Diário',
+      icon: <MenuBook />,
+      badge: resumoNotificacoes.diariosPendentes,
+      color: '#06B6D4',
+      roles: ['coordenadora', 'professora', 'pai']
+    },
+    {
       label: 'Mensagens',
       icon: <Email />,
       badge: resumoNotificacoes.mensagensNaoLidas,
@@ -122,13 +129,6 @@ const Agenda = () => {
       icon: <DirectionsBus />,
       badge: resumoNotificacoes.autorizacoesPendentes,
       color: '#EF4444',
-      roles: ['coordenadora', 'professora', 'pai']
-    },
-    {
-      label: 'Diário',
-      icon: <MenuBook />,
-      badge: resumoNotificacoes.diariosPendentes,
-      color: '#06B6D4',
       roles: ['coordenadora', 'professora', 'pai']
     }
   ];
@@ -228,26 +228,26 @@ const Agenda = () => {
 
             {/* Conteúdo das Abas */}
             <TabPanel value={activeTab} index={0}>
+              <DiarioSection userRole={userRole} userData={userData} />
+            </TabPanel>
+            <TabPanel value={activeTab} index={1}>
               {userData ? (
                 <MensagensSection userRole={userRole} userData={userData} />
               ) : (
                 <Typography>Carregando dados do usuário...</Typography>
               )}
             </TabPanel>
-            <TabPanel value={activeTab} index={1}>
+            <TabPanel value={activeTab} index={2}>
               <AgendaMedicaSection userRole={userRole} userData={userData} />
             </TabPanel>
-            <TabPanel value={activeTab} index={2}>
+            <TabPanel value={activeTab} index={3}>
               <ComportamentosSection userRole={userRole} userData={userData} />
             </TabPanel>
-            <TabPanel value={activeTab} index={3}>
+            <TabPanel value={activeTab} index={4}>
               <AvisosEspecificosSection userRole={userRole} userData={userData} />
             </TabPanel>
-            <TabPanel value={activeTab} index={4}>
-              <AutorizacoesSection userRole={userRole} userData={userData} />
-            </TabPanel>
             <TabPanel value={activeTab} index={5}>
-              <DiarioSection userRole={userRole} userData={userData} />
+              <AutorizacoesSection userRole={userRole} userData={userData} />
             </TabPanel>
           </Box>
         </main>

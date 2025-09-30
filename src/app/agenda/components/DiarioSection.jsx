@@ -155,13 +155,14 @@ const DiarioSection = ({ userRole, userData }) => {
         // Filtrar baseado na role
         let entradasFiltradas = entradasList;
         if (userRole === 'pai') {
+          const alunosVinculados = userData?.filhosVinculados || userData?.alunosVinculados || (userData?.alunoVinculado ? [userData.alunoVinculado] : []);
           entradasFiltradas = entradasList.filter(entrada => 
-            userData?.filhos?.includes(entrada.aluno)
+            alunosVinculados.includes(entrada.aluno)
           );
         } else if (userRole === 'professora') {
           entradasFiltradas = entradasList.filter(entrada => {
             const aluno = alunos.find(a => a.id === entrada.aluno);
-            return aluno && userData?.turmas?.includes(aluno.turma);
+            return aluno && userData?.turmas?.includes(aluno.turmaId);
           });
         }
         
@@ -201,7 +202,21 @@ const DiarioSection = ({ userRole, userData }) => {
           ...aluno
         }));
         
-        setAlunos(alunosList);
+        // Filtrar alunos baseado na role
+        let alunosFiltrados = alunosList;
+        if (userRole === 'pai') {
+          const alunosVinculados = userData?.filhosVinculados || userData?.alunosVinculados || (userData?.alunoVinculado ? [userData.alunoVinculado] : []);
+          alunosFiltrados = alunosList.filter(aluno => 
+            alunosVinculados.includes(aluno.id)
+          );
+        } else if (userRole === 'professora') {
+          // Professoras veem alunos das suas turmas
+          alunosFiltrados = alunosList.filter(aluno => 
+            userData?.turmas?.includes(aluno.turmaId)
+          );
+        }
+        
+        setAlunos(alunosFiltrados);
       }
     } catch (error) {
       console.error('Erro ao buscar alunos:', error);
@@ -247,7 +262,7 @@ const DiarioSection = ({ userRole, userData }) => {
         ...novaEntrada,
         registradoPor: userData?.id || userData?.uid,
         dataRegistro: new Date().toISOString(),
-        turma: alunos.find(a => a.id === novaEntrada.aluno)?.turma
+        turmaId: alunos.find(a => a.id === novaEntrada.aluno)?.turmaId
       };
 
       const diarioRef = ref(db, 'diario');

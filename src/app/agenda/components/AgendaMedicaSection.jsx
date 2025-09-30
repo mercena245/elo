@@ -93,17 +93,17 @@ const AgendaMedicaSection = ({ userRole, userData }) => {
         // Filtrar baseado na role
         let medicamentosFiltrados = medicamentosList;
         if (userRole === 'pai') {
-          // Pais só veem medicamentos dos seus filhos
+          // Pais só veem medicamentos dos seus filhos vinculados
+          const alunosVinculados = userData?.filhosVinculados || userData?.alunosVinculados || (userData?.alunoVinculado ? [userData.alunoVinculado] : []);
           medicamentosFiltrados = medicamentosList.filter(med => 
-            userData?.filhos?.includes(med.aluno)
+            alunosVinculados.includes(med.aluno)
           );
         } else if (userRole === 'professora') {
           // Professoras veem medicamentos dos alunos das suas turmas
-          medicamentosFiltrados = medicamentosList.filter(med => 
-            userData?.turmas?.some(turma => 
-              med.turma === turma
-            )
-          );
+          medicamentosFiltrados = medicamentosList.filter(med => {
+            const aluno = alunos.find(a => a.id === med.aluno);
+            return userData?.turmas?.includes(aluno?.turmaId);
+          });
         }
         
         setMedicamentos(medicamentosFiltrados);
@@ -127,7 +127,22 @@ const AgendaMedicaSection = ({ userRole, userData }) => {
           ...aluno
         }));
         
-        setAlunos(alunosList);
+        // Filtrar alunos baseado na role
+        let alunosFiltrados = alunosList;
+        if (userRole === 'pai') {
+          // Pais só veem seus filhos vinculados
+          const alunosVinculados = userData?.filhosVinculados || userData?.alunosVinculados || (userData?.alunoVinculado ? [userData.alunoVinculado] : []);
+          alunosFiltrados = alunosList.filter(aluno => 
+            alunosVinculados.includes(aluno.id)
+          );
+        } else if (userRole === 'professora') {
+          // Professoras veem alunos das suas turmas
+          alunosFiltrados = alunosList.filter(aluno => 
+            userData?.turmas?.includes(aluno.turmaId)
+          );
+        }
+        
+        setAlunos(alunosFiltrados);
       }
     } catch (error) {
       console.error('Erro ao buscar alunos:', error);
@@ -146,7 +161,22 @@ const AgendaMedicaSection = ({ userRole, userData }) => {
           ...hist
         }));
         
-        setHistoricoMedicacao(historicoList.sort((a, b) => 
+        // Filtrar histórico baseado na role
+        let historicoFiltrado = historicoList;
+        if (userRole === 'pai') {
+          const alunosVinculados = userData?.filhosVinculados || userData?.alunosVinculados || (userData?.alunoVinculado ? [userData.alunoVinculado] : []);
+          historicoFiltrado = historicoList.filter(hist => 
+            alunosVinculados.includes(hist.alunoId)
+          );
+        } else if (userRole === 'professora') {
+          // Professoras veem histórico dos alunos das suas turmas
+          historicoFiltrado = historicoList.filter(hist => {
+            const aluno = alunos.find(a => a.id === hist.alunoId);
+            return userData?.turmas?.includes(aluno?.turmaId);
+          });
+        }
+        
+        setHistoricoMedicacao(historicoFiltrado.sort((a, b) => 
           new Date(b.dataHora) - new Date(a.dataHora)
         ));
       }
@@ -356,7 +386,7 @@ const AgendaMedicaSection = ({ userRole, userData }) => {
         <Typography variant="h5" fontWeight={600}>
           💊 Agenda Médica
         </Typography>
-        {(userRole === 'pai' || userRole === 'coordenadora') && (
+        {(userRole === 'pai' || userRole === 'coordenadora') && alunos.length > 0 && (
           <IconButton 
             color="primary"
             onClick={() => setDialogNovoMedicamento(true)}

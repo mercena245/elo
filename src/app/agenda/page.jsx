@@ -68,6 +68,13 @@ const Agenda = () => {
         
         if (userSnap.exists()) {
           const data = userSnap.val();
+          
+          // Para pais, buscar dados dos alunos vinculados
+          if (data.role === 'pai') {
+            const alunosVinculados = data.alunosVinculados || (data.alunoVinculado ? [data.alunoVinculado] : []);
+            data.filhosVinculados = alunosVinculados;
+          }
+          
           setUserData({ ...data, id: userId });
           setUserRole(data.role?.toLowerCase() || '');
         }

@@ -49,6 +49,9 @@ import { db, ref, get, push, set, remove } from '../../../firebase';
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 
 const ComportamentosSection = ({ userRole, userData }) => {
+  // Debug global para acessar via console
+  window.debugComportamentos = { userRole, userData };
+  
   const [comportamentos, setComportamentos] = useState([]);
   const [dialogNovoComportamento, setDialogNovoComportamento] = useState(false);
   const [dialogDetalhes, setDialogDetalhes] = useState(false);
@@ -95,23 +98,13 @@ const ComportamentosSection = ({ userRole, userData }) => {
   };
 
   useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      try {
-        await Promise.all([
-          fetchComportamentos(),
-          fetchAlunos(),
-          fetchUsuarios()
-        ]);
-      } finally {
-        setLoading(false);
-      }
-    };
-    
     if (userData) {
-      loadData();
+      setLoading(true);
+      fetchComportamentos();
+      fetchAlunos();
+      fetchUsuarios();
     }
-  }, [userRole, userData]);
+  }, [userData]);
 
   useEffect(() => {
     if (comportamentos.length > 0) {
@@ -163,6 +156,8 @@ const ComportamentosSection = ({ userRole, userData }) => {
       }
     } catch (error) {
       console.error('Erro ao buscar comportamentos:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -186,16 +181,29 @@ const ComportamentosSection = ({ userRole, userData }) => {
             alunosVinculados.includes(aluno.id)
           );
         } else if (userRole === 'professora') {
+          // Debug detalhado dos tipos de dados
+          console.log('🔍 ComportamentosSection - Debug detalhado:');
+          console.log('userData?.turmas:', userData?.turmas, 'tipo:', typeof userData?.turmas, 'Array?', Array.isArray(userData?.turmas));
+          if (userData?.turmas && userData.turmas.length > 0) {
+            console.log('Primeira turma:', userData.turmas[0], 'tipo:', typeof userData.turmas[0]);
+          }
+          
           // Professoras veem alunos das suas turmas
-          alunosFiltrados = alunosList.filter(aluno => 
-            userData?.turmas?.includes(aluno.turmaId)
-          );
+          alunosFiltrados = alunosList.filter(aluno => {
+            const includes = userData?.turmas?.includes(aluno.turmaId);
+            if (!includes && alunosList.length < 5) { // Log apenas para poucos alunos para não poluir
+              console.log(`Aluno ${aluno.nome}: turmaId=${aluno.turmaId} (tipo: ${typeof aluno.turmaId}) não está em turmas`, userData?.turmas);
+            }
+            return includes;
+          });
           
           // Debug apenas se não há alunos filtrados
           if (alunosFiltrados.length === 0) {
             console.log('⚠️ ComportamentosSection - Nenhum aluno encontrado para professora');
             console.log('Turmas da professora:', userData?.turmas);
             console.log('Alunos disponíveis:', alunosList.map(a => ({ nome: a.nome, turmaId: a.turmaId })));
+          } else {
+            console.log('✅ ComportamentosSection - Alunos encontrados:', alunosFiltrados.length);
           }
         }
         

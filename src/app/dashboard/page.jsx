@@ -341,50 +341,219 @@ const Dashboard = () => {
                   <Typography variant="h6" fontWeight={600} gutterBottom sx={{ mb: 2, color: '#374151', fontSize: { xs: '1.1rem', md: '1.25rem' } }}>
                     ⚡ Ações Rápidas
                   </Typography>
-                  <Grid container spacing={{ xs: 1.5, sm: 2 }}>
-                    {getQuickActions().map((acao, idx) => (
-                      <Grid item xs={6} sm={6} md={3} key={idx}>
-                        <Zoom in timeout={1200 + (idx * 150)}>
-                          <Card 
-                            sx={{ 
-                              cursor: 'pointer',
-                              background: `linear-gradient(135deg, ${acao.cor}15, ${acao.cor}05)`,
-                              border: `2px solid ${acao.cor}20`,
-                              transition: 'all 0.3s ease',
-                              height: { xs: 60, sm: 80 },
-                              '&:hover': {
-                                transform: 'translateY(-2px)',
-                                boxShadow: `0 8px 25px ${acao.cor}30`
-                              }
-                            }}
-                            onClick={() => router.push(acao.rota)}
-                          >
-                            <CardActionArea sx={{ height: '100%' }}>
-                              <CardContent sx={{ 
-                                textAlign: 'center', 
-                                py: { xs: 0.5, sm: 1 },
-                                px: { xs: 1, sm: 1.5 },
-                                height: '100%',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                justifyContent: 'center',
-                                alignItems: 'center'
-                              }}>
-                                <acao.icon sx={{ fontSize: { xs: 20, sm: 24, md: 28 }, color: acao.cor, mb: 0.5 }} />
-                                <Typography variant="subtitle1" fontWeight={600} sx={{ 
-                                  fontSize: { xs: '0.7rem', sm: '0.8rem', md: '0.9rem' },
-                                  lineHeight: 1.1,
-                                  textAlign: 'center'
+                  
+                  {/* Carrossel de Ações Rápidas */}
+                  <Box sx={{ position: 'relative', px: { xs: 0, sm: 1 } }}>
+                    <Swiper
+                      modules={[Navigation, Pagination]}
+                      spaceBetween={20}
+                      navigation={{
+                        enabled: getQuickActions().length > 4,
+                        nextEl: '.swiper-button-next-actions',
+                        prevEl: '.swiper-button-prev-actions'
+                      }}
+                      pagination={{
+                        clickable: true,
+                        dynamicBullets: true,
+                        enabled: getQuickActions().length > 4
+                      }}
+                      breakpoints={{
+                        320: {
+                          slidesPerView: 1.8,
+                          spaceBetween: 12
+                        },
+                        480: {
+                          slidesPerView: 2.5,
+                          spaceBetween: 16
+                        },
+                        768: {
+                          slidesPerView: 3,
+                          spaceBetween: 20
+                        },
+                        1024: {
+                          slidesPerView: Math.min(4, getQuickActions().length),
+                          spaceBetween: 24
+                        },
+                        1280: {
+                          slidesPerView: Math.min(getQuickActions().length, 6),
+                          spaceBetween: 24
+                        }
+                      }}
+                      style={{
+                        paddingLeft: '8px',
+                        paddingRight: '8px',
+                        paddingBottom: getQuickActions().length > 4 ? '40px' : '10px'
+                      }}
+                    >
+                      {getQuickActions().map((acao, idx) => (
+                        <SwiperSlide key={idx} style={{ width: 'auto' }}>
+                          <Zoom in timeout={1200 + (idx * 150)}>
+                            <Card 
+                              sx={{ 
+                                cursor: 'pointer',
+                                background: `linear-gradient(135deg, ${acao.cor}15, ${acao.cor}08)`,
+                                border: `2px solid ${acao.cor}25`,
+                                borderRadius: 3,
+                                transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                                width: { xs: 160, sm: 180, md: 200 },
+                                height: { xs: 120, sm: 140, md: 160 },
+                                position: 'relative',
+                                overflow: 'hidden',
+                                '&:hover': {
+                                  transform: 'translateY(-8px) scale(1.02)',
+                                  boxShadow: `0 20px 40px ${acao.cor}30`,
+                                  '& .action-icon': {
+                                    transform: 'scale(1.2) rotate(5deg)'
+                                  },
+                                  '& .action-bg': {
+                                    transform: 'scale(1.1)',
+                                    opacity: 0.3
+                                  }
+                                }
+                              }}
+                              onClick={() => router.push(acao.rota)}
+                            >
+                              {/* Background decorativo */}
+                              <Box 
+                                className="action-bg"
+                                sx={{
+                                  position: 'absolute',
+                                  top: -20,
+                                  right: -20,
+                                  width: 80,
+                                  height: 80,
+                                  borderRadius: '50%',
+                                  background: `linear-gradient(135deg, ${acao.cor}20, ${acao.cor}10)`,
+                                  transition: 'all 0.4s ease',
+                                  opacity: 0.2
+                                }}
+                              />
+                              
+                              <CardActionArea sx={{ height: '100%' }}>
+                                <CardContent sx={{ 
+                                  textAlign: 'center', 
+                                  p: { xs: 2, sm: 2.5, md: 3 },
+                                  height: '100%',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  justifyContent: 'center',
+                                  alignItems: 'center',
+                                  position: 'relative'
                                 }}>
-                                  {acao.titulo}
-                                </Typography>
-                              </CardContent>
-                            </CardActionArea>
-                          </Card>
-                        </Zoom>
-                      </Grid>
-                    ))}
-                  </Grid>
+                                  <Box 
+                                    className="action-icon"
+                                    sx={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      width: { xs: 48, sm: 56, md: 64 },
+                                      height: { xs: 48, sm: 56, md: 64 },
+                                      borderRadius: '16px',
+                                      background: `linear-gradient(135deg, ${acao.cor}, ${acao.cor}dd)`,
+                                      mb: { xs: 1.5, sm: 2 },
+                                      boxShadow: `0 8px 20px ${acao.cor}40`,
+                                      transition: 'all 0.4s ease'
+                                    }}
+                                  >
+                                    <acao.icon sx={{ 
+                                      fontSize: { xs: 24, sm: 28, md: 32 }, 
+                                      color: 'white'
+                                    }} />
+                                  </Box>
+                                  
+                                  <Typography 
+                                    variant="subtitle1" 
+                                    fontWeight={600} 
+                                    sx={{ 
+                                      fontSize: { xs: '0.85rem', sm: '0.95rem', md: '1rem' },
+                                      lineHeight: 1.2,
+                                      textAlign: 'center',
+                                      color: '#374151',
+                                      letterSpacing: '0.5px'
+                                    }}
+                                  >
+                                    {acao.titulo}
+                                  </Typography>
+                                </CardContent>
+                              </CardActionArea>
+                            </Card>
+                          </Zoom>
+                        </SwiperSlide>
+                      ))}
+                    </Swiper>
+                    
+                    {/* Botões de navegação customizados */}
+                    <Box
+                      className="swiper-button-prev-actions"
+                      sx={{
+                        position: 'absolute',
+                        left: -20,
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        width: 40,
+                        height: 40,
+                        borderRadius: '50%',
+                        background: 'rgba(255, 255, 255, 0.9)',
+                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        zIndex: 10,
+                        transition: 'all 0.3s ease',
+                        '&:hover': {
+                          background: 'white',
+                          transform: 'translateY(-50%) scale(1.1)',
+                          boxShadow: '0 6px 20px rgba(0, 0, 0, 0.2)'
+                        },
+                        '&::after': {
+                          content: '""',
+                          display: 'none'
+                        }
+                      }}
+                    >
+                      <ChevronRight sx={{ 
+                        fontSize: 20, 
+                        color: '#6B7280',
+                        transform: 'rotate(180deg)'
+                      }} />
+                    </Box>
+                    
+                    <Box
+                      className="swiper-button-next-actions"
+                      sx={{
+                        position: 'absolute',
+                        right: -20,
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        width: 40,
+                        height: 40,
+                        borderRadius: '50%',
+                        background: 'rgba(255, 255, 255, 0.9)',
+                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        zIndex: 10,
+                        transition: 'all 0.3s ease',
+                        '&:hover': {
+                          background: 'white',
+                          transform: 'translateY(-50%) scale(1.1)',
+                          boxShadow: '0 6px 20px rgba(0, 0, 0, 0.2)'
+                        },
+                        '&::after': {
+                          content: '""',
+                          display: 'none'
+                        }
+                      }}
+                    >
+                      <ChevronRight sx={{ 
+                        fontSize: 20, 
+                        color: '#6B7280'
+                      }} />
+                    </Box>
+                  </Box>
                 </Grid>
               </Grid>
             </Fade>

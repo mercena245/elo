@@ -55,6 +55,7 @@ const ComportamentosSection = ({ userRole, userData }) => {
   const [comportamentoSelecionado, setComportamentoSelecionado] = useState(null);
   const [loading, setLoading] = useState(true);
   const [alunos, setAlunos] = useState([]);
+  const [usuarios, setUsuarios] = useState([]);
   const [estatisticas, setEstatisticas] = useState({});
   const [novoComportamento, setNovoComportamento] = useState({
     aluno: '',
@@ -96,6 +97,7 @@ const ComportamentosSection = ({ userRole, userData }) => {
   useEffect(() => {
     fetchComportamentos();
     fetchAlunos();
+    fetchUsuarios();
   }, [userData]);
 
   useEffect(() => {
@@ -103,6 +105,13 @@ const ComportamentosSection = ({ userRole, userData }) => {
       calcularEstatisticas();
     }
   }, [comportamentos]);
+
+  // Reprocessar alunos quando usuários carregarem
+  useEffect(() => {
+    if (usuarios.length > 0 && alunos.length > 0) {
+      fetchAlunos();
+    }
+  }, [usuarios]);
 
   const fetchComportamentos = async () => {
     try {
@@ -119,8 +128,9 @@ const ComportamentosSection = ({ userRole, userData }) => {
         // Filtrar baseado na role
         let comportamentosFiltrados = comportamentosList;
         if (userRole === 'pai') {
+          const alunosVinculados = userData?.filhosVinculados || userData?.alunosVinculados || (userData?.alunoVinculado ? [userData.alunoVinculado] : []);
           comportamentosFiltrados = comportamentosList.filter(comp => 
-            userData?.filhos?.includes(comp.aluno)
+            alunosVinculados.includes(comp.aluno)
           );
         } else if (userRole === 'professora') {
           comportamentosFiltrados = comportamentosList.filter(comp => 
@@ -153,10 +163,63 @@ const ComportamentosSection = ({ userRole, userData }) => {
           ...aluno
         }));
         
-        setAlunos(alunosList);
+        // Filtrar alunos baseado na role
+        let alunosFiltrados = alunosList;
+        if (userRole === 'pai') {
+          const alunosVinculados = userData?.filhosVinculados || userData?.alunosVinculados || (userData?.alunoVinculado ? [userData.alunoVinculado] : []);
+          alunosFiltrados = alunosList.filter(aluno => 
+            alunosVinculados.includes(aluno.id)
+          );
+        } else if (userRole === 'professora') {
+          // Professoras veem alunos das suas turmas
+          alunosFiltrados = alunosList.filter(aluno => 
+            userData?.turmas?.includes(aluno.turmaId)
+          );
+        }
+        
+        // Associar dados do responsável aos alunos quando os usuários estiverem carregados
+        if (usuarios.length > 0) {
+          alunosFiltrados = alunosFiltrados.map(aluno => {
+            if (aluno.responsavelUsuarioId) {
+              const responsavel = usuarios.find(u => u.id === aluno.responsavelUsuarioId);
+              if (responsavel) {
+                return {
+                  ...aluno,
+                  responsavelUsuario: {
+                    id: responsavel.id,
+                    nome: responsavel.nome || responsavel.email,
+                    email: responsavel.email
+                  }
+                };
+              }
+            }
+            return aluno;
+          });
+        }
+        
+        setAlunos(alunosFiltrados);
       }
     } catch (error) {
       console.error('Erro ao buscar alunos:', error);
+    }
+  };
+
+  const fetchUsuarios = async () => {
+    try {
+      const usuariosRef = ref(db, 'users');
+      const snap = await get(usuariosRef);
+      
+      if (snap.exists()) {
+        const dados = snap.val();
+        const usuariosList = Object.entries(dados).map(([id, user]) => ({
+          id,
+          ...user
+        }));
+        
+        setUsuarios(usuariosList);
+      }
+    } catch (error) {
+      console.error('Erro ao buscar usuários:', error);
     }
   };
 
@@ -426,6 +489,18 @@ const ComportamentosSection = ({ userRole, userData }) => {
                               <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 0.5 }}>
                                 {alunos.find(a => a.id === comportamento.aluno)?.nome || 'Aluno não encontrado'}
                               </Typography>
+                              {/* Mostrar responsável se disponível */}
+                              {(() => {
+                                const aluno = alunos.find(a => a.id === comportamento.aluno);
+                                if (aluno?.responsavelUsuario) {
+                                  return (
+                                    <Typography variant="body2" sx={{ color: '#7C3AED', mb: 0.5 }}>
+                                      👤 Responsável: {aluno.responsavelUsuario.nome} ({aluno.responsavelUsuario.email})
+                                    </Typography>
+                                  );
+                                }
+                                return null;
+                              })()}
                               <Box sx={{ 
                                 display: 'flex', 
                                 flexWrap: 'wrap',

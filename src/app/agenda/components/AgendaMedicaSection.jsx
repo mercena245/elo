@@ -197,6 +197,8 @@ const AgendaMedicaSection = ({ userRole, userData }) => {
       console.error('Erro ao buscar histórico:', error);
     }
   };
+
+  const fetchSolicitacoesPendentes = async () => {
     try {
       const medicamentosRef = ref(db, 'medicamentos');
       const snap = await get(medicamentosRef);
@@ -249,6 +251,8 @@ const AgendaMedicaSection = ({ userRole, userData }) => {
       alert('❌ Erro ao processar aprovação. Tente novamente.');
     }
   };
+
+  const reavaliarHistorico = async () => {
     try {
       const historicoRef = ref(db, 'historicoMedicacao');
       const snap = await get(historicoRef);

@@ -65,17 +65,27 @@ const AgendaMedicaSection = ({ userRole, userData }) => {
     dataFim: '',
     ativo: true,
     aluno: '',
-    receita: null
+    receita: null,
+    status: 'pendente', // pendente, aprovado, rejeitado
+    solicitadoPor: '',
+    dataSolicitacao: ''
   });
   const [alunos, setAlunos] = useState([]);
   const [historicoMedicacao, setHistoricoMedicacao] = useState([]);
   const [modalDetalhes, setModalDetalhes] = useState(false);
   const [medicamentoDetalhes, setMedicamentoDetalhes] = useState(null);
+  const [solicitacoesPendentes, setSolicitacoesPendentes] = useState([]);
+  const [dialogAprovacao, setDialogAprovacao] = useState(false);
+  const [medicamentoParaAprovar, setMedicamentoParaAprovar] = useState(null);
+  const [uploadingReceita, setUploadingReceita] = useState(false);
 
   useEffect(() => {
     fetchMedicamentos();
     fetchAlunos();
     fetchHistorico();
+    if (userRole === 'coordenadora') {
+      fetchSolicitacoesPendentes();
+    }
   }, [userData]);
 
   const fetchMedicamentos = async () => {
@@ -90,8 +100,11 @@ const AgendaMedicaSection = ({ userRole, userData }) => {
           ...med
         }));
         
+        // Filtrar apenas medicamentos aprovados
+        const medicamentosAprovados = medicamentosList.filter(med => med.status === 'aprovado');
+        
         // Filtrar baseado na role
-        let medicamentosFiltrados = medicamentosList;
+        let medicamentosFiltrados = medicamentosAprovados;
         if (userRole === 'pai') {
           // Pais só veem medicamentos dos seus filhos vinculados
           const alunosVinculados = userData?.filhosVinculados || userData?.alunosVinculados || (userData?.alunoVinculado ? [userData.alunoVinculado] : []);
@@ -184,29 +197,133 @@ const AgendaMedicaSection = ({ userRole, userData }) => {
       console.error('Erro ao buscar histórico:', error);
     }
   };
+    try {
+      const medicamentosRef = ref(db, 'medicamentos');
+      const snap = await get(medicamentosRef);
+      
+      if (snap.exists()) {
+        const dados = snap.val();
+        const medicamentosList = Object.entries(dados).map(([id, med]) => ({
+          id,
+          ...med
+        }));
+        
+        // Filtrar apenas solicitações pendentes
+        const pendentes = medicamentosList.filter(med => med.status === 'pendente');
+        setSolicitacoesPendentes(pendentes);
+      }
+    } catch (error) {
+      console.error('Erro ao buscar solicitações pendentes:', error);
+    }
+  };
+
+  const aprovarMedicamento = async (medicamentoId, aprovado = true) => {
+    try {
+      const medicamento = solicitacoesPendentes.find(m => m.id === medicamentoId);
+      if (!medicamento) return;
+      
+      const novoStatus = aprovado ? 'aprovado' : 'rejeitado';
+      const medicamentoRef = ref(db, `medicamentos/${medicamentoId}`);
+      
+      const dadosAtualizados = {
+        ...medicamento,
+        status: novoStatus,
+        dataAprovacao: new Date().toISOString(),
+        aprovadoPor: userData?.id || userData?.uid,
+        aprovadorNome: userData?.nome || userData?.email || 'Coordenação',
+        proximaDose: aprovado ? calcularProximaDose(medicamento.horarios) : null
+      };
+      
+      await set(medicamentoRef, dadosAtualizados);
+      
+      // Feedback
+      alert(`✅ Medicamento ${aprovado ? 'aprovado' : 'rejeitado'} com sucesso!`);
+      
+      // Atualizar listas
+      fetchMedicamentos();
+      fetchSolicitacoesPendentes();
+      setDialogAprovacao(false);
+      setMedicamentoParaAprovar(null);
+    } catch (error) {
+      console.error('Erro ao processar aprovação:', error);
+      alert('❌ Erro ao processar aprovação. Tente novamente.');
+    }
+  };
+    try {
+      const historicoRef = ref(db, 'historicoMedicacao');
+      const snap = await get(historicoRef);
+      
+      if (snap.exists()) {
+        const dados = snap.val();
+        const historicoList = Object.entries(dados).map(([id, hist]) => ({
+          id,
+          ...hist
+        }));
+        
+        // Filtrar histórico baseado na role
+        let historicoFiltrado = historicoList;
+        if (userRole === 'pai') {
+          const alunosVinculados = userData?.filhosVinculados || userData?.alunosVinculados || (userData?.alunoVinculado ? [userData.alunoVinculado] : []);
+          historicoFiltrado = historicoList.filter(hist => 
+            alunosVinculados.includes(hist.alunoId)
+          );
+        } else if (userRole === 'professora') {
+          // Professoras veem histórico dos alunos das suas turmas
+          historicoFiltrado = historicoList.filter(hist => {
+            const aluno = alunos.find(a => a.id === hist.alunoId);
+            return userData?.turmas?.includes(aluno?.turmaId);
+          });
+        }
+        
+        setHistoricoMedicacao(historicoFiltrado.sort((a, b) => 
+          new Date(b.dataHora) - new Date(a.dataHora)
+        ));
+      }
+    } catch (error) {
+      console.error('Erro ao buscar histórico:', error);
+    }
+  };
 
   const salvarMedicamento = async () => {
     try {
+      // Validação especial para pais - receita obrigatória
+      if (userRole === 'pai' && !novoMedicamento.receita) {
+        alert('⚠️ Receita médica é obrigatória! Por favor, anexe a receita ou laudo médico antes de continuar.');
+        return;
+      }
+
       const medicamentoData = {
         ...novoMedicamento,
         criadoPor: userData?.id || userData?.uid,
+        solicitadoPor: userData?.nome || userData?.email || 'Usuário',
         dataCriacao: new Date().toISOString(),
-        proximaDose: calcularProximaDose(novoMedicamento.horarios)
+        dataSolicitacao: new Date().toISOString(),
+        status: userRole === 'coordenadora' ? 'aprovado' : 'pendente', // Coordenadora aprova automaticamente
+        proximaDose: userRole === 'coordenadora' ? calcularProximaDose(novoMedicamento.horarios) : null
       };
 
       const medicamentosRef = ref(db, 'medicamentos');
       await push(medicamentosRef, medicamentoData);
       
+      // Feedback diferenciado por role
+      if (userRole === 'pai') {
+        alert('✅ Solicitação de medicamento enviada! Aguarde aprovação da coordenação.');
+      } else {
+        alert('✅ Medicamento cadastrado com sucesso!');
+      }
+      
       setDialogNovoMedicamento(false);
       setNovoMedicamento({
         nome: '', dosagem: '', frequencia: '', horarios: [],
         observacoes: '', dataInicio: '', dataFim: '', ativo: true,
-        aluno: '', receita: null
+        aluno: '', receita: null, status: 'pendente', solicitadoPor: '', dataSolicitacao: ''
       });
       
       fetchMedicamentos();
+      fetchSolicitacoesPendentes();
     } catch (error) {
       console.error('Erro ao salvar medicamento:', error);
+      alert('❌ Erro ao salvar medicamento. Tente novamente.');
     }
   };
 
@@ -281,30 +398,32 @@ const AgendaMedicaSection = ({ userRole, userData }) => {
     }
   };
 
-  const uploadReceita = async (file, medicamentoId) => {
+  const uploadReceita = async (file) => {
     try {
+      setUploadingReceita(true);
       const storage = getStorage();
-      const receitaRef = storageRef(storage, `receitas/${medicamentoId}/${file.name}`);
+      const timestamp = new Date().getTime();
+      const receitaRef = storageRef(storage, `receitas/temp_${timestamp}_${file.name}`);
       
       await uploadBytes(receitaRef, file);
       const downloadURL = await getDownloadURL(receitaRef);
       
-      // Atualizar medicamento com URL da receita
-      const medicamentoRef = ref(db, `medicamentos/${medicamentoId}`);
-      const medicamento = medicamentos.find(m => m.id === medicamentoId);
-      
-      await set(medicamentoRef, {
-        ...medicamento,
+      // Atualizar estado do novo medicamento
+      setNovoMedicamento(prev => ({
+        ...prev,
         receita: {
           url: downloadURL,
           nome: file.name,
           dataUpload: new Date().toISOString()
         }
-      });
+      }));
       
-      fetchMedicamentos();
+      alert('✅ Receita anexada com sucesso!');
     } catch (error) {
       console.error('Erro ao fazer upload da receita:', error);
+      alert('❌ Erro ao anexar receita. Tente novamente.');
+    } finally {
+      setUploadingReceita(false);
     }
   };
 
@@ -470,6 +589,106 @@ const AgendaMedicaSection = ({ userRole, userData }) => {
       </Grid>
 
       <Grid container spacing={3}>
+        {/* Solicitações Pendentes - Apenas para Coordenadora */}
+        {userRole === 'coordenadora' && (
+          <Grid item xs={12}>
+            <Card sx={{ mb: 3, border: '2px solid #F59E0B' }}>
+              <CardContent>
+                <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#F59E0B' }}>
+                  <Warning /> Solicitações Pendentes de Aprovação ({solicitacoesPendentes.length})
+                </Typography>
+                
+                {solicitacoesPendentes.length === 0 ? (
+                  <Typography color="text.secondary" variant="body2">
+                    Nenhuma solicitação pendente
+                  </Typography>
+                ) : (
+                  <List>
+                    {solicitacoesPendentes.map((solicitacao) => (
+                      <ListItem 
+                        key={solicitacao.id}
+                        sx={{ 
+                          border: '1px solid #fbbf24',
+                          borderRadius: 2,
+                          mb: 2,
+                          bgcolor: '#fef3c7'
+                        }}
+                      >
+                        <ListItemAvatar>
+                          <Avatar sx={{ bgcolor: '#F59E0B' }}>
+                            <Medication />
+                          </Avatar>
+                        </ListItemAvatar>
+                        <ListItemText
+                          primary={
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                              <Typography variant="h6" fontWeight={600}>
+                                {solicitacao.nome}
+                              </Typography>
+                              <Chip size="small" label={solicitacao.dosagem} color="warning" />
+                              <Chip size="small" label="Pendente" color="error" />
+                            </Box>
+                          }
+                          secondary={
+                            <Box>
+                              <Typography variant="body2" color="text.secondary">
+                                👤 Aluno: {alunos.find(a => a.id === solicitacao.aluno)?.nome || 'N/A'}
+                              </Typography>
+                              <Typography variant="body2" color="text.secondary">
+                                📅 Horários: {formatarHorario(solicitacao.horarios)}
+                              </Typography>
+                              <Typography variant="body2" color="text.secondary">
+                                🙋 Solicitado por: {solicitacao.solicitadoPor}
+                              </Typography>
+                              <Typography variant="body2" color="text.secondary">
+                                📅 Data: {new Date(solicitacao.dataSolicitacao).toLocaleDateString('pt-BR')}
+                              </Typography>
+                              {solicitacao.observacoes && (
+                                <Typography variant="body2" color="text.secondary">
+                                  📝 {solicitacao.observacoes}
+                                </Typography>
+                              )}
+                            </Box>
+                          }
+                        />
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                          <Button
+                            size="small"
+                            variant="contained"
+                            color="success"
+                            onClick={() => aprovarMedicamento(solicitacao.id, true)}
+                            startIcon={<CheckCircle />}
+                          >
+                            Aprovar
+                          </Button>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            color="error"
+                            onClick={() => aprovarMedicamento(solicitacao.id, false)}
+                            startIcon={<Warning />}
+                          >
+                            Rejeitar
+                          </Button>
+                          {solicitacao.receita && (
+                            <Button
+                              size="small"
+                              onClick={() => window.open(solicitacao.receita.url, '_blank')}
+                              startIcon={<AttachFile />}
+                            >
+                              Ver Receita
+                            </Button>
+                          )}
+                        </Box>
+                      </ListItem>
+                    ))}
+                  </List>
+                )}
+              </CardContent>
+            </Card>
+          </Grid>
+        )}
+
         {/* Lista de Medicamentos */}
         <Grid item xs={12} md={8}>
           <Card>
@@ -747,6 +966,84 @@ const AgendaMedicaSection = ({ userRole, userData }) => {
               </Grid>
               
               <Grid item xs={12}>
+                <Alert severity="warning" sx={{ mb: 2 }}>
+                  <Typography variant="body2">
+                    ⚠️ <strong>IMPORTANTE:</strong> Para solicitar medicamentos, é obrigatório anexar a receita médica ou laudo. 
+                    Todas as solicitações passarão por aprovação da coordenação antes de serem aplicadas.
+                  </Typography>
+                </Alert>
+              </Grid>
+              
+              {/* Upload de Receita - Campo obrigatório para pais */}
+              <Grid item xs={12}>
+                <Typography variant="subtitle2" gutterBottom color="primary">
+                  📄 Receita Médica {userRole === 'pai' && <span style={{ color: 'red' }}>*</span>}
+                </Typography>
+                {novoMedicamento.receita ? (
+                  <Box sx={{ p: 2, bgcolor: '#f0f9ff', borderRadius: 2, border: '2px solid #3B82F6' }}>
+                    <Typography variant="body1" fontWeight={600} color="primary">
+                      ✅ {novoMedicamento.receita.nome}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Anexado em: {new Date(novoMedicamento.receita.dataUpload).toLocaleString('pt-BR')}
+                    </Typography>
+                    <Box sx={{ mt: 1 }}>
+                      <Button 
+                        size="small" 
+                        onClick={() => window.open(novoMedicamento.receita.url, '_blank')}
+                        sx={{ mr: 1 }}
+                      >
+                        Visualizar
+                      </Button>
+                      <Button 
+                        size="small" 
+                        color="error"
+                        onClick={() => setNovoMedicamento(prev => ({ ...prev, receita: null }))}
+                      >
+                        Remover
+                      </Button>
+                    </Box>
+                  </Box>
+                ) : (
+                  <Box sx={{ 
+                    border: '2px dashed #e2e8f0', 
+                    borderRadius: 2, 
+                    p: 3, 
+                    textAlign: 'center',
+                    bgcolor: userRole === 'pai' ? '#fef2f2' : '#f9fafb',
+                    borderColor: userRole === 'pai' ? '#fca5a5' : '#e2e8f0'
+                  }}>
+                    <CloudUpload sx={{ fontSize: 48, color: '#9CA3AF', mb: 2 }} />
+                    <Typography variant="body1" gutterBottom>
+                      {userRole === 'pai' ? 'Receita Médica Obrigatória' : 'Anexar Receita (Recomendado)'}
+                    </Typography>
+                    <Button
+                      variant="contained"
+                      component="label"
+                      startIcon={<CloudUpload />}
+                      disabled={uploadingReceita}
+                      color={userRole === 'pai' ? 'error' : 'primary'}
+                    >
+                      {uploadingReceita ? 'Enviando...' : 'Selecionar Arquivo'}
+                      <input
+                        type="file"
+                        hidden
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        onChange={(e) => {
+                          if (e.target.files[0]) {
+                            uploadReceita(e.target.files[0]);
+                          }
+                        }}
+                      />
+                    </Button>
+                    <Typography variant="caption" display="block" sx={{ mt: 1 }}>
+                      Formatos aceitos: PDF, JPG, PNG
+                    </Typography>
+                  </Box>
+                )}
+              </Grid>
+              
+              <Grid item xs={12}>
                 <TextField
                   fullWidth
                   label="Observações"
@@ -754,7 +1051,6 @@ const AgendaMedicaSection = ({ userRole, userData }) => {
                   rows={3}
                   value={novoMedicamento.observacoes}
                   onChange={(e) => setNovoMedicamento({ ...novoMedicamento, observacoes: e.target.value })}
-                  sx={{ mb: 2 }}
                   placeholder="Instruções especiais, efeitos colaterais, etc."
                 />
               </Grid>
@@ -767,9 +1063,9 @@ const AgendaMedicaSection = ({ userRole, userData }) => {
           <Button 
             variant="contained" 
             onClick={salvarMedicamento}
-            disabled={!novoMedicamento.nome || !novoMedicamento.dosagem || !novoMedicamento.aluno}
+            disabled={!novoMedicamento.nome || !novoMedicamento.dosagem || !novoMedicamento.aluno || (userRole === 'pai' && !novoMedicamento.receita)}
           >
-            Salvar
+            {userRole === 'pai' ? 'Enviar Solicitação' : 'Salvar Medicamento'}
           </Button>
         </DialogActions>
       </Dialog>

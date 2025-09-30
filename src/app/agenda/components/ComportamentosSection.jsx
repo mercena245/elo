@@ -95,10 +95,23 @@ const ComportamentosSection = ({ userRole, userData }) => {
   };
 
   useEffect(() => {
-    fetchComportamentos();
-    fetchAlunos();
-    fetchUsuarios();
-  }, [userData]);
+    const loadData = async () => {
+      setLoading(true);
+      try {
+        await Promise.all([
+          fetchComportamentos(),
+          fetchAlunos(),
+          fetchUsuarios()
+        ]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    if (userData) {
+      loadData();
+    }
+  }, [userRole, userData]);
 
   useEffect(() => {
     if (comportamentos.length > 0) {
@@ -106,10 +119,14 @@ const ComportamentosSection = ({ userRole, userData }) => {
     }
   }, [comportamentos]);
 
-  // Reprocessar alunos quando usuários carregarem
+  // Reprocessar alunos quando usuários carregarem (apenas para associar responsáveis)
   useEffect(() => {
     if (usuarios.length > 0 && alunos.length > 0) {
-      fetchAlunos();
+      // Só reprocessar se ainda não temos responsáveis associados
+      const temResponsaveis = alunos.some(aluno => aluno.responsavelUsuario);
+      if (!temResponsaveis) {
+        fetchAlunos();
+      }
     }
   }, [usuarios]);
 
@@ -146,8 +163,6 @@ const ComportamentosSection = ({ userRole, userData }) => {
       }
     } catch (error) {
       console.error('Erro ao buscar comportamentos:', error);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -175,6 +190,13 @@ const ComportamentosSection = ({ userRole, userData }) => {
           alunosFiltrados = alunosList.filter(aluno => 
             userData?.turmas?.includes(aluno.turmaId)
           );
+          
+          // Debug apenas se não há alunos filtrados
+          if (alunosFiltrados.length === 0) {
+            console.log('⚠️ ComportamentosSection - Nenhum aluno encontrado para professora');
+            console.log('Turmas da professora:', userData?.turmas);
+            console.log('Alunos disponíveis:', alunosList.map(a => ({ nome: a.nome, turmaId: a.turmaId })));
+          }
         }
         
         // Associar dados do responsável aos alunos quando os usuários estiverem carregados

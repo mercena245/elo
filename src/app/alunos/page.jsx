@@ -529,6 +529,11 @@ const Alunos = () => {
                                 {aluno.nomeMae && (
                                   <Typography variant="body2" sx={{ color: '#64748b', mb: 0.5 }}>👩 Mãe: {aluno.nomeMae}</Typography>
                                 )}
+                                {aluno.responsavelUsuario && (
+                                  <Typography variant="body2" sx={{ color: '#8b5cf6', fontWeight: 500, mb: 0.5 }}>
+                                    👤 Responsável Cadastrado: {aluno.responsavelUsuario.nome} ({aluno.responsavelUsuario.email})
+                                  </Typography>
+                                )}
                                 {aluno.contatoEmergencia && (
                                   <Typography variant="body2" sx={{ color: '#dc2626', mb: 0.5 }}>🚨 Contato Emergência: {aluno.contatoEmergencia.nome} ({aluno.contatoEmergencia.telefone})</Typography>
                                 )}

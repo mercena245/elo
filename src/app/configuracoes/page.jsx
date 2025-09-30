@@ -240,8 +240,11 @@ export default function Configuracoes() {
       const snap = await get(turmasRef);
       if (snap.exists()) {
         const all = snap.val();
-        // Se turmas for objeto, transforma em array de nomes
-        const listaTurmas = Object.values(all).map(t => t.nome || t);
+        // Transformar em array de objetos com ID e nome para usar no Select
+        const listaTurmas = Object.entries(all).map(([id, turma]) => ({
+          id,
+          nome: turma.nome || turma
+        }));
         setTurmas(listaTurmas);
       } else {
         setTurmas([]);
@@ -555,10 +558,16 @@ export default function Configuracoes() {
                     const turmasSelecionadas = e.target.value;
                     setEditUser({ ...editUser, turmas: turmasSelecionadas });
                   }}
-                  renderValue={selected => selected.join(', ')}
+                  renderValue={selected => {
+                    // Mostrar nomes das turmas selecionadas
+                    return selected.map(turmaId => {
+                      const turma = turmas.find(t => t.id === turmaId);
+                      return turma ? turma.nome : turmaId;
+                    }).join(', ');
+                  }}
                 >
-                  {turmas.map((turma, idx) => (
-                    <MenuItem key={idx} value={turma}>{turma}</MenuItem>
+                  {turmas.map((turma) => (
+                    <MenuItem key={turma.id} value={turma.id}>{turma.nome}</MenuItem>
                   ))}
                 </Select>
               </FormControl>

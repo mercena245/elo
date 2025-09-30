@@ -184,13 +184,38 @@ const ComportamentosSection = ({ userRole, userData }) => {
           // Usar lógica simples igual à seção de medicamentos
           console.log('🔍 ComportamentosSection - userData?.turmas:', userData?.turmas);
           console.log('🔍 Total alunos no sistema:', alunosList.length);
+          console.log('🔍 userData completo:', userData);
           
-          // Professoras veem alunos das suas turmas
-          alunosFiltrados = alunosList.filter(aluno => 
-            userData?.turmas?.includes(aluno.turmaId)
-          );
+          // Verificar se userData e turmas existem
+          if (!userData) {
+            console.log('❌ userData é null/undefined');
+            alunosFiltrados = [];
+          } else if (!userData.turmas) {
+            console.log('❌ userData.turmas é null/undefined');
+            alunosFiltrados = [];
+          } else if (!Array.isArray(userData.turmas)) {
+            console.log('❌ userData.turmas não é array:', typeof userData.turmas);
+            alunosFiltrados = [];
+          } else if (userData.turmas.length === 0) {
+            console.log('❌ userData.turmas está vazio');
+            alunosFiltrados = [];
+          } else {
+            // Professoras veem alunos das suas turmas
+            alunosFiltrados = alunosList.filter(aluno => {
+              const match = userData?.turmas?.includes(aluno.turmaId);
+              console.log(`🔍 Comparando: Aluno "${aluno.nome}" com turmaId "${aluno.turmaId}" vs turmas da professora`, userData?.turmas, '=> Match:', match);
+              return match;
+            });
+          }
           
           console.log('✅ Alunos filtrados:', alunosFiltrados.length);
+          
+          // Debug detalhado: mostrar turmaId de cada aluno
+          console.log('🔍 Debug dos turmaId dos alunos:');
+          alunosList.forEach(aluno => {
+            console.log(`Aluno: ${aluno.nome} | turmaId: "${aluno.turmaId}" | tipo: ${typeof aluno.turmaId}`);
+          });
+          console.log('🔍 Turma da professora para comparação:', userData?.turmas);
         }
         
         // Associar dados do responsável aos alunos quando os usuários estiverem carregados

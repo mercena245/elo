@@ -150,16 +150,9 @@ const AgendaMedicaSection = ({ userRole, userData }) => {
           );
         } else if (userRole === 'professora') {
           // Professoras veem alunos das suas turmas
-          console.log('🩺 AgendaMedicaSection - userData?.turmas:', userData?.turmas);
-          console.log('🩺 Total alunos no sistema:', alunosList.length);
-          
-          alunosFiltrados = alunosList.filter(aluno => {
-            const match = userData?.turmas?.includes(aluno.turmaId);
-            console.log(`🩺 Med: Aluno "${aluno.nome}" turmaId "${aluno.turmaId}" => Match:`, match);
-            return match;
-          });
-          
-          console.log('🩺 AgendaMedicaSection - Alunos filtrados:', alunosFiltrados.length);
+          alunosFiltrados = alunosList.filter(aluno => 
+            userData?.turmas?.includes(aluno.turmaId)
+          );
         }
         
         setAlunos(alunosFiltrados);

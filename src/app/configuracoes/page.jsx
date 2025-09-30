@@ -2,7 +2,7 @@
 import SidebarMenu from '../../components/SidebarMenu';
 import AdminClaimChecker from '../../components/AdminClaimChecker';
 import DevClaimsAccordion from '../../components/DevClaimsAccordion';
-import { Box, Typography, Card, CardContent, List, ListItem, ListItemText, CircularProgress, Button, FormControl, InputLabel, Select, MenuItem, Dialog, DialogTitle, DialogContent, DialogActions, TextField } from '@mui/material';
+import { Box, Typography, Card, CardContent, List, ListItem, ListItemText, CircularProgress, Button, FormControl, InputLabel, Select, MenuItem, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Autocomplete, Chip } from '@mui/material';
 import { useEffect, useState } from 'react';
 import { db, ref, get, set, push, remove, auth, deleteUserFunction } from '../../firebase';
 import UserApprovalDialog from '../../components/UserApprovalDialog';
@@ -40,6 +40,8 @@ export default function Configuracoes() {
   const [editUser, setEditUser] = useState(null);
   const [editRole, setEditRole] = useState('');
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [alunos, setAlunos] = useState([]);
+  const [alunosSelecionados, setAlunosSelecionados] = useState([]);
   // Função para atualizar lista de usuários e pendentes
   const fetchUsuarios = async () => {
     setLoading(true);
@@ -64,21 +66,92 @@ export default function Configuracoes() {
     setLoadingUsuarios(false);
   };
 
-  // Atualiza role do usuário
+  // Função para buscar alunos
+  const fetchAlunos = async () => {
+    try {
+      const alunosRef = ref(db, 'alunos');
+      const snap = await get(alunosRef);
+      if (snap.exists()) {
+        const all = snap.val();
+        const listaAlunos = Object.entries(all)
+          .map(([id, aluno]) => ({ 
+            id, 
+            ...aluno,
+            nome: aluno.nome || 'Nome não informado',
+            matricula: aluno.matricula || 'S/N'
+          }))
+          .filter(aluno => aluno.status !== 'inativo'); // Filtrar apenas alunos ativos
+        setAlunos(listaAlunos);
+      } else {
+        setAlunos([]);
+      }
+    } catch (error) {
+      console.error('Erro ao buscar alunos:', error);
+      setAlunos([]);
+    }
+  };
+
+  // Atualiza role do usuário e vincula com aluno se aplicável
   const handleEditRole = async () => {
     if (!editUser) return;
-    const userRef = ref(db, `usuarios/${editUser.uid}`);
-    const snap = await get(userRef);
-    if (snap.exists()) {
-      const userData = snap.val();
-      await set(userRef, {
-        ...userData,
-        role: editRole,
-        turmas: editUser.turmas || [] // Salva as turmas selecionadas
-      });
-      setEditDialogOpen(false);
-      setEditUser(null);
-      await fetchUsuarios();
+    try {
+      const userRef = ref(db, `usuarios/${editUser.uid}`);
+      const snap = await get(userRef);
+      if (snap.exists()) {
+        const userData = snap.val();
+        
+        // Remover vinculações antigas se necessário
+        const alunosAntigos = userData.alunosVinculados || (userData.alunoVinculado ? [userData.alunoVinculado] : []);
+        const novosIds = editRole === 'pai' ? alunosSelecionados.map(a => a.id) : [];
+        const alunosParaRemover = alunosAntigos.filter(id => !novosIds.includes(id));
+        
+        for (const alunoId of alunosParaRemover) {
+          const alunoAntigoRef = ref(db, `alunos/${alunoId}`);
+          const alunoAntigoSnap = await get(alunoAntigoRef);
+          if (alunoAntigoSnap.exists()) {
+            const alunoAntigoData = alunoAntigoSnap.val();
+            const { responsavelUsuario, ...alunoSemResponsavel } = alunoAntigoData;
+            await set(alunoAntigoRef, alunoSemResponsavel);
+          }
+        }
+        
+        // Atualizar dados do usuário
+        const updatedUserData = {
+          ...userData,
+          role: editRole,
+          turmas: editUser.turmas || [],
+          alunosVinculados: (editRole === 'pai' && alunosSelecionados.length > 0) ? alunosSelecionados.map(a => a.id) : []
+        };
+        
+        await set(userRef, updatedUserData);
+        
+        // Vincular novos alunos se o role é "pai"
+        if (editRole === 'pai' && alunosSelecionados.length > 0) {
+          for (const aluno of alunosSelecionados) {
+            const alunoRef = ref(db, `alunos/${aluno.id}`);
+            const alunoSnap = await get(alunoRef);
+            if (alunoSnap.exists()) {
+              const alunoData = alunoSnap.val();
+              await set(alunoRef, {
+                ...alunoData,
+                responsavelUsuario: {
+                  uid: editUser.uid,
+                  nome: editUser.nome || editUser.email,
+                  email: editUser.email
+                }
+              });
+            }
+          }
+        }
+        
+        setEditDialogOpen(false);
+        setEditUser(null);
+        setAlunosSelecionados([]);
+        await fetchUsuarios();
+      }
+    } catch (error) {
+      console.error('Erro ao salvar vinculação:', error);
+      alert('Erro ao salvar vinculação: ' + error.message);
     }
   };
 
@@ -89,9 +162,23 @@ export default function Configuracoes() {
     const snap = await get(userRef);
     if (snap.exists()) {
       const userData = snap.val();
-      await set(userRef, { ...userData, role: 'inativo' });
+      
+      // Se havia alunos vinculados, remover as vinculações
+      const alunosVinculados = userData.alunosVinculados || (userData.alunoVinculado ? [userData.alunoVinculado] : []);
+      for (const alunoId of alunosVinculados) {
+        const alunoRef = ref(db, `alunos/${alunoId}`);
+        const alunoSnap = await get(alunoRef);
+        if (alunoSnap.exists()) {
+          const alunoData = alunoSnap.val();
+          const { responsavelUsuario, ...alunoSemResponsavel } = alunoData;
+          await set(alunoRef, alunoSemResponsavel);
+        }
+      }
+      
+      await set(userRef, { ...userData, role: 'inativo', alunosVinculados: [] });
       setEditDialogOpen(false);
       setEditUser(null);
+      setAlunosSelecionados([]);
       await fetchUsuarios();
     }
   };
@@ -100,6 +187,18 @@ export default function Configuracoes() {
   const handleDeleteUser = async () => {
     if (!editUser) return;
     try {
+      // Se havia alunos vinculados, remover as vinculações primeiro
+      const alunosVinculados = editUser.alunosVinculados || (editUser.alunoVinculado ? [editUser.alunoVinculado] : []);
+      for (const alunoId of alunosVinculados) {
+        const alunoRef = ref(db, `alunos/${alunoId}`);
+        const alunoSnap = await get(alunoRef);
+        if (alunoSnap.exists()) {
+          const alunoData = alunoSnap.val();
+          const { responsavelUsuario, ...alunoSemResponsavel } = alunoData;
+          await set(alunoRef, alunoSemResponsavel);
+        }
+      }
+      
       // Força refresh do token para garantir claims atualizados
       if (auth.currentUser) {
         const token = await auth.currentUser.getIdTokenResult(true);
@@ -109,6 +208,7 @@ export default function Configuracoes() {
       setConfirmDeleteOpen(false);
       setEditDialogOpen(false);
       setEditUser(null);
+      setAlunosSelecionados([]);
       await fetchUsuarios();
     } catch (e) {
       // Mostra detalhes completos do erro
@@ -133,6 +233,7 @@ export default function Configuracoes() {
 
   useEffect(() => {
     fetchUsuarios();
+    fetchAlunos();
     // Buscar turmas do banco
     const fetchTurmas = async () => {
       const turmasRef = ref(db, 'turmas');
@@ -385,11 +486,36 @@ export default function Configuracoes() {
                       <ListItem key={user.uid} divider button onClick={() => {
                         setEditUser(user);
                         setEditRole(user.role || '');
+                        
+                        // Carregar alunos vinculados existentes se houver
+                        const alunosVinculados = user.alunosVinculados || (user.alunoVinculado ? [user.alunoVinculado] : []);
+                        if (alunosVinculados.length > 0) {
+                          const alunosCarregados = alunosVinculados.map(id => 
+                            alunos.find(aluno => aluno.id === id)
+                          ).filter(Boolean); // Remove valores undefined
+                          setAlunosSelecionados(alunosCarregados);
+                        } else {
+                          setAlunosSelecionados([]);
+                        }
+                        
                         setEditDialogOpen(true);
                       }}>
                         <ListItemText
                           primary={user.nome || user.email}
-                          secondary={user.email + (user.role ? ` • ${user.role}` : ' • (pendente)')}
+                          secondary={
+                            user.email + 
+                            (user.role ? ` • ${user.role}` : ' • (pendente)') +
+                            (user.role === 'pai' ? (() => {
+                              const alunosVinculados = user.alunosVinculados || (user.alunoVinculado ? [user.alunoVinculado] : []);
+                              if (alunosVinculados.length > 0) {
+                                const nomesAlunos = alunosVinculados.map(id => 
+                                  alunos.find(a => a.id === id)?.nome || 'Nome não encontrado'
+                                );
+                                return ` • Filhos: ${nomesAlunos.join(', ')} (${alunosVinculados.length})`;
+                              }
+                              return '';
+                            })() : '')
+                          }
                         />
                       </ListItem>
                     ))}
@@ -404,7 +530,13 @@ export default function Configuracoes() {
                   labelId="edit-role-label"
                   value={editRole}
                   label="Tipo de acesso"
-                  onChange={e => setEditRole(e.target.value)}
+                  onChange={e => {
+                    setEditRole(e.target.value);
+                    // Se mudou de "pai" para outra role, limpar seleção de alunos
+                    if (editRole === 'pai' && e.target.value !== 'pai') {
+                      setAlunosSelecionados([]);
+                    }
+                  }}
                 >
                   <MenuItem value="coordenadora">Coordenadora</MenuItem>
                   <MenuItem value="professora">Professora</MenuItem>
@@ -430,9 +562,103 @@ export default function Configuracoes() {
                   ))}
                 </Select>
               </FormControl>
+              
+              {/* Seleção de alunos (apenas para role "pai") */}
+              {editRole === 'pai' && (
+                <Box sx={{ mt: 2 }}>
+                  <Typography variant="subtitle2" gutterBottom color="primary">
+                    Vincular aos Alunos
+                  </Typography>
+                  <Autocomplete
+                    multiple
+                    options={alunos}
+                    getOptionLabel={(option) => `${option.nome} - Matrícula: ${option.matricula}`}
+                    value={alunosSelecionados}
+                    onChange={(event, newValue) => {
+                      setAlunosSelecionados(newValue);
+                    }}
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        label="Selecionar Alunos"
+                        placeholder="Digite o nome dos alunos para buscar..."
+                        variant="outlined"
+                        size="medium"
+                      />
+                    )}
+                    renderOption={(props, option) => (
+                      <Box component="li" {...props}>
+                        <Box>
+                          <Typography variant="body1" fontWeight={600}>
+                            {option.nome}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            Matrícula: {option.matricula}
+                            {option.nomePai && ` • Pai: ${option.nomePai}`}
+                            {option.nomeMae && ` • Mãe: ${option.nomeMae}`}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    )}
+                    renderTags={(tagValue, getTagProps) =>
+                      tagValue.map((option, index) => (
+                        <Chip
+                          key={option.id}
+                          label={`${option.nome} (${option.matricula})`}
+                          {...getTagProps({ index })}
+                          size="small"
+                          color="primary"
+                          variant="outlined"
+                        />
+                      ))
+                    }
+                    filterOptions={(options, { inputValue }) => {
+                      return options.filter(option =>
+                        option.nome.toLowerCase().includes(inputValue.toLowerCase()) ||
+                        option.matricula.toLowerCase().includes(inputValue.toLowerCase()) ||
+                        (option.nomePai && option.nomePai.toLowerCase().includes(inputValue.toLowerCase())) ||
+                        (option.nomeMae && option.nomeMae.toLowerCase().includes(inputValue.toLowerCase()))
+                      );
+                    }}
+                    isOptionEqualToValue={(option, value) => option.id === value?.id}
+                    noOptionsText="Nenhum aluno encontrado"
+                    sx={{ mt: 1 }}
+                  />
+                  {alunosSelecionados.length > 0 && (
+                    <Box sx={{ mt: 2, p: 2, bgcolor: '#f8fafc', borderRadius: 2, border: '1px solid #e2e8f0' }}>
+                      <Typography variant="subtitle2" color="primary" gutterBottom>
+                        Alunos Selecionados ({alunosSelecionados.length}):
+                      </Typography>
+                      {alunosSelecionados.map((aluno, index) => (
+                        <Box key={aluno.id} sx={{ mb: index < alunosSelecionados.length - 1 ? 1.5 : 0 }}>
+                          <Typography variant="body2" fontWeight={600}>
+                            {index + 1}. {aluno.nome}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary" sx={{ ml: 2 }}>
+                            Matrícula: {aluno.matricula}
+                          </Typography>
+                          {aluno.nomePai && (
+                            <Typography variant="body2" color="text.secondary" sx={{ ml: 2 }}>
+                              Pai: {aluno.nomePai}
+                            </Typography>
+                          )}
+                          {aluno.nomeMae && (
+                            <Typography variant="body2" color="text.secondary" sx={{ ml: 2 }}>
+                              Mãe: {aluno.nomeMae}
+                            </Typography>
+                          )}
+                        </Box>
+                      ))}
+                    </Box>
+                  )}
+                </Box>
+              )}
             </DialogContent>
             <DialogActions>
-              <Button onClick={() => setEditDialogOpen(false)} color="secondary">Cancelar</Button>
+              <Button onClick={() => {
+                setEditDialogOpen(false);
+                setAlunosSelecionados([]);
+              }} color="secondary">Cancelar</Button>
               <Button onClick={handleEditRole} color="primary" disabled={!editRole}>Salvar</Button>
               <Button onClick={handleInativar} color="warning">Inativar</Button>
               <Button onClick={() => setConfirmDeleteOpen(true)} color="error">Excluir</Button>

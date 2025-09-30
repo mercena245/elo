@@ -181,29 +181,36 @@ const ComportamentosSection = ({ userRole, userData }) => {
             alunosVinculados.includes(aluno.id)
           );
         } else if (userRole === 'professora') {
-          // Debug detalhado dos tipos de dados
-          console.log('🔍 ComportamentosSection - Debug detalhado:');
-          console.log('userData?.turmas:', userData?.turmas, 'tipo:', typeof userData?.turmas, 'Array?', Array.isArray(userData?.turmas));
-          if (userData?.turmas && userData.turmas.length > 0) {
-            console.log('Primeira turma:', userData.turmas[0], 'tipo:', typeof userData.turmas[0]);
+          // Solução robusta para professoras
+          console.log('🔍 ComportamentosSection - Verificando dados da professora');
+          console.log('userData?.turmas:', userData?.turmas);
+          
+          if (!userData?.turmas || userData.turmas.length === 0) {
+            console.log('⚠️ Professora não tem turmas associadas');
+            alunosFiltrados = [];
+          } else {
+            // Tentar múltiplas estratégias de comparação
+            alunosFiltrados = alunosList.filter(aluno => {
+              if (!aluno.turmaId) return false;
+              
+              // Estratégia 1: Comparação direta
+              if (userData.turmas.includes(aluno.turmaId)) return true;
+              
+              // Estratégia 2: Comparação com conversão para string
+              if (userData.turmas.includes(String(aluno.turmaId))) return true;
+              
+              // Estratégia 3: Comparação com conversão para número
+              if (userData.turmas.map(t => Number(t)).includes(Number(aluno.turmaId))) return true;
+              
+              return false;
+            });
           }
           
-          // Professoras veem alunos das suas turmas
-          alunosFiltrados = alunosList.filter(aluno => {
-            const includes = userData?.turmas?.includes(aluno.turmaId);
-            if (!includes && alunosList.length < 5) { // Log apenas para poucos alunos para não poluir
-              console.log(`Aluno ${aluno.nome}: turmaId=${aluno.turmaId} (tipo: ${typeof aluno.turmaId}) não está em turmas`, userData?.turmas);
-            }
-            return includes;
-          });
-          
-          // Debug apenas se não há alunos filtrados
-          if (alunosFiltrados.length === 0) {
-            console.log('⚠️ ComportamentosSection - Nenhum aluno encontrado para professora');
-            console.log('Turmas da professora:', userData?.turmas);
-            console.log('Alunos disponíveis:', alunosList.map(a => ({ nome: a.nome, turmaId: a.turmaId })));
-          } else {
-            console.log('✅ ComportamentosSection - Alunos encontrados:', alunosFiltrados.length);
+          console.log('✅ Alunos filtrados para professora:', alunosFiltrados.length);
+          if (alunosFiltrados.length === 0 && alunosList.length > 0) {
+            console.log('❌ Possível problema de tipos de dados:');
+            console.log('Tipos das turmas:', userData?.turmas?.map(t => typeof t));
+            console.log('Tipos dos turmaId dos alunos:', alunosList.slice(0, 3).map(a => ({ nome: a.nome, turmaId: a.turmaId, tipo: typeof a.turmaId })));
           }
         }
         

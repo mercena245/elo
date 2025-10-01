@@ -678,10 +678,11 @@ const ComportamentosSection = ({ userRole, userData }) => {
           <Box sx={{ pt: 1 }}>
             <Grid container spacing={2}>
               <Grid item xs={12} sm={6}>
-                <FormControl fullWidth sx={{ mb: 2 }}>
+                <FormControl fullWidth sx={{ mb: 2, minWidth: '250px' }}>
                   <InputLabel>Aluno</InputLabel>
                   <Select
                     value={novoComportamento.aluno}
+                    label="Aluno"
                     onChange={(e) => setNovoComportamento({ ...novoComportamento, aluno: e.target.value })}
                   >
                     {alunos.map((aluno) => (
@@ -694,10 +695,11 @@ const ComportamentosSection = ({ userRole, userData }) => {
               </Grid>
               
               <Grid item xs={12} sm={6}>
-                <FormControl fullWidth sx={{ mb: 2 }}>
+                <FormControl fullWidth sx={{ mb: 2, minWidth: '250px' }}>
                   <InputLabel>Categoria</InputLabel>
                   <Select
                     value={novoComportamento.categoria}
+                    label="Categoria"
                     onChange={(e) => setNovoComportamento({ ...novoComportamento, categoria: e.target.value, tipo: '' })}
                   >
                     {Object.entries(categorias).map(([key, cat]) => (
@@ -714,10 +716,11 @@ const ComportamentosSection = ({ userRole, userData }) => {
               
               {novoComportamento.categoria && (
                 <Grid item xs={12}>
-                  <FormControl fullWidth sx={{ mb: 2 }}>
+                  <FormControl fullWidth sx={{ mb: 2, minWidth: '250px' }}>
                     <InputLabel>Tipo</InputLabel>
                     <Select
                       value={novoComportamento.tipo}
+                      label="Tipo"
                       onChange={(e) => setNovoComportamento({ ...novoComportamento, tipo: e.target.value })}
                     >
                       {categorias[novoComportamento.categoria].opcoes.map((opcao) => (

@@ -570,10 +570,11 @@ const AvisosEspecificosSection = ({ userRole, userData }) => {
               </Grid>
               
               <Grid item xs={12} sm={6}>
-                <FormControl fullWidth sx={{ mb: 2 }}>
+                <FormControl fullWidth sx={{ mb: 2, minWidth: '250px' }}>
                   <InputLabel>Tipo</InputLabel>
                   <Select
                     value={novoAviso.tipo}
+                    label="Tipo"
                     onChange={(e) => setNovoAviso({ ...novoAviso, tipo: e.target.value })}
                   >
                     {Object.entries(tiposAviso).map(([key, tipo]) => (
@@ -586,10 +587,11 @@ const AvisosEspecificosSection = ({ userRole, userData }) => {
               </Grid>
               
               <Grid item xs={12} sm={6}>
-                <FormControl fullWidth sx={{ mb: 2 }}>
+                <FormControl fullWidth sx={{ mb: 2, minWidth: '250px' }}>
                   <InputLabel>Prioridade</InputLabel>
                   <Select
                     value={novoAviso.prioridade}
+                    label="Prioridade"
                     onChange={(e) => setNovoAviso({ ...novoAviso, prioridade: e.target.value })}
                   >
                     {Object.entries(prioridades).map(([key, prioridade]) => (
@@ -602,10 +604,11 @@ const AvisosEspecificosSection = ({ userRole, userData }) => {
               </Grid>
               
               <Grid item xs={12} sm={6}>
-                <FormControl fullWidth sx={{ mb: 2 }}>
+                <FormControl fullWidth sx={{ mb: 2, minWidth: '250px' }}>
                   <InputLabel>Destinatários</InputLabel>
                   <Select
                     value={novoAviso.tipoDestinatario}
+                    label="Destinatários"
                     onChange={(e) => setNovoAviso({ 
                       ...novoAviso, 
                       tipoDestinatario: e.target.value,
@@ -623,13 +626,14 @@ const AvisosEspecificosSection = ({ userRole, userData }) => {
               
               {novoAviso.tipoDestinatario !== 'todos' && (
                 <Grid item xs={12} sm={6}>
-                  <FormControl fullWidth sx={{ mb: 2 }}>
+                  <FormControl fullWidth sx={{ mb: 2, minWidth: '250px' }}>
                     <InputLabel>
                       {novoAviso.tipoDestinatario === 'aluno' ? 'Selecionar Alunos' : 'Selecionar Turmas'}
                     </InputLabel>
                     <Select
                       multiple
                       value={novoAviso.destinatarios}
+                      label={novoAviso.tipoDestinatario === 'aluno' ? 'Selecionar Alunos' : 'Selecionar Turmas'}
                       onChange={(e) => setNovoAviso({ ...novoAviso, destinatarios: e.target.value })}
                     >
                       {novoAviso.tipoDestinatario === 'aluno' 

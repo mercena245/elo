@@ -559,10 +559,11 @@ const AutorizacoesSection = ({ userRole, userData }) => {
               </Grid>
               
               <Grid item xs={12} sm={6}>
-                <FormControl fullWidth sx={{ mb: 2 }}>
+                <FormControl fullWidth sx={{ mb: 2, minWidth: '250px' }}>
                   <InputLabel>Tipo de Autorização</InputLabel>
                   <Select
                     value={novaAutorizacao.tipo}
+                    label="Tipo de Autorização"
                     onChange={(e) => setNovaAutorizacao({ ...novaAutorizacao, tipo: e.target.value })}
                   >
                     {Object.entries(tiposAutorizacao).map(([key, tipo]) => (
@@ -578,10 +579,11 @@ const AutorizacoesSection = ({ userRole, userData }) => {
               </Grid>
               
               <Grid item xs={12} sm={6}>
-                <FormControl fullWidth sx={{ mb: 2 }}>
+                <FormControl fullWidth sx={{ mb: 2, minWidth: '250px' }}>
                   <InputLabel>Aluno</InputLabel>
                   <Select
                     value={novaAutorizacao.aluno}
+                    label="Aluno"
                     onChange={(e) => setNovaAutorizacao({ ...novaAutorizacao, aluno: e.target.value })}
                   >
                     {alunos.map((aluno) => (

@@ -903,7 +903,7 @@ const AgendaMedicaSection = ({ userRole, userData }) => {
             </Grid>
 
             <Grid item xs={12} sm={6}>
-              <FormControl fullWidth variant="outlined">
+              <FormControl fullWidth variant="outlined" sx={{ minWidth: '250px' }}>
                 <InputLabel id="select-aluno-label">Aluno</InputLabel >
                 <Select
                   labelId="select-aluno-label"

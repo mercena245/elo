@@ -66,8 +66,8 @@ const PeriodoCard = ({
               <FormControl fullWidth>
                 <InputLabel id="periodo-select-label">Período</InputLabel>
                 <Select labelId="periodo-select-label" name="periodo" value={periodoForm.periodo} label="Período" onChange={handlePeriodoFormChange} required>
-                  <MenuItem value={1}>1</MenuItem>
-                  <MenuItem value={2}>2</MenuItem>
+                  <MenuItem value="integral">Integral</MenuItem>
+                  <MenuItem value="meio-periodo">Meio Período</MenuItem>
                 </Select>
               </FormControl>
             </Box>

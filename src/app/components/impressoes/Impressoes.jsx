@@ -931,7 +931,7 @@ const Impressoes = () => {
                   <Grid container spacing={3}>
                     {/* Filtro Turmas */}
                     <Grid item xs={12} md={6}>
-                      <FormControl fullWidth>
+                      <FormControl fullWidth sx={{ minWidth: '250px' }}>
                         <InputLabel>Turmas</InputLabel>
                         <Select
                           multiple
@@ -960,7 +960,7 @@ const Impressoes = () => {
 
                     {/* Filtro Disciplinas */}
                     <Grid item xs={12} md={6}>
-                      <FormControl fullWidth>
+                      <FormControl fullWidth sx={{ minWidth: '250px' }}>
                         <InputLabel>Disciplinas</InputLabel>
                         <Select
                           multiple
@@ -989,7 +989,7 @@ const Impressoes = () => {
 
                     {/* Filtro Professores */}
                     <Grid item xs={12} md={6}>
-                      <FormControl fullWidth>
+                      <FormControl fullWidth sx={{ minWidth: '250px' }}>
                         <InputLabel>Professores</InputLabel>
                         <Select
                           multiple
@@ -1018,7 +1018,7 @@ const Impressoes = () => {
 
                     {/* Filtro Bimestres */}
                     <Grid item xs={12} md={6}>
-                      <FormControl fullWidth>
+                      <FormControl fullWidth sx={{ minWidth: '250px' }}>
                         <InputLabel>Bimestres</InputLabel>
                         <Select
                           multiple

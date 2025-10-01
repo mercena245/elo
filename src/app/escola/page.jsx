@@ -59,7 +59,7 @@ const Escola = () => {
   const [filtroTurno, setFiltroTurno] = useState('');
   const [filtroNomeTurma, setFiltroNomeTurma] = useState('');
   const [editTurma, setEditTurma] = useState(null);
-  const [editTurmaForm, setEditTurmaForm] = useState({ nome: '', status: '', turnoId: '', periodoId: '' });
+  const [editTurmaForm, setEditTurmaForm] = useState({ nome: '', status: 'ativa', turnoId: '', periodoId: '' });
   const [savingTurma, setSavingTurma] = useState(false);
   const [isNewTurma, setIsNewTurma] = useState(false);
 
@@ -296,7 +296,7 @@ const Escola = () => {
   const handleAddTurma = async () => {
     await fetchPeriodosAtivos();
     setEditTurma(null);
-    setEditTurmaForm({ nome: '', status: '', turnoId: '', periodoId: '' });
+    setEditTurmaForm({ nome: '', status: 'ativa', turnoId: '', periodoId: '' });
     setIsNewTurma(true);
     setOpenTurmaModal(true);
   };

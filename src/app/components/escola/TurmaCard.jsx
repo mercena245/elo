@@ -70,6 +70,7 @@ const TurmaCard = ({
             <MenuItem value="Manhã">Manhã</MenuItem>
             <MenuItem value="Tarde">Tarde</MenuItem>
             <MenuItem value="Noite">Noite</MenuItem>
+            <MenuItem value="Integral">Integral</MenuItem>
           </Select>
         </FormControl>
         <TextField label="Filtrar por nome" variant="outlined" size="small" value={filtroNomeTurma} onChange={e => setFiltroNomeTurma(e.target.value)} sx={{ minWidth: 180 }} />
@@ -142,19 +143,57 @@ const TurmaCard = ({
         <DialogTitle>{isNewTurma ? 'Incluir Turma' : 'Editar Turma'}</DialogTitle>
         <DialogContent>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <TextField label="Nome" name="nome" value={editTurmaForm.nome || ''} onChange={handleTurmaFormChange} fullWidth required />
-            <TextField label="Status" name="status" value={editTurmaForm.status || ''} onChange={handleTurmaFormChange} fullWidth />
+            <TextField 
+              label="Nome" 
+              name="nome" 
+              value={editTurmaForm.nome || ''} 
+              onChange={handleTurmaFormChange} 
+              fullWidth 
+              required 
+            />
+            
+            <FormControl fullWidth>
+              <InputLabel id="status-select-label">Status</InputLabel>
+              <Select 
+                labelId="status-select-label" 
+                name="status" 
+                value={editTurmaForm.status || 'ativa'} 
+                label="Status" 
+                onChange={handleTurmaFormChange}
+              >
+                <MenuItem value="ativa">Ativa</MenuItem>
+                <MenuItem value="inativa">Inativa</MenuItem>
+              </Select>
+            </FormControl>
+            
             <FormControl fullWidth>
               <InputLabel id="turno-select-label">Turno</InputLabel>
-              <Select labelId="turno-select-label" name="turnoId" value={editTurmaForm.turnoId || ''} label="Turno" onChange={handleTurmaFormChange} required>
+              <Select 
+                labelId="turno-select-label" 
+                name="turnoId" 
+                value={editTurmaForm.turnoId || ''} 
+                label="Turno" 
+                onChange={handleTurmaFormChange} 
+                required
+              >
                 <MenuItem value="Manhã">Manhã</MenuItem>
                 <MenuItem value="Tarde">Tarde</MenuItem>
                 <MenuItem value="Noite">Noite</MenuItem>
+                <MenuItem value="Integral">Integral</MenuItem>
               </Select>
             </FormControl>
+            
             <FormControl fullWidth required>
               <InputLabel id="periodo-select-label-turma">Período</InputLabel>
-              <Select labelId="periodo-select-label-turma" name="periodoId" value={editTurmaForm.periodoId || ''} label="Período" onChange={handleTurmaFormChange} required disabled={loadingPeriodosAtivos}>
+              <Select 
+                labelId="periodo-select-label-turma" 
+                name="periodoId" 
+                value={editTurmaForm.periodoId || ''} 
+                label="Período" 
+                onChange={handleTurmaFormChange} 
+                required 
+                disabled={loadingPeriodosAtivos}
+              >
                 {loadingPeriodosAtivos ? (
                   <MenuItem value=""><CircularProgress size={20} /></MenuItem>
                 ) : periodosAtivos.length === 0 ? (

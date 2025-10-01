@@ -65,10 +65,10 @@ const RegistroFaltas = ({ professorId = null }) => {
   }, []);
 
   useEffect(() => {
-    if (filtros.turmaId) {
+    if (filtros.turmaId && turmas.length > 0) {
       carregarAlunos();
     }
-  }, [filtros.turmaId]);
+  }, [filtros.turmaId, turmas]);
 
   useEffect(() => {
     if (filtros.turmaId && filtros.disciplinaId && filtros.professorIdSelecionado && filtros.data) {

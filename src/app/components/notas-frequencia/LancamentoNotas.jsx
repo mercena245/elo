@@ -44,15 +44,22 @@ const LancamentoNotas = ({ professorId = null }) => {
   const [turmas, setTurmas] = useState([]);
   const [disciplinas, setDisciplinas] = useState([]);
   const [professores, setProfessores] = useState([]);
-  const [periodos, setPeriodos] = useState([]);
   const [alunos, setAlunos] = useState([]);
   const [notas, setNotas] = useState([]);
+  
+  // Bimestres fixos
+  const bimestres = [
+    { id: '1º Bimestre', nome: '1º Bimestre' },
+    { id: '2º Bimestre', nome: '2º Bimestre' },
+    { id: '3º Bimestre', nome: '3º Bimestre' },
+    { id: '4º Bimestre', nome: '4º Bimestre' }
+  ];
   
   const [filtros, setFiltros] = useState({
     turmaId: '',
     disciplinaId: '',
     professorIdSelecionado: professorId || '',
-    periodoId: ''
+    bimestre: ''
   });
   
   const [notasEditadas, setNotasEditadas] = useState({});
@@ -71,27 +78,43 @@ const LancamentoNotas = ({ professorId = null }) => {
   }, [filtros.turmaId, turmas]);
 
   useEffect(() => {
-    if (filtros.turmaId && filtros.disciplinaId && filtros.professorIdSelecionado && filtros.periodoId) {
+    if (filtros.turmaId && filtros.disciplinaId && filtros.professorIdSelecionado && filtros.bimestre) {
       carregarNotas();
     }
-  }, [filtros.turmaId, filtros.disciplinaId, filtros.professorIdSelecionado, filtros.periodoId]);
+  }, [filtros.turmaId, filtros.disciplinaId, filtros.professorIdSelecionado, filtros.bimestre]);
 
   const carregarDados = async () => {
     setLoading(true);
     try {
-      const [turmasSnap, disciplinasSnap, usuariosSnap, escolaSnap] = await Promise.all([
+      const [turmasSnap, disciplinasSnap, usuariosSnap] = await Promise.all([
         get(ref(db, 'turmas')),
         get(ref(db, 'disciplinas')),
-        get(ref(db, 'usuarios')),
-        get(ref(db, 'Escola/Periodo'))
+        get(ref(db, 'usuarios'))
       ]);
 
-      // Carregar turmas
-      const turmasData = [];
+      // Carregar turmas - aplicar filtro para professoras
+      let turmasData = [];
       if (turmasSnap.exists()) {
+        const todasTurmas = [];
         Object.entries(turmasSnap.val()).forEach(([id, data]) => {
-          turmasData.push({ id, ...data });
+          todasTurmas.push({ id, ...data });
         });
+
+        // Se é professora, filtrar apenas suas turmas usando ID
+        if (professorId) {
+          const professoraSnap = await get(ref(db, `usuarios/${professorId}`));
+          if (professoraSnap.exists()) {
+            const professoraData = professoraSnap.val();
+            const minhasTurmas = professoraData.turmas || [];
+            
+            turmasData = todasTurmas.filter(turma => 
+              minhasTurmas.includes(turma.id)
+            );
+          }
+        } else {
+          // Se é coordenadora, mostrar todas as turmas
+          turmasData = todasTurmas;
+        }
       }
       setTurmas(turmasData);
 
@@ -115,15 +138,6 @@ const LancamentoNotas = ({ professorId = null }) => {
       }
       setProfessores(professoresData);
 
-      // Carregar períodos letivos
-      const periodosData = [];
-      if (escolaSnap.exists()) {
-        Object.entries(escolaSnap.val()).forEach(([id, data]) => {
-          periodosData.push({ id, ...data });
-        });
-      }
-      setPeriodos(periodosData);
-
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
     } finally {
@@ -137,6 +151,23 @@ const LancamentoNotas = ({ professorId = null }) => {
       const alunosData = [];
       
       if (alunosSnap.exists()) {
+        // Se é professora, verificar se tem permissão para ver esta turma
+        if (professorId) {
+          const professoraSnap = await get(ref(db, `usuarios/${professorId}`));
+          
+          if (professoraSnap.exists()) {
+            const professoraData = professoraSnap.val();
+            const minhasTurmas = professoraData.turmas || [];
+            
+            // Verificar se a turma selecionada está nas turmas da professora usando ID
+            if (!minhasTurmas.includes(filtros.turmaId)) {
+              console.log('Professora não tem acesso a esta turma');
+              setAlunos([]);
+              return;
+            }
+          }
+        }
+        
         Object.entries(alunosSnap.val()).forEach(([id, data]) => {
           if (data.turmaId === filtros.turmaId) {
             alunosData.push({ id, ...data });
@@ -163,7 +194,7 @@ const LancamentoNotas = ({ professorId = null }) => {
             data.turmaId === filtros.turmaId &&
             data.disciplinaId === filtros.disciplinaId &&
             data.professorId === filtros.professorIdSelecionado &&
-            data.periodoId === filtros.periodoId
+            data.bimestre === filtros.bimestre
           ) {
             notasData.push({ id, ...data });
           }
@@ -212,7 +243,7 @@ const LancamentoNotas = ({ professorId = null }) => {
           turmaId: filtros.turmaId,
           disciplinaId: filtros.disciplinaId,
           professorId: filtros.professorIdSelecionado,
-          periodoId: filtros.periodoId,
+          bimestre: filtros.bimestre,
           nota: parseFloat(nota),
           dataLancamento: new Date().toISOString(),
           createdAt: notaExistente?.createdAt || new Date().toISOString(),
@@ -339,15 +370,15 @@ const LancamentoNotas = ({ professorId = null }) => {
 
             <Grid item xs={12} sx={{ minWidth: '300px' }}>
               <FormControl fullWidth sx={{ minWidth: '250px' }}>
-                <InputLabel>Período Letivo</InputLabel>
+                <InputLabel>Bimestre</InputLabel>
                 <Select
-                  value={filtros.periodoId}
-                  label="Período Letivo"
-                  onChange={(e) => setFiltros(prev => ({ ...prev, periodoId: e.target.value }))}
+                  value={filtros.bimestre}
+                  label="Bimestre"
+                  onChange={(e) => setFiltros(prev => ({ ...prev, bimestre: e.target.value }))}
                 >
-                  {periodos.map((periodo) => (
-                    <MenuItem key={periodo.id} value={periodo.id}>
-                      {periodo.nome || `Período ${periodo.id}`}
+                  {bimestres.map((bimestre) => (
+                    <MenuItem key={bimestre.id} value={bimestre.id}>
+                      {bimestre.nome}
                     </MenuItem>
                   ))}
                 </Select>
@@ -371,12 +402,12 @@ const LancamentoNotas = ({ professorId = null }) => {
       )}
 
       {/* Tabela de Notas */}
-      {filtros.turmaId && filtros.disciplinaId && filtros.professorIdSelecionado && filtros.periodoId && alunos.length > 0 && (
+      {filtros.turmaId && filtros.disciplinaId && filtros.professorIdSelecionado && filtros.bimestre && alunos.length > 0 && (
         <Card>
           <CardContent>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
               <Typography variant="h6" fontWeight={600}>
-                📊 Lançamento de Notas - Período Selecionado
+                📊 Lançamento de Notas - {filtros.bimestre}
               </Typography>
               <Button
                 variant="contained"
@@ -475,7 +506,7 @@ const LancamentoNotas = ({ professorId = null }) => {
       )}
 
       {/* Estado vazio */}
-      {(!filtros.turmaId || !filtros.disciplinaId || !filtros.professorIdSelecionado || !filtros.periodoId) && (
+      {(!filtros.turmaId || !filtros.disciplinaId || !filtros.professorIdSelecionado || !filtros.bimestre) && (
         <Card>
           <CardContent sx={{ textAlign: 'center', py: 4 }}>
             <School sx={{ fontSize: 48, color: 'text.secondary', mb: 2 }} />
@@ -483,7 +514,7 @@ const LancamentoNotas = ({ professorId = null }) => {
               Selecione os filtros para começar
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Escolha a turma, disciplina{!professorId && ', professor'} e período letivo para lançar as notas.
+              Escolha a turma, disciplina{!professorId && ', professor'} e bimestre para lançar as notas.
             </Typography>
           </CardContent>
         </Card>

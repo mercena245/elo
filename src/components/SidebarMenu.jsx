@@ -131,7 +131,9 @@ const SidebarMenu = () => {
     { icon: FaCalendarAlt, label: 'Agenda', path: '/agenda', color: '#F97316' },
     { icon: FaCashRegister, label: 'Caixa (Financeiro)', path: '#', color: '#10B981' },
     { icon: FaEnvelope, label: 'Avisos', path: '/avisos', color: '#8B5CF6' },
-    { icon: FaPrint, label: 'Impressões', path: '#', color: '#6B7280' },
+    ...(userRole === 'coordenadora' ? [
+      { icon: FaPrint, label: 'Impressões', path: '/impressoes', color: '#6B7280' }
+    ] : []),
     { icon: FaImages, label: 'Galeria de Fotos', path: '/galeriafotos', color: '#EC4899' }
   ];
 

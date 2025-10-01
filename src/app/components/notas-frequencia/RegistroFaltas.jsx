@@ -85,12 +85,29 @@ const RegistroFaltas = ({ professorId = null }) => {
         get(ref(db, 'usuarios'))
       ]);
 
-      // Carregar turmas
-      const turmasData = [];
+      // Carregar turmas - aplicar filtro para professoras
+      let turmasData = [];
       if (turmasSnap.exists()) {
+        const todasTurmas = [];
         Object.entries(turmasSnap.val()).forEach(([id, data]) => {
-          turmasData.push({ id, ...data });
+          todasTurmas.push({ id, ...data });
         });
+
+        // Se é professora, filtrar apenas suas turmas usando ID
+        if (professorId) {
+          const professoraSnap = await get(ref(db, `usuarios/${professorId}`));
+          if (professoraSnap.exists()) {
+            const professoraData = professoraSnap.val();
+            const minhasTurmas = professoraData.turmas || [];
+            
+            turmasData = todasTurmas.filter(turma => 
+              minhasTurmas.includes(turma.id)
+            );
+          }
+        } else {
+          // Se é coordenadora, mostrar todas as turmas
+          turmasData = todasTurmas;
+        }
       }
       setTurmas(turmasData);
 
@@ -127,6 +144,23 @@ const RegistroFaltas = ({ professorId = null }) => {
       const alunosData = [];
       
       if (alunosSnap.exists()) {
+        // Se é professora, verificar se tem permissão para ver esta turma
+        if (professorId) {
+          const professoraSnap = await get(ref(db, `usuarios/${professorId}`));
+          
+          if (professoraSnap.exists()) {
+            const professoraData = professoraSnap.val();
+            const minhasTurmas = professoraData.turmas || [];
+            
+            // Verificar se a turma selecionada está nas turmas da professora usando ID
+            if (!minhasTurmas.includes(filtros.turmaId)) {
+              console.log('Professora não tem acesso a esta turma');
+              setAlunos([]);
+              return;
+            }
+          }
+        }
+        
         Object.entries(alunosSnap.val()).forEach(([id, data]) => {
           if (data.turmaId === filtros.turmaId) {
             alunosData.push({ id, ...data });

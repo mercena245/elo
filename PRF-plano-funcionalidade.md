@@ -288,16 +288,16 @@ configuracaoFinanceira: {
 - **45 dias após**: Notificação de cancelamento
 
 #### 4.2 Canais de Comunicação
-- **WhatsApp Business API**
-- **Email automático**
-- **SMS** (opcional)
+- 
+- **Email automático - cadastrado**
+
 - **Notificação no app**
 
 ### 5. 🏦 **Integração com Sistemas de Pagamento**
 
 #### 5.1 Métodos de Pagamento
 - **PIX**: Geração automática de QR Code
-- **Boleto Bancário**: Integração com bancos
+
 - **Cartão de Crédito**: Gateway de pagamento
 - **Transferência Bancária**
 - **Dinheiro**: Registro manual
@@ -307,6 +307,254 @@ configuracaoFinanceira: {
 - **Baixa automática** de títulos pagos
 - **Controle de divergências**
 - **Estorno** e cancelamentos
+
+---
+
+## 🏦 **Integração Bancária e Gateways - Passo a Passo**
+
+### 📋 **Opções de Integração Recomendadas**
+
+#### 🥇 **1. MERCADO PAGO (Recomendado para Começar)**
+
+**✅ Vantagens:**
+- API completa e bem documentada
+- PIX, Cartão, Boleto em uma só integração
+- Webhook nativo para confirmações
+- Ambiente sandbox para testes
+- Taxa competitiva: 3,99% cartão + R$ 0,40
+- Suporte brasileiro 24/7
+
+**📋 Pré-requisitos:**
+- [ ] **Conta Mercado Pago**: Criar conta empresarial
+- [ ] **CNPJ da Escola**: Necessário para conta empresarial
+- [ ] **Conta Bancária**: Para recebimento dos valores
+- [ ] **Certificado SSL**: Obrigatório para webhooks
+
+**🔧 Implementação:**
+
+**Passo 1: Configuração da Conta**
+```bash
+# 1. Criar conta no Mercado Pago
+https://www.mercadopago.com.br/developers
+
+# 2. Verificar conta empresarial
+- Enviar documentos do CNPJ
+- Aguardar aprovação (1-3 dias úteis)
+
+# 3. Obter credenciais
+- Access Token (Produção)
+- Public Key (Frontend)
+- Client ID e Client Secret
+```
+
+**Passo 2: Configuração Técnica**
+```javascript
+// Instalação SDK
+npm install mercadopago
+
+// Configuração básica
+import { MercadoPagoConfig, Payment } from 'mercadopago';
+
+const client = new MercadoPagoConfig({ 
+  accessToken: 'YOUR_ACCESS_TOKEN',
+  options: { timeout: 5000 }
+});
+```
+
+**Passo 3: Criar Pagamento PIX**
+```javascript
+const createPixPayment = async (tituloData) => {
+  const payment = new Payment(client);
+  
+  const body = {
+    transaction_amount: tituloData.valor,
+    description: tituloData.descricao,
+    payment_method_id: 'pix',
+    payer: {
+      email: tituloData.email,
+      first_name: tituloData.nome,
+      identification: {
+        type: 'CPF',
+        number: tituloData.cpf
+      }
+    },
+    notification_url: 'https://sua-escola.com/webhook/mercadopago'
+  };
+  
+  const response = await payment.create({ body });
+  return response;
+};
+```
+
+**Passo 4: Webhook de Confirmação**
+```javascript
+// Endpoint para receber notificações
+app.post('/webhook/mercadopago', async (req, res) => {
+  const { data, type } = req.body;
+  
+  if (type === 'payment') {
+    const payment = await getPaymentById(data.id);
+    
+    if (payment.status === 'approved') {
+      // Baixar título no sistema
+      await baixarTitulo(payment.external_reference);
+    }
+  }
+  
+  res.status(200).send('OK');
+});
+```
+
+#### 🥈 **2. BANCO DO BRASIL / CAIXA (Boletos)**
+
+**📋 Pré-requisitos:**
+- [ ] **Conta Corrente Empresarial** no banco
+- [ ] **Convênio de Cobrança** (negociar com gerente)
+- [ ] **Certificado Digital A1** (para autenticação API)
+- [ ] **IP Fixo** (alguns bancos exigem)
+
+**💰 Custos:**
+- **Taxa de adesão**: R$ 200-500 (única)
+- **Taxa mensal**: R$ 30-80
+- **Por boleto**: R$ 0,30-0,80
+- **Arquivo retorno**: R$ 5-15
+
+**🔧 Configuração BB:**
+```bash
+# 1. Solicitar convênio no gerente
+- Convênio de cobrança registrada
+- Número do convênio (6-8 dígitos)
+- Carteira de cobrança
+
+# 2. Instalar certificado A1
+- Baixar certificado do banco
+- Instalar no servidor de aplicação
+
+# 3. Configurar API
+- Endpoint: https://api.bb.com.br
+- Client ID e Client Secret
+- Scope: cobrancas.boletos
+```
+
+#### 🥉 **3. PAGSEGURO / STONE**
+
+**📊 Comparativo de Taxas:**
+```
+┌─────────────────┬──────────┬──────────┬─────────────┐
+│ Método          │ Mercado  │ PagSeguro│ Stone       │
+│                 │ Pago     │          │             │
+├─────────────────┼──────────┼──────────┼─────────────┤
+│ PIX             │ 0,99%    │ 0,99%    │ 0,60%       │
+│ Cartão Débito   │ 2,99%    │ 2,79%    │ 1,50%       │
+│ Cartão Crédito  │ 3,99%    │ 4,99%    │ 2,95%       │
+│ Boleto          │ R$ 3,49  │ R$ 3,45  │ R$ 2,90     │
+└─────────────────┴──────────┴──────────┴─────────────┘
+```
+
+### 🚀 **Roadmap de Implementação**
+
+#### **Fase 1: Mercado Pago PIX (1 semana)**
+```bash
+Dia 1-2: 
+- [x] Criar conta Mercado Pago
+- [x] Verificar documentos
+- [x] Obter credenciais de teste
+
+Dia 3-4:
+- [ ] Implementar SDK no projeto
+- [ ] Criar endpoint de geração PIX
+- [ ] Implementar webhook básico
+
+Dia 5-7:
+- [ ] Testes em sandbox
+- [ ] Integração com sistema de títulos
+- [ ] Deploy em produção
+```
+
+#### **Fase 2: Cartão de Crédito (1 semana)**
+```bash
+Dia 1-3:
+- [ ] Implementar tokenização de cartão
+- [ ] Interface de captura segura
+- [ ] Validações de segurança
+
+Dia 4-7:
+- [ ] Parcelamento automático
+- [ ] Gestão de estornos
+- [ ] Relatórios de transação
+```
+
+#### **Fase 3: Boleto Bancário (2 semanas)**
+```bash
+Semana 1:
+- [ ] Negociar convênio com banco
+- [ ] Configurar certificado digital
+- [ ] Implementar API de geração
+
+Semana 2:
+- [ ] Arquivo remessa automático
+- [ ] Processamento de retorno
+- [ ] Conciliação bancária
+```
+
+### 🔒 **Segurança e Compliance**
+
+#### **Checklist de Segurança:**
+- [ ] **HTTPS obrigatório** em todos os endpoints
+- [ ] **Tokenização** de dados sensíveis (cartão)
+- [ ] **Validação** de webhooks (signature)
+- [ ] **Rate limiting** nas APIs
+- [ ] **Logs criptografados** de transações
+- [ ] **Backup** de dados financeiros
+- [ ] **Conformidade PCI-DSS** (para cartões)
+
+#### **Variáveis de Ambiente:**
+```bash
+# .env (NUNCA commitar)
+MERCADOPAGO_ACCESS_TOKEN=TEST-1234567890
+MERCADOPAGO_PUBLIC_KEY=TEST-abcdef123456
+MERCADOPAGO_WEBHOOK_SECRET=your-webhook-secret
+
+# Banco
+BANCO_CERTIFICADO_PATH=/path/to/cert.p12
+BANCO_CERTIFICADO_PASSWORD=senha-certificado
+BANCO_CONVENIO=1234567
+```
+
+### 📊 **Monitoramento e Métricas**
+
+#### **KPIs Essenciais:**
+- **Taxa de conversão** por método de pagamento
+- **Tempo médio** de confirmação
+- **Taxa de estorno** por método
+- **Custo efetivo** por transação
+- **Disponibilidade** das APIs
+- **Latência** de webhooks
+
+#### **Alertas Automáticos:**
+- 🚨 **Webhook fora do ar** > 5 minutos
+- 🚨 **Taxa de falha** > 5%
+- 🚨 **Transação suspeita** (valor alto)
+- 🚨 **Limite de transações** atingido
+
+### 💡 **Dicas de Implementação**
+
+#### **Melhores Práticas:**
+1. **Começar com Mercado Pago PIX** (mais simples)
+2. **Implementar idempotência** (evitar duplicações)
+3. **Usar filas** para processamento assíncrono
+4. **Cache de tokens** (renovação automática)
+5. **Retry automático** em falhas temporárias
+6. **Logs estruturados** para auditoria
+
+#### **Armadilhas Comuns:**
+- ❌ **Não validar webhooks** (segurança)
+- ❌ **Processar webhook duas vezes** (duplicação)
+- ❌ **Não tratar timeout** de APIs
+- ❌ **Hardcode de credenciais** no código
+- ❌ **Não testar cenários de falha**
+
+---
 
 ### 6. 📱 **Interface do Sistema Financeiro**
 
@@ -409,6 +657,157 @@ configuracaoFinanceira: {
 - ✅ Conformidade LGPD
 - ✅ Certificado SSL válido
 - ✅ Autenticação multifator (opcional)
+
+---
+
+## 🎯 **PRÓXIMOS PASSOS IMEDIATOS - ACTION PLAN**
+
+### 📋 **Semana 1: Preparação (Você precisa fazer)**
+
+#### **🏦 Definir Integração Bancária**
+- [ ] **Mercado Pago** (Recomendado): 
+  - Acesse: https://www.mercadopago.com.br/developers
+  - Criar conta empresarial com CNPJ
+  - Solicitar verificação de conta
+- [ ] **Alternativa - Banco Tradicional**:
+  - Agendar reunião com gerente do banco
+  - Solicitar proposta de convênio de cobrança
+  - Comparar taxas e prazos
+
+#### **📄 Documentação Necessária**
+- [ ] **CNPJ** da escola (obrigatório)
+- [ ] **Contrato Social** atualizado
+- [ ] **Comprovante de Endereço** da empresa
+- [ ] **Conta Bancária** empresarial ativa
+- [ ] **Certificado SSL** válido para o domínio
+
+### 📋 **Semana 2: Configuração Técnica (Para Implementar)**
+
+#### **🔧 Preparar Ambiente**
+```bash
+# 1. Configurar variáveis de ambiente
+MERCADOPAGO_ACCESS_TOKEN_SANDBOX=TEST-xxx
+MERCADOPAGO_PUBLIC_KEY_SANDBOX=TEST-xxx
+MERCADOPAGO_WEBHOOK_URL=https://sua-escola.com/webhook
+
+# 2. Instalar dependências
+npm install mercadopago
+npm install express-rate-limit
+npm install crypto
+```
+
+#### **🔗 Endpoints Necessários**
+```javascript
+// APIs que precisam ser criadas:
+POST /api/financeiro/gerar-pix         // Gerar pagamento PIX
+POST /api/financeiro/gerar-cartao      // Processar cartão
+POST /webhook/mercadopago              // Receber confirmações
+GET  /api/financeiro/status/:id        // Consultar status
+POST /api/financeiro/estorno/:id       // Processar estorno
+```
+
+### 📋 **Semana 3-4: Implementação Base**
+
+#### **🏗️ Estrutura de Dados**
+```javascript
+// Adicionar ao Firebase:
+titulos_financeiros: {
+  titulo_id: {
+    alunoId: "string",
+    tipo: "matricula|mensalidade|taxa",
+    valorOriginal: 800.00,
+    valorFinal: 720.00,
+    dataVencimento: "2025-10-15",
+    status: "pendente|pago|vencido",
+    paymentId: "mp_payment_123",  // ID do Mercado Pago
+    qrCode: "base64_qr_code",     // Para PIX
+    linkPagamento: "https://...",  // Para cartão
+    createdAt: "timestamp",
+    updatedAt: "timestamp"
+  }
+}
+```
+
+#### **🎨 Telas Básicas**
+- [ ] **Dashboard Financeiro** (métricas simples)
+- [ ] **Lista de Títulos** (filtros básicos)
+- [ ] **Gerar Pagamento** (PIX + Cartão)
+- [ ] **Webhook Handler** (confirmação automática)
+
+### 📋 **Cronograma Detalhado (30 dias)**
+
+```
+📅 Semana 1 (Dias 1-7): PREPARAÇÃO
+├── Dia 1: Criar conta Mercado Pago
+├── Dia 2: Enviar documentos verificação  
+├── Dia 3: Configurar domínio SSL
+├── Dia 4: Definir estrutura de dados
+├── Dia 5: Instalar dependências
+├── Dia 6-7: Estudar APIs Mercado Pago
+
+📅 Semana 2 (Dias 8-14): BACKEND
+├── Dia 8-9: Implementar serviço PIX
+├── Dia 10-11: Criar webhook handler
+├── Dia 12-13: Sistema de títulos
+├── Dia 14: Testes unitários básicos
+
+📅 Semana 3 (Dias 15-21): FRONTEND  
+├── Dia 15-16: Dashboard financeiro
+├── Dia 17-18: Lista de títulos
+├── Dia 19-20: Interface pagamento
+├── Dia 21: Responsividade mobile
+
+📅 Semana 4 (Dias 22-30): INTEGRAÇÃO
+├── Dia 22-24: Testes sandbox completos
+├── Dia 25-26: Deploy produção
+├── Dia 27-28: Testes com valores reais
+├── Dia 29-30: Ajustes e documentação
+```
+
+### 🚨 **ALERTAS IMPORTANTES**
+
+#### **⚠️ Cuidados de Segurança**
+```bash
+# NUNCA fazer:
+❌ Commitar tokens de produção no Git
+❌ Processar dados de cartão no frontend  
+❌ Ignorar validação de webhooks
+❌ Usar HTTP (sempre HTTPS)
+
+# SEMPRE fazer:
+✅ Usar variáveis de ambiente
+✅ Validar assinatura dos webhooks
+✅ Logs criptografados para auditoria
+✅ Rate limiting nas APIs públicas
+```
+
+#### **💰 Custos Estimados (Primeiro Mês)**
+```
+Mercado Pago:
+├── 📊 Taxa por transação: 0,99% (PIX) - 3,99% (Cartão)
+├── 📱 Sem taxa de adesão ou mensalidade
+├── 💳 Antecipação automática em 14 dias
+└── 🎯 Estimativa: R$ 150-300 (baseado em 50 transações)
+
+Banco Tradicional (se escolher):
+├── 💰 Taxa adesão: R$ 200-500
+├── 📅 Mensalidade: R$ 30-80  
+├── 📄 Por boleto: R$ 0,30-0,80
+└── 🎯 Estimativa: R$ 400-800 primeiro mês
+```
+
+### 📞 **Contatos e Suporte**
+
+#### **🆘 Se Precisar de Ajuda**
+- **Mercado Pago**: https://www.mercadopago.com.br/developers/pt/support
+- **Documentação**: https://www.mercadopago.com.br/developers/pt/docs
+- **Sandbox**: https://www.mercadopago.com.br/developers/pt/guides/sdks
+- **Status APIs**: https://status.mercadopago.com/
+
+#### **📚 Material de Estudo**
+- Guia PIX: https://www.mercadopago.com.br/developers/pt/docs/checkout-pro/integration-configuration/pix
+- Webhooks: https://www.mercadopago.com.br/developers/pt/docs/notifications/webhooks
+- Segurança: https://www.mercadopago.com.br/developers/pt/docs/security
 
 ---
 

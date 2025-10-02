@@ -76,12 +76,15 @@ export const financeiroService = {
         titulosGerados.push({ id: novoTituloRef.key, tipo: 'matricula', valor: valorMatriculaNum });
       }
 
-      // 2. Gerar mensalidades para o ano letivo (12 meses)
+      // 2. Gerar mensalidades do mês atual até dezembro
       const valorMensalidadeComDesconto = mensalidadeNum * (1 - descontoNum / 100);
+      const mesAtual = hoje.getMonth(); // 0-11 (Janeiro=0, Dezembro=11)
+      const anoAtual = hoje.getFullYear();
+      const mesesRestantes = 12 - mesAtual; // Quantos meses restam até dezembro
       
-      for (let i = 0; i < 12; i++) {
-        const mesVencimento = (hoje.getMonth() + i) % 12;
-        const anoVencimento = hoje.getFullYear() + Math.floor((hoje.getMonth() + i) / 12);
+      for (let i = 0; i < mesesRestantes; i++) {
+        const mesVencimento = mesAtual + i;
+        const anoVencimento = anoAtual;
         const vencimento = new Date(anoVencimento, mesVencimento, diaVencNum);
 
         const mensalidade = {

@@ -979,7 +979,7 @@ const Alunos = () => {
                           <Alert severity="info" sx={{ mb: 2 }}>
                             💰 <strong>Sistema Financeiro Automático:</strong><br />
                             - Se informar valor de matrícula, o aluno ficará em "pré-matrícula" até o pagamento<br />
-                            - Mensalidades serão geradas automaticamente para o ano letivo (12 meses)<br />
+                            - Mensalidades serão geradas automaticamente do mês atual até dezembro<br />
                             - Status financeiro será atualizado automaticamente conforme pagamentos
                           </Alert>
                           

@@ -159,7 +159,10 @@ const FinanceiroPage = () => {
         setUserId(null);
         setUserRole(null);
         setRoleChecked(true);
-        router.push('/login');
+        // Evitar redirecionamento se já estamos na página de login ou se é a primeira carga
+        if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+          router.push('/login');
+        }
       }
     });
 

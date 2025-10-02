@@ -71,6 +71,14 @@
         "destination": "/register/index.html"
       },
       {
+        "source": "/secretaria-digital",
+        "destination": "/secretaria-digital/index.html"
+      },
+      {
+        "source": "/validacao",
+        "destination": "/validacao/index.html"
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }

@@ -43,7 +43,7 @@ import {
   Circle
 } from '@mui/icons-material';
 import { db, ref, get, push, set, storage, storageRef, uploadBytes, getDownloadURL, auth } from '../../../firebase';
-import { auditService, LOG_ACTIONS } from '../../services/auditService';
+import { auditService, LOG_ACTIONS } from '../../../services/auditService';
 
 const MensagensSection = ({ userRole, userData }) => {
   const [conversas, setConversas] = useState([]);

@@ -63,7 +63,7 @@ import {
   Close
 } from '@mui/icons-material';
 import { db, ref, get, push, set, storage, storageRef, uploadBytes, getDownloadURL } from '../../../firebase';
-import { auditService, LOG_ACTIONS } from '../../services/auditService';
+import { auditService, LOG_ACTIONS } from '../../../services/auditService';
 
 const DiarioSection = ({ userRole, userData }) => {
   // Funções para detectar tipo de turma baseado no turnoId

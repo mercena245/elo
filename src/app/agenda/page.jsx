@@ -32,7 +32,7 @@ import {
   CheckCircle,
   Schedule
 } from '@mui/icons-material';
-import { db, ref, get, auth } from '../../firebase';
+import { db, ref, get, auth, onAuthStateChanged } from '../../firebase';
 
 // Componentes das seções
 import MensagensSection from './components/MensagensSection';
@@ -46,6 +46,7 @@ const Agenda = () => {
   const [activeTab, setActiveTab] = useState(0);
   const [userRole, setUserRole] = useState('');
   const [userData, setUserData] = useState(null);
+  const [userId, setUserId] = useState(null);
   const [resumoNotificacoes, setResumoNotificacoes] = useState({
     mensagensNaoLidas: 0,
     medicacoesPendentes: 0,
@@ -56,7 +57,21 @@ const Agenda = () => {
   });
   const [loading, setLoading] = useState(true);
   const router = useRouter();
-  const userId = auth.currentUser ? auth.currentUser.uid : null;
+  
+  // Listener de autenticação
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        setUserId(user.uid);
+      } else {
+        setUserId(null);
+        setUserRole('');
+        router.push('/login');
+      }
+    });
+
+    return () => unsubscribe();
+  }, [router]);
 
   useEffect(() => {
     const fetchUserData = async () => {

@@ -14,6 +14,7 @@ import { storage } from '../../firebase-storage';
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import { deleteObject } from "firebase/storage";
 import { auditService, LOG_ACTIONS } from '../../services/auditService';
+import { financeiroService } from '../../services/financeiroService';
 
 import { set } from 'firebase/database';
 
@@ -44,6 +45,9 @@ const Alunos = () => {
   const [filtroMatricula, setFiltroMatricula] = useState('');
   const [formStep, setFormStep] = useState(1); // 1 = dados pessoais, 2 = dados financeiros
   const [financeiroError, setFinanceiroError] = useState('');
+  const [gerandoTitulos, setGerandoTitulos] = useState(false);
+  const [resultadoTitulos, setResultadoTitulos] = useState(null);
+  const [statusMatricula, setStatusMatricula] = useState(null);
   const [inativarDialogOpen, setInativarDialogOpen] = useState(false);
   const [inativarMotivo, setInativarMotivo] = useState('');
   // Estado para anexos temporários
@@ -203,23 +207,75 @@ const Alunos = () => {
         )
       : [];
 
-  const handleEditAluno = aluno => {
+  const handleEditAluno = async aluno => {
     setEditAluno(aluno);
+    
     // Garante estrutura financeira ao editar, mesmo que não exista ainda
     setEditForm({ 
       ...aluno,
       financeiro: {
         mensalidadeValor: aluno.financeiro?.mensalidadeValor || '',
         descontoPercentual: aluno.financeiro?.descontoPercentual || '',
-        diaVencimento: aluno.financeiro?.diaVencimento || '',
+        diaVencimento: aluno.financeiro?.diaVencimento || '10',
         status: aluno.financeiro?.status || 'ativo',
+        valorMatricula: aluno.financeiro?.valorMatricula || '',
         observacoes: aluno.financeiro?.observacoes || ''
       }
     });
+    
     setIsNew(false);
     setEditOpen(true);
     setFormError('');
     setFormStep(1);
+    setResultadoTitulos(null);
+    
+    // Verificar status da matrícula se o aluno estiver em pré-matrícula
+    if (aluno.status === 'pre_matricula') {
+      const statusMatricula = await financeiroService.verificarStatusMatricula(aluno.id);
+      setStatusMatricula(statusMatricula);
+    } else {
+      setStatusMatricula(null);
+    }
+  };
+
+  // Ativar aluno após pagamento da matrícula
+  const handleAtivarAluno = async () => {
+    if (!editAluno || !editAluno.id) return;
+    
+    setSaving(true);
+    try {
+      const alunoAtualizado = {
+        ...editForm,
+        status: 'ativo',
+        dataAtivacao: new Date().toISOString()
+      };
+      
+      await set(ref(db, `alunos/${editAluno.id}`), alunoAtualizado);
+      
+      // Log da ativação
+      await auditService.logAction(
+        'student_activated',
+        userId,
+        {
+          entityId: editAluno.id,
+          description: `Aluno ativado após confirmação de pagamento da matrícula: ${editForm.nome}`,
+          changes: {
+            statusAnterior: 'pre_matricula',
+            novoStatus: 'ativo',
+            dataAtivacao: alunoAtualizado.dataAtivacao
+          }
+        }
+      );
+      
+      setEditOpen(false);
+      setStatusMatricula(null);
+      fetchAlunos(); // Recarregar lista
+    } catch (error) {
+      console.error('Erro ao ativar aluno:', error);
+      setFormError('Erro ao ativar aluno. Tente novamente.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleAddAluno = () => {
@@ -242,14 +298,20 @@ const Alunos = () => {
         mensalidadeValor: '',
         descontoPercentual: '',
         diaVencimento: '',
+        valorMatricula: '',
         status: 'ativo',
         observacoes: ''
-      }
+      },
+      status: 'pre_matricula',
+      dataMatricula: new Date().toISOString(),
+      dataAtivacao: null
     });
-  setIsNew(true);
-  setEditOpen(true);
-  setFormError('');
-  setFormStep(1);
+    setIsNew(true);
+    setEditOpen(true);
+    setFormError('');
+    setFormStep(1);
+    setResultadoTitulos(null);
+    setStatusMatricula(null);
   };
 
   const handleFormChange = e => {
@@ -373,7 +435,46 @@ const Alunos = () => {
       
       if (isNew) {
         const novoId = alunoId;
-        await set(ref(db, `alunos/${novoId}`), dadosParaSalvar);
+        
+        // Definir status inicial baseado na existência de valor de matrícula
+        const statusInicial = dadosParaSalvar.financeiro?.valorMatricula > 0 ? 'pre_matricula' : 'ativo';
+        const dadosComStatus = {
+          ...dadosParaSalvar,
+          status: statusInicial
+        };
+        
+        await set(ref(db, `alunos/${novoId}`), dadosComStatus);
+        
+        // Gerar títulos financeiros automaticamente
+        if (dadosParaSalvar.financeiro?.mensalidadeValor > 0) {
+          setGerandoTitulos(true);
+          
+          const resultadoFinanceiro = await financeiroService.gerarTitulosNovoAluno(novoId, dadosComStatus);
+          
+          if (resultadoFinanceiro.success) {
+            setResultadoTitulos(resultadoFinanceiro);
+            
+            // Log da geração de títulos
+            await auditService.logAction(
+              'financial_titles_generated',
+              userId,
+              {
+                entityId: novoId,
+                description: `Títulos financeiros gerados automaticamente para ${dadosComStatus.nome}`,
+                changes: {
+                  titulosGerados: resultadoFinanceiro.titulosGerados,
+                  matricula: resultadoFinanceiro.matricula,
+                  mensalidades: resultadoFinanceiro.mensalidades,
+                  valorTotal: resultadoFinanceiro.valorTotal
+                }
+              }
+            );
+          } else {
+            console.error('Erro ao gerar títulos:', resultadoFinanceiro.error);
+          }
+          
+          setGerandoTitulos(false);
+        }
         
         // Log da criação do aluno
         await auditService.logAction(
@@ -381,13 +482,14 @@ const Alunos = () => {
           userId,
           {
             entityId: novoId,
-            description: `Novo aluno cadastrado: ${dadosParaSalvar.nome} (${dadosParaSalvar.matricula})`,
+            description: `Novo aluno cadastrado: ${dadosComStatus.nome} (${dadosComStatus.matricula})`,
             changes: {
-              nome: dadosParaSalvar.nome,
-              matricula: dadosParaSalvar.matricula,
-              turma: getTurmaNome(dadosParaSalvar.turmaId),
-              dataNascimento: dadosParaSalvar.dataNascimento,
-              statusFinanceiro: dadosParaSalvar.financeiro?.status,
+              nome: dadosComStatus.nome,
+              matricula: dadosComStatus.matricula,
+              turma: getTurmaNome(dadosComStatus.turmaId),
+              dataNascimento: dadosComStatus.dataNascimento,
+              statusFinanceiro: dadosComStatus.financeiro?.status,
+              statusAluno: statusInicial,
               anexosCount: anexosUrls.length
             }
           }
@@ -855,45 +957,72 @@ const Alunos = () => {
                       )}
                       {formStep === 2 && (
                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                          <Alert severity="info" sx={{ mb: 2 }}>
+                            💰 <strong>Sistema Financeiro Automático:</strong><br />
+                            - Se informar valor de matrícula, o aluno ficará em "pré-matrícula" até o pagamento<br />
+                            - Mensalidades serão geradas automaticamente para o ano letivo (12 meses)<br />
+                            - Status financeiro será atualizado automaticamente conforme pagamentos
+                          </Alert>
+                          
+                          <TextField
+                            label="Valor da Matrícula (R$)"
+                            name="financeiro.valorMatricula"
+                            type="number"
+                            value={editForm.financeiro?.valorMatricula || ''}
+                            onChange={handleFormChange}
+                            fullWidth
+                            inputProps={{ min: 0, step: 0.01 }}
+                            helperText="Deixe em branco se não há taxa de matrícula"
+                          />
+                          
                           <TextField
                             label="Mensalidade (R$)"
                             name="financeiro.mensalidadeValor"
                             type="number"
-                            value={editForm.financeiro?.mensalidadeValor}
+                            value={editForm.financeiro?.mensalidadeValor || ''}
                             onChange={handleFormChange}
                             fullWidth
                             required
+                            inputProps={{ min: 0, step: 0.01 }}
                           />
+                          
                           <TextField
                             label="Desconto (%)"
                             name="financeiro.descontoPercentual"
                             type="number"
-                            value={editForm.financeiro?.descontoPercentual}
+                            value={editForm.financeiro?.descontoPercentual || ''}
                             onChange={handleFormChange}
                             fullWidth
+                            inputProps={{ min: 0, max: 100, step: 0.1 }}
                           />
-                          <Box sx={{ fontSize: 14, color: 'text.secondary', mt: -1 }}>
-                            Valor final: R$ {valorComDesconto.toFixed(2)}
+                          
+                          <Box sx={{ fontSize: 14, color: 'text.secondary', mt: -1, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+                            📊 <strong>Resumo Financeiro:</strong><br />
+                            Mensalidade original: R$ {(parseFloat(editForm.financeiro?.mensalidadeValor || '0')).toFixed(2)}<br />
+                            Desconto: {(parseFloat(editForm.financeiro?.descontoPercentual || '0')).toFixed(1)}%<br />
+                            <strong>Valor final: R$ {valorComDesconto.toFixed(2)}</strong>
                           </Box>
+                          
                           <TextField
                             label="Dia de Vencimento"
                             name="financeiro.diaVencimento"
                             type="number"
-                            value={editForm.financeiro?.diaVencimento}
+                            value={editForm.financeiro?.diaVencimento || '10'}
                             onChange={handleFormChange}
                             fullWidth
                             required
                             inputProps={{ min:1, max:31 }}
                             error={!!financeiroError}
-                            helperText={financeiroError || 'Entre 1 e 31'}
+                            helperText={financeiroError || 'Entre 1 e 31 (dia do mês para vencimento das mensalidades)'}
                           />
+                          
                           <FormControl fullWidth required>
-                            <InputLabel id="status-financeiro-label">Status</InputLabel>
+                            <InputLabel id="status-financeiro-label">Status Financeiro Inicial</InputLabel>
                             <Select
                               labelId="status-financeiro-label"
                               name="financeiro.status"
                               value={editForm.financeiro?.status || 'ativo'}
-                              label="Status"
+                              label="Status Financeiro Inicial"
                               onChange={handleFormChange}
                               required
                             >
@@ -1101,6 +1230,24 @@ const Alunos = () => {
                           ⚠ Inativar
                         </Button>
                       )}
+                      {gerandoTitulos && (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: 'primary.main' }}>
+                          <CircularProgress size={16} />
+                          <Typography variant="body2">Gerando títulos financeiros...</Typography>
+                        </Box>
+                      )}
+                      
+                      {resultadoTitulos && (
+                        <Alert severity="success" sx={{ mt: 1 }}>
+                          <Typography variant="body2">
+                            <strong>🎉 Títulos gerados com sucesso!</strong><br />
+                            • {resultadoTitulos.matricula > 0 ? `Taxa de matrícula: R$ ${(parseFloat(resultadoTitulos.detalhes.find(t => t.tipo === 'matricula')?.valor) || 0).toFixed(2)}` : 'Sem taxa de matrícula'}<br />
+                            • Mensalidades: {resultadoTitulos.mensalidades} títulos<br />
+                            • <strong>Total: R$ {(parseFloat(resultadoTitulos.valorTotal) || 0).toFixed(2)}</strong>
+                          </Typography>
+                        </Alert>
+                      )}
+                      
                       {formStep === 2 && (
                         <Button 
                           onClick={handleSaveEdit} 
@@ -1120,9 +1267,9 @@ const Alunos = () => {
                             },
                             transition: 'all 0.3s ease'
                           }}
-                          disabled={saving || !isFinalFormValid()}
+                          disabled={saving || !isFinalFormValid() || gerandoTitulos}
                         >
-                          {saving ? '💾 Salvando...' : '✓ Salvar'}
+                          {saving ? '💾 Salvando...' : gerandoTitulos ? '🔄 Gerando títulos...' : isNew ? '✓ Criar Matrícula' : '✓ Salvar'}
                         </Button>
                       )}
                     </DialogActions>

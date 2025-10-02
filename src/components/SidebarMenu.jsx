@@ -124,12 +124,12 @@ const SidebarMenu = () => {
     ...(userRole === 'coordenadora' ? [
       { icon: FaSchool, label: 'Escola', path: '/escola', color: '#EF4444' }
     ] : []),
-    { icon: FaStore, label: 'Loja', path: '#', color: '#06B6D4' },
+    { icon: FaStore, label: 'Loja', path: '/loja', color: '#06B6D4' },
     ...(userRole === 'coordenadora' ? [
       { icon: FaUsers, label: 'Colaboradores', path: '/colaboradores', color: '#84CC16' }
     ] : []),
     { icon: FaCalendarAlt, label: 'Agenda', path: '/agenda', color: '#F97316' },
-    { icon: FaCashRegister, label: 'Caixa (Financeiro)', path: '#', color: '#10B981' },
+    { icon: FaCashRegister, label: 'Caixa (Financeiro)', path: '/financeiro', color: '#10B981' },
     { icon: FaEnvelope, label: 'Avisos', path: '/avisos', color: '#8B5CF6' },
     ...(userRole === 'coordenadora' ? [
       { icon: FaPrint, label: 'Impressões', path: '/impressoes', color: '#6B7280' }

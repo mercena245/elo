@@ -55,7 +55,9 @@ import {
   PersonAdd,
   History,
   LocalHospital,
-  Chat
+  Chat,
+  Store,
+  AttachMoney
 } from '@mui/icons-material';
 import '../../styles/Dashboard.css';
 import '../../styles/AvisosCarousel.css';
@@ -101,6 +103,8 @@ const Dashboard = () => {
         { titulo: 'Gerenciar Alunos', icon: PersonAdd, rota: '/alunos', cor: '#3B82F6' },
         { titulo: 'Colaboradores', icon: Group, rota: '/colaboradores', cor: '#8B5CF6' },
         { titulo: 'Relatórios & Notas', icon: Assessment, rota: '/notas-frequencia', cor: '#10B981' },
+        { titulo: 'Financeiro', icon: Assessment, rota: '/financeiro', cor: '#059669' },
+        { titulo: 'Loja ELO', icon: Store, rota: '/loja', cor: '#DC2626' },
         { titulo: 'Configurações', icon: Settings, rota: '/configuracoes', cor: '#EF4444' },
         { titulo: 'Grade Horária', icon: Schedule, rota: '/grade-horaria', cor: '#F59E0B' },
         { titulo: 'Galeria de Fotos', icon: PhotoLibrary, rota: '/galeriafotos', cor: '#06B6D4' }
@@ -116,6 +120,8 @@ const Dashboard = () => {
       pai: [
         { titulo: 'Agenda Médica', icon: MedicalServices, rota: '/agenda', cor: '#EF4444' },
         { titulo: 'Boletim do Filho', icon: Assessment, rota: '/notas-frequencia', cor: '#10B981' },
+        { titulo: 'Financeiro', icon: AttachMoney, rota: '/financeiro', cor: '#059669' },
+        { titulo: 'Loja ELO', icon: Store, rota: '/loja', cor: '#DC2626' },
         { titulo: 'Galeria de Fotos', icon: PhotoLibrary, rota: '/galeriafotos', cor: '#F59E0B' },
         { titulo: 'Avisos da Escola', icon: Notifications, rota: '/avisos', cor: '#3B82F6' },
         { titulo: 'Cardápio', icon: MenuBook, rota: '/escola', cor: '#8B5CF6' },

@@ -40,6 +40,7 @@ import {
   Close
 } from '@mui/icons-material';
 import { db, ref, get, set } from '../../../firebase';
+import { logAction, LOG_ACTIONS } from '../../../services/auditService';
 
 const RegistroFaltas = ({ professorId = null }) => {
   const [loading, setLoading] = useState(true);
@@ -239,10 +240,17 @@ const RegistroFaltas = ({ professorId = null }) => {
 
     try {
       const promises = [];
+      const logsPromises = [];
+      
+      // Buscar nomes para os logs
+      const turma = turmas.find(t => t.id === filtros.turmaId);
+      const disciplina = disciplinas.find(d => d.id === filtros.disciplinaId);
+      const professor = professores.find(p => p.id === filtros.professorIdSelecionado);
 
       for (const [alunoId, presente] of Object.entries(presencas)) {
         const faltaExistente = faltas.find(f => f.alunoId === alunoId);
         const frequenciaId = faltaExistente ? faltaExistente.id : `freq_${Date.now()}_${alunoId}`;
+        const aluno = alunos.find(a => a.id === alunoId);
         
         const frequenciaData = {
           alunoId,
@@ -257,9 +265,32 @@ const RegistroFaltas = ({ professorId = null }) => {
         };
 
         promises.push(set(ref(db, `frequencia/${frequenciaId}`), frequenciaData));
+        
+        // Log apenas se houve mudança no status de presença
+        const presencaAnterior = faltaExistente ? faltaExistente.presente : null;
+        if (presencaAnterior !== presente) {
+          const logData = {
+            action: LOG_ACTIONS.ATTENDANCE_UPDATE,
+            entity: 'attendance',
+            entityId: frequenciaId,
+            details: `Frequência ${faltaExistente ? 'atualizada' : 'registrada'}: ${aluno?.nome || 'Aluno'} - ${presente ? 'Presente' : 'Faltou'} (${filtros.data})`,
+            changes: {
+              aluno: aluno?.nome || 'Nome não encontrado',
+              matricula: aluno?.matricula || 'S/N',
+              disciplina: disciplina?.nome || 'Disciplina não encontrada',
+              professor: professor?.nome || 'Professor não encontrado',
+              turma: turma?.nome || 'Turma não encontrada',
+              data: filtros.data,
+              presencaAnterior: presencaAnterior === null ? 'Não registrada' : (presencaAnterior ? 'Presente' : 'Faltou'),
+              presencaNova: presente ? 'Presente' : 'Faltou'
+            }
+          };
+          
+          logsPromises.push(logAction(logData));
+        }
       }
 
-      await Promise.all(promises);
+      await Promise.all([...promises, ...logsPromises]);
       
       // Recarregar faltas
       await carregarFaltas();

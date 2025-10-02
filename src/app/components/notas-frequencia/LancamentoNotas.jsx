@@ -38,6 +38,7 @@ import {
   Grade
 } from '@mui/icons-material';
 import { db, ref, get, set } from '../../../firebase';
+import { logAction, LOG_ACTIONS } from '../../../services/auditService';
 
 const LancamentoNotas = ({ professorId = null }) => {
   const [loading, setLoading] = useState(true);
@@ -233,10 +234,17 @@ const LancamentoNotas = ({ professorId = null }) => {
 
     try {
       const promises = [];
+      const logsPromises = [];
+      
+      // Buscar nomes para os logs
+      const turma = turmas.find(t => t.id === filtros.turmaId);
+      const disciplina = disciplinas.find(d => d.id === filtros.disciplinaId);
+      const professor = professores.find(p => p.id === filtros.professorIdSelecionado);
 
       for (const [alunoId, nota] of Object.entries(notasEditadas)) {
         const notaExistente = notas.find(n => n.alunoId === alunoId);
         const notaId = notaExistente ? notaExistente.id : `nota_${Date.now()}_${alunoId}`;
+        const aluno = alunos.find(a => a.id === alunoId);
         
         const notaData = {
           alunoId,
@@ -251,9 +259,31 @@ const LancamentoNotas = ({ professorId = null }) => {
         };
 
         promises.push(set(ref(db, `notas/${notaId}`), notaData));
+        
+        // Preparar log para cada nota
+        const logData = {
+          action: notaExistente ? LOG_ACTIONS.GRADE_UPDATE : LOG_ACTIONS.GRADE_CREATE,
+          entity: 'grade',
+          entityId: notaId,
+          details: `${
+            notaExistente ? 'Nota atualizada' : 'Nota lançada'
+          }: ${aluno?.nome || 'Aluno não encontrado'} - ${disciplina?.nome || 'Disciplina'} (${nota})`,
+          changes: {
+            aluno: aluno?.nome || 'Nome não encontrado',
+            matricula: aluno?.matricula || 'S/N',
+            disciplina: disciplina?.nome || 'Disciplina não encontrada',
+            professor: professor?.nome || 'Professor não encontrado',
+            turma: turma?.nome || 'Turma não encontrada',
+            bimestre: filtros.bimestre,
+            notaAnterior: notaExistente?.nota || 'N/A',
+            notaNova: parseFloat(nota)
+          }
+        };
+        
+        logsPromises.push(logAction(logData));
       }
 
-      await Promise.all(promises);
+      await Promise.all([...promises, ...logsPromises]);
       
       // Recarregar notas e limpar edições
       await carregarNotas();

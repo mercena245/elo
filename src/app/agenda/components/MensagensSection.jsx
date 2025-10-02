@@ -43,6 +43,7 @@ import {
   Circle
 } from '@mui/icons-material';
 import { db, ref, get, push, set, storage, storageRef, uploadBytes, getDownloadURL, auth } from '../../../firebase';
+import { auditService, LOG_ACTIONS } from '../../services/auditService';
 
 const MensagensSection = ({ userRole, userData }) => {
   const [conversas, setConversas] = useState([]);
@@ -181,16 +182,58 @@ const MensagensSection = ({ userRole, userData }) => {
       };
 
       const mensagensRef = ref(db, 'mensagens');
-      await push(mensagensRef, mensagemData);
+      const mensagemRef = await push(mensagensRef, mensagemData);
+      
+      // Log do envio de mensagem
+      await auditService.logAction(
+        LOG_ACTIONS.MESSAGE_SENT,
+        userData?.id,
+        {
+          mensagemId: mensagemRef.key,
+          destinatario: {
+            id: novaMensagem.destinatario.id,
+            nome: novaMensagem.destinatario.nome,
+            role: novaMensagem.destinatario.role
+          },
+          assunto: novaMensagem.assunto,
+          temAnexos: (novaMensagem.anexos || []).length > 0,
+          quantidadeAnexos: (novaMensagem.anexos || []).length
+        }
+      );
       
       fecharDialogNovaMensagem();
       fetchConversas();
     } catch (error) {
       console.error('Erro ao enviar mensagem:', error);
+      
+      // Log do erro
+      await auditService.logAction(
+        LOG_ACTIONS.MESSAGE_SEND_ERROR,
+        userData?.id,
+        {
+          erro: error.message,
+          destinatario: novaMensagem.destinatario?.nome,
+          assunto: novaMensagem.assunto
+        }
+      );
     }
   };
 
   const fecharDialogNovaMensagem = () => {
+    // Log do cancelamento se havia conteúdo
+    if (novaMensagem.destinatario || novaMensagem.assunto || novaMensagem.conteudo || (novaMensagem.anexos && novaMensagem.anexos.length > 0)) {
+      auditService.logAction(
+        LOG_ACTIONS.MESSAGE_COMPOSE_CANCELLED,
+        userData?.id,
+        {
+          tinhaDestinatario: !!novaMensagem.destinatario,
+          tinhaAssunto: !!novaMensagem.assunto,
+          tinhaConteudo: !!novaMensagem.conteudo,
+          tinhaAnexos: !!(novaMensagem.anexos && novaMensagem.anexos.length > 0)
+        }
+      );
+    }
+    
     setDialogNovaMensagem(false);
     setNovaMensagem({ destinatario: null, assunto: '', conteudo: '', anexos: [] });
   };
@@ -258,18 +301,64 @@ const MensagensSection = ({ userRole, userData }) => {
         anexos: [...(prev.anexos || []), ...anexosUpload]
       }));
 
+      // Log do upload de anexos
+      await auditService.logAction(
+        LOG_ACTIONS.ATTACHMENT_UPLOADED,
+        userData?.id,
+        {
+          context: 'mensagem',
+          arquivos: anexosUpload.map(anexo => ({
+            nome: anexo.nome,
+            tipo: anexo.tipo,
+            tamanho: anexo.tamanho
+          })),
+          quantidade: anexosUpload.length
+        }
+      );
+
       console.log('Anexos adicionados ao estado:', anexosUpload);
     } catch (error) {
       console.error('Erro detalhado ao fazer upload dos anexos:', error);
       alert(`Erro ao anexar arquivo(s): ${error.message}`);
+      
+      // Log do erro no upload
+      await auditService.logAction(
+        LOG_ACTIONS.ATTACHMENT_UPLOAD_ERROR,
+        userData?.id,
+        {
+          context: 'mensagem',
+          erro: error.message,
+          arquivos: Array.from(files).map(file => ({
+            nome: file.name,
+            tipo: file.type,
+            tamanho: file.size
+          }))
+        }
+      );
     }
   };
 
   const removerAnexo = (index) => {
+    const anexoRemovido = novaMensagem.anexos[index];
+    
     setNovaMensagem(prev => ({
       ...prev,
       anexos: prev.anexos.filter((_, i) => i !== index)
     }));
+    
+    // Log da remoção do anexo
+    auditService.logAction(
+      LOG_ACTIONS.ATTACHMENT_REMOVED,
+      userData?.id,
+      {
+        context: 'mensagem',
+        arquivo: anexoRemovido ? {
+          nome: anexoRemovido.nome,
+          tipo: anexoRemovido.tipo,
+          tamanho: anexoRemovido.tamanho
+        } : null
+      }
+    );
   };
 
   const marcarComoLida = async (mensagemId) => {
@@ -285,6 +374,20 @@ const MensagensSection = ({ userRole, userData }) => {
       if (conversaSelecionada?.id === mensagemId) {
         setConversaSelecionada(prev => ({ ...prev, lida: true }));
       }
+      
+      // Log da leitura da mensagem
+      await auditService.logAction(
+        LOG_ACTIONS.MESSAGE_READ,
+        userData?.id,
+        {
+          mensagemId,
+          remetente: {
+            id: conversaSelecionada?.remetente?.id,
+            nome: conversaSelecionada?.remetente?.nome
+          },
+          assunto: conversaSelecionada?.assunto
+        }
+      );
     } catch (error) {
       console.error('Erro ao marcar mensagem como lida:', error);
     }
@@ -364,7 +467,15 @@ const MensagensSection = ({ userRole, userData }) => {
         <Fab 
           size="medium"
           color="primary"
-          onClick={() => setDialogNovaMensagem(true)}
+          onClick={() => {
+            setDialogNovaMensagem(true);
+            // Log da abertura do dialog de nova mensagem
+            auditService.logAction(
+              LOG_ACTIONS.MESSAGE_COMPOSE_STARTED,
+              userData?.id,
+              {}
+            );
+          }}
           sx={{ 
             background: 'linear-gradient(45deg, #3B82F6, #1D4ED8)',
             '&:hover': {
@@ -395,7 +506,21 @@ const MensagensSection = ({ userRole, userData }) => {
                 </Typography>
                 <Tabs 
                   value={abaConversas} 
-                  onChange={(e, newValue) => setAbaConversas(newValue)}
+                  onChange={(e, newValue) => {
+                    const abaAnterior = abaConversas;
+                    setAbaConversas(newValue);
+                    
+                    // Log da mudança de aba
+                    const abas = ['Não Lidas', 'Lidas', 'Enviados'];
+                    auditService.logAction(
+                      LOG_ACTIONS.MESSAGE_FILTER_CHANGED,
+                      userData?.id,
+                      {
+                        filtroAnterior: abas[abaAnterior],
+                        novoFiltro: abas[newValue]
+                      }
+                    );
+                  }}
                   variant="fullWidth"
                   sx={{ 
                     minHeight: 40,
@@ -481,6 +606,25 @@ const MensagensSection = ({ userRole, userData }) => {
                           if (isNaoLida && !isEnviada) {
                             marcarComoLida(conversa.id);
                           }
+                          
+                          // Log da visualização da mensagem
+                          auditService.logAction(
+                            LOG_ACTIONS.MESSAGE_VIEWED,
+                            userData?.id,
+                            {
+                              mensagemId: conversa.id,
+                              remetente: {
+                                id: conversa.remetente?.id,
+                                nome: conversa.remetente?.nome
+                              },
+                              destinatario: {
+                                id: conversa.destinatario?.id,
+                                nome: conversa.destinatario?.nome
+                              },
+                              assunto: conversa.assunto,
+                              jaLida: conversa.lida
+                            }
+                          );
                         }}
                         sx={{ 
                           borderBottom: '1px solid #f3f4f6',
@@ -628,6 +772,21 @@ const MensagensSection = ({ userRole, userData }) => {
                             icon={<AttachFile />}
                             onClick={() => {
                               if (anexo.url) {
+                                // Log do download/visualização do anexo
+                                auditService.logAction(
+                                  LOG_ACTIONS.ATTACHMENT_DOWNLOADED,
+                                  userData?.id,
+                                  {
+                                    context: 'mensagem',
+                                    mensagemId: conversaSelecionada.id,
+                                    arquivo: {
+                                      nome: anexo.nome,
+                                      tipo: anexo.tipo,
+                                      tamanho: anexo.tamanho
+                                    },
+                                    remetente: conversaSelecionada.remetente?.nome
+                                  }
+                                );
                                 window.open(anexo.url, '_blank');
                               } else {
                                 alert('URL do anexo não encontrada');

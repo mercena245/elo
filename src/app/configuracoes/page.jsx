@@ -2,18 +2,38 @@
 import SidebarMenu from '../../components/SidebarMenu';
 import AdminClaimChecker from '../../components/AdminClaimChecker';
 import DevClaimsAccordion from '../../components/DevClaimsAccordion';
+import LogsViewer from '../components/LogsViewer';
 import { Box, Typography, Card, CardContent, List, ListItem, ListItemText, CircularProgress, Button, FormControl, InputLabel, Select, MenuItem, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Autocomplete, Chip } from '@mui/material';
 import { useEffect, useState } from 'react';
 import { db, ref, get, set, push, remove, auth, deleteUserFunction } from '../../firebase';
+import { logAction, LOG_ACTIONS } from '../../services/auditService';
 import UserApprovalDialog from '../../components/UserApprovalDialog';
 import { useRouter } from 'next/navigation';
 
 export default function Configuracoes() {
   // Função para recusar usuário (excluir do banco e do Auth)
   async function rejectUser(uid) {
-    // Remove do banco
+    // Buscar dados do usuário para o log antes de excluir
     const userRef = ref(db, `usuarios/${uid}`);
+    const userSnap = await get(userRef);
+    const userData = userSnap.exists() ? userSnap.val() : {};
+    
+    // Remove do banco
     await set(userRef, null);
+    
+    // Log da rejeição do usuário
+    await logAction({
+      action: LOG_ACTIONS.USER_DELETE,
+      entity: 'user',
+      entityId: uid,
+      details: `Usuário rejeitado: ${userData.nome || userData.email || 'Usuário desconhecido'}`,
+      changes: {
+        email: userData.email,
+        nome: userData.nome,
+        motivo: 'Acesso negado durante aprovação'
+      }
+    });
+    
     // Excluir do Auth (apenas se admin, normalmente via backend)
     try {
       // Se for possível usar admin SDK, aqui seria feito
@@ -36,6 +56,7 @@ export default function Configuracoes() {
   const [devModalOpen, setDevModalOpen] = useState(false);
   const [devPassword, setDevPassword] = useState('');
   const [devAccess, setDevAccess] = useState(false);
+  const [logsDialogOpen, setLogsDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editUser, setEditUser] = useState(null);
   const [editRole, setEditRole] = useState('');
@@ -99,6 +120,7 @@ export default function Configuracoes() {
       const snap = await get(userRef);
       if (snap.exists()) {
         const userData = snap.val();
+        const dadosAnteriores = { ...userData };
         
         // Remover vinculações antigas se necessário
         const alunosAntigos = userData.alunosVinculados || (userData.alunoVinculado ? [userData.alunoVinculado] : []);
@@ -125,6 +147,38 @@ export default function Configuracoes() {
         
         await set(userRef, updatedUserData);
         
+        // Identificar mudanças para o log
+        const mudancas = {};
+        if (dadosAnteriores.role !== editRole) {
+          mudancas.role = { de: dadosAnteriores.role || 'pendente', para: editRole };
+        }
+        
+        // Verificar mudanças em turmas
+        const turmasAntigas = dadosAnteriores.turmas || [];
+        const turmasNovas = editUser.turmas || [];
+        if (JSON.stringify(turmasAntigas.sort()) !== JSON.stringify(turmasNovas.sort())) {
+          mudancas.turmas = { de: turmasAntigas, para: turmasNovas };
+        }
+        
+        // Verificar mudanças em alunos vinculados
+        if (JSON.stringify(alunosAntigos.sort()) !== JSON.stringify(novosIds.sort())) {
+          const nomesAlunosAntigos = alunosAntigos.map(id => {
+            const aluno = alunos.find(a => a.id === id);
+            return aluno ? aluno.nome : 'Aluno não encontrado';
+          });
+          const nomesAlunosNovos = alunosSelecionados.map(a => a.nome);
+          mudancas.alunosVinculados = { de: nomesAlunosAntigos, para: nomesAlunosNovos };
+        }
+        
+        // Log da atualização do usuário
+        await logAction({
+          action: LOG_ACTIONS.USER_UPDATE,
+          entity: 'user',
+          entityId: editUser.uid,
+          details: `Dados atualizados para usuário: ${editUser.nome || editUser.email}`,
+          changes: mudancas
+        });
+        
         // Vincular novos alunos se o role é "pai"
         if (editRole === 'pai' && alunosSelecionados.length > 0) {
           for (const aluno of alunosSelecionados) {
@@ -141,6 +195,19 @@ export default function Configuracoes() {
                 }
               });
             }
+          }
+          
+          // Log específico da vinculação de alunos
+          if (alunosSelecionados.length > 0) {
+            await logAction({
+              action: LOG_ACTIONS.USER_UPDATE,
+              entity: 'user',
+              entityId: editUser.uid,
+              details: `${alunosSelecionados.length} aluno(s) vinculado(s) ao responsável ${editUser.nome || editUser.email}`,
+              changes: {
+                alunosVinculados: alunosSelecionados.map(a => `${a.nome} (${a.matricula})`)
+              }
+            });
           }
         }
         
@@ -165,6 +232,11 @@ export default function Configuracoes() {
       
       // Se havia alunos vinculados, remover as vinculações
       const alunosVinculados = userData.alunosVinculados || (userData.alunoVinculado ? [userData.alunoVinculado] : []);
+      const nomesAlunosVinculados = alunosVinculados.map(id => {
+        const aluno = alunos.find(a => a.id === id);
+        return aluno ? aluno.nome : 'Aluno não encontrado';
+      });
+      
       for (const alunoId of alunosVinculados) {
         const alunoRef = ref(db, `alunos/${alunoId}`);
         const alunoSnap = await get(alunoRef);
@@ -176,6 +248,20 @@ export default function Configuracoes() {
       }
       
       await set(userRef, { ...userData, role: 'inativo', alunosVinculados: [] });
+      
+      // Log da inativação do usuário
+      await logAction({
+        action: LOG_ACTIONS.USER_UPDATE,
+        entity: 'user',
+        entityId: editUser.uid,
+        details: `Usuário inativado: ${editUser.nome || editUser.email}`,
+        changes: {
+          statusAnterior: userData.role,
+          statusNovo: 'inativo',
+          alunosDesvinculados: nomesAlunosVinculados
+        }
+      });
+      
       setEditDialogOpen(false);
       setEditUser(null);
       setAlunosSelecionados([]);
@@ -189,6 +275,11 @@ export default function Configuracoes() {
     try {
       // Se havia alunos vinculados, remover as vinculações primeiro
       const alunosVinculados = editUser.alunosVinculados || (editUser.alunoVinculado ? [editUser.alunoVinculado] : []);
+      const nomesAlunosVinculados = alunosVinculados.map(id => {
+        const aluno = alunos.find(a => a.id === id);
+        return aluno ? aluno.nome : 'Aluno não encontrado';
+      });
+      
       for (const alunoId of alunosVinculados) {
         const alunoRef = ref(db, `alunos/${alunoId}`);
         const alunoSnap = await get(alunoRef);
@@ -198,6 +289,21 @@ export default function Configuracoes() {
           await set(alunoRef, alunoSemResponsavel);
         }
       }
+      
+      // Log da exclusão do usuário ANTES de excluir
+      await logAction({
+        action: LOG_ACTIONS.USER_DELETE,
+        entity: 'user',
+        entityId: editUser.uid,
+        details: `Usuário excluído permanentemente: ${editUser.nome || editUser.email}`,
+        changes: {
+          email: editUser.email,
+          nome: editUser.nome,
+          role: editUser.role,
+          alunosDesvinculados: nomesAlunosVinculados,
+          motivo: 'Exclusão manual pelo administrador'
+        }
+      });
       
       // Força refresh do token para garantir claims atualizados
       if (auth.currentUser) {
@@ -300,6 +406,21 @@ export default function Configuracoes() {
     if (snap.exists()) {
       const userData = snap.val();
       await set(userRef, { ...userData, role });
+      
+      // Log da aprovação do usuário
+      await logAction({
+        action: LOG_ACTIONS.USER_CREATE,
+        entity: 'user',
+        entityId: uid,
+        details: `Usuário aprovado: ${userData.nome || userData.email} como ${role}`,
+        changes: {
+          email: userData.email,
+          nome: userData.nome,
+          roleAtribuido: role,
+          statusAnterior: 'pendente',
+          statusNovo: 'ativo'
+        }
+      });
     }
     setDialogOpen(false);
   };
@@ -400,9 +521,24 @@ export default function Configuracoes() {
                 <Typography variant="body2" align="center" sx={{ mb: 2 }}>
                   Funções exclusivas para DEV podem ser implementadas aqui.
                 </Typography>
-                <Button variant="contained" color="info" onClick={handleBackupBanco} sx={{ display: 'block', mx: 'auto', mt: 2 }}>
-                  Fazer backup do banco (JSON)
-                </Button>
+                <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', flexWrap: 'wrap' }}>
+                  <Button 
+                    variant="contained" 
+                    color="info" 
+                    onClick={handleBackupBanco}
+                    sx={{ minWidth: '200px' }}
+                  >
+                    Fazer backup do banco (JSON)
+                  </Button>
+                  <Button 
+                    variant="contained" 
+                    color="secondary" 
+                    onClick={() => setLogsDialogOpen(true)}
+                    sx={{ minWidth: '200px' }}
+                  >
+                    📋 Visualizar Logs de Auditoria
+                  </Button>
+                </Box>
                 {/* Menu recolhido para claims do usuário logado */}
                 <Box sx={{ mt: 3 }}>
                   <DevClaimsAccordion />
@@ -684,6 +820,12 @@ export default function Configuracoes() {
               <Button onClick={handleDeleteUser} color="error">Excluir</Button>
             </DialogActions>
           </Dialog>
+
+          {/* Dialog de Logs */}
+          <LogsViewer 
+            open={logsDialogOpen} 
+            onClose={() => setLogsDialogOpen(false)} 
+          />
                 </List>
               )}
             </CardContent>

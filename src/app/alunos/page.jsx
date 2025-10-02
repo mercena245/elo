@@ -13,6 +13,7 @@ import { db, ref, get, auth } from '../../firebase';
 import { storage } from '../../firebase-storage';
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import { deleteObject } from "firebase/storage";
+import { auditService, LOG_ACTIONS } from '../../services/auditService';
 
 import { set } from 'firebase/database';
 
@@ -66,8 +67,28 @@ const Alunos = () => {
       if (isNew) {
         const novoId = alunoId;
         await set(ref(db, `alunos/${novoId}`), dadosAtualizados);
+        // Log da remoção de anexo
+        await auditService.logAction(
+          LOG_ACTIONS.STUDENT_FILE_DELETE,
+          userId,
+          {
+            entityId: novoId,
+            description: `Anexo removido: ${anexo.name}`,
+            changes: { anexoRemovido: anexo.name }
+          }
+        );
       } else if (editAluno && editAluno.id) {
         await set(ref(db, `alunos/${editAluno.id}`), dadosAtualizados);
+        // Log da remoção de anexo
+        await auditService.logAction(
+          LOG_ACTIONS.STUDENT_FILE_DELETE,
+          userId,
+          {
+            entityId: editAluno.id,
+            description: `Anexo removido: ${anexo.name}`,
+            changes: { anexoRemovido: anexo.name }
+          }
+        );
       }
       setEditForm(dadosAtualizados);
     } catch (err) {
@@ -96,6 +117,19 @@ const Alunos = () => {
       const novo = { ...editForm, status: 'inativo' };
       if (editAluno && editAluno.id) {
         await set(ref(db, `alunos/${editAluno.id}`), novo);
+        // Log da inativação do aluno
+        await auditService.logAction(
+          LOG_ACTIONS.STUDENT_DEACTIVATE,
+          userId,
+          {
+            entityId: editAluno.id,
+            description: `Aluno inativado: ${editForm.nome} (${editForm.matricula})`,
+            changes: { 
+              statusAnterior: editForm.status,
+              statusNovo: 'inativo'
+            }
+          }
+        );
       }
       setEditOpen(false);
       await fetchData();
@@ -336,12 +370,107 @@ const Alunos = () => {
         ...editForm,
         anexos: anexosUrls
       };
+      
       if (isNew) {
         const novoId = alunoId;
         await set(ref(db, `alunos/${novoId}`), dadosParaSalvar);
+        
+        // Log da criação do aluno
+        await auditService.logAction(
+          LOG_ACTIONS.STUDENT_CREATE,
+          userId,
+          {
+            entityId: novoId,
+            description: `Novo aluno cadastrado: ${dadosParaSalvar.nome} (${dadosParaSalvar.matricula})`,
+            changes: {
+              nome: dadosParaSalvar.nome,
+              matricula: dadosParaSalvar.matricula,
+              turma: getTurmaNome(dadosParaSalvar.turmaId),
+              dataNascimento: dadosParaSalvar.dataNascimento,
+              statusFinanceiro: dadosParaSalvar.financeiro?.status,
+              anexosCount: anexosUrls.length
+            }
+          }
+        );
+        
+        // Log de upload de anexos se houver
+        if (anexosSelecionados.length > 0) {
+          await auditService.logAction(
+            LOG_ACTIONS.STUDENT_FILE_UPLOAD,
+            userId,
+            {
+              entityId: novoId,
+              description: `${anexosSelecionados.length} anexo(s) enviado(s) para ${dadosParaSalvar.nome}`,
+              changes: {
+                anexosEnviados: anexosSelecionados.map(f => f.name)
+              }
+            }
+          );
+        }
+        
       } else if (editAluno && editAluno.id) {
+        // Identificar mudanças para o log
+        const mudancas = {};
+        
+        if (editAluno.nome !== dadosParaSalvar.nome) mudancas.nome = { de: editAluno.nome, para: dadosParaSalvar.nome };
+        if (editAluno.turmaId !== dadosParaSalvar.turmaId) mudancas.turma = { de: getTurmaNome(editAluno.turmaId), para: getTurmaNome(dadosParaSalvar.turmaId) };
+        if (editAluno.dataNascimento !== dadosParaSalvar.dataNascimento) mudancas.dataNascimento = { de: editAluno.dataNascimento, para: dadosParaSalvar.dataNascimento };
+        if (editAluno.nomePai !== dadosParaSalvar.nomePai) mudancas.nomePai = { de: editAluno.nomePai, para: dadosParaSalvar.nomePai };
+        if (editAluno.nomeMae !== dadosParaSalvar.nomeMae) mudancas.nomeMae = { de: editAluno.nomeMae, para: dadosParaSalvar.nomeMae };
+        if (editAluno.contatoEmergencia?.nome !== dadosParaSalvar.contatoEmergencia?.nome) mudancas.contatoEmergenciaNome = { de: editAluno.contatoEmergencia?.nome, para: dadosParaSalvar.contatoEmergencia?.nome };
+        if (editAluno.contatoEmergencia?.telefone !== dadosParaSalvar.contatoEmergencia?.telefone) mudancas.contatoEmergenciaTelefone = { de: editAluno.contatoEmergencia?.telefone, para: dadosParaSalvar.contatoEmergencia?.telefone };
+        
+        // Verificar mudanças financeiras
+        if (editAluno.financeiro?.mensalidadeValor !== dadosParaSalvar.financeiro?.mensalidadeValor) mudancas.mensalidade = { de: editAluno.financeiro?.mensalidadeValor, para: dadosParaSalvar.financeiro?.mensalidadeValor };
+        if (editAluno.financeiro?.status !== dadosParaSalvar.financeiro?.status) mudancas.statusFinanceiro = { de: editAluno.financeiro?.status, para: dadosParaSalvar.financeiro?.status };
+        if (editAluno.financeiro?.diaVencimento !== dadosParaSalvar.financeiro?.diaVencimento) mudancas.diaVencimento = { de: editAluno.financeiro?.diaVencimento, para: dadosParaSalvar.financeiro?.diaVencimento };
+        
         await set(ref(db, `alunos/${editAluno.id}`), dadosParaSalvar);
+        
+        // Log da atualização do aluno
+        if (Object.keys(mudancas).length > 0) {
+          await auditService.logAction(
+            LOG_ACTIONS.STUDENT_UPDATE,
+            userId,
+            {
+              entityId: editAluno.id,
+              description: `Dados atualizados para ${dadosParaSalvar.nome} (${dadosParaSalvar.matricula})`,
+              changes: mudancas
+            }
+          );
+        }
+        
+        // Log de exclusão de anexos se houver
+        if (anexosParaExcluir.length > 0) {
+          await auditService.logAction(
+            LOG_ACTIONS.STUDENT_FILE_DELETE,
+            userId,
+            {
+              entityId: editAluno.id,
+              description: `${anexosParaExcluir.length} anexo(s) excluído(s) de ${dadosParaSalvar.nome}`,
+              changes: {
+                anexosExcluidos: anexosParaExcluir
+              }
+            }
+          );
+        }
+        
+        // Log de upload de novos anexos se houver
+        if (anexosSelecionados.length > 0) {
+          await auditService.logAction(
+            LOG_ACTIONS.STUDENT_FILE_UPLOAD,
+            userId,
+            {
+              entityId: editAluno.id,
+              description: `${anexosSelecionados.length} anexo(s) enviado(s) para ${dadosParaSalvar.nome}`,
+              changes: {
+                anexosEnviados: anexosSelecionados.map(f => f.name)
+              }
+            }
+          );
+        }
       }
+      
       setEditOpen(false);
       await fetchData();
       setAnexosSelecionados([]);
@@ -880,7 +1009,26 @@ const Alunos = () => {
                       )}
                       {formStep === 2 && !isNew && editForm.turmaId && editForm.turmaId !== '' && (
                         <Button
-                          onClick={() => setEditForm(prev => ({ ...prev, turmaId: '' }))}
+                          onClick={async () => {
+                            const turmaAnterior = getTurmaNome(editForm.turmaId);
+                            setEditForm(prev => ({ ...prev, turmaId: '' }));
+                            
+                            // Log da desvinculação de turma
+                            if (editAluno && editAluno.id) {
+                              await auditService.logAction(
+                                LOG_ACTIONS.CLASS_REMOVE_STUDENT,
+                                userId,
+                                {
+                                  entityId: editAluno.id,
+                                  description: `Aluno ${editForm.nome} desvinculado da turma ${turmaAnterior}`,
+                                  changes: {
+                                    turmaAnterior: turmaAnterior,
+                                    turmaNova: 'Sem turma'
+                                  }
+                                }
+                              );
+                            }
+                          }}
                           color="info"
                           variant="outlined"
                           size="small"
@@ -897,6 +1045,19 @@ const Alunos = () => {
                             const novo = { ...editForm, status: 'ativo' };
                             if (editAluno && editAluno.id) {
                               await set(ref(db, `alunos/${editAluno.id}`), novo);
+                              // Log da ativação do aluno
+                              await auditService.logAction(
+                                LOG_ACTIONS.STUDENT_ACTIVATE,
+                                userId,
+                                {
+                                  entityId: editAluno.id,
+                                  description: `Aluno ativado: ${editForm.nome} (${editForm.matricula})`,
+                                  changes: { 
+                                    statusAnterior: editForm.status,
+                                    statusNovo: 'ativo'
+                                  }
+                                }
+                              );
                             }
                             setEditOpen(false);
                             await fetchData();

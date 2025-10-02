@@ -8,7 +8,7 @@ export const deleteUser = functions.https.onCall(async (data, context) => {
   if (!context.auth || !context.auth.token.admin) {
     throw new functions.https.HttpsError('permission-denied', 'Apenas administradores podem excluir usuários.');
   }
-  const uid = data.uid;
+rob  const uid = data.uid;
   if (!uid) {
     throw new functions.https.HttpsError('invalid-argument', 'UID do usuário é obrigatório.');
   }

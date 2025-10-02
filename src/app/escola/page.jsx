@@ -35,6 +35,8 @@ import { FaTrash } from 'react-icons/fa';
 import { FaUsers, FaChalkboardTeacher } from 'react-icons/fa';
 import { db, ref, get, set, push, remove, storage, storageRef, uploadBytes, getDownloadURL, deleteObject } from '@/firebase';
 import { auth } from '@/firebase';
+import { auditService } from '../../services/auditService';
+const { logAction, LOG_ACTIONS } = auditService;
 import DisciplinaCard from "../components/escola/DisciplinaCard";
 import GestaoEscolarCard from "../components/escola/GestaoEscolarCard";
 import NotasFrequenciaCard from "../components/escola/NotasFrequenciaCard";
@@ -326,15 +328,65 @@ const Escola = () => {
     }
     setSavingTurma(true);
     try {
+      const periodo = periodosAtivos.find(p => p.id === editTurmaForm.periodoId);
+      const periodoLabel = periodo ? periodo.label : 'Período não encontrado';
+      
       if (isNewTurma) {
         const novoId = `id_turma_${editTurmaForm.nome.replace(/\s/g, '').toLowerCase()}`;
         await set(ref(db, `turmas/${novoId}`), editTurmaForm);
+        
+        // Log da criação da turma
+        const userData = {
+          id: userId,
+          email: auth.currentUser?.email,
+          role: userRole
+        };
+        await logAction({
+          action: LOG_ACTIONS.CLASS_CREATE,
+          entity: 'class',
+          entityId: novoId,
+          details: `Nova turma criada: ${editTurmaForm.nome}`,
+          changes: {
+            nome: editTurmaForm.nome,
+            status: editTurmaForm.status,
+            turno: editTurmaForm.turnoId,
+            periodo: periodoLabel
+          },
+          userData: userData
+        });
       } else if (editTurma && editTurma.id) {
+        // Identificar mudanças para o log
+        const mudancas = {};
+        if (editTurma.nome !== editTurmaForm.nome) mudancas.nome = { de: editTurma.nome, para: editTurmaForm.nome };
+        if (editTurma.status !== editTurmaForm.status) mudancas.status = { de: editTurma.status, para: editTurmaForm.status };
+        if (editTurma.turnoId !== editTurmaForm.turnoId) mudancas.turno = { de: editTurma.turnoId, para: editTurmaForm.turnoId };
+        if (editTurma.periodoId !== editTurmaForm.periodoId) mudancas.periodo = { de: editTurma.periodoId, para: editTurmaForm.periodoId };
+        
         await set(ref(db, `turmas/${editTurma.id}`), editTurmaForm);
+        
+        // Log da atualização da turma
+        if (Object.keys(mudancas).length > 0) {
+          const userData = {
+            id: userId,
+            email: auth.currentUser?.email,
+            role: userRole
+          };
+          await logAction({
+            action: LOG_ACTIONS.CLASS_UPDATE,
+            entity: 'class',
+            entityId: editTurma.id,
+            details: `Turma atualizada: ${editTurmaForm.nome}`,
+            changes: mudancas,
+            userData: userData
+          });
+        }
       }
       setOpenTurmaModal(false);
       await fetchData();
-    } catch (err) {}
+    } catch (err) {
+      console.error('Erro ao salvar turma:', err);
+      alert('Erro ao salvar turma: ' + (err.message || 'Erro desconhecido'));
+    }
     setSavingTurma(false);
   };
 
@@ -383,6 +435,28 @@ const Escola = () => {
     setExcluindoTurma(true);
     try {
       await remove(ref(db, `turmas/${turmaExcluir.id}`));
+      
+      // Log da exclusão da turma
+      const userData = {
+        id: userId,
+        email: auth.currentUser?.email,
+        role: userRole
+      };
+      await logAction({
+        action: LOG_ACTIONS.CLASS_DELETE,
+        entity: 'class',
+        entityId: turmaExcluir.id,
+        details: `Turma excluída: ${turmaExcluir.nome}`,
+        changes: {
+          nome: turmaExcluir.nome,
+          status: turmaExcluir.status,
+          turno: turmaExcluir.turnoId,
+          periodo: turmaExcluir.periodoId,
+          vinculosRemovidos: vinculosTurma.length > 0 ? vinculosTurma : 'Nenhum vínculo'
+        },
+        userData: userData
+      });
+      
       setModalConfirmExcluirOpen(false);
       setTurmaExcluir(null);
       await fetchData();
@@ -459,6 +533,22 @@ const Escola = () => {
       
       await set(ref(db, `avisos/${avisoId}`), avisoData);
       
+      // Log da criação do aviso
+      await logAction({
+        action: LOG_ACTIONS.ANNOUNCEMENT_CREATE,
+        entity: 'announcement',
+        entityId: avisoId,
+        details: `Novo aviso criado: ${avisoForm.titulo}`,
+        changes: {
+          titulo: avisoForm.titulo,
+          prioridade: avisoForm.prioridade,
+          categoria: avisoForm.categoria,
+          visibilidade: avisoForm.visibilidade,
+          temAnexo: !!anexoURL,
+          dataExpiracao: avisoForm.dataExpiracao || 'Sem expiração'
+        }
+      });
+      
       setAvisoForm({
         titulo: '',
         conteudo: '',
@@ -522,7 +612,28 @@ const Escola = () => {
   };
 
   const handleRemoveAviso = async id => {
-    await set(ref(db, `avisos/${id}`), null);
+    // Buscar dados do aviso antes de excluir para o log
+    const avisoRef = ref(db, `avisos/${id}`);
+    const avisoSnap = await get(avisoRef);
+    const avisoData = avisoSnap.exists() ? avisoSnap.val() : {};
+    
+    await set(avisoRef, null);
+    
+    // Log da remoção do aviso
+    await logAction({
+      action: LOG_ACTIONS.ANNOUNCEMENT_DELETE,
+      entity: 'announcement',
+      entityId: id,
+      details: `Aviso removido: ${avisoData.titulo || 'Título não disponível'}`,
+      changes: {
+        titulo: avisoData.titulo,
+        categoria: avisoData.categoria,
+        prioridade: avisoData.prioridade,
+        autor: avisoData.autor,
+        dataCreacao: avisoData.dataCreacao
+      }
+    });
+    
     await fetchData();
   };
 
@@ -572,7 +683,10 @@ const Escola = () => {
       }
       setOpenColabModal(false);
       await fetchData();
-    } catch (err) {}
+    } catch (err) {
+      console.error('Erro ao salvar colaborador:', err);
+      alert('Erro ao salvar colaborador: ' + (err.message || 'Erro desconhecido'));
+    }
     setSavingColab(false);
   };
   {/* Modal de cadastro/edição de colaborador */}
@@ -642,6 +756,22 @@ const Escola = () => {
       await set(ref(db, `Escola/Periodo/${periodoId}`), {
         ...periodoForm
       });
+      
+      // Log da criação do período
+      await logAction({
+        action: LOG_ACTIONS.PERIOD_CREATE,
+        entity: 'period',
+        entityId: periodoId,
+        details: `Novo período criado: Ano ${periodoForm.ano} - Período ${periodoForm.periodo}`,
+        changes: {
+          ano: periodoForm.ano,
+          periodo: periodoForm.periodo,
+          dataInicio: periodoForm.dataInicio,
+          dataFim: periodoForm.dataFim,
+          ativo: periodoForm.ativo
+        }
+      });
+      
       setMsgPeriodo("Período salvo com sucesso!");
       setPeriodoForm({
         ano: "",
@@ -719,6 +849,14 @@ const Escola = () => {
     }
     setEditLoading(true);
     try {
+      // Identificar mudanças para o log
+      const mudancas = {};
+      if (editPeriodo.ano !== editPeriodoForm.ano) mudancas.ano = { de: editPeriodo.ano, para: editPeriodoForm.ano };
+      if (editPeriodo.periodo !== editPeriodoForm.periodo) mudancas.periodo = { de: editPeriodo.periodo, para: editPeriodoForm.periodo };
+      if (editPeriodo.ativo !== editPeriodoForm.ativo) mudancas.ativo = { de: editPeriodo.ativo, para: editPeriodoForm.ativo };
+      if (editPeriodo.dataInicio !== editPeriodoForm.dataInicio) mudancas.dataInicio = { de: editPeriodo.dataInicio, para: editPeriodoForm.dataInicio };
+      if (editPeriodo.dataFim !== editPeriodoForm.dataFim) mudancas.dataFim = { de: editPeriodo.dataFim, para: editPeriodoForm.dataFim };
+      
       await set(ref(db, `Escola/Periodo/${editPeriodoForm.id}`), {
         ano: editPeriodoForm.ano,
         periodo: editPeriodoForm.periodo,
@@ -726,6 +864,18 @@ const Escola = () => {
         dataInicio: editPeriodoForm.dataInicio,
         dataFim: editPeriodoForm.dataFim
       });
+      
+      // Log da atualização do período
+      if (Object.keys(mudancas).length > 0) {
+        await logAction({
+          action: LOG_ACTIONS.PERIOD_UPDATE,
+          entity: 'period',
+          entityId: editPeriodoForm.id,
+          details: `Período atualizado: Ano ${editPeriodoForm.ano} - Período ${editPeriodoForm.periodo}`,
+          changes: mudancas
+        });
+      }
+      
       setEditMsg("Período atualizado com sucesso!");
       setEditDialogOpen(false);
       carregarPeriodosCadastrados();
@@ -738,7 +888,28 @@ const Escola = () => {
   async function handleExcluirPeriodo(id) {
     if (!window.confirm('Confirma excluir este período?')) return;
     try {
-      await remove(ref(db, `Escola/Periodo/${id}`));
+      // Buscar dados do período antes de excluir para o log
+      const periodoRef = ref(db, `Escola/Periodo/${id}`);
+      const periodoSnap = await get(periodoRef);
+      const periodoData = periodoSnap.exists() ? periodoSnap.val() : {};
+      
+      await remove(periodoRef);
+      
+      // Log da exclusão do período
+      await logAction({
+        action: LOG_ACTIONS.PERIOD_DELETE,
+        entity: 'period',
+        entityId: id,
+        details: `Período excluído: Ano ${periodoData.ano || 'N/A'} - Período ${periodoData.periodo || 'N/A'}`,
+        changes: {
+          ano: periodoData.ano,
+          periodo: periodoData.periodo,
+          dataInicio: periodoData.dataInicio,
+          dataFim: periodoData.dataFim,
+          ativo: periodoData.ativo
+        }
+      });
+      
       carregarPeriodosCadastrados();
     } catch (err) {
       alert('Erro ao excluir período!');
@@ -758,6 +929,18 @@ const Escola = () => {
     try {
       const disciplinaId = `disciplina_${Date.now()}`;
       await set(ref(db, `disciplinas/${disciplinaId}`), { nome: novaDisciplina });
+      
+      // Log da criação da disciplina
+      await logAction({
+        action: LOG_ACTIONS.SUBJECT_CREATE,
+        entity: 'subject',
+        entityId: disciplinaId,
+        details: `Nova disciplina criada: ${novaDisciplina}`,
+        changes: {
+          nome: novaDisciplina
+        }
+      });
+      
       setNovaDisciplina("");
       await fetchDataDisciplinas();
     } catch (err) {
@@ -770,6 +953,18 @@ const Escola = () => {
     setLoadingDisciplinas(true);
     try {
       await remove(ref(db, `disciplinas/${disciplina.id}`));
+      
+      // Log da exclusão da disciplina
+      await logAction({
+        action: LOG_ACTIONS.SUBJECT_DELETE,
+        entity: 'subject',
+        entityId: disciplina.id,
+        details: `Disciplina excluída: ${disciplina.nome}`,
+        changes: {
+          nome: disciplina.nome
+        }
+      });
+      
       await fetchDataDisciplinas();
     } catch (err) {
       alert("Erro ao excluir disciplina!");

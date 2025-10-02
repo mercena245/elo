@@ -63,6 +63,7 @@ import {
   Close
 } from '@mui/icons-material';
 import { db, ref, get, push, set, storage, storageRef, uploadBytes, getDownloadURL } from '../../../firebase';
+import { auditService, LOG_ACTIONS } from '../../services/auditService';
 
 const DiarioSection = ({ userRole, userData }) => {
   // Funções para detectar tipo de turma baseado no turnoId
@@ -349,7 +350,23 @@ const DiarioSection = ({ userRole, userData }) => {
       };
 
       const diarioRef = ref(db, 'diario');
-      await push(diarioRef, entradaData);
+      const entradaRef = await push(diarioRef, entradaData);
+      
+      // Log da criação da entrada do diário
+      await auditService.logAction(
+        LOG_ACTIONS.DIARY_ENTRY_CREATED,
+        userData?.id,
+        {
+          entradaId: entradaRef.key,
+          turmaId: novaEntrada.turma,
+          turma: turmas.find(t => t.id === novaEntrada.turma)?.nome,
+          data: novaEntrada.data,
+          periodo: novaEntrada.periodo,
+          temHomework: novaEntrada.homework?.tem,
+          quantidadeAtividades: novaEntrada.atividadesDinamicas?.length || 0,
+          temObservacoes: !!novaEntrada.observacoesGerais
+        }
+      );
       
       setDialogNovaEntrada(false);
       setNovaEntrada({
@@ -370,6 +387,17 @@ const DiarioSection = ({ userRole, userData }) => {
       fetchEntradas();
     } catch (error) {
       console.error('Erro ao salvar entrada do diário:', error);
+      
+      // Log do erro
+      await auditService.logAction(
+        LOG_ACTIONS.DIARY_ENTRY_ERROR,
+        userData?.id,
+        {
+          erro: error.message,
+          turmaId: novaEntrada.turma,
+          data: novaEntrada.data
+        }
+      );
     }
   };
 
@@ -428,6 +456,21 @@ const DiarioSection = ({ userRole, userData }) => {
       // Obter URL de download
       const downloadURL = await getDownloadURL(uploadResult.ref);
       
+      // Log do upload do arquivo
+      await auditService.logAction(
+        LOG_ACTIONS.ATTACHMENT_UPLOADED,
+        userData?.id,
+        {
+          context: 'diario_homework',
+          arquivo: {
+            nome: file.name,
+            tipo: file.type,
+            tamanho: file.size,
+            nomeStorage: fileName
+          }
+        }
+      );
+      
       return {
         name: fileName,
         originalName: file.name,
@@ -437,6 +480,22 @@ const DiarioSection = ({ userRole, userData }) => {
       };
     } catch (error) {
       console.error('Erro ao fazer upload do arquivo:', error);
+      
+      // Log do erro no upload
+      await auditService.logAction(
+        LOG_ACTIONS.ATTACHMENT_UPLOAD_ERROR,
+        userData?.id,
+        {
+          context: 'diario_homework',
+          erro: error.message,
+          arquivo: {
+            nome: file.name,
+            tipo: file.type,
+            tamanho: file.size
+          }
+        }
+      );
+      
       throw error;
     } finally {
       setUploadingFile(false);
@@ -446,6 +505,19 @@ const DiarioSection = ({ userRole, userData }) => {
   const openFilePreview = (fileName) => {
     setSelectedFile(fileName);
     setFilePreviewDialog(true);
+    
+    // Log da visualização do arquivo
+    auditService.logAction(
+      LOG_ACTIONS.ATTACHMENT_VIEWED,
+      userData?.id,
+      {
+        context: 'diario_homework',
+        arquivo: {
+          nome: fileName.originalName || fileName.name || fileName,
+          tipo: fileName.type || getFileType(fileName.originalName || fileName.name || fileName)
+        }
+      }
+    );
   };
 
   const getFileType = (fileName) => {
@@ -559,7 +631,15 @@ const DiarioSection = ({ userRole, userData }) => {
             <Fab 
               size="medium"
               color="primary"
-              onClick={() => setDialogNovaEntrada(true)}
+              onClick={() => {
+                setDialogNovaEntrada(true);
+                // Log da abertura do dialog de nova entrada
+                auditService.logAction(
+                  LOG_ACTIONS.DIARY_COMPOSE_STARTED,
+                  userData?.id,
+                  {}
+                );
+              }}
               sx={{ 
                 background: 'linear-gradient(45deg, #6366F1, #4F46E5)',
                 '&:hover': {
@@ -584,7 +664,24 @@ const DiarioSection = ({ userRole, userData }) => {
                 type="date"
                 label="Data"
                 value={filtroData}
-                onChange={(e) => setFiltroData(e.target.value)}
+                onChange={(e) => {
+                  const novaData = e.target.value;
+                  const dataAnterior = filtroData;
+                  setFiltroData(novaData);
+                  
+                  // Log da mudança de filtro de data
+                  if (dataAnterior !== novaData) {
+                    auditService.logAction(
+                      LOG_ACTIONS.DIARY_FILTER_CHANGED,
+                      userData?.id,
+                      {
+                        filtro: 'data',
+                        valorAnterior: dataAnterior,
+                        novoValor: novaData
+                      }
+                    );
+                  }
+                }}
                 InputLabelProps={{ shrink: true }}
                 sx={{ minWidth: '250px' }}
               />
@@ -594,7 +691,27 @@ const DiarioSection = ({ userRole, userData }) => {
                 <InputLabel>Aluno</InputLabel>
                 <Select
                   value={filtroAluno}
-                  onChange={(e) => setFiltroAluno(e.target.value)}
+                  onChange={(e) => {
+                    const novoAluno = e.target.value;
+                    const alunoAnterior = filtroAluno;
+                    setFiltroAluno(novoAluno);
+                    
+                    // Log da mudança de filtro de aluno
+                    if (alunoAnterior !== novoAluno) {
+                      const alunoNome = novoAluno ? alunos.find(a => a.id === novoAluno)?.nome : 'Todos os alunos';
+                      const alunoAnteriorNome = alunoAnterior ? alunos.find(a => a.id === alunoAnterior)?.nome : 'Todos os alunos';
+                      
+                      auditService.logAction(
+                        LOG_ACTIONS.DIARY_FILTER_CHANGED,
+                        userData?.id,
+                        {
+                          filtro: 'aluno',
+                          valorAnterior: alunoAnteriorNome,
+                          novoValor: alunoNome
+                        }
+                      );
+                    }
+                  }}
                 >
                   <MenuItem value="">Todos os alunos</MenuItem>
                   {alunos.map((aluno) => (
@@ -714,6 +831,18 @@ const DiarioSection = ({ userRole, userData }) => {
                           onClick={() => {
                             setEntradaSelecionada(entrada);
                             setDialogDetalhes(true);
+                            
+                            // Log da visualização dos detalhes
+                            auditService.logAction(
+                              LOG_ACTIONS.DIARY_ENTRY_VIEWED,
+                              userData?.id,
+                              {
+                                entradaId: entrada.id,
+                                turma: turma?.nome,
+                                data: entrada.data,
+                                periodo: entrada.periodo
+                              }
+                            );
                           }}
                         >
                           <Visibility />
@@ -943,7 +1072,31 @@ const DiarioSection = ({ userRole, userData }) => {
       {/* Dialog Nova Entrada */}
       <Dialog 
         open={dialogNovaEntrada} 
-        onClose={() => setDialogNovaEntrada(false)}
+        onClose={() => {
+          // Log do cancelamento se havia dados preenchidos
+          const temDados = novaEntrada.turma || 
+                          novaEntrada.data !== new Date().toISOString().split('T')[0] ||
+                          novaEntrada.periodo ||
+                          novaEntrada.observacoesGerais ||
+                          novaEntrada.homework?.tem ||
+                          novaEntrada.atividadesDinamicas?.some(ativ => ativ.titulo || ativ.descricao);
+          
+          if (temDados) {
+            auditService.logAction(
+              LOG_ACTIONS.DIARY_COMPOSE_CANCELLED,
+              userData?.id,
+              {
+                temTurma: !!novaEntrada.turma,
+                temPeriodo: !!novaEntrada.periodo,
+                temObservacoes: !!novaEntrada.observacoesGerais,
+                temHomework: !!novaEntrada.homework?.tem,
+                temAtividades: !!(novaEntrada.atividadesDinamicas?.some(ativ => ativ.titulo || ativ.descricao))
+              }
+            );
+          }
+          
+          setDialogNovaEntrada(false);
+        }}
         maxWidth="lg"
         fullWidth
       >
@@ -1671,6 +1824,19 @@ const DiarioSection = ({ userRole, userData }) => {
             startIcon={<AttachFile />}
             onClick={() => {
               if (selectedFile) {
+                // Log do download do arquivo
+                auditService.logAction(
+                  LOG_ACTIONS.ATTACHMENT_DOWNLOADED,
+                  userData?.id,
+                  {
+                    context: 'diario_homework',
+                    arquivo: {
+                      nome: selectedFile.originalName || selectedFile.name || selectedFile,
+                      tipo: selectedFile.type || getFileType(selectedFile.originalName || selectedFile.name || selectedFile)
+                    }
+                  }
+                );
+                
                 const link = document.createElement('a');
                 link.href = selectedFile.url || selectedFile;
                 link.download = selectedFile.originalName || selectedFile;

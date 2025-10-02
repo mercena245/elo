@@ -1,0 +1,485 @@
+/**
+ * Serviço de Auditoria e Logs
+ * Responsável por registrar todas as ações importantes do sistema
+ */
+
+import { db, ref, push, get, query, orderByChild, equalTo, limitToLast } from '../firebase';
+
+// Tipos de ação para categorização
+export const LOG_ACTIONS = {
+  // Ações de usuários
+  USER_CREATE: 'user_create',
+  USER_UPDATE: 'user_update',
+  USER_DELETE: 'user_delete',
+  USER_APPROVE: 'user_approve',
+  USER_REJECT: 'user_reject',
+  USER_LOGIN: 'user_login',
+  USER_LOGOUT: 'user_logout',
+  USER_ROLE_CHANGE: 'user_role_change',
+  USER_STUDENT_LINK: 'user_student_link',
+  USER_STUDENT_UNLINK: 'user_student_unlink',
+  USER_ACTIVATE: 'user_activate',
+  USER_DEACTIVATE: 'user_deactivate',
+
+  // Ações de alunos
+  STUDENT_CREATE: 'student_create',
+  STUDENT_UPDATE: 'student_update',
+  STUDENT_DELETE: 'student_delete',
+  STUDENT_ACTIVATE: 'student_activate',
+  STUDENT_DEACTIVATE: 'student_deactivate',
+  STUDENT_FILE_UPLOAD: 'student_file_upload',
+  STUDENT_FILE_DELETE: 'student_file_delete',
+  STUDENT_VIEWED: 'student_viewed',
+
+  // Ações de turmas
+  CLASS_CREATE: 'class_create',
+  CLASS_UPDATE: 'class_update',
+  CLASS_DELETE: 'class_delete',
+  CLASS_ASSIGN_STUDENT: 'class_assign_student',
+  CLASS_REMOVE_STUDENT: 'class_remove_student',
+
+  // Ações de período escolar
+  PERIOD_CREATE: 'period_create',
+  PERIOD_UPDATE: 'period_update',
+  PERIOD_DELETE: 'period_delete',
+  PERIOD_ACTIVATE: 'period_activate',
+
+  // Ações de disciplinas
+  SUBJECT_CREATE: 'subject_create',
+  SUBJECT_UPDATE: 'subject_update',
+  SUBJECT_DELETE: 'subject_delete',
+
+  // Ações de avisos
+  NOTICE_CREATE: 'notice_create',
+  NOTICE_UPDATE: 'notice_update',
+  NOTICE_DELETE: 'notice_delete',
+
+  // Ações de grade horária
+  SCHEDULE_CREATE: 'schedule_create',
+  SCHEDULE_UPDATE: 'schedule_update',
+  SCHEDULE_DELETE: 'schedule_delete',
+
+  // Ações de notas
+  GRADE_CREATE: 'grade_create',
+  GRADE_UPDATE: 'grade_update',
+  GRADE_DELETE: 'grade_delete',
+
+  // Ações de frequência
+  ATTENDANCE_CREATE: 'attendance_create',
+  ATTENDANCE_UPDATE: 'attendance_update',
+  ATTENDANCE_DELETE: 'attendance_delete',
+
+  // Ações de mensagens
+  MESSAGE_SENT: 'message_sent',
+  MESSAGE_READ: 'message_read',
+  MESSAGE_VIEWED: 'message_viewed',
+  MESSAGE_SEND_ERROR: 'message_send_error',
+  MESSAGE_COMPOSE_STARTED: 'message_compose_started',
+  MESSAGE_COMPOSE_CANCELLED: 'message_compose_cancelled',
+  MESSAGE_FILTER_CHANGED: 'message_filter_changed',
+
+  // Ações de diário
+  DIARY_ENTRY_CREATED: 'diary_entry_created',
+  DIARY_ENTRY_VIEWED: 'diary_entry_viewed',
+  DIARY_ENTRY_ERROR: 'diary_entry_error',
+  DIARY_FILTER_CHANGED: 'diary_filter_changed',
+  DIARY_COMPOSE_STARTED: 'diary_compose_started',
+  DIARY_COMPOSE_CANCELLED: 'diary_compose_cancelled',
+
+  // Ações de anexos
+  ATTACHMENT_UPLOADED: 'attachment_uploaded',
+  ATTACHMENT_DOWNLOADED: 'attachment_downloaded',
+  ATTACHMENT_VIEWED: 'attachment_viewed',
+  ATTACHMENT_REMOVED: 'attachment_removed',
+  ATTACHMENT_UPLOAD_ERROR: 'attachment_upload_error',
+
+  // Ações de sistema
+  SYSTEM_BACKUP: 'system_backup',
+  SYSTEM_EXPORT: 'system_export',
+  SYSTEM_IMPORT: 'system_import'
+};
+
+// Níveis de severidade
+export const LOG_LEVELS = {
+  INFO: 'info',
+  WARNING: 'warning',
+  ERROR: 'error',
+  CRITICAL: 'critical'
+};
+
+/**
+ * Registra uma ação no sistema de auditoria
+ * @param {string|Object} actionOrData - Tipo da ação ou objeto com dados completos (compatibilidade)
+ * @param {string} userId - ID do usuário que executou a ação
+ * @param {Object} details - Detalhes da ação
+ * @param {string} level - Nível de severidade (opcional, padrão: INFO)
+ */
+export const logAction = async (actionOrData, userId, details = {}, level = LOG_LEVELS.INFO) => {
+  try {
+    let action, entityId, description, changes;
+    
+    // Compatibilidade: se o primeiro parâmetro é um objeto (formato antigo)
+    if (typeof actionOrData === 'object' && actionOrData !== null) {
+      const logData = actionOrData;
+      action = logData.action;
+      entityId = logData.entityId;
+      description = logData.details;
+      changes = logData.changes;
+      level = logData.level || LOG_LEVELS.INFO;
+      
+      // Tentar obter userData do objeto ou do localStorage
+      let userData = logData.userData;
+      if (!userData && typeof window !== 'undefined') {
+        try {
+          const storedData = localStorage.getItem('userData');
+          if (storedData) {
+            userData = JSON.parse(storedData);
+          }
+        } catch (error) {
+          console.error('Erro ao obter dados do usuário do localStorage:', error);
+        }
+      }
+      userId = userData?.id || userData?.uid || 'unknown';
+    } else {
+      // Formato novo
+      action = actionOrData;
+      entityId = details.entityId;
+      description = details.description;
+      changes = details.changes;
+    }
+
+    // Validação básica
+    if (!action || !userId) {
+      console.error('Dados obrigatórios faltando para o log:', { action, userId });
+      return;
+    }
+
+    // Tentar obter dados do usuário do localStorage se não fornecido
+    let userData = null;
+    if (typeof window !== 'undefined') {
+      try {
+        const storedData = localStorage.getItem('userData');
+        if (storedData) {
+          userData = JSON.parse(storedData);
+        }
+      } catch (error) {
+        console.error('Erro ao obter dados do usuário do localStorage:', error);
+      }
+    }
+
+    // Determinar entidade baseada na ação
+    let entity = 'system';
+    if (action.startsWith('user_')) entity = 'user';
+    else if (action.startsWith('student_')) entity = 'student';
+    else if (action.startsWith('class_')) entity = 'class';
+    else if (action.startsWith('period_')) entity = 'period';
+    else if (action.startsWith('subject_')) entity = 'subject';
+    else if (action.startsWith('notice_')) entity = 'notice';
+    else if (action.startsWith('schedule_')) entity = 'schedule';
+    else if (action.startsWith('grade_')) entity = 'grade';
+    else if (action.startsWith('attendance_')) entity = 'attendance';
+    else if (action.startsWith('message_')) entity = 'message';
+    else if (action.startsWith('diary_')) entity = 'diary';
+    else if (action.startsWith('attachment_')) entity = 'attachment';
+
+    // Estrutura do log
+    const logEntry = {
+      // Identificação da ação
+      action,
+      entity,
+      entityId: entityId || null,
+      level,
+      
+      // Dados do usuário
+      userId: userId,
+      userEmail: userData?.email || null,
+      userRole: userData?.role || null,
+      userName: userData?.nome || userData?.name || userData?.displayName || null,
+      
+      // Detalhes da ação
+      details: description || JSON.stringify(details),
+      
+      // Dados da alteração (se houver)
+      changes: changes ? JSON.stringify(changes) : null,
+      
+      // Metadados
+      metadata: JSON.stringify(details),
+      
+      // Informações de contexto
+      timestamp: new Date().toISOString(),
+      userAgent: typeof window !== 'undefined' ? window.navigator.userAgent : 'Server',
+      ip: details.ip || 'unknown',
+      
+      // Para facilitar consultas
+      date: new Date().toISOString().split('T')[0],
+      month: new Date().toISOString().substring(0, 7),
+      year: new Date().getFullYear()
+    };
+
+    // Salvar no Firebase
+    const logsRef = ref(db, 'audit_logs');
+    const newLogRef = await push(logsRef, logEntry);
+    
+    // Log no console para desenvolvimento
+    console.log('📋 Ação registrada com sucesso:', {
+      action,
+      entity,
+      user: userData?.email || userId,
+      timestamp: logEntry.timestamp,
+      firebaseKey: newLogRef.key
+    });
+
+  } catch (error) {
+    console.error('❌ Erro ao registrar log de auditoria:', error);
+    console.error('❌ Dados que causaram erro:', { action, userId, details, level });
+    // Não queremos que erros de log quebrem o fluxo principal
+  }
+};
+
+/**
+ * Busca logs por filtros
+ * @param {Object} filters - Filtros para busca
+ * @param {string} filters.action - Tipo de ação
+ * @param {string} filters.entity - Entidade
+ * @param {string} filters.userId - ID do usuário
+ * @param {string} filters.date - Data específica (YYYY-MM-DD)
+ * @param {number} filters.limit - Limite de resultados (padrão: 100)
+ */
+export const getLogs = async (filters = {}) => {
+  try {
+    const {
+      action,
+      entity,
+      userId,
+      date,
+      limit = 100
+    } = filters;
+
+    let logsQuery = ref(db, 'audit_logs');
+
+    // Aplicar filtros
+    if (action) {
+      logsQuery = query(logsQuery, orderByChild('action'), equalTo(action));
+    } else if (entity) {
+      logsQuery = query(logsQuery, orderByChild('entity'), equalTo(entity));
+    } else if (userId) {
+      logsQuery = query(logsQuery, orderByChild('userId'), equalTo(userId));
+    } else if (date) {
+      logsQuery = query(logsQuery, orderByChild('date'), equalTo(date));
+    } else {
+      // Por padrão, buscar os mais recentes
+      logsQuery = query(logsQuery, orderByChild('timestamp'), limitToLast(limit));
+    }
+
+    const snapshot = await get(logsQuery);
+    
+    if (!snapshot.exists()) {
+      return [];
+    }
+
+    // Converter para array e ordenar por timestamp (mais recentes primeiro)
+    const logs = Object.entries(snapshot.val()).map(([id, log]) => ({
+      id,
+      ...log,
+      changes: log.changes ? JSON.parse(log.changes) : null,
+      metadata: log.metadata ? JSON.parse(log.metadata) : {}
+    }));
+
+    return logs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+  } catch (error) {
+    console.error('Erro ao buscar logs:', error);
+    return [];
+  }
+};
+
+/**
+ * Busca logs de uma entidade específica
+ * @param {string} entity - Tipo da entidade
+ * @param {string} entityId - ID da entidade
+ * @param {number} limit - Limite de resultados
+ */
+export const getEntityLogs = async (entity, entityId, limit = 50) => {
+  try {
+    const logsRef = ref(db, 'audit_logs');
+    const logsQuery = query(
+      logsRef,
+      orderByChild('entityId'),
+      equalTo(entityId),
+      limitToLast(limit)
+    );
+
+    const snapshot = await get(logsQuery);
+    
+    if (!snapshot.exists()) {
+      return [];
+    }
+
+    const logs = Object.entries(snapshot.val())
+      .map(([id, log]) => ({
+        id,
+        ...log,
+        changes: log.changes ? JSON.parse(log.changes) : null,
+        metadata: log.metadata ? JSON.parse(log.metadata) : {}
+      }))
+      .filter(log => log.entity === entity)
+      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+    return logs;
+
+  } catch (error) {
+    console.error('Erro ao buscar logs da entidade:', error);
+    return [];
+  }
+};
+
+/**
+ * Busca estatísticas de logs
+ * @param {string} period - Período (today, week, month, year)
+ */
+export const getLogStats = async (period = 'month') => {
+  try {
+    const now = new Date();
+    let startDate;
+
+    switch (period) {
+      case 'today':
+        startDate = now.toISOString().split('T')[0];
+        break;
+      case 'week':
+        const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        startDate = weekAgo.toISOString().split('T')[0];
+        break;
+      case 'month':
+        startDate = now.toISOString().substring(0, 7);
+        break;
+      case 'year':
+        startDate = now.getFullYear().toString();
+        break;
+      default:
+        startDate = now.toISOString().substring(0, 7);
+    }
+
+    const logsRef = ref(db, 'audit_logs');
+    const logsQuery = query(logsRef, orderByChild(period === 'year' ? 'year' : 'date'));
+    
+    const snapshot = await get(logsQuery);
+    
+    if (!snapshot.exists()) {
+      return { total: 0, byAction: {}, byUser: {}, byEntity: {} };
+    }
+
+    const logs = Object.values(snapshot.val());
+    
+    // Filtrar por período
+    const filteredLogs = logs.filter(log => {
+      if (period === 'today') {
+        return log.date === startDate;
+      } else if (period === 'week') {
+        return log.date >= startDate;
+      } else if (period === 'month') {
+        return log.month === startDate;
+      } else if (period === 'year') {
+        return log.year.toString() === startDate;
+      }
+      return true;
+    });
+
+    // Calcular estatísticas
+    const stats = {
+      total: filteredLogs.length,
+      byAction: {},
+      byUser: {},
+      byEntity: {}
+    };
+
+    filteredLogs.forEach(log => {
+      // Por ação
+      stats.byAction[log.action] = (stats.byAction[log.action] || 0) + 1;
+      
+      // Por usuário
+      const userKey = log.userEmail || log.userId;
+      stats.byUser[userKey] = (stats.byUser[userKey] || 0) + 1;
+      
+      // Por entidade
+      stats.byEntity[log.entity] = (stats.byEntity[log.entity] || 0) + 1;
+    });
+
+    return stats;
+
+  } catch (error) {
+    console.error('Erro ao buscar estatísticas de logs:', error);
+    return { total: 0, byAction: {}, byUser: {}, byEntity: {} };
+  }
+};
+
+// Helper para criar descrições legíveis das ações
+export const getActionDescription = (action, entity, changes) => {
+  const actionMap = {
+    [LOG_ACTIONS.USER_CREATE]: 'criou usuário',
+    [LOG_ACTIONS.USER_UPDATE]: 'atualizou usuário',
+    [LOG_ACTIONS.USER_DELETE]: 'excluiu usuário',
+    [LOG_ACTIONS.USER_APPROVE]: 'aprovou usuário',
+    [LOG_ACTIONS.USER_LOGIN]: 'fez login',
+    [LOG_ACTIONS.USER_LOGOUT]: 'fez logout',
+    
+    [LOG_ACTIONS.STUDENT_CREATE]: 'cadastrou aluno',
+    [LOG_ACTIONS.STUDENT_UPDATE]: 'atualizou dados do aluno',
+    [LOG_ACTIONS.STUDENT_DELETE]: 'excluiu aluno',
+    [LOG_ACTIONS.STUDENT_UPLOAD]: 'fez upload de arquivo do aluno',
+    [LOG_ACTIONS.STUDENT_DELETE_FILE]: 'excluiu arquivo do aluno',
+    
+    [LOG_ACTIONS.CLASS_CREATE]: 'criou turma',
+    [LOG_ACTIONS.CLASS_UPDATE]: 'atualizou turma',
+    [LOG_ACTIONS.CLASS_DELETE]: 'excluiu turma',
+    [LOG_ACTIONS.CLASS_ASSIGN_STUDENT]: 'vinculou aluno à turma',
+    [LOG_ACTIONS.CLASS_REMOVE_STUDENT]: 'removeu aluno da turma',
+    
+    [LOG_ACTIONS.PERIOD_CREATE]: 'criou período escolar',
+    [LOG_ACTIONS.PERIOD_UPDATE]: 'atualizou período escolar',
+    [LOG_ACTIONS.PERIOD_DELETE]: 'excluiu período escolar',
+    [LOG_ACTIONS.PERIOD_ACTIVATE]: 'ativou período escolar',
+    
+    [LOG_ACTIONS.DIARY_CREATE]: 'criou entrada do diário',
+    [LOG_ACTIONS.DIARY_UPDATE]: 'atualizou entrada do diário',
+    [LOG_ACTIONS.DIARY_DELETE]: 'excluiu entrada do diário',
+    [LOG_ACTIONS.DIARY_UPLOAD]: 'fez upload no diário',
+    
+    [LOG_ACTIONS.GRADE_CREATE]: 'lançou nota',
+    [LOG_ACTIONS.GRADE_UPDATE]: 'atualizou nota',
+    [LOG_ACTIONS.GRADE_DELETE]: 'excluiu nota',
+    [LOG_ACTIONS.ATTENDANCE_CREATE]: 'registrou frequência',
+    [LOG_ACTIONS.ATTENDANCE_UPDATE]: 'atualizou frequência'
+  };
+
+  return actionMap[action] || `executou ação ${action}`;
+};
+
+// Helper para obter dados do usuário atual
+export const getCurrentUserData = () => {
+  if (typeof window !== 'undefined') {
+    const userData = localStorage.getItem('userData');
+    if (userData) {
+      try {
+        return JSON.parse(userData);
+      } catch (error) {
+        console.error('Erro ao obter dados do usuário:', error);
+      }
+    }
+  }
+  return null;
+};
+
+// Objeto auditService para compatibilidade
+export const auditService = {
+  logAction,
+  getLogs,
+  getEntityLogs,
+  getLogStats,
+  getActionDescription,
+  getCurrentUserData,
+  LOG_ACTIONS,
+  LOG_LEVELS
+};
+
+export default auditService;

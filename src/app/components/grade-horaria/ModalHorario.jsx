@@ -15,6 +15,7 @@ import {
   Divider
 } from '@mui/material';
 import { db, ref, get, set, remove } from '../../../firebase';
+import { logAction, LOG_ACTIONS } from '../../../services/auditService';
 
 const ModalHorario = ({ 
   open, 
@@ -152,6 +153,44 @@ const ModalHorario = ({
 
       await set(ref(db, `GradeHoraria/${horarioId}`), horarioData);
       
+      // Buscar nomes para o log
+      const disciplinaNome = disciplinas.find(d => d.id === form.disciplinaId)?.nome || 'Disciplina não encontrada';
+      const professorNome = professores.find(p => p.id === form.professorId)?.nome || 'Professor não encontrado';
+      const diaNome = diasSemanaLabels[diaSemana] || `Dia ${diaSemana}`;
+      
+      // Log da operação
+      if (horarioExistente) {
+        // Edição
+        await logAction({
+          action: LOG_ACTIONS.SCHEDULE_UPDATE,
+          entity: 'schedule',
+          entityId: horarioId,
+          details: `Aula atualizada: ${disciplinaNome} - ${professorNome} (${diaNome}, Período ${periodoAulaId})`,
+          changes: {
+            disciplina: disciplinaNome,
+            professor: professorNome,
+            diaSemana: diaNome,
+            periodo: periodoAulaId,
+            turmaId: turmaId
+          }
+        });
+      } else {
+        // Criação
+        await logAction({
+          action: LOG_ACTIONS.SCHEDULE_CREATE,
+          entity: 'schedule',
+          entityId: horarioId,
+          details: `Nova aula criada: ${disciplinaNome} - ${professorNome} (${diaNome}, Período ${periodoAulaId})`,
+          changes: {
+            disciplina: disciplinaNome,
+            professor: professorNome,
+            diaSemana: diaNome,
+            periodo: periodoAulaId,
+            turmaId: turmaId
+          }
+        });
+      }
+      
       onSalvar();
       onClose();
     } catch (err) {
@@ -165,7 +204,28 @@ const ModalHorario = ({
     
     setLoading(true);
     try {
+      // Buscar nomes para o log antes de excluir
+      const disciplinaNome = disciplinas.find(d => d.id === horarioExistente.disciplinaId)?.nome || 'Disciplina não encontrada';
+      const professorNome = professores.find(p => p.id === horarioExistente.professorId)?.nome || 'Professor não encontrado';
+      const diaNome = diasSemanaLabels[diaSemana] || `Dia ${diaSemana}`;
+      
       await remove(ref(db, `GradeHoraria/${horarioExistente.id}`));
+      
+      // Log da exclusão
+      await logAction({
+        action: LOG_ACTIONS.SCHEDULE_DELETE,
+        entity: 'schedule',
+        entityId: horarioExistente.id,
+        details: `Aula excluída: ${disciplinaNome} - ${professorNome} (${diaNome}, Período ${periodoAulaId})`,
+        changes: {
+          disciplina: disciplinaNome,
+          professor: professorNome,
+          diaSemana: diaNome,
+          periodo: periodoAulaId,
+          turmaId: turmaId
+        }
+      });
+      
       onSalvar();
       onClose();
     } catch (err) {

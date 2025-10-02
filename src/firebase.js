@@ -2,7 +2,7 @@
 // Importa os módulos principais do Firebase para uso no projeto
 import { initializeApp } from "firebase/app"; // Inicialização do app
 import { getAuth, GoogleAuthProvider, signInWithPopup } from "firebase/auth"; // Autenticação
-import { getDatabase, ref, get, set, push, remove, update } from "firebase/database"; // Realtime Database
+import { getDatabase, ref, get, set, push, remove, update, query, orderByChild, equalTo, limitToLast } from "firebase/database"; // Realtime Database
 import { getFunctions, httpsCallable } from "firebase/functions"; // Cloud Functions
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage"; // Firebase Storage
 
@@ -50,6 +50,10 @@ export {
   push, 
   remove, 
   update,
+  query,
+  orderByChild,
+  equalTo,
+  limitToLast,
   deleteUserFunction,
   storage,
   storageRef,

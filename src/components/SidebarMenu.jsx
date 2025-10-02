@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FaBars, FaHome, FaUserFriends, FaSchool, FaSignOutAlt, FaStore, FaUsers, FaCalendarAlt, FaCashRegister, FaEnvelope, FaPrint, FaImages, FaUserCircle, FaCog, FaGraduationCap } from 'react-icons/fa';
+import { FaBars, FaHome, FaUserFriends, FaSchool, FaSignOutAlt, FaStore, FaUsers, FaCalendarAlt, FaCashRegister, FaEnvelope, FaPrint, FaImages, FaUserCircle, FaCog, FaGraduationCap, FaCertificate } from 'react-icons/fa';
 import { db, ref, get, auth, onAuthStateChanged } from '../firebase';
 import { signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
@@ -144,6 +144,9 @@ const SidebarMenu = () => {
     ] : []),
     { icon: FaCalendarAlt, label: 'Agenda', path: '/agenda', color: '#F97316' },
     { icon: FaCashRegister, label: 'Caixa (Financeiro)', path: '/financeiro', color: '#10B981' },
+    ...(userRole === 'coordenadora' || userRole === 'pai' ? [
+      { icon: FaCertificate, label: 'Secretaria Digital', path: '/secretaria-digital', color: '#7C3AED' }
+    ] : []),
     { icon: FaEnvelope, label: 'Avisos', path: '/avisos', color: '#8B5CF6' },
     ...(userRole === 'coordenadora' ? [
       { icon: FaPrint, label: 'Impressões', path: '/impressoes', color: '#6B7280' }

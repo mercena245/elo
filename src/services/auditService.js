@@ -96,7 +96,20 @@ export const LOG_ACTIONS = {
   // Ações de sistema
   SYSTEM_BACKUP: 'system_backup',
   SYSTEM_EXPORT: 'system_export',
-  SYSTEM_IMPORT: 'system_import'
+  SYSTEM_IMPORT: 'system_import',
+
+  // Ações da Secretaria Digital
+  DIGITAL_SECRETARY_HISTORIC_GENERATED: 'digital_secretary_historic_generated',
+  DIGITAL_SECRETARY_DECLARATION_GENERATED: 'digital_secretary_declaration_generated',
+  DIGITAL_SECRETARY_CERTIFICATE_GENERATED: 'digital_secretary_certificate_generated',
+  DIGITAL_SECRETARY_TRANSFER_GENERATED: 'digital_secretary_transfer_generated',
+  DIGITAL_SECRETARY_DOCUMENT_VALIDATED: 'digital_secretary_document_validated',
+  DIGITAL_SECRETARY_VALIDATION_FAILED: 'digital_secretary_validation_failed',
+  DIGITAL_SECRETARY_VALIDATION_ERROR: 'digital_secretary_validation_error',
+  DIGITAL_SECRETARY_INSTITUTION_CONFIGURED: 'digital_secretary_institution_configured',
+  DIGITAL_SECRETARY_DOCUMENT_DOWNLOADED: 'digital_secretary_document_downloaded',
+  DIGITAL_SECRETARY_DOCUMENT_VIEWED: 'digital_secretary_document_viewed',
+  DIGITAL_SECRETARY_DOCUMENT_DELETED: 'digital_secretary_document_deleted'
 };
 
 // Níveis de severidade
@@ -449,7 +462,20 @@ export const getActionDescription = (action, entity, changes) => {
     [LOG_ACTIONS.GRADE_UPDATE]: 'atualizou nota',
     [LOG_ACTIONS.GRADE_DELETE]: 'excluiu nota',
     [LOG_ACTIONS.ATTENDANCE_CREATE]: 'registrou frequência',
-    [LOG_ACTIONS.ATTENDANCE_UPDATE]: 'atualizou frequência'
+    [LOG_ACTIONS.ATTENDANCE_UPDATE]: 'atualizou frequência',
+    
+    // Ações da Secretaria Digital
+    [LOG_ACTIONS.DIGITAL_SECRETARY_HISTORIC_GENERATED]: 'gerou histórico escolar digital',
+    [LOG_ACTIONS.DIGITAL_SECRETARY_DECLARATION_GENERATED]: 'gerou declaração digital',
+    [LOG_ACTIONS.DIGITAL_SECRETARY_CERTIFICATE_GENERATED]: 'gerou certificado digital',
+    [LOG_ACTIONS.DIGITAL_SECRETARY_TRANSFER_GENERATED]: 'gerou transferência digital',
+    [LOG_ACTIONS.DIGITAL_SECRETARY_DOCUMENT_VALIDATED]: 'validou documento digital',
+    [LOG_ACTIONS.DIGITAL_SECRETARY_VALIDATION_FAILED]: 'falhou na validação de documento',
+    [LOG_ACTIONS.DIGITAL_SECRETARY_VALIDATION_ERROR]: 'erro na validação de documento',
+    [LOG_ACTIONS.DIGITAL_SECRETARY_INSTITUTION_CONFIGURED]: 'configurou dados da instituição',
+    [LOG_ACTIONS.DIGITAL_SECRETARY_DOCUMENT_DOWNLOADED]: 'baixou documento digital',
+    [LOG_ACTIONS.DIGITAL_SECRETARY_DOCUMENT_VIEWED]: 'visualizou documento digital',
+    [LOG_ACTIONS.DIGITAL_SECRETARY_DOCUMENT_DELETED]: 'excluiu documento digital'
   };
 
   return actionMap[action] || `executou ação ${action}`;

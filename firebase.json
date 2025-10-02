@@ -11,8 +11,79 @@
     ],
     "rewrites": [
       {
+        "source": "/alunos",
+        "destination": "/alunos/index.html"
+      },
+      {
+        "source": "/financeiro",
+        "destination": "/financeiro/index.html"
+      },
+      {
+        "source": "/loja",
+        "destination": "/loja/index.html"
+      },
+      {
+        "source": "/agenda",
+        "destination": "/agenda/index.html"
+      },
+      {
+        "source": "/dashboard",
+        "destination": "/dashboard/index.html"
+      },
+      {
+        "source": "/avisos",
+        "destination": "/avisos/index.html"
+      },
+      {
+        "source": "/colaboradores",
+        "destination": "/colaboradores/index.html"
+      },
+      {
+        "source": "/configuracoes",
+        "destination": "/configuracoes/index.html"
+      },
+      {
+        "source": "/escola",
+        "destination": "/escola/index.html"
+      },
+      {
+        "source": "/galeriafotos",
+        "destination": "/galeriafotos/index.html"
+      },
+      {
+        "source": "/grade-horaria",
+        "destination": "/grade-horaria/index.html"
+      },
+      {
+        "source": "/impressoes",
+        "destination": "/impressoes/index.html"
+      },
+      {
+        "source": "/notas-frequencia",
+        "destination": "/notas-frequencia/index.html"
+      },
+      {
+        "source": "/login",
+        "destination": "/login/index.html"
+      },
+      {
+        "source": "/register",
+        "destination": "/register/index.html"
+      },
+      {
         "source": "**",
         "destination": "/index.html"
+      }
+    ],
+    "headers": [
+      {
+        "source": "**",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
+          }
+        ]
       }
     ]
   },

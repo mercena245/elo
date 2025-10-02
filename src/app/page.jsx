@@ -8,17 +8,20 @@ export default function HomePage() {
   const router = useRouter();
 
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged((user) => {
-      if (user) {
-        // Se usuário está logado, redireciona para dashboard
-        router.push('/dashboard');
-      } else {
-        // Se não está logado, redireciona para login
-        router.push('/login');
-      }
-    });
+    // Verificar se estamos na rota raiz antes de redirecionar
+    if (typeof window !== 'undefined' && window.location.pathname === '/') {
+      const unsubscribe = auth.onAuthStateChanged((user) => {
+        if (user) {
+          // Se usuário está logado, redireciona para dashboard
+          router.push('/dashboard');
+        } else {
+          // Se não está logado, redireciona para login
+          router.push('/login');
+        }
+      });
 
-    return () => unsubscribe();
+      return () => unsubscribe();
+    }
   }, [router]);
 
   return (

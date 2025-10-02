@@ -88,7 +88,10 @@ const Dashboard = () => {
         setUserId(user.uid);
       } else {
         setUserId(null);
-        router.push('/login');
+        // Evitar redirecionamento se já estamos na página de login
+        if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+          router.push('/login');
+        }
       }
     });
 

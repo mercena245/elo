@@ -11,9 +11,15 @@ export default function ProtectedRoute({ children, allowedRoles }) {
   React.useEffect(() => {
     if (!loading) {
       if (!user) {
-        router.push('/login');
+        // Evitar redirecionamento se já estamos na página de login ou se é a primeira carga
+        if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+          router.push('/login');
+        }
       } else if (allowedRoles && !allowedRoles.includes(role)) {
-        router.push('/'); // Ou uma página de acesso negado
+        // Redirecionamento para dashboard ao invés de home para evitar loops
+        if (typeof window !== 'undefined' && window.location.pathname !== '/dashboard') {
+          router.push('/dashboard');
+        }
       }
     }
   }, [user, role, loading, allowedRoles, router]);

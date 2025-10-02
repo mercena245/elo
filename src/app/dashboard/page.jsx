@@ -28,7 +28,7 @@ import {
   Zoom,
   Button
 } from '@mui/material';
-import { db, ref, get, auth } from '../../firebase';
+import { db, ref, get, auth, onAuthStateChanged } from '../../firebase';
 import { 
   People,
   School,
@@ -78,8 +78,22 @@ const Dashboard = () => {
     mediaGeral: 0
   });
   const [loading, setLoading] = useState(true);
-  const userId = auth.currentUser ? auth.currentUser.uid : null;
+  const [userId, setUserId] = useState(null);
   const router = useRouter();
+
+  // Verificar autenticação
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        setUserId(user.uid);
+      } else {
+        setUserId(null);
+        router.push('/login');
+      }
+    });
+
+    return () => unsubscribe();
+  }, [router]);
 
   // Função para truncar texto
   const truncateText = (text, maxLength = 120) => {

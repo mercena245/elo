@@ -9,7 +9,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs from 'dayjs';
-import { db, ref, get, auth } from '../../firebase';
+import { db, ref, get, auth, onAuthStateChanged } from '../../firebase';
 import { storage } from '../../firebase-storage';
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import { deleteObject } from "firebase/storage";
@@ -40,6 +40,7 @@ const Alunos = () => {
   const [isNew, setIsNew] = useState(false);
   const [userRole, setUserRole] = useState('');
   const [roleChecked, setRoleChecked] = useState(false);
+  const [userId, setUserId] = useState(null);
   const [formError, setFormError] = useState('');
   const [filtroNome, setFiltroNome] = useState('');
   const [filtroMatricula, setFiltroMatricula] = useState('');
@@ -142,7 +143,23 @@ const Alunos = () => {
     }
     setSaving(false);
   };
-  const userId = auth.currentUser ? auth.currentUser.uid : null;
+
+  // Verificar autenticação
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        setUserId(user.uid);
+      } else {
+        setUserId(null);
+        // Redirecionar para login se necessário
+        if (typeof window !== 'undefined') {
+          window.location.href = '/login';
+        }
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   const fetchData = async () => {
     setLoading(true);
@@ -168,8 +185,10 @@ const Alunos = () => {
   };
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (userId) {
+      fetchData();
+    }
+  }, [userId]);
 
   useEffect(() => {
     async function fetchRole() {
@@ -583,7 +602,7 @@ const Alunos = () => {
     setSaving(false);
   };
 
-  if (!roleChecked) {
+  if (!roleChecked || userId === null) {
     return (
       <Box sx={{ mt: 8, textAlign: 'center' }}>
         <CircularProgress />

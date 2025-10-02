@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { FaBars, FaHome, FaUserFriends, FaSchool, FaSignOutAlt, FaStore, FaUsers, FaCalendarAlt, FaCashRegister, FaEnvelope, FaPrint, FaImages, FaUserCircle, FaCog, FaGraduationCap } from 'react-icons/fa';
-import { auth, db } from '../firebase';
+import { db, ref, get, auth, onAuthStateChanged } from '../firebase';
 import { signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import { 
@@ -18,7 +18,6 @@ import {
   Divider,
   Chip
 } from '@mui/material';
-import { ref, get } from 'firebase/database';
 
 // Versão modernizada do SidebarMenu
 const SidebarMenu = () => {
@@ -28,11 +27,26 @@ const SidebarMenu = () => {
   const [userRole, setUserRole] = useState('');
   const [userName, setUserName] = useState('');
   const [userEmail, setUserEmail] = useState('');
+  const [userId, setUserId] = useState(null);
   const router = useRouter();
 
-  const userId = typeof window !== 'undefined' && localStorage.getItem('userId')
-    ? localStorage.getItem('userId')
-    : (auth.currentUser ? auth.currentUser.uid : '');
+  // Verificar autenticação
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        setUserId(user.uid);
+        localStorage.setItem('userId', user.uid);
+      } else {
+        setUserId(null);
+        localStorage.removeItem('userId');
+        setUserRole('');
+        setUserName('Usuário');
+        setUserEmail('');
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   useEffect(() => {
     async function fetchRole() {
@@ -44,11 +58,11 @@ const SidebarMenu = () => {
           const data = snap.val();
           setUserRole(data.role || '');
           setUserName(data.nome || data.displayName || 'Usuário');
-          setUserEmail(data.email || auth.currentUser?.email || '');
+          setUserEmail(data.email || '');
         } else {
           setUserRole('');
-          setUserName(auth.currentUser?.displayName || 'Usuário');
-          setUserEmail(auth.currentUser?.email || '');
+          setUserName('Usuário');
+          setUserEmail('');
         }
       } catch {
         setUserRole('');

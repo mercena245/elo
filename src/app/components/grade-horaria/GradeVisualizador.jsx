@@ -29,6 +29,7 @@ const GradeVisualizador = () => {
   const [periodosAula, setPeriodosAula] = useState([]);
   const [horariosAula, setHorariosAula] = useState([]);
   const [turmaSelected, setTurmaSelected] = useState('');
+  const [turnoSelected, setTurnoSelected] = useState(''); // Novo estado para turno selecionado
   const [loading, setLoading] = useState(true);
   const [disciplinas, setDisciplinas] = useState([]);
   const [professores, setProfessores] = useState([]);
@@ -47,6 +48,35 @@ const GradeVisualizador = () => {
   useEffect(() => {
     carregarDados();
   }, []);
+
+  // Effect para atualizar períodos quando turma ou turno mudam
+  useEffect(() => {
+    if (turmaSelected) {
+      const turma = turmas.find(t => t.id === turmaSelected);
+      if (turma) {
+        // Se a turma mudou, determinar turno automaticamente ou deixar usuário escolher
+        if (turma.turnoId === 'Integral') {
+          // Para turno integral, não definir automaticamente
+          if (!turnoSelected) {
+            setTurnoSelected(''); // Usuário deve escolher
+          }
+        } else {
+          // Para outros turnos, definir automaticamente
+          setTurnoSelected(turma.turnoId);
+        }
+      }
+    }
+  }, [turmaSelected, turmas]);
+
+  // Function para filtrar períodos baseado no turno selecionado
+  const getPeriodosFiltrados = () => {
+    if (!turnoSelected) return [];
+    
+    return periodosAula.filter(periodo => {
+      const turno = periodo.turno || 'Manhã'; // Default para compatibilidade
+      return turno === turnoSelected;
+    }).sort((a, b) => a.ordem - b.ordem);
+  };
 
   const carregarDados = async () => {
     setLoading(true);
@@ -74,7 +104,11 @@ const GradeVisualizador = () => {
       if (periodosSnap.exists()) {
         const periodosData = periodosSnap.val();
         const periodosArray = Object.entries(periodosData)
-          .map(([id, periodo]) => ({ id, ...periodo }))
+          .map(([id, periodo]) => ({ 
+            id, 
+            ...periodo,
+            turno: periodo.turno || 'Manhã' // Default para compatibilidade com dados existentes
+          }))
           .sort((a, b) => a.ordem - b.ordem);
         setPeriodosAula(periodosArray);
       }
@@ -138,6 +172,16 @@ const GradeVisualizador = () => {
   const handleImprimir = () => {
     if (!turmaSelected) {
       alert('Selecione uma turma para imprimir a grade.');
+      return;
+    }
+    
+    if (!turnoSelected) {
+      alert('Selecione um turno para imprimir a grade.');
+      return;
+    }
+    
+    if (getPeriodosFiltrados().length === 0) {
+      alert('Não há períodos configurados para este turno.');
       return;
     }
     
@@ -235,7 +279,7 @@ const GradeVisualizador = () => {
         </Typography>
         
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          {turmaSelected && (
+          {turmaSelected && turnoSelected && (
             <Button
               variant="contained"
               startIcon={<Print />}
@@ -262,12 +306,29 @@ const GradeVisualizador = () => {
               ) : (
                 turmas.map((turma) => (
                   <MenuItem key={turma.id} value={turma.id}>
-                    {turma.nome}
+                    {turma.nome} - {turma.turnoId}
                   </MenuItem>
                 ))
               )}
             </Select>
           </FormControl>
+          
+          {/* Seletor de turno - aparece apenas para turmas integrais */}
+          {turmaSelected && turmas.find(t => t.id === turmaSelected)?.turnoId === 'Integral' && (
+            <FormControl sx={{ minWidth: 200 }}>
+              <InputLabel>Selecionar Turno</InputLabel>
+              <Select
+                value={turnoSelected}
+                label="Selecionar Turno"
+                onChange={(e) => setTurnoSelected(e.target.value)}
+              >
+                <MenuItem value="Manhã">🌅 Manhã</MenuItem>
+                <MenuItem value="Tarde">🌞 Tarde</MenuItem>
+                <MenuItem value="Contra-turno Manhã">🌅➕ Contra-turno Manhã</MenuItem>
+                <MenuItem value="Contra-turno Tarde">🌞➕ Contra-turno Tarde</MenuItem>
+              </Select>
+            </FormControl>
+          )}
         </Box>
       </Box>
 
@@ -307,6 +368,31 @@ const GradeVisualizador = () => {
             </Typography>
           </CardContent>
         </Card>
+      ) : turmas.find(t => t.id === turmaSelected)?.turnoId === 'Integral' && !turnoSelected ? (
+        <Card>
+          <CardContent sx={{ textAlign: 'center' }}>
+            <Typography variant="h6" color="primary" gutterBottom>
+              🎓 Turma de Turno Integral
+            </Typography>
+            <Typography variant="body1" color="text.secondary">
+              Selecione o turno para visualizar a grade horária
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              Turmas integrais podem ter períodos de manhã, tarde e contra-turnos
+            </Typography>
+          </CardContent>
+        </Card>
+      ) : getPeriodosFiltrados().length === 0 ? (
+        <Card>
+          <CardContent sx={{ textAlign: 'center' }}>
+            <Typography variant="h6" color="warning.main" gutterBottom>
+              ⚠️ Nenhum período encontrado para este turno
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Configure períodos de aula para o turno "{turnoSelected}" na aba "Configurações".
+            </Typography>
+          </CardContent>
+        </Card>
       ) : (
         <TableContainer component={Paper} sx={{ mt: 2 }}>
           <Table>
@@ -327,7 +413,7 @@ const GradeVisualizador = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {periodosAula.map((periodo) => (
+              {getPeriodosFiltrados().map((periodo) => (
                 <TableRow key={periodo.id}>
                   <TableCell sx={{ fontWeight: 600, minWidth: 120 }}>
                     <Box>
@@ -355,10 +441,21 @@ const GradeVisualizador = () => {
         </TableContainer>
       )}
 
-      {turmaSelected && periodosAula.length > 0 && (
-        <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center' }}>
+      {turmaSelected && turnoSelected && getPeriodosFiltrados().length > 0 && (
+        <Box sx={{ mt: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Typography variant="caption" color="text.secondary">
             💡 Clique em uma célula vazia para adicionar uma aula
+          </Typography>
+          <Typography variant="caption" color="primary" sx={{ 
+            bgcolor: 'primary.light', 
+            color: 'white', 
+            px: 2, 
+            py: 0.5, 
+            borderRadius: 1 
+          }}>
+            {turnoSelected === 'Manhã' ? '🌅' : 
+             turnoSelected === 'Tarde' ? '🌞' :
+             turnoSelected === 'Contra-turno Manhã' ? '🌅➕' : '🌞➕'} {turnoSelected}
           </Typography>
         </Box>
       )}
@@ -373,14 +470,15 @@ const GradeVisualizador = () => {
         onSalvar={handleSalvarHorario}
       />
 
-      {turmaSelected && (
+      {turmaSelected && turnoSelected && (
         <ImpressaoGradeNova
           ref={impressaoRef}
           turma={turmas.find(t => t.id === turmaSelected)}
-          periodosAula={periodosAula}
+          periodosAula={getPeriodosFiltrados()}
           horariosAula={horariosAula.filter(h => h.turmaId === turmaSelected)}
           disciplinas={disciplinas}
           professores={professores}
+          turnoSelecionado={turnoSelected}
         />
       )}
     </Box>

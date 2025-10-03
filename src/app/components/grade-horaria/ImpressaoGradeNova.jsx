@@ -5,7 +5,8 @@ const ImpressaoGradeNova = forwardRef(({
   periodosAula, 
   horariosAula, 
   disciplinas, 
-  professores 
+  professores,
+  turnoSelecionado 
 }, ref) => {
   const diasSemana = [
     { id: 1, nome: 'Segunda-feira' },
@@ -29,6 +30,7 @@ const ImpressaoGradeNova = forwardRef(({
 
   // Função para obter horário de uma célula específica
   const getHorarioAula = (dia, periodoId) => {
+    // Os horários já vêm filtrados do GradeVisualizador, então não precisa filtrar novamente
     const horario = horariosAula.find(
       h => h.diaSemana === dia && h.periodoAula === periodoId
     );
@@ -51,7 +53,7 @@ const ImpressaoGradeNova = forwardRef(({
           <tr>
             <td class="celula-periodo">
               <div class="periodo-nome">${periodo.nome}</div>
-              <div class="periodo-horario">${periodo.horaInicio} - ${periodo.horaFim}</div>
+              <div class="periodo-horario">${periodo.inicio} - ${periodo.fim}</div>
             </td>`;
         
         diasSemana.forEach(dia => {
@@ -72,7 +74,7 @@ const ImpressaoGradeNova = forwardRef(({
           <tr class="linha-intervalo">
             <td class="celula-periodo intervalo">
               <div class="periodo-nome">🍽️ ${periodo.nome}</div>
-              <div class="periodo-horario">${periodo.horaInicio} - ${periodo.horaFim}</div>
+              <div class="periodo-horario">${periodo.inicio} - ${periodo.fim}</div>
             </td>
             <td colspan="5" class="celula-intervalo">INTERVALO</td>
           </tr>`;
@@ -296,8 +298,9 @@ const ImpressaoGradeNova = forwardRef(({
         <div class="logo-escola">Sistema Escolar ELO</div>
         <div class="titulo-documento">Grade Horária</div>
         <div class="info-turma">
-            <strong>${turma?.nome || 'N/A'}</strong> - ${turma?.serie || 'N/A'} 
-            ${turma?.turno ? `(${turma.turno})` : ''}
+            <strong>${turma?.nome || 'N/A'}</strong>
+            ${turma?.turnoId ? `- Turno: ${turma.turnoId}` : ''} 
+            ${turnoSelecionado && turnoSelecionado !== turma?.turnoId ? `(${turnoSelecionado})` : ''}
         </div>
         <div class="data-geracao">Documento gerado em ${dataAtual}</div>
     </div>
@@ -344,10 +347,27 @@ const ImpressaoGradeNova = forwardRef(({
   };
 
   const handleImprimirGrade = () => {
+    // Validar se há períodos para imprimir
+    if (!periodosAula || periodosAula.length === 0) {
+      alert('Não há períodos de aula para imprimir.');
+      return;
+    }
+    
+    // Validar se há uma turma selecionada
+    if (!turma || !turma.id) {
+      alert('Turma não identificada para impressão.');
+      return;
+    }
+    
     const documentoHTML = gerarDocumentoImpressao();
     
     // Criar uma nova janela
     const janelaImpressao = window.open('', '_blank');
+    
+    if (!janelaImpressao) {
+      alert('Pop-up bloqueado! Permita pop-ups para imprimir a grade.');
+      return;
+    }
     
     // Escrever o HTML na nova janela
     janelaImpressao.document.write(documentoHTML);

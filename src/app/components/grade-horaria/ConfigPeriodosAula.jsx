@@ -28,12 +28,14 @@ const ConfigPeriodosAula = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [editPeriodo, setEditPeriodo] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [filtroTurno, setFiltroTurno] = useState(''); // Novo estado para filtro
   const [form, setForm] = useState({
     nome: '',
     inicio: '',
     fim: '',
     ordem: 1,
-    tipo: 'aula' // 'aula' ou 'intervalo'
+    tipo: 'aula', // 'aula' ou 'intervalo'
+    turno: 'Manhã' // 'Manhã', 'Tarde', 'Contra-turno Manhã', 'Contra-turno Tarde'
   });
   const [msg, setMsg] = useState('');
 
@@ -48,7 +50,11 @@ const ConfigPeriodosAula = () => {
       if (snap.exists()) {
         const data = snap.val();
         const lista = Object.entries(data)
-          .map(([id, periodo]) => ({ id, ...periodo }))
+          .map(([id, periodo]) => ({ 
+            id, 
+            ...periodo,
+            turno: periodo.turno || 'Manhã' // Default para compatibilidade com dados existentes
+          }))
           .sort((a, b) => a.ordem - b.ordem);
         setPeriodosAula(lista);
       } else {
@@ -82,7 +88,8 @@ const ConfigPeriodosAula = () => {
         inicio: form.inicio,
         fim: form.fim,
         ordem: parseInt(form.ordem),
-        tipo: form.tipo
+        tipo: form.tipo,
+        turno: form.turno
       });
       
       setModalOpen(false);
@@ -103,7 +110,8 @@ const ConfigPeriodosAula = () => {
       inicio: periodo.inicio,
       fim: periodo.fim,
       ordem: periodo.ordem,
-      tipo: periodo.tipo || 'aula'
+      tipo: periodo.tipo || 'aula',
+      turno: periodo.turno || 'Manhã'
     });
     setModalOpen(true);
   };
@@ -127,7 +135,8 @@ const ConfigPeriodosAula = () => {
       inicio: '', 
       fim: '', 
       ordem: periodosAula.length + 1, 
-      tipo: 'aula' 
+      tipo: 'aula',
+      turno: 'Manhã'
     });
     setModalOpen(true);
   };
@@ -154,6 +163,25 @@ const ConfigPeriodosAula = () => {
         </Button>
       </Box>
 
+      {/* Filtro por turno */}
+      <Box sx={{ mb: 2 }}>
+        <FormControl sx={{ minWidth: 200 }}>
+          <InputLabel>Filtrar por turno</InputLabel>
+          <Select
+            value={filtroTurno}
+            label="Filtrar por turno"
+            onChange={(e) => setFiltroTurno(e.target.value)}
+            size="small"
+          >
+            <MenuItem value="">Todos os turnos</MenuItem>
+            <MenuItem value="Manhã">🌅 Manhã</MenuItem>
+            <MenuItem value="Tarde">🌞 Tarde</MenuItem>
+            <MenuItem value="Contra-turno Manhã">🌅➕ Contra-turno Manhã</MenuItem>
+            <MenuItem value="Contra-turno Tarde">🌞➕ Contra-turno Tarde</MenuItem>
+          </Select>
+        </FormControl>
+      </Box>
+
       {msg && (
         <Alert severity={msg.includes('sucesso') ? 'success' : 'error'} sx={{ mb: 2 }}>
           {msg}
@@ -170,7 +198,9 @@ const ConfigPeriodosAula = () => {
         </Typography>
       ) : (
         <List>
-          {periodosAula.map((periodo) => (
+          {periodosAula
+            .filter(periodo => !filtroTurno || periodo.turno === filtroTurno)
+            .map((periodo) => (
             <ListItem
               key={periodo.id}
               sx={{
@@ -219,6 +249,23 @@ const ConfigPeriodosAula = () => {
                         INTERVALO
                       </Typography>
                     )}
+                    <Typography 
+                      variant="caption" 
+                      sx={{ 
+                        bgcolor: periodo.turno === 'Manhã' ? '#4caf50' : 
+                               periodo.turno === 'Tarde' ? '#ff9800' :
+                               periodo.turno === 'Contra-turno Manhã' ? '#2196f3' : '#9c27b0',
+                        color: 'white', 
+                        px: 1, 
+                        py: 0.2, 
+                        borderRadius: 1,
+                        ml: 1
+                      }}
+                    >
+                      {periodo.turno === 'Manhã' ? '🌅' : 
+                       periodo.turno === 'Tarde' ? '🌞' :
+                       periodo.turno === 'Contra-turno Manhã' ? '🌅➕' : '🌞➕'} {periodo.turno || 'Manhã'}
+                    </Typography>
                   </Box>
                 }
                 secondary={`${periodo.inicio} às ${periodo.fim}`}
@@ -289,6 +336,20 @@ const ConfigPeriodosAula = () => {
                 </Select>
               </FormControl>
             </Box>
+            <FormControl fullWidth required>
+              <InputLabel>Turno</InputLabel>
+              <Select
+                name="turno"
+                value={form.turno}
+                label="Turno"
+                onChange={handleFormChange}
+              >
+                <MenuItem value="Manhã">🌅 Manhã</MenuItem>
+                <MenuItem value="Tarde">🌞 Tarde</MenuItem>
+                <MenuItem value="Contra-turno Manhã">🌅➕ Contra-turno Manhã</MenuItem>
+                <MenuItem value="Contra-turno Tarde">🌞➕ Contra-turno Tarde</MenuItem>
+              </Select>
+            </FormControl>
             {msg && (
               <Alert severity="error">{msg}</Alert>
             )}

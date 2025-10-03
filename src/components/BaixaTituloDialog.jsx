@@ -46,12 +46,17 @@ import {
   Print,
   Email
 } from '@mui/icons-material';
-import { financeiroService } from '../services/financeiroService';
+import financeiroService from '../services/financeiroService';
 import { auditService } from '../services/auditService';
 
 const BaixaTituloDialog = ({ open, onClose, titulo, onSuccess, userId }) => {
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
+  
+  // Estados para créditos
+  const [creditoDisponivel, setCreditoDisponivel] = useState(0);
+  const [creditoAUtilizar, setCreditoAUtilizar] = useState(0);
+  const [carregandoCredito, setCarregandoCredito] = useState(false);
   
   const [dadosPagamento, setDadosPagamento] = useState({
     formaPagamento: 'dinheiro',
@@ -63,7 +68,9 @@ const BaixaTituloDialog = ({ open, onClose, titulo, onSuccess, userId }) => {
     numeroComprovante: '',
     contaDestino: '',
     gerarRecibo: true,
-    enviarEmailConfirmacao: false
+    enviarEmailConfirmacao: false,
+    usarCredito: false,
+    valorCredito: 0
   });
 
   const [resumoOperacao, setResumoOperacao] = useState(null);
@@ -83,11 +90,33 @@ const BaixaTituloDialog = ({ open, onClose, titulo, onSuccess, userId }) => {
   useEffect(() => {
     if (open && titulo) {
       resetDialog();
+      buscarCreditoAluno();
     }
   }, [open, titulo]);
 
+  const buscarCreditoAluno = async () => {
+    if (!titulo?.alunoId) return;
+    
+    setCarregandoCredito(true);
+    try {
+      const resultado = await financeiroService.obterSaldoCredito(titulo.alunoId);
+      if (resultado.success) {
+        setCreditoDisponivel(resultado.saldo);
+      } else {
+        console.error('Erro ao buscar crédito:', resultado.error);
+        setCreditoDisponivel(0);
+      }
+    } catch (error) {
+      console.error('Erro ao buscar crédito:', error);
+      setCreditoDisponivel(0);
+    } finally {
+      setCarregandoCredito(false);
+    }
+  };
+
   const resetDialog = () => {
     setStep(0);
+    setCreditoAUtilizar(0);
     setDadosPagamento({
       formaPagamento: 'dinheiro',
       valorPago: titulo?.valor?.toString() || '',
@@ -98,7 +127,9 @@ const BaixaTituloDialog = ({ open, onClose, titulo, onSuccess, userId }) => {
       numeroComprovante: '',
       contaDestino: '',
       gerarRecibo: true,
-      enviarEmailConfirmacao: false
+      enviarEmailConfirmacao: false,
+      usarCredito: false,
+      valorCredito: 0
     });
     setResumoOperacao(null);
   };
@@ -117,15 +148,29 @@ const BaixaTituloDialog = ({ open, onClose, titulo, onSuccess, userId }) => {
   const calcularValorFinal = () => {
     const valorOriginal = parseFloat(titulo?.valor || 0);
     const desconto = parseFloat(dadosPagamento.valorDesconto || 0);
-    return valorOriginal - desconto;
+    const credito = dadosPagamento.usarCredito ? creditoAUtilizar : 0;
+    return Math.max(0, valorOriginal - desconto - credito);
+  };
+
+  const calcularValorComCredito = () => {
+    const valorOriginal = parseFloat(titulo?.valor || 0);
+    const desconto = parseFloat(dadosPagamento.valorDesconto || 0);
+    const valorAposDEsconto = valorOriginal - desconto;
+    const creditoMaximo = Math.min(creditoDisponivel, valorAposDEsconto);
+    return creditoMaximo;
   };
 
   const validarStep = () => {
     switch (step) {
       case 0:
+        const valorFinal = calcularValorFinal();
+        // Se usar crédito e ele cobrir o valor total, não precisa de valor pago
+        const creditoCobre = dadosPagamento.usarCredito && valorFinal === 0;
+        
         return dadosPagamento.formaPagamento && 
-               parseFloat(dadosPagamento.valorPago) > 0 &&
-               parseFloat(dadosPagamento.valorPago) >= calcularValorFinal();
+               (creditoCobre || 
+                (parseFloat(dadosPagamento.valorPago) > 0 && 
+                 parseFloat(dadosPagamento.valorPago) >= valorFinal));
       case 1:
         return true;
       default:
@@ -136,16 +181,19 @@ const BaixaTituloDialog = ({ open, onClose, titulo, onSuccess, userId }) => {
   const handleNext = () => {
     if (step === 0) {
       // Gerar resumo da operação
+      const valorFinal = calcularValorFinal();
       const resumo = {
         titulo: titulo,
         formaPagamento: dadosPagamento.formaPagamento,
         valorOriginal: titulo?.valor || 0,
         valorDesconto: parseFloat(dadosPagamento.valorDesconto || 0),
-        valorFinal: calcularValorFinal(),
-        valorPago: parseFloat(dadosPagamento.valorPago || 0),
-        troco: parseFloat(dadosPagamento.valorPago || 0) - calcularValorFinal(),
+        creditoUtilizado: dadosPagamento.usarCredito ? creditoAUtilizar : 0,
+        valorFinal: valorFinal,
+        valorPago: valorFinal > 0 ? parseFloat(dadosPagamento.valorPago || 0) : 0,
+        troco: valorFinal > 0 ? parseFloat(dadosPagamento.valorPago || 0) - valorFinal : 0,
         dataRecebimento: dadosPagamento.dataRecebimento,
-        observacoes: dadosPagamento.observacoes
+        observacoes: dadosPagamento.observacoes,
+        usouCredito: dadosPagamento.usarCredito
       };
       setResumoOperacao(resumo);
       setStep(prev => prev + 1);
@@ -163,6 +211,23 @@ const BaixaTituloDialog = ({ open, onClose, titulo, onSuccess, userId }) => {
   const executarBaixa = async () => {
     setLoading(true);
     try {
+      // Utilizar crédito se houver
+      if (dadosPagamento.usarCredito && creditoAUtilizar > 0) {
+        console.log('💳 Utilizando crédito:', creditoAUtilizar);
+        const resultadoCredito = await financeiroService.utilizarCredito(
+          titulo.alunoId,
+          creditoAUtilizar,
+          titulo.id,
+          `Crédito utilizado no pagamento do título: ${titulo.descricao}`
+        );
+        
+        if (!resultadoCredito.success) {
+          throw new Error('Erro ao utilizar crédito: ' + resultadoCredito.error);
+        }
+        
+        console.log('✅ Crédito utilizado com sucesso:', resultadoCredito.novoSaldo);
+      }
+
       // Aplicar desconto se houver
       if (parseFloat(dadosPagamento.valorDesconto) > 0) {
         const descontoPercentual = (parseFloat(dadosPagamento.valorDesconto) / titulo.valor) * 100;
@@ -179,14 +244,17 @@ const BaixaTituloDialog = ({ open, onClose, titulo, onSuccess, userId }) => {
       }
 
       // Dar baixa no título
+      const valorFinalPago = calcularValorFinal();
       const dadosBaixa = {
         formaPagamento: dadosPagamento.formaPagamento,
-        valorPago: parseFloat(dadosPagamento.valorPago),
+        valorPago: valorFinalPago > 0 ? valorFinalPago : titulo.valor,
         dataRecebimento: dadosPagamento.dataRecebimento,
         numeroComprovante: dadosPagamento.numeroComprovante,
         contaDestino: dadosPagamento.contaDestino,
-        observacoes: dadosPagamento.observacoes,
-        baixadoPor: userId
+        observacoes: dadosPagamento.observacoes + 
+          (dadosPagamento.usarCredito ? ` | Crédito utilizado: R$ ${creditoAUtilizar.toFixed(2)}` : ''),
+        baixadoPor: userId,
+        creditoUtilizado: dadosPagamento.usarCredito ? creditoAUtilizar : 0
       };
 
       console.log('🔄 Executando baixa do título:', titulo.id, dadosBaixa);
@@ -404,6 +472,84 @@ const BaixaTituloDialog = ({ open, onClose, titulo, onSuccess, userId }) => {
                 </Grid>
               )}
 
+              {/* Seção de Créditos */}
+              {creditoDisponivel > 0 && (
+                <Grid item xs={12}>
+                  <Card sx={{ bgcolor: '#f0f9ff', border: '1px solid #0ea5e9' }}>
+                    <CardContent>
+                      <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                        <MonetizationOn sx={{ color: '#0ea5e9', mr: 1 }} />
+                        <Typography variant="h6" color="#0ea5e9">
+                          Créditos Disponíveis
+                        </Typography>
+                      </Box>
+                      
+                      <Grid container spacing={2} alignItems="center">
+                        <Grid item xs={12} md={4}>
+                          <Typography variant="body2" color="text.secondary">
+                            Saldo Disponível: <strong>{formatCurrency(creditoDisponivel)}</strong>
+                          </Typography>
+                        </Grid>
+                        
+                        <Grid item xs={12} md={4}>
+                          <FormControlLabel
+                            control={
+                              <Checkbox
+                                checked={dadosPagamento.usarCredito}
+                                onChange={(e) => {
+                                  const usar = e.target.checked;
+                                  setDadosPagamento(prev => ({ ...prev, usarCredito: usar }));
+                                  if (usar) {
+                                    const creditoMaximo = calcularValorComCredito();
+                                    setCreditoAUtilizar(creditoMaximo);
+                                  } else {
+                                    setCreditoAUtilizar(0);
+                                  }
+                                }}
+                                color="primary"
+                              />
+                            }
+                            label="Usar créditos"
+                          />
+                        </Grid>
+                        
+                        {dadosPagamento.usarCredito && (
+                          <Grid item xs={12} md={4}>
+                            <TextField
+                              label="Valor do Crédito"
+                              type="number"
+                              value={creditoAUtilizar}
+                              onChange={(e) => {
+                                const valor = Math.min(
+                                  parseFloat(e.target.value) || 0,
+                                  calcularValorComCredito()
+                                );
+                                setCreditoAUtilizar(valor);
+                              }}
+                              fullWidth
+                              InputProps={{
+                                startAdornment: <InputAdornment position="start">R$</InputAdornment>,
+                                inputProps: { 
+                                  min: 0, 
+                                  step: 0.01, 
+                                  max: calcularValorComCredito()
+                                }
+                              }}
+                            />
+                          </Grid>
+                        )}
+                      </Grid>
+                      
+                      {dadosPagamento.usarCredito && creditoAUtilizar > 0 && (
+                        <Alert severity="info" sx={{ mt: 2 }}>
+                          Valor após crédito: <strong>{formatCurrency(calcularValorFinal())}</strong>
+                        </Alert>
+                      )}
+                    </CardContent>
+                  </Card>
+                </Grid>
+              )}
+
               <Grid item xs={12} md={6}>
                 <TextField
                   label="Data do Recebimento"
@@ -534,12 +680,24 @@ const BaixaTituloDialog = ({ open, onClose, titulo, onSuccess, userId }) => {
                               Desconto: -{formatCurrency(resumoOperacao.valorDesconto)}
                             </Typography>
                           )}
+                          {resumoOperacao.usouCredito && (
+                            <Typography variant="body2" color="info.main">
+                              Crédito: -{formatCurrency(resumoOperacao.creditoUtilizado)}
+                            </Typography>
+                          )}
                           <Typography variant="body2" fontWeight="bold">
                             Final: {formatCurrency(resumoOperacao.valorFinal)}
                           </Typography>
-                          <Typography variant="body2">
-                            Pago: {formatCurrency(resumoOperacao.valorPago)}
-                          </Typography>
+                          {resumoOperacao.valorFinal > 0 && (
+                            <Typography variant="body2">
+                              Pago: {formatCurrency(resumoOperacao.valorPago)}
+                            </Typography>
+                          )}
+                          {resumoOperacao.usouCredito && resumoOperacao.valorFinal === 0 && (
+                            <Typography variant="body2" color="success.main" fontWeight="bold">
+                              💳 Título quitado com créditos!
+                            </Typography>
+                          )}
                           {resumoOperacao.troco > 0 && (
                             <Typography variant="body2" color="warning.main">
                               Troco: {formatCurrency(resumoOperacao.troco)}

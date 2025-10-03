@@ -39,7 +39,13 @@ import {
   Fab,
   SpeedDial,
   SpeedDialIcon,
-  SpeedDialAction
+  SpeedDialAction,
+  Pagination,
+  Stack,
+  FormControlLabel,
+  Checkbox,
+  Snackbar,
+  Backdrop
 } from '@mui/material';
 import {
   AttachMoney,
@@ -68,6 +74,7 @@ import {
 } from '@mui/icons-material';
 import { db, ref, get, set, push, auth, storage, storageRef, uploadBytes, getDownloadURL, onAuthStateChanged } from '../../firebase';
 import { auditService } from '../../services/auditService';
+import financeiroService from '../../services/financeiroService';
 import GeradorMensalidadesDialog from '../../components/GeradorMensalidadesDialog';
 import DashboardFinanceiro from '../../components/DashboardFinanceiro';
 import BaixaTituloDialog from '../../components/BaixaTituloDialog';
@@ -114,12 +121,23 @@ const FinanceiroPage = () => {
     observacoes: ''
   });
 
-  // Estados dos filtros
-  const [filtros, setFiltros] = useState({
+  // Estados dos filtros - separados por aba
+  const [filtrosTitulos, setFiltrosTitulos] = useState({
     aluno: '',
     turma: '',
     tipo: '',
     status: '',
+    dataInicio: '',
+    dataFim: ''
+  });
+
+  const [filtrosContasPagar, setFiltrosContasPagar] = useState({
+    categoria: '',
+    fornecedor: '',
+    status: ''
+  });
+
+  const [filtrosContasPagas, setFiltrosContasPagas] = useState({
     dataInicio: '',
     dataFim: ''
   });
@@ -149,6 +167,121 @@ const FinanceiroPage = () => {
     comprovante: null,
     carregando: false
   });
+
+  // Estados da paginação
+  const [paginacao, setPaginacao] = useState({
+    paginaAtual: 1,
+    itensPorPagina: 20,
+    totalPaginas: 1
+  });
+
+  // Estados das contas a pagar/pagas
+  const [contasPagar, setContasPagar] = useState([]);
+  const [contasPagas, setContasPagas] = useState([]);
+  const [saldoEscola, setSaldoEscola] = useState(0);
+  const [novaContaDialog, setNovaContaDialog] = useState(false);
+  const [pagamentoContaDialog, setPagamentoContaDialog] = useState(false);
+  const [contaSelecionada, setContaSelecionada] = useState(null);
+  const [dialogPagamentoConta, setDialogPagamentoConta] = useState({ open: false, conta: null });
+  const [pagamentoConta, setPagamentoConta] = useState({
+    dataPagamento: '',
+    formaPagamento: '',
+    observacoes: ''
+  });
+
+  // Estados para feedback modal e loading
+  const [feedbackModal, setFeedbackModal] = useState({ open: false, type: '', title: '', message: '' });
+  const [processingOperation, setProcessingOperation] = useState(false);
+
+  // Estado para permitir saldo negativo
+  const [permitirSaldoNegativo, setPermitirSaldoNegativo] = useState(false);
+
+  // Estados para controle de período
+  const [periodoSelecionado, setPeriodoSelecionado] = useState(new Date());
+  const [exibirPorPeriodo, setExibirPorPeriodo] = useState(false);
+  const [novaConta, setNovaConta] = useState({
+    descricao: '',
+    categoria: '',
+    valor: '',
+    vencimento: '',
+    fornecedor: '',
+    observacoes: '',
+    recorrente: false,
+    tipoRecorrencia: 'mensal',
+    jaFoiPaga: false,
+    dataPagamento: '',
+    formaPagamento: '',
+    anexos: []
+  });
+
+  // Estados para controle mensal
+  const [mesAtual, setMesAtual] = useState({
+    mes: new Date().getMonth() + 1,
+    ano: new Date().getFullYear(),
+    fechado: false
+  });
+  const [dialogFecharMes, setDialogFecharMes] = useState(false);
+
+  // Função para mostrar feedback modal
+  const showFeedback = (type, title, message) => {
+    setFeedbackModal({ open: true, type, title, message });
+  };
+
+  // Função para fechar feedback modal
+  const closeFeedback = () => {
+    setFeedbackModal({ open: false, type: '', title: '', message: '' });
+  };
+
+  // Função para obter períodos disponíveis
+  const obterPeriodosDisponiveis = () => {
+    const periodos = [];
+    const hoje = new Date();
+    
+    // 6 meses para trás
+    for (let i = 5; i >= 0; i--) {
+      const data = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
+      periodos.push(data);
+    }
+    
+    // 6 meses para frente
+    for (let i = 1; i <= 6; i++) {
+      const data = new Date(hoje.getFullYear(), hoje.getMonth() + i, 1);
+      periodos.push(data);
+    }
+    
+    return periodos;
+  };
+
+  // Função para filtrar contas por período selecionado
+  const filtrarContasPorPeriodo = (contas) => {
+    if (!exibirPorPeriodo) return contas;
+    
+    const anoSelecionado = periodoSelecionado.getFullYear();
+    const mesSelecionado = periodoSelecionado.getMonth();
+    
+    return contas.filter(conta => {
+      const dataVencimento = new Date(conta.vencimento);
+      return dataVencimento.getFullYear() === anoSelecionado && 
+             dataVencimento.getMonth() === mesSelecionado;
+    });
+  };
+
+  // Função para obter apenas contas realmente pendentes (não pagas)
+  const obterContasPendentes = () => {
+    return contasPagar.filter(conta => conta.status !== 'paga');
+  };
+
+  // Função para calcular estatísticas das contas pendentes
+  const calcularEstatisticasPendentes = () => {
+    const contasPendentesReais = obterContasPendentes();
+    const totalPendentes = contasPendentesReais.length;
+    const valorTotalPendente = contasPendentesReais.reduce((sum, conta) => sum + conta.valor, 0);
+    
+    return {
+      quantidade: totalPendentes,
+      valorTotal: valorTotalPendente
+    };
+  };
 
   // Listener de autenticação
   useEffect(() => {
@@ -233,6 +366,36 @@ const FinanceiroPage = () => {
     }
   }, [titulos, alunos, userRole]);
 
+  // useEffect para carregar dados do mês atual
+  useEffect(() => {
+    if (userId) {
+      carregarDadosMesAtual();
+      // Configurar filtro padrão para contas pagas do mês atual
+      const inicio = `${mesAtual.ano}-${mesAtual.mes.toString().padStart(2, '0')}-01`;
+      const fim = new Date(mesAtual.ano, mesAtual.mes, 0).toISOString().split('T')[0];
+      setFiltrosContasPagas(prev => ({ ...prev, dataInicio: inicio, dataFim: fim }));
+    }
+  }, [userId, mesAtual.mes, mesAtual.ano]);
+
+  // useEffect para recarregar contas quando período selecionado mudar
+  useEffect(() => {
+    if (userId && exibirPorPeriodo) {
+      fetchContasPagar();
+    }
+  }, [exibirPorPeriodo, periodoSelecionado, userId]);
+
+  // Função para carregar dados do mês atual
+  const carregarDadosMesAtual = async () => {
+    try {
+      const result = await financeiroService.verificarMesFechado(mesAtual.mes, mesAtual.ano);
+      if (result.success) {
+        setMesAtual(prev => ({ ...prev, fechado: result.fechado }));
+      }
+    } catch (error) {
+      console.error('Erro ao verificar status do mês:', error);
+    }
+  };
+
   const fetchData = async () => {
     setLoading(true);
     try {
@@ -241,6 +404,9 @@ const FinanceiroPage = () => {
         await fetchAlunos();
         await fetchTitulos();
         await fetchTurmas();
+        await fetchContasPagar();
+        await fetchContasPagas();
+        await fetchSaldoEscola();
         // calcularMetricas será chamado pelo useEffect quando os dados estiverem prontos
       } else if (isProfessor()) {
         // Professor(a) vê dados básicos
@@ -650,7 +816,7 @@ const FinanceiroPage = () => {
       // Validar tipo de arquivo
       const tiposPermitidos = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
       if (!tiposPermitidos.includes(file.type)) {
-        alert('Tipo de arquivo não permitido. Use apenas JPG, PNG ou PDF.');
+        showFeedback('error', 'Arquivo Inválido', 'Tipo de arquivo não permitido. Use apenas JPG, PNG ou PDF.');
         event.target.value = '';
         return;
       }
@@ -658,7 +824,7 @@ const FinanceiroPage = () => {
       // Validar tamanho (máximo 5MB)
       const tamanhoMaximo = 5 * 1024 * 1024; // 5MB
       if (file.size > tamanhoMaximo) {
-        alert('Arquivo muito grande. O tamanho máximo é 5MB.');
+        showFeedback('error', 'Arquivo Muito Grande', 'Arquivo muito grande. O tamanho máximo é 5MB.');
         event.target.value = '';
         return;
       }
@@ -672,7 +838,7 @@ const FinanceiroPage = () => {
 
   const enviarPagamento = async () => {
     if (!pagamento.comprovante) {
-      alert('Por favor, anexe um comprovante de pagamento.');
+      showFeedback('error', 'Comprovante Necessário', 'Por favor, anexe um comprovante de pagamento.');
       return;
     }
 
@@ -720,11 +886,11 @@ const FinanceiroPage = () => {
 
       setPagamentoDialog(false);
       fetchTitulos();
-      alert('Comprovante enviado com sucesso!');
+      showFeedback('success', 'Comprovante Enviado', 'Comprovante enviado com sucesso!');
       
     } catch (error) {
       console.error('Erro ao enviar pagamento:', error);
-      alert('Erro ao enviar pagamento. Tente novamente.');
+      showFeedback('error', 'Erro no Envio', 'Erro ao enviar pagamento. Tente novamente.');
     } finally {
       setPagamento({ ...pagamento, carregando: false });
     }
@@ -758,7 +924,7 @@ const FinanceiroPage = () => {
       
     } catch (error) {
       console.error('Erro ao aprovar pagamento:', error);
-      alert('Erro ao aprovar pagamento. Tente novamente.');
+      showFeedback('error', 'Erro na Aprovação', 'Erro ao aprovar pagamento. Tente novamente.');
     }
   };
 
@@ -789,7 +955,7 @@ const FinanceiroPage = () => {
       
     } catch (error) {
       console.error('Erro ao rejeitar pagamento:', error);
-      alert('Erro ao rejeitar pagamento. Tente novamente.');
+      showFeedback('error', 'Erro na Rejeição', 'Erro ao rejeitar pagamento. Tente novamente.');
     }
   };
 
@@ -801,42 +967,418 @@ const FinanceiroPage = () => {
       const alunoTurma = aluno?.turmaId || '';
       
       // Filtro por aluno
-      if (filtros.aluno && !alunoNome.includes(filtros.aluno.toLowerCase())) {
+      if (filtrosTitulos.aluno && !alunoNome.includes(filtrosTitulos.aluno.toLowerCase())) {
         return false;
       }
       
       // Filtro por turma
-      if (filtros.turma && filtros.turma !== 'todos' && alunoTurma !== filtros.turma) {
+      if (filtrosTitulos.turma && filtrosTitulos.turma !== 'todos' && alunoTurma !== filtrosTitulos.turma) {
         return false;
       }
       
       // Filtro por tipo
-      if (filtros.tipo && filtros.tipo !== 'todos' && titulo.tipo !== filtros.tipo) {
+      if (filtrosTitulos.tipo && filtrosTitulos.tipo !== 'todos' && titulo.tipo !== filtrosTitulos.tipo) {
         return false;
       }
       
       // Filtro por status
-      if (filtros.status && filtros.status !== 'todos' && titulo.status !== filtros.status) {
+      if (filtrosTitulos.status && filtrosTitulos.status !== 'todos' && titulo.status !== filtrosTitulos.status) {
         return false;
       }
       
       // Filtro por data de vencimento
-      if (filtros.dataInicio || filtros.dataFim) {
+      if (filtrosTitulos.dataInicio || filtrosTitulos.dataFim) {
         const vencimento = new Date(titulo.vencimento);
         
-        if (filtros.dataInicio) {
-          const dataInicio = new Date(filtros.dataInicio);
+        if (filtrosTitulos.dataInicio) {
+          const dataInicio = new Date(filtrosTitulos.dataInicio);
           if (vencimento < dataInicio) return false;
         }
         
-        if (filtros.dataFim) {
-          const dataFim = new Date(filtros.dataFim);
+        if (filtrosTitulos.dataFim) {
+          const dataFim = new Date(filtrosTitulos.dataFim);
           if (vencimento > dataFim) return false;
         }
       }
       
       return true;
     });
+  };
+
+  // Funções de paginação
+  const obterTitulosPaginados = () => {
+    const titulosFiltrados = filtrarTitulos();
+    const totalPaginas = Math.ceil(titulosFiltrados.length / paginacao.itensPorPagina);
+    
+    // Atualizar total de páginas se necessário
+    if (totalPaginas !== paginacao.totalPaginas) {
+      setPaginacao(prev => ({ ...prev, totalPaginas }));
+    }
+    
+    const inicio = (paginacao.paginaAtual - 1) * paginacao.itensPorPagina;
+    const fim = inicio + paginacao.itensPorPagina;
+    
+    return titulosFiltrados.slice(inicio, fim);
+  };
+
+  const irParaPagina = (pagina) => {
+    if (pagina >= 1 && pagina <= paginacao.totalPaginas) {
+      setPaginacao(prev => ({ ...prev, paginaAtual: pagina }));
+    }
+  };
+
+  const proximaPagina = () => {
+    if (paginacao.paginaAtual < paginacao.totalPaginas) {
+      setPaginacao(prev => ({ ...prev, paginaAtual: prev.paginaAtual + 1 }));
+    }
+  };
+
+  const paginaAnterior = () => {
+    if (paginacao.paginaAtual > 1) {
+      setPaginacao(prev => ({ ...prev, paginaAtual: prev.paginaAtual - 1 }));
+    }
+  };
+
+  // Reset da paginação quando os filtros mudarem
+  useEffect(() => {
+    setPaginacao(prev => ({ ...prev, paginaAtual: 1 }));
+  }, [filtrosTitulos, filtrosContasPagar, filtrosContasPagas]);
+
+  // Funções para contas a pagar/pagas
+  const fetchContasPagar = async () => {
+    try {
+      const todasContas = [];
+      
+      // Definir qual período buscar
+      const mesParaBuscar = exibirPorPeriodo ? {
+        mes: periodoSelecionado.getMonth() + 1,
+        ano: periodoSelecionado.getFullYear()
+      } : mesAtual;
+      
+      // Buscar contas pendentes
+      const contasRef = ref(db, 'contas_pagar');
+      const snapshot = await get(contasRef);
+      if (snapshot.exists()) {
+        Object.entries(snapshot.val()).forEach(([id, conta]) => {
+          const vencimento = new Date(conta.vencimento);
+          if (vencimento.getMonth() + 1 === mesParaBuscar.mes && 
+              vencimento.getFullYear() === mesParaBuscar.ano) {
+            todasContas.push({ id, ...conta });
+          }
+        });
+      }
+      
+      // Buscar contas pagas do mês para exibir na lista
+      const contasPagasRef = ref(db, 'contas_pagas');
+      const snapshotPagas = await get(contasPagasRef);
+      if (snapshotPagas.exists()) {
+        Object.entries(snapshotPagas.val()).forEach(([id, conta]) => {
+          if (conta.dataPagamento) {
+            const dataPagamento = new Date(conta.dataPagamento);
+            if (dataPagamento.getMonth() + 1 === mesParaBuscar.mes && 
+                dataPagamento.getFullYear() === mesParaBuscar.ano) {
+              todasContas.push({ id, ...conta, status: 'paga' });
+            }
+          }
+        });
+      }
+      
+      setContasPagar(todasContas);
+    } catch (error) {
+      console.error('Erro ao buscar contas:', error);
+    }
+  };
+
+  // Função para filtrar contas a pagar
+  const filtrarContasPagar = () => {
+    let contasFiltradas = [...contasPagar];
+    
+    // Não aplicar filtro por período aqui, pois já é aplicado no fetch
+    
+    if (filtrosContasPagar.categoria) {
+      contasFiltradas = contasFiltradas.filter(conta => conta.categoria === filtrosContasPagar.categoria);
+    }
+    
+    if (filtrosContasPagar.fornecedor) {
+      contasFiltradas = contasFiltradas.filter(conta => 
+        conta.fornecedor?.toLowerCase().includes(filtrosContasPagar.fornecedor.toLowerCase())
+      );
+    }
+    
+    if (filtrosContasPagar.status) {
+      if (filtrosContasPagar.status === 'vencida') {
+        contasFiltradas = contasFiltradas.filter(conta => 
+          new Date(conta.vencimento) < new Date()
+        );
+      } else if (filtrosContasPagar.status === 'pendente') {
+        contasFiltradas = contasFiltradas.filter(conta => 
+          new Date(conta.vencimento) >= new Date()
+        );
+      }
+    }
+    
+    return contasFiltradas;
+  };
+
+  // Função para imprimir demonstrativo
+  const imprimirDemonstrativo = () => {
+    const contasFiltradas = contasPagas.filter(conta => {
+      if (filtrosContasPagas.dataInicio && new Date(conta.dataPagamento) < new Date(filtrosContasPagas.dataInicio)) return false;
+      if (filtrosContasPagas.dataFim && new Date(conta.dataPagamento) > new Date(filtrosContasPagas.dataFim)) return false;
+      return true;
+    });
+
+    const valorTotal = contasFiltradas.reduce((sum, conta) => sum + conta.valor, 0);
+    const periodoStr = filtrosContasPagas.dataInicio && filtrosContasPagas.dataFim 
+      ? `${formatDate(filtrosContasPagas.dataInicio)} a ${formatDate(filtrosContasPagas.dataFim)}`
+      : 'Todos os períodos';
+
+    const conteudoHTML = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Demonstrativo de Contas Pagas - ELO</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            h1 { color: #1976d2; text-align: center; }
+            .cabecalho { text-align: center; margin-bottom: 30px; }
+            .periodo { font-size: 14px; color: #666; margin-bottom: 20px; }
+            table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            th { background-color: #f5f5f5; font-weight: bold; }
+            .valor { text-align: right; }
+            .total { font-weight: bold; background-color: #e8f5e8; }
+            .rodape { text-align: center; margin-top: 30px; font-size: 12px; color: #666; }
+          </style>
+        </head>
+        <body>
+          <div class="cabecalho">
+            <h1>ELO - Sistema Educacional</h1>
+            <h2>Demonstrativo de Contas Pagas</h2>
+            <div class="periodo">Período: ${periodoStr}</div>
+            <div class="periodo">Gerado em: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}</div>
+          </div>
+          
+          <table>
+            <thead>
+              <tr>
+                <th>Data Pagamento</th>
+                <th>Descrição</th>
+                <th>Categoria</th>
+                <th>Fornecedor</th>
+                <th class="valor">Valor</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${contasFiltradas.map(conta => `
+                <tr>
+                  <td>${formatDate(conta.dataPagamento)}</td>
+                  <td>${conta.descricao}</td>
+                  <td>${conta.categoria}</td>
+                  <td>${conta.fornecedor || '-'}</td>
+                  <td class="valor">${formatCurrency(conta.valor)}</td>
+                </tr>
+              `).join('')}
+              <tr class="total">
+                <td colspan="4"><strong>TOTAL GERAL</strong></td>
+                <td class="valor"><strong>${formatCurrency(valorTotal)}</strong></td>
+              </tr>
+            </tbody>
+          </table>
+          
+          <div class="rodape">
+            <p>Total de contas pagas: ${contasFiltradas.length}</p>
+            <p>Sistema ELO - Gestão Escolar Integrada</p>
+          </div>
+        </body>
+      </html>
+    `;
+
+    const novaJanela = window.open('', '_blank');
+    novaJanela.document.write(conteudoHTML);
+    novaJanela.document.close();
+    novaJanela.print();
+  };
+
+  const fetchContasPagas = async () => {
+    try {
+      const contasPagas = [];
+      
+      // Buscar de contas_pagar com status 'paga'
+      const contasPagarRef = ref(db, 'contas_pagar');
+      const snapshotPagar = await get(contasPagarRef);
+      if (snapshotPagar.exists()) {
+        Object.entries(snapshotPagar.val()).forEach(([id, conta]) => {
+          if (conta.status === 'paga') {
+            contasPagas.push({ id, ...conta });
+          }
+        });
+      }
+      
+      // Buscar de contas_pagas
+      const contasPagasRef = ref(db, 'contas_pagas');
+      const snapshotPagas = await get(contasPagasRef);
+      if (snapshotPagas.exists()) {
+        Object.entries(snapshotPagas.val()).forEach(([id, conta]) => {
+          contasPagas.push({ id, ...conta });
+        });
+      }
+      
+      setContasPagas(contasPagas);
+    } catch (error) {
+      console.error('Erro ao buscar contas pagas:', error);
+    }
+  };
+
+  const fetchSaldoEscola = async () => {
+    try {
+      const result = await financeiroService.obterSaldoEscola();
+      if (result.success) {
+        setSaldoEscola(result.saldo);
+        console.log('🏦 Saldo da escola atualizado:', result.saldo);
+      } else {
+        console.error('Erro ao obter saldo:', result.error);
+      }
+    } catch (error) {
+      console.error('Erro ao buscar saldo da escola:', error);
+    }
+  };
+
+  const criarConta = async () => {
+    setProcessingOperation(true);
+    try {
+      const contaData = {
+        ...novaConta,
+        valor: parseFloat(novaConta.valor),
+        status: novaConta.jaFoiPaga ? 'paga' : 'pendente',
+        criadoEm: new Date().toISOString(),
+        criadoPor: userId
+      };
+
+      let novaContaRef;
+      // Se a conta já foi paga, adicionar informações de pagamento
+      if (novaConta.jaFoiPaga) {
+        contaData.dataPagamento = novaConta.dataPagamento;
+        contaData.formaPagamento = novaConta.formaPagamento;
+        contaData.pagoPor = userId;
+        contaData.pagoEm = new Date().toISOString();
+        
+        // Conta já paga vai apenas para contas_pagas
+        const contasPagasRef = ref(db, 'contas_pagas');
+        novaContaRef = await push(contasPagasRef, contaData);
+      } else {
+        // Conta pendente vai para contas_pagar
+        const contasRef = ref(db, 'contas_pagar');
+        novaContaRef = await push(contasRef, contaData);
+        
+        // Se for recorrente, criar próximas parcelas
+        if (novaConta.recorrente) {
+          await criarContasRecorrentes(novaContaRef.key, contaData);
+        }
+      }
+
+      // Log da ação
+      await auditService.logAction('conta_criada', userId, {
+        entityId: novaContaRef.key,
+        description: `Conta criada: ${novaConta.descricao}`,
+        changes: { valor: novaConta.valor, vencimento: novaConta.vencimento }
+      });
+
+      setNovaContaDialog(false);
+      setNovaConta({
+        descricao: '',
+        categoria: '',
+        valor: '',
+        vencimento: '',
+        fornecedor: '',
+        observacoes: '',
+        recorrente: false,
+        tipoRecorrencia: 'mensal',
+        jaFoiPaga: false,
+        dataPagamento: '',
+        formaPagamento: '',
+        anexos: []
+      });
+      fetchContasPagar();
+      showFeedback('success', 'Conta Criada', 'Conta criada com sucesso!');
+    } catch (error) {
+      console.error('Erro ao criar conta:', error);
+      showFeedback('error', 'Erro na Criação', 'Erro ao criar conta. Tente novamente.');
+    } finally {
+      setProcessingOperation(false);
+    }
+  };
+
+  const criarContasRecorrentes = async (contaId, contaData) => {
+    try {
+      const contasRef = ref(db, 'contas_pagar');
+      const proximoVencimento = new Date(contaData.vencimento);
+      
+      // Criar próximas 12 parcelas
+      for (let i = 1; i <= 12; i++) {
+        switch (contaData.tipoRecorrencia) {
+          case 'mensal':
+            proximoVencimento.setMonth(proximoVencimento.getMonth() + 1);
+            break;
+          case 'trimestral':
+            proximoVencimento.setMonth(proximoVencimento.getMonth() + 3);
+            break;
+          case 'anual':
+            proximoVencimento.setFullYear(proximoVencimento.getFullYear() + 1);
+            break;
+        }
+
+        const contaRecorrente = {
+          ...contaData,
+          vencimento: proximoVencimento.toISOString().split('T')[0],
+          contaPai: contaId,
+          parcela: i + 1
+        };
+
+        await push(contasRef, contaRecorrente);
+      }
+    } catch (error) {
+      console.error('Erro ao criar contas recorrentes:', error);
+    }
+  };
+
+  const pagarConta = async (conta) => {
+    setProcessingOperation(true);
+    try {
+      // Usar o serviço para pagar a conta
+      const result = await financeiroService.pagarConta(conta, pagamentoConta, userId, permitirSaldoNegativo);
+      
+      if (result.success) {
+        // Recarregar dados
+        await fetchContasPagar();
+        await fetchContasPagas();
+        await fetchSaldoEscola();
+        
+        // Fechar dialog
+        setDialogPagamentoConta({ open: false, conta: null });
+        setPagamentoConta({
+          dataPagamento: '',
+          formaPagamento: '',
+          observacoes: ''
+        });
+        setPermitirSaldoNegativo(false); // Reset da opção de saldo negativo
+        
+        // Verificar se o saldo ficou negativo após o pagamento
+        const novoSaldo = await financeiroService.obterSaldoEscola();
+        if (novoSaldo < 0) {
+          showFeedback('success', 'Pagamento Realizado', `Conta paga com sucesso! ⚠️ Saldo atual: ${formatCurrency(novoSaldo)}`);
+        } else {
+          showFeedback('success', 'Pagamento Realizado', 'Conta paga com sucesso!');
+        }
+      } else {
+        showFeedback('error', 'Erro no Pagamento', 'Erro ao pagar conta: ' + result.error);
+      }
+    } catch (error) {
+      console.error('Erro ao pagar conta:', error);
+      showFeedback('error', 'Erro no Pagamento', 'Erro ao pagar conta. Tente novamente.');
+    } finally {
+      setProcessingOperation(false);
+    }
   };
 
   // Funções de relatórios
@@ -1201,6 +1743,138 @@ const FinanceiroPage = () => {
     );
   }
 
+  // Componente para exibir informações de crédito do aluno
+  const CreditoAlunoInfo = ({ alunoId, aluno, userRole, userId }) => {
+    const [creditoInfo, setCreditoInfo] = useState({
+      saldo: 0,
+      historico: [],
+      carregando: true
+    });
+
+    useEffect(() => {
+      if (alunoId) {
+        buscarDadosCredito();
+      }
+    }, [alunoId]);
+
+    const buscarDadosCredito = async () => {
+      setCreditoInfo(prev => ({ ...prev, carregando: true }));
+      
+      try {
+        // Buscar saldo
+        const resultadoSaldo = await financeiroService.obterSaldoCredito(alunoId);
+        
+        // Buscar histórico
+        const resultadoHistorico = await financeiroService.obterHistoricoCreditos(alunoId);
+        
+        setCreditoInfo({
+          saldo: resultadoSaldo.success ? resultadoSaldo.saldo : 0,
+          historico: resultadoHistorico.success ? resultadoHistorico.historico : [],
+          carregando: false
+        });
+      } catch (error) {
+        console.error('Erro ao buscar dados de crédito:', error);
+        setCreditoInfo({
+          saldo: 0,
+          historico: [],
+          carregando: false
+        });
+      }
+    };
+
+    if (creditoInfo.carregando) {
+      return (
+        <Card>
+          <CardContent sx={{ textAlign: 'center', py: 4 }}>
+            <CircularProgress />
+            <Typography variant="body2" sx={{ mt: 2 }}>
+              Carregando informações de crédito...
+            </Typography>
+          </CardContent>
+        </Card>
+      );
+    }
+
+    return (
+      <Grid container spacing={3}>
+        {/* Card de Saldo */}
+        <Grid item xs={12} md={6}>
+          <Card sx={{ bgcolor: creditoInfo.saldo > 0 ? '#f0f9ff' : '#f8fafc', border: '1px solid #e2e8f0' }}>
+            <CardContent>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                <MonetizationOn sx={{ color: creditoInfo.saldo > 0 ? '#0ea5e9' : '#64748b', mr: 1 }} />
+                <Typography variant="h6" color={creditoInfo.saldo > 0 ? '#0ea5e9' : '#64748b'}>
+                  Saldo de Créditos
+                </Typography>
+              </Box>
+              
+              <Typography variant="h4" fontWeight="bold" color={creditoInfo.saldo > 0 ? '#0ea5e9' : '#64748b'}>
+                {formatCurrency(creditoInfo.saldo)}
+              </Typography>
+              
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                Aluno: {aluno?.nome || 'Nome não encontrado'}
+              </Typography>
+              
+              {creditoInfo.saldo > 0 && (
+                <Alert severity="info" sx={{ mt: 2 }}>
+                  💡 Este crédito pode ser utilizado para abater valores de títulos em aberto
+                </Alert>
+              )}
+
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* Card de Histórico */}
+        <Grid item xs={12} md={6}>
+          <Card>
+            <CardContent>
+              <Typography variant="h6" gutterBottom>
+                📊 Histórico de Movimentações
+              </Typography>
+              
+              {creditoInfo.historico.length === 0 ? (
+                <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 3 }}>
+                  Nenhuma movimentação de crédito encontrada
+                </Typography>
+              ) : (
+                <Box sx={{ maxHeight: 300, overflowY: 'auto' }}>
+                  {creditoInfo.historico.slice(0, 5).map((item, index) => (
+                    <Box key={item.id || index} sx={{ 
+                      borderBottom: index < Math.min(4, creditoInfo.historico.length - 1) ? '1px solid #e2e8f0' : 'none',
+                      py: 2
+                    }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Box>
+                          <Typography variant="body2" fontWeight="bold" color={item.tipo === 'adicao' ? 'success.main' : 'error.main'}>
+                            {item.tipo === 'adicao' ? '+ ' : '- '}{formatCurrency(item.valor)}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {formatDate(item.dataHora)} • {item.motivo}
+                          </Typography>
+                        </Box>
+                        <Typography variant="caption" color="text.secondary">
+                          Saldo: {formatCurrency(item.saldoNovo)}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  ))}
+                  
+                  {creditoInfo.historico.length > 5 && (
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'center', mt: 2 }}>
+                      E mais {creditoInfo.historico.length - 5} movimentações...
+                    </Typography>
+                  )}
+                </Box>
+              )}
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
+    );
+  };
+
   return (
     <ProtectedRoute>
       <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: '#f5f6fa' }}>
@@ -1368,8 +2042,18 @@ const FinanceiroPage = () => {
                     label="📋 Títulos" 
                     disabled={userRole === 'professora'}
                   />
+                  <Tab 
+                    label="💳 Créditos" 
+                    disabled={userRole === 'professora'}
+                  />
                   {userRole === 'coordenadora' && (
-                    <Tab label="📈 Relatórios" />
+                    <Tab label="📅 Contas a Pagar" />
+                  )}
+                  {userRole === 'coordenadora' && (
+                    <Tab label="🟢 Contas Pagas" />
+                  )}
+                  {userRole === 'coordenadora' && (
+                    <Tab label="📊 Relatórios" />
                   )}
                 </Tabs>
               </Paper>
@@ -1410,9 +2094,9 @@ const FinanceiroPage = () => {
                             <FormControl fullWidth sx={{ minWidth: '250px' }}>
                               <InputLabel>Turma</InputLabel>
                               <Select
-                                value={filtros.turma}
+                                value={filtrosTitulos.turma}
                                 label="Turma"
-                                onChange={(e) => setFiltros({...filtros, turma: e.target.value})}
+                                onChange={(e) => setFiltrosTitulos({...filtrosTitulos, turma: e.target.value})}
                               >
                                 <MenuItem value="">Todas</MenuItem>
                                 {Object.entries(turmas).map(([id, turma]) => (
@@ -1428,8 +2112,8 @@ const FinanceiroPage = () => {
                             <TextField
                               label="Nome do Aluno"
                               fullWidth
-                              value={filtros.aluno}
-                              onChange={(e) => setFiltros({...filtros, aluno: e.target.value})}
+                              value={filtrosTitulos.aluno}
+                              onChange={(e) => setFiltrosTitulos({...filtrosTitulos, aluno: e.target.value})}
                               placeholder="Digite o nome do aluno"
                               sx={{ minWidth: '250px' }}
                             />
@@ -1439,16 +2123,18 @@ const FinanceiroPage = () => {
                             <FormControl fullWidth sx={{ minWidth: '250px' }}>
                               <InputLabel>Tipo de Título</InputLabel>
                               <Select
-                                value={filtros.tipo}
+                                value={filtrosTitulos.tipo}
                                 label="Tipo de Título"
-                                onChange={(e) => setFiltros({...filtros, tipo: e.target.value})}
+                                onChange={(e) => setFiltrosTitulos({...filtrosTitulos, tipo: e.target.value})}
                               >
                                 <MenuItem value="">Todos</MenuItem>
                                 <MenuItem value="mensalidade">Mensalidade</MenuItem>
-                                <MenuItem value="material">Material</MenuItem>
+                                <MenuItem value="matricula">Matrícula</MenuItem>
+                                <MenuItem value="materiais">Materiais</MenuItem>
                                 <MenuItem value="uniforme">Uniforme</MenuItem>
                                 <MenuItem value="taxa">Taxa</MenuItem>
                                 <MenuItem value="loja">Loja</MenuItem>
+                                <MenuItem value="credito">Crédito</MenuItem>
                                 <MenuItem value="outros">Outros</MenuItem>
                               </Select>
                             </FormControl>
@@ -1458,9 +2144,9 @@ const FinanceiroPage = () => {
                             <FormControl fullWidth sx={{ minWidth: '250px' }}>
                               <InputLabel>Status</InputLabel>
                               <Select
-                                value={filtros.status}
+                                value={filtrosTitulos.status}
                                 label="Status"
-                                onChange={(e) => setFiltros({...filtros, status: e.target.value})}
+                                onChange={(e) => setFiltrosTitulos({...filtrosTitulos, status: e.target.value})}
                               >
                                 <MenuItem value="">Todos</MenuItem>
                                 <MenuItem value="pendente">Pendente</MenuItem>
@@ -1476,8 +2162,8 @@ const FinanceiroPage = () => {
                               label="Data Início"
                               type="date"
                               fullWidth
-                              value={filtros.dataInicio}
-                              onChange={(e) => setFiltros({...filtros, dataInicio: e.target.value})}
+                              value={filtrosTitulos.dataInicio}
+                              onChange={(e) => setFiltrosTitulos({...filtrosTitulos, dataInicio: e.target.value})}
                               InputLabelProps={{ shrink: true }}
                               sx={{ minWidth: '250px' }}
                             />
@@ -1488,8 +2174,8 @@ const FinanceiroPage = () => {
                               label="Data Fim"
                               type="date"
                               fullWidth
-                              value={filtros.dataFim}
-                              onChange={(e) => setFiltros({...filtros, dataFim: e.target.value})}
+                              value={filtrosTitulos.dataFim}
+                              onChange={(e) => setFiltrosTitulos({...filtrosTitulos, dataFim: e.target.value})}
                               InputLabelProps={{ shrink: true }}
                               sx={{ minWidth: '250px' }}
                             />
@@ -1499,7 +2185,7 @@ const FinanceiroPage = () => {
                             <Button
                               variant="outlined"
                               fullWidth
-                              onClick={() => setFiltros({
+                              onClick={() => setFiltrosTitulos({
                                 aluno: '',
                                 turma: '',
                                 tipo: '',
@@ -1516,6 +2202,33 @@ const FinanceiroPage = () => {
                       </CardContent>
                     </Card>
 
+                    {/* Paginação - Topo */}
+                    {filtrarTitulos().length > 0 && (
+                      <Card sx={{ mb: 2 }}>
+                        <CardContent>
+                          <Stack 
+                            direction="row" 
+                            justifyContent="space-between" 
+                            alignItems="center"
+                            flexWrap="wrap"
+                            gap={2}
+                          >
+                            <Typography variant="body2" color="text.secondary">
+                              Exibindo {Math.min((paginacao.paginaAtual - 1) * paginacao.itensPorPagina + 1, filtrarTitulos().length)} - {Math.min(paginacao.paginaAtual * paginacao.itensPorPagina, filtrarTitulos().length)} de {filtrarTitulos().length} títulos
+                            </Typography>
+                            <Pagination
+                              count={paginacao.totalPaginas}
+                              page={paginacao.paginaAtual}
+                              onChange={(event, page) => irParaPagina(page)}
+                              color="primary"
+                              showFirstButton
+                              showLastButton
+                            />
+                          </Stack>
+                        </CardContent>
+                      </Card>
+                    )}
+
                     <TableContainer>
                       <Table>
                         <TableHead>
@@ -1530,7 +2243,7 @@ const FinanceiroPage = () => {
                           </TableRow>
                         </TableHead>
                         <TableBody>
-                          {filtrarTitulos().slice(0, 20).map((titulo) => (
+                          {obterTitulosPaginados().map((titulo) => (
                             <TableRow key={titulo.id}>
                               <TableCell>
                                 {alunos.find(a => a.id === titulo.alunoId)?.nome || 'Aluno não encontrado'}
@@ -1615,6 +2328,33 @@ const FinanceiroPage = () => {
                       </Table>
                     </TableContainer>
 
+                    {/* Paginação - Final */}
+                    {filtrarTitulos().length > 0 && (
+                      <Card sx={{ mt: 2 }}>
+                        <CardContent>
+                          <Stack 
+                            direction="row" 
+                            justifyContent="space-between" 
+                            alignItems="center"
+                            flexWrap="wrap"
+                            gap={2}
+                          >
+                            <Typography variant="body2" color="text.secondary">
+                              Exibindo {Math.min((paginacao.paginaAtual - 1) * paginacao.itensPorPagina + 1, filtrarTitulos().length)} - {Math.min(paginacao.paginaAtual * paginacao.itensPorPagina, filtrarTitulos().length)} de {filtrarTitulos().length} títulos
+                            </Typography>
+                            <Pagination
+                              count={paginacao.totalPaginas}
+                              page={paginacao.paginaAtual}
+                              onChange={(event, page) => irParaPagina(page)}
+                              color="primary"
+                              showFirstButton
+                              showLastButton
+                            />
+                          </Stack>
+                        </CardContent>
+                      </Card>
+                    )}
+
                     {titulos.length === 0 && (
                       <Box sx={{ textAlign: 'center', py: 4 }}>
                         <Typography variant="body1" color="text.secondary">
@@ -1626,8 +2366,503 @@ const FinanceiroPage = () => {
                 </Card>
               )}
 
+              {/* Tab Créditos */}
+              {tabValue === 2 && !isProfessor() && (
+                <Card>
+                  <CardContent>
+                    <Typography variant="h6" gutterBottom color="primary">
+                      💳 Gestão de Créditos
+                    </Typography>
+                    
+                    {/* Seletor de Aluno */}
+                    <Card sx={{ mb: 3, bgcolor: '#f8fafc' }}>
+                      <CardContent>
+                        <Typography variant="subtitle2" gutterBottom color="primary" fontWeight="bold">
+                          👤 Selecionar Aluno
+                        </Typography>
+                        <Autocomplete
+                          options={alunos}
+                          getOptionLabel={(option) => option.nome || ''}
+                          value={alunos.find(a => a.id === filtrosTitulos.aluno) || null}
+                          onChange={(e, value) => setFiltrosTitulos(prev => ({ 
+                            ...prev, 
+                            aluno: value?.id || '' 
+                          }))}
+                          renderInput={(params) => (
+                            <TextField {...params} label="Pesquisar aluno..." fullWidth />
+                          )}
+                          isOptionEqualToValue={(option, value) => option.id === value.id}
+                        />
+                      </CardContent>
+                    </Card>
+
+                    {/* Informações de Crédito do Aluno Selecionado */}
+                    {filtrosTitulos.aluno && (
+                      <CreditoAlunoInfo 
+                        alunoId={filtrosTitulos.aluno} 
+                        aluno={alunos.find(a => a.id === filtrosTitulos.aluno)}
+                        userRole={userRole}
+                        userId={userId}
+                      />
+                    )}
+
+                    {/* Se nenhum aluno selecionado */}
+                    {!filtrosTitulos.aluno && (
+                      <Card sx={{ bgcolor: '#f0f9ff', border: '1px solid #0ea5e9' }}>
+                        <CardContent sx={{ textAlign: 'center', py: 4 }}>
+                          <MonetizationOn sx={{ fontSize: 48, color: '#0ea5e9', mb: 2 }} />
+                          <Typography variant="h6" color="#0ea5e9" gutterBottom>
+                            Sistema de Créditos
+                          </Typography>
+                          <Typography variant="body1" color="text.secondary" sx={{ mb: 2 }}>
+                            Selecione um aluno para visualizar seus créditos disponíveis
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            💡 Os créditos podem ser gerados através de títulos do tipo "Crédito" e utilizados para abater valores de outros títulos
+                          </Typography>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Tab Contas a Pagar */}
+              {tabValue === 3 && isCoordenador() && (
+                <Card>
+                  <CardContent>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                      <Box>
+                        <Typography variant="h6" color="primary">
+                          🔴 Contas a Pagar - {exibirPorPeriodo 
+                            ? `${(periodoSelecionado.getMonth() + 1).toString().padStart(2, '0')}/${periodoSelecionado.getFullYear()}`
+                            : `${mesAtual.mes.toString().padStart(2, '0')}/${mesAtual.ano}`}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          Mês atual - {mesAtual.fechado ? 'Fechado' : 'Em andamento'}
+                        </Typography>
+                      </Box>
+                      <Box sx={{ display: 'flex', gap: 1 }}>
+                        <Button
+                          variant="outlined"
+                          color="warning"
+                          onClick={() => {
+                            const estatisticas = calcularEstatisticasPendentes();
+                            if (estatisticas.quantidade === 0) {
+                              showFeedback('success', 'Mês sem Pendências', 'Não há contas pendentes neste mês. O mês pode ser considerado como finalizado.');
+                            } else {
+                              setDialogFecharMes(true);
+                            }
+                          }}
+                          disabled={mesAtual.fechado}
+                        >
+                          {calcularEstatisticasPendentes().quantidade === 0 ? 'Mês Finalizado' : 'Fechar Mês'}
+                        </Button>
+                        <Button
+                          variant="contained"
+                          startIcon={<Add />}
+                          onClick={() => setNovaContaDialog(true)}
+                        >
+                          Nova Conta
+                        </Button>
+                      </Box>
+                    </Box>
+
+                    {/* Filtros */}
+                    <Card sx={{ mb: 3, bgcolor: '#f8fafc' }}>
+                      <CardContent>
+                        <Typography variant="subtitle2" gutterBottom color="primary" fontWeight="bold">
+                          🔍 Filtros de Contas a Pagar
+                        </Typography>
+                        <Grid container spacing={2} alignItems="center">
+                          <Grid item xs={12} sm={6} md={3}>
+                            <FormControl fullWidth size="small" sx={{ minWidth: '200px' }}>
+                              <InputLabel>Categoria</InputLabel>
+                              <Select
+                                value={filtrosContasPagar.categoria || ''}
+                                label="Categoria"
+                                onChange={(e) => setFiltrosContasPagar(prev => ({ ...prev, categoria: e.target.value }))}
+                              >
+                                <MenuItem value="">Todas</MenuItem>
+                                <MenuItem value="aluguel">Aluguel</MenuItem>
+                                <MenuItem value="energia">Energia Elétrica</MenuItem>
+                                <MenuItem value="agua">Água</MenuItem>
+                                <MenuItem value="internet">Internet</MenuItem>
+                                <MenuItem value="telefone">Telefone</MenuItem>
+                                <MenuItem value="material">Material Escolar</MenuItem>
+                                <MenuItem value="manutencao">Manutenção</MenuItem>
+                                <MenuItem value="limpeza">Limpeza</MenuItem>
+                                <MenuItem value="salarios">Salários</MenuItem>
+                                <MenuItem value="impostos">Impostos</MenuItem>
+                                <MenuItem value="outros">Outros</MenuItem>
+                              </Select>
+                            </FormControl>
+                          </Grid>
+                          <Grid item xs={12} sm={6} md={3}>
+                            <TextField
+                              label="Fornecedor"
+                              size="small"
+                              fullWidth
+                              value={filtrosContasPagar.fornecedor || ''}
+                              onChange={(e) => setFiltrosContasPagar(prev => ({ ...prev, fornecedor: e.target.value }))}
+                            />
+                          </Grid>
+                          <Grid item xs={12} sm={6} md={3}>
+                            <FormControl fullWidth size="small" sx={{ minWidth: '150px' }}>
+                              <InputLabel>Status</InputLabel>
+                              <Select
+                                value={filtrosContasPagar.status || ''}
+                                label="Status"
+                                onChange={(e) => setFiltrosContasPagar(prev => ({ ...prev, status: e.target.value }))}
+                              >
+                                <MenuItem value="">Todos</MenuItem>
+                                <MenuItem value="pendente">Pendente</MenuItem>
+                                <MenuItem value="vencida">Vencida</MenuItem>
+                              </Select>
+                            </FormControl>
+                          </Grid>
+                          <Grid item xs={12} sm={6} md={3}>
+                            <FormControl fullWidth size="small">
+                              <FormControlLabel
+                                control={
+                                  <Checkbox
+                                    checked={exibirPorPeriodo}
+                                    onChange={(e) => {
+                                      setExibirPorPeriodo(e.target.checked);
+                                      if (!e.target.checked) {
+                                        // Quando desmarcar, volta para o mês atual
+                                        fetchContasPagar();
+                                      }
+                                    }}
+                                    color="primary"
+                                  />
+                                }
+                                label="Filtrar por período"
+                              />
+                            </FormControl>
+                          </Grid>
+                          {exibirPorPeriodo && (
+                            <Grid item xs={12} sm={6} md={3}>
+                              <FormControl fullWidth size="small">
+                                <InputLabel>Período</InputLabel>
+                                <Select
+                                  value={periodoSelecionado.getTime()}
+                                  label="Período"
+                                  onChange={(e) => setPeriodoSelecionado(new Date(e.target.value))}
+                                >
+                                  {obterPeriodosDisponiveis().map((periodo) => (
+                                    <MenuItem key={periodo.getTime()} value={periodo.getTime()}>
+                                      {periodo.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
+                                    </MenuItem>
+                                  ))}
+                                </Select>
+                              </FormControl>
+                            </Grid>
+                          )}
+                          <Grid item xs={12} sm={6} md={3}>
+                            <Button
+                              variant="contained"
+                              fullWidth
+                              size="small"
+                              onClick={() => {
+                                setFiltrosContasPagar({ categoria: '', fornecedor: '', status: '' });
+                              }}
+                            >
+                              Limpar Filtros
+                            </Button>
+                          </Grid>
+                        </Grid>
+                      </CardContent>
+                    </Card>
+
+                    {/* Resumo */}
+                    <Grid container spacing={3} sx={{ mb: 3 }}>
+                      <Grid item xs={12} md={4}>
+                        <Card sx={{ bgcolor: '#fef2f2', border: '1px solid #fca5a5' }}>
+                          <CardContent>
+                            <Typography variant="h6" color="#dc2626">
+                              Saldo Disponível
+                            </Typography>
+                            <Typography variant="h4" color="#dc2626" fontWeight="bold">
+                              {formatCurrency(saldoEscola)}
+                            </Typography>
+                          </CardContent>
+                        </Card>
+                      </Grid>
+                      <Grid item xs={12} md={4}>
+                        <Card sx={{ bgcolor: '#fff7ed', border: '1px solid #fb923c' }}>
+                          <CardContent>
+                            <Typography variant="h6" color="#ea580c">
+                              Contas Pendentes
+                            </Typography>
+                            <Typography variant="h4" color="#ea580c" fontWeight="bold">
+                              {calcularEstatisticasPendentes().quantidade}
+                            </Typography>
+                          </CardContent>
+                        </Card>
+                      </Grid>
+                      <Grid item xs={12} md={4}>
+                        <Card sx={{ bgcolor: '#fef2f2', border: '1px solid #f87171' }}>
+                          <CardContent>
+                            <Typography variant="h6" color="#dc2626">
+                              Valor Total Pendente
+                            </Typography>
+                            <Typography variant="h4" color="#dc2626" fontWeight="bold">
+                              {formatCurrency(calcularEstatisticasPendentes().valorTotal)}
+                            </Typography>
+                          </CardContent>
+                        </Card>
+                      </Grid>
+                    </Grid>
+
+                    {/* Lista de Contas */}
+                    <TableContainer component={Paper}>
+                      <Table>
+                        <TableHead>
+                          <TableRow>
+                            <TableCell>Descrição</TableCell>
+                            <TableCell>Categoria</TableCell>
+                            <TableCell>Fornecedor</TableCell>
+                            <TableCell>Valor</TableCell>
+                            <TableCell>Vencimento/Pagamento</TableCell>
+                            <TableCell>Status</TableCell>
+                            <TableCell>Ação/Forma Pgto</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {filtrarContasPagar().map((conta) => (
+                            <TableRow 
+                              key={conta.id}
+                              sx={{ 
+                                bgcolor: conta.status === 'paga' ? '#f0fdf4' : 'inherit',
+                                opacity: conta.status === 'paga' ? 0.8 : 1
+                              }}
+                            >
+                              <TableCell>{conta.descricao}</TableCell>
+                              <TableCell>{conta.categoria}</TableCell>
+                              <TableCell>{conta.fornecedor}</TableCell>
+                              <TableCell>{formatCurrency(conta.valor)}</TableCell>
+                              <TableCell>
+                                {conta.status === 'paga' 
+                                  ? formatDate(conta.dataPagamento) 
+                                  : formatDate(conta.vencimento)
+                                }
+                              </TableCell>
+                              <TableCell>
+                                {conta.status === 'paga' ? (
+                                  <Chip
+                                    label="✅ Paga"
+                                    color="success"
+                                    size="small"
+                                  />
+                                ) : (
+                                  <Chip
+                                    label={new Date(conta.vencimento) < new Date() ? 'Vencida' : 'Pendente'}
+                                    color={new Date(conta.vencimento) < new Date() ? 'error' : 'warning'}
+                                    size="small"
+                                  />
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                {conta.status === 'paga' ? (
+                                  <Chip
+                                    label={`💳 ${conta.formaPagamento || 'N/A'}`}
+                                    variant="outlined"
+                                    size="small"
+                                  />
+                                ) : (
+                                  <Button
+                                    size="small"
+                                    variant="contained"
+                                    color="success"
+                                    onClick={() => {
+                                      setDialogPagamentoConta({ open: true, conta });
+                                      setPagamentoConta({
+                                        dataPagamento: new Date().toISOString().split('T')[0],
+                                        formaPagamento: '',
+                                        observacoes: ''
+                                      });
+                                    }}
+                                    disabled={false}
+                                  >
+                                    Pagar
+                                  </Button>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+
+                    {filtrarContasPagar().length === 0 && (
+                      <Box sx={{ textAlign: 'center', py: 4 }}>
+                        <Typography variant="body1" color="text.secondary">
+                          {contasPagar.length === 0 ? 'Nenhuma conta a pagar encontrada' : 'Nenhuma conta encontrada com os filtros aplicados'}
+                        </Typography>
+                      </Box>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Tab Contas Pagas */}
+              {tabValue === 4 && isCoordenador() && (
+                <Card>
+                  <CardContent>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                      <Box>
+                        <Typography variant="h6" color="primary">
+                          🟢 Contas Pagas - {mesAtual.mes.toString().padStart(2, '0')}/{mesAtual.ano}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          Visualizando contas pagas do mês atual
+                        </Typography>
+                      </Box>
+                      <Box sx={{ display: 'flex', gap: 1 }}>
+                        <Button
+                          variant="outlined"
+                          onClick={() => {
+                            const inicio = `${mesAtual.ano}-${mesAtual.mes.toString().padStart(2, '0')}-01`;
+                            const fim = new Date(mesAtual.ano, mesAtual.mes, 0).toISOString().split('T')[0];
+                            setFiltrosContasPagas(prev => ({ ...prev, dataInicio: inicio, dataFim: fim }));
+                          }}
+                        >
+                          Mês Atual
+                        </Button>
+                        <Button
+                          variant="contained"
+                          color="secondary"
+                          startIcon={<Receipt />}
+                          onClick={() => imprimirDemonstrativo()}
+                        >
+                          Imprimir Demonstrativo
+                        </Button>
+                      </Box>
+                    </Box>
+
+                    {/* Filtros por período */}
+                    <Card sx={{ mb: 3, bgcolor: '#f8fafc' }}>
+                      <CardContent>
+                        <Typography variant="subtitle2" gutterBottom color="primary" fontWeight="bold">
+                          📅 Filtros de Período
+                        </Typography>
+                        <Grid container spacing={2} alignItems="center">
+                          <Grid item xs={12} md={4}>
+                            <TextField
+                              label="Data Início"
+                              type="date"
+                              value={filtrosContasPagas.dataInicio}
+                              onChange={(e) => setFiltrosContasPagas(prev => ({ ...prev, dataInicio: e.target.value }))}
+                              fullWidth
+                              InputLabelProps={{ shrink: true }}
+                            />
+                          </Grid>
+                          <Grid item xs={12} md={4}>
+                            <TextField
+                              label="Data Fim"
+                              type="date"
+                              value={filtrosContasPagas.dataFim}
+                              onChange={(e) => setFiltrosContasPagas(prev => ({ ...prev, dataFim: e.target.value }))}
+                              fullWidth
+                              InputLabelProps={{ shrink: true }}
+                            />
+                          </Grid>
+                          <Grid item xs={12} md={4}>
+                            <Button
+                              variant="contained"
+                              fullWidth
+                              onClick={() => {
+                                // Filtrar contas pagas por período
+                                const contasFiltradas = contasPagas.filter(conta => {
+                                  const dataPagamento = new Date(conta.dataPagamento);
+                                  const inicio = filtrosContasPagas.dataInicio ? new Date(filtrosContasPagas.dataInicio) : null;
+                                  const fim = filtrosContasPagas.dataFim ? new Date(filtrosContasPagas.dataFim) : null;
+                                  
+                                  if (inicio && dataPagamento < inicio) return false;
+                                  if (fim && dataPagamento > fim) return false;
+                                  return true;
+                                });
+                                setContasPagas(contasFiltradas);
+                              }}
+                            >
+                              Filtrar
+                            </Button>
+                          </Grid>
+                        </Grid>
+                      </CardContent>
+                    </Card>
+
+                    {/* Resumo das Contas Pagas */}
+                    <Grid container spacing={3} sx={{ mb: 3 }}>
+                      <Grid item xs={12} md={6}>
+                        <Card sx={{ bgcolor: '#f0fdf4', border: '1px solid #22c55e' }}>
+                          <CardContent>
+                            <Typography variant="h6" color="#16a34a">
+                              Total de Contas Pagas
+                            </Typography>
+                            <Typography variant="h4" color="#16a34a" fontWeight="bold">
+                              {contasPagas.length}
+                            </Typography>
+                          </CardContent>
+                        </Card>
+                      </Grid>
+                      <Grid item xs={12} md={6}>
+                        <Card sx={{ bgcolor: '#f0fdf4', border: '1px solid #22c55e' }}>
+                          <CardContent>
+                            <Typography variant="h6" color="#16a34a">
+                              Valor Total Pago
+                            </Typography>
+                            <Typography variant="h4" color="#16a34a" fontWeight="bold">
+                              {formatCurrency(contasPagas.reduce((sum, conta) => sum + conta.valor, 0))}
+                            </Typography>
+                          </CardContent>
+                        </Card>
+                      </Grid>
+                    </Grid>
+
+                    {/* Lista de Contas Pagas */}
+                    <TableContainer component={Paper}>
+                      <Table>
+                        <TableHead>
+                          <TableRow>
+                            <TableCell>Descrição</TableCell>
+                            <TableCell>Categoria</TableCell>
+                            <TableCell>Valor</TableCell>
+                            <TableCell>Data Pagamento</TableCell>
+                            <TableCell>Pago Por</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {contasPagas.map((conta) => (
+                            <TableRow key={conta.id}>
+                              <TableCell>{conta.descricao}</TableCell>
+                              <TableCell>{conta.categoria}</TableCell>
+                              <TableCell>{formatCurrency(conta.valor)}</TableCell>
+                              <TableCell>{formatDate(conta.dataPagamento)}</TableCell>
+                              <TableCell>
+                                {alunos.find(u => u.id === conta.pagoPor)?.nome || 'Sistema'}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+
+                    {contasPagas.length === 0 && (
+                      <Box sx={{ textAlign: 'center', py: 4 }}>
+                        <Typography variant="body1" color="text.secondary">
+                          Nenhuma conta paga encontrada no período
+                        </Typography>
+                      </Box>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
               {/* Tab Relatórios */}
-              {tabValue === 2 && isCoordenador() && (
+              {tabValue === 5 && isCoordenador() && (
                 <Card>
                   <CardContent>
                     <Typography variant="h6" gutterBottom color="primary">
@@ -2034,7 +3269,7 @@ const FinanceiroPage = () => {
                 renderInput={(params) => <TextField {...params} label="Aluno" required />}
               />
               
-              <FormControl fullWidth required>
+              <FormControl fullWidth required sx={{ minWidth: '250px' }}>
                 <InputLabel>Tipo</InputLabel>
                 <Select
                   value={novoTitulo.tipo}
@@ -2043,9 +3278,10 @@ const FinanceiroPage = () => {
                 >
                   <MenuItem value="matricula">Matrícula</MenuItem>
                   <MenuItem value="mensalidade">Mensalidade</MenuItem>
-                  <MenuItem value="material">Material Escolar</MenuItem>
+                  <MenuItem value="materiais">Materiais</MenuItem>
                   <MenuItem value="uniforme">Uniforme</MenuItem>
                   <MenuItem value="extra">Taxa Extra</MenuItem>
+                  <MenuItem value="credito">Crédito</MenuItem>
                 </Select>
               </FormControl>
 
@@ -3023,6 +4259,377 @@ const FinanceiroPage = () => {
             )}
           </DialogActions>
         </Dialog>
+
+        {/* Dialog Nova Conta a Pagar */}
+        <Dialog open={novaContaDialog} onClose={() => setNovaContaDialog(false)} maxWidth="md" fullWidth>
+          <DialogTitle>🔴 Nova Conta a Pagar</DialogTitle>
+          <DialogContent>
+            <Grid container spacing={3} sx={{ mt: 1 }}>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  label="Descrição"
+                  value={novaConta.descricao}
+                  onChange={(e) => setNovaConta(prev => ({ ...prev, descricao: e.target.value }))}
+                  fullWidth
+                  required
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <FormControl fullWidth required sx={{ minWidth: '250px' }}>
+                  <InputLabel>Categoria</InputLabel>
+                  <Select
+                    value={novaConta.categoria}
+                    label="Categoria"
+                    onChange={(e) => setNovaConta(prev => ({ ...prev, categoria: e.target.value }))}
+                  >
+                    <MenuItem value="aluguel">Aluguel</MenuItem>
+                    <MenuItem value="energia">Energia Elétrica</MenuItem>
+                    <MenuItem value="agua">Água</MenuItem>
+                    <MenuItem value="internet">Internet</MenuItem>
+                    <MenuItem value="telefone">Telefone</MenuItem>
+                    <MenuItem value="material">Material Escolar</MenuItem>
+                    <MenuItem value="manutencao">Manutenção</MenuItem>
+                    <MenuItem value="limpeza">Limpeza</MenuItem>
+                    <MenuItem value="salarios">Salários</MenuItem>
+                    <MenuItem value="impostos">Impostos</MenuItem>
+                    <MenuItem value="outros">Outros</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  label="Fornecedor"
+                  value={novaConta.fornecedor}
+                  onChange={(e) => setNovaConta(prev => ({ ...prev, fornecedor: e.target.value }))}
+                  fullWidth
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  label="Valor (R$)"
+                  type="number"
+                  value={novaConta.valor}
+                  onChange={(e) => setNovaConta(prev => ({ ...prev, valor: e.target.value }))}
+                  fullWidth
+                  required
+                  inputProps={{ min: 0, step: 0.01 }}
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  label="Data de Vencimento"
+                  type="date"
+                  value={novaConta.vencimento}
+                  onChange={(e) => setNovaConta(prev => ({ ...prev, vencimento: e.target.value }))}
+                  fullWidth
+                  required={!novaConta.jaFoiPaga}
+                  disabled={novaConta.jaFoiPaga}
+                  InputLabelProps={{ shrink: true }}
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={novaConta.recorrente}
+                      onChange={(e) => setNovaConta(prev => ({ ...prev, recorrente: e.target.checked }))}
+                    />
+                  }
+                  label="Conta Recorrente"
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={novaConta.jaFoiPaga}
+                      onChange={(e) => setNovaConta(prev => ({ 
+                        ...prev, 
+                        jaFoiPaga: e.target.checked,
+                        vencimento: e.target.checked ? '' : prev.vencimento
+                      }))}
+                    />
+                  }
+                  label="Conta já foi paga"
+                />
+              </Grid>
+              {novaConta.jaFoiPaga && (
+                <>
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      label="Data do Pagamento"
+                      type="date"
+                      value={novaConta.dataPagamento}
+                      onChange={(e) => setNovaConta(prev => ({ ...prev, dataPagamento: e.target.value }))}
+                      fullWidth
+                      required
+                      InputLabelProps={{ shrink: true }}
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <FormControl fullWidth required sx={{ minWidth: '250px' }}>
+                      <InputLabel>Forma de Pagamento</InputLabel>
+                      <Select
+                        value={novaConta.formaPagamento}
+                        label="Forma de Pagamento"
+                        onChange={(e) => setNovaConta(prev => ({ ...prev, formaPagamento: e.target.value }))}
+                      >
+                        <MenuItem value="dinheiro">Dinheiro</MenuItem>
+                        <MenuItem value="pix">PIX</MenuItem>
+                        <MenuItem value="transferencia">Transferência</MenuItem>
+                        <MenuItem value="cartao">Cartão</MenuItem>
+                        <MenuItem value="boleto">Boleto</MenuItem>
+                        <MenuItem value="debito">Débito Automático</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                </>
+              )}
+              {novaConta.recorrente && (
+                <Grid item xs={12} md={6}>
+                  <FormControl fullWidth>
+                    <InputLabel>Tipo de Recorrência</InputLabel>
+                    <Select
+                      value={novaConta.tipoRecorrencia}
+                      label="Tipo de Recorrência"
+                      onChange={(e) => setNovaConta(prev => ({ ...prev, tipoRecorrencia: e.target.value }))}
+                    >
+                      <MenuItem value="mensal">Mensal</MenuItem>
+                      <MenuItem value="trimestral">Trimestral</MenuItem>
+                      <MenuItem value="anual">Anual</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+              )}
+              <Grid item xs={12}>
+                <TextField
+                  label="Observações"
+                  value={novaConta.observacoes}
+                  onChange={(e) => setNovaConta(prev => ({ ...prev, observacoes: e.target.value }))}
+                  fullWidth
+                  multiline
+                  rows={3}
+                />
+              </Grid>
+            </Grid>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setNovaContaDialog(false)}>Cancelar</Button>
+            <Button 
+              onClick={criarConta}
+              variant="contained"
+              disabled={
+                !novaConta.descricao || 
+                !novaConta.categoria || 
+                !novaConta.valor || 
+                (!novaConta.jaFoiPaga && !novaConta.vencimento) ||
+                (novaConta.jaFoiPaga && (!novaConta.dataPagamento || !novaConta.formaPagamento))
+              }
+            >
+              Criar Conta
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Dialog Pagamento de Conta */}
+        <Dialog open={dialogPagamentoConta.open} onClose={() => {
+          setDialogPagamentoConta({ open: false, conta: null });
+          setPermitirSaldoNegativo(false);
+        }} maxWidth="sm" fullWidth>
+          <DialogTitle>💸 Pagar Conta</DialogTitle>
+          <DialogContent>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
+              {dialogPagamentoConta.conta && (
+                <>
+                  <Typography variant="h6">{dialogPagamentoConta.conta.descricao}</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Fornecedor: {dialogPagamentoConta.conta.fornecedor}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Vencimento: {new Date(dialogPagamentoConta.conta.vencimento).toLocaleDateString('pt-BR')}
+                  </Typography>
+                  <Typography variant="h5" color="error.main">
+                    R$ {parseFloat(dialogPagamentoConta.conta.valor || 0).toFixed(2).replace('.', ',')}
+                  </Typography>
+                  
+                  <TextField
+                    label="Data do Pagamento"
+                    type="date"
+                    value={pagamentoConta.dataPagamento}
+                    onChange={(e) => setPagamentoConta(prev => ({ ...prev, dataPagamento: e.target.value }))}
+                    fullWidth
+                    required
+                    InputLabelProps={{ shrink: true }}
+                  />
+                  
+                  <FormControl fullWidth required sx={{ minWidth: '250px' }}>
+                    <InputLabel>Forma de Pagamento</InputLabel>
+                    <Select
+                      value={pagamentoConta.formaPagamento}
+                      label="Forma de Pagamento"
+                      onChange={(e) => setPagamentoConta(prev => ({ ...prev, formaPagamento: e.target.value }))}
+                    >
+                      <MenuItem value="dinheiro">Dinheiro</MenuItem>
+                      <MenuItem value="pix">PIX</MenuItem>
+                      <MenuItem value="transferencia">Transferência</MenuItem>
+                      <MenuItem value="cartao">Cartão</MenuItem>
+                      <MenuItem value="boleto">Boleto</MenuItem>
+                      <MenuItem value="debito">Débito Automático</MenuItem>
+                    </Select>
+                  </FormControl>
+                  
+                  <TextField
+                    label="Observações"
+                    value={pagamentoConta.observacoes}
+                    onChange={(e) => setPagamentoConta(prev => ({ ...prev, observacoes: e.target.value }))}
+                    fullWidth
+                    multiline
+                    rows={3}
+                  />
+                  
+                  {/* Verificação de saldo e opção de saldo negativo */}
+                  {dialogPagamentoConta.conta && saldoEscola < dialogPagamentoConta.conta.valor && (
+                    <Alert severity="warning" sx={{ mt: 2 }}>
+                      <Typography variant="body2">
+                        <strong>Saldo insuficiente!</strong> 
+                        <br />Saldo atual: {formatCurrency(saldoEscola)}
+                        <br />Valor da conta: {formatCurrency(dialogPagamentoConta.conta.valor)}
+                        <br />Saldo após pagamento: {formatCurrency(saldoEscola - dialogPagamentoConta.conta.valor)}
+                      </Typography>
+                      
+                      <FormControlLabel
+                        control={
+                          <Checkbox
+                            checked={permitirSaldoNegativo}
+                            onChange={(e) => setPermitirSaldoNegativo(e.target.checked)}
+                            color="warning"
+                          />
+                        }
+                        label="Permitir saldo negativo e prosseguir com o pagamento"
+                        sx={{ mt: 1 }}
+                      />
+                    </Alert>
+                  )}
+                </>
+              )}
+            </Box>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => {
+              setDialogPagamentoConta({ open: false, conta: null });
+              setPermitirSaldoNegativo(false);
+            }}>Cancelar</Button>
+            <Button 
+              onClick={() => pagarConta(dialogPagamentoConta.conta)}
+              variant="contained"
+              color="success"
+              disabled={
+                !pagamentoConta.dataPagamento || 
+                !pagamentoConta.formaPagamento || 
+                processingOperation ||
+                (dialogPagamentoConta.conta && saldoEscola < dialogPagamentoConta.conta.valor && !permitirSaldoNegativo)
+              }
+              startIcon={processingOperation ? <CircularProgress size={20} /> : <Payment />}
+            >
+              {processingOperation ? 'Processando...' : 'Confirmar Pagamento'}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Dialog Fechar Mês */}
+        <Dialog open={dialogFecharMes} onClose={() => setDialogFecharMes(false)} maxWidth="sm" fullWidth>
+          <DialogTitle>🔒 Fechar Mês Financeiro</DialogTitle>
+          <DialogContent>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
+              <Alert severity={calcularEstatisticasPendentes().quantidade > 0 ? "warning" : "info"}>
+                <Typography variant="body2">
+                  {calcularEstatisticasPendentes().quantidade > 0 ? (
+                    <>
+                      <strong>Atenção!</strong> Ao fechar o mês, todas as contas pendentes serão migradas para o próximo mês.
+                      Esta ação não pode ser desfeita.
+                    </>
+                  ) : (
+                    <>
+                      <strong>Mês sem pendências!</strong> Este mês não possui contas pendentes.
+                      O fechamento será apenas para organização mensal.
+                    </>
+                  )}
+                </Typography>
+              </Alert>
+              
+              <Typography variant="body1">
+                <strong>Mês a fechar:</strong> {mesAtual.mes.toString().padStart(2, '0')}/{mesAtual.ano}
+              </Typography>
+              
+              <Typography variant="body2" color="text.secondary">
+                Contas pendentes no mês atual: {calcularEstatisticasPendentes().quantidade}
+              </Typography>
+              
+              <Typography variant="body2" color="text.secondary">
+                Valor total das contas pendentes: {formatCurrency(calcularEstatisticasPendentes().valorTotal)}
+              </Typography>
+            </Box>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setDialogFecharMes(false)}>Cancelar</Button>
+            <Button 
+              onClick={async () => {
+                const result = await financeiroService.fecharMes(mesAtual, userId);
+                if (result.success) {
+                  showFeedback('success', 'Mês Fechado', `Mês fechado com sucesso! ${result.contasMigradas} contas migradas para o próximo mês.`);
+                  setMesAtual(prev => ({
+                    mes: prev.mes === 12 ? 1 : prev.mes + 1,
+                    ano: prev.mes === 12 ? prev.ano + 1 : prev.ano,
+                    fechado: false
+                  }));
+                  await fetchContasPagar();
+                  setDialogFecharMes(false);
+                } else {
+                  showFeedback('error', 'Erro no Fechamento', 'Erro ao fechar mês: ' + result.error);
+                }
+              }}
+              variant="contained"
+              color="warning"
+            >
+              Confirmar Fechamento
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Modal de Feedback */}
+        <Dialog
+          open={feedbackModal.open}
+          onClose={closeFeedback}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle sx={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: 1,
+            color: feedbackModal.type === 'success' ? 'success.main' : 'error.main'
+          }}>
+            {feedbackModal.type === 'success' ? <CheckCircle /> : <Warning />}
+            {feedbackModal.title}
+          </DialogTitle>
+          <DialogContent>
+            <Typography>{feedbackModal.message}</Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={closeFeedback} variant="contained">
+              OK
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Backdrop de Loading */}
+        <Backdrop
+          sx={{ color: '#fff', zIndex: (theme) => theme.zIndex.drawer + 1 }}
+          open={processingOperation}
+        >
+          <CircularProgress color="inherit" />
+          <Typography sx={{ ml: 2 }}>Processando...</Typography>
+        </Backdrop>
       </Box>
     </ProtectedRoute>
   );

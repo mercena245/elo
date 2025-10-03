@@ -238,6 +238,7 @@ const Alunos = () => {
         diaVencimento: aluno.financeiro?.diaVencimento || '10',
         status: aluno.financeiro?.status || 'ativo',
         valorMatricula: aluno.financeiro?.valorMatricula || '',
+        valorMateriais: aluno.financeiro?.valorMateriais || '',
         observacoes: aluno.financeiro?.observacoes || ''
       }
     });
@@ -318,6 +319,7 @@ const Alunos = () => {
         descontoPercentual: '',
         diaVencimento: '',
         valorMatricula: '',
+        valorMateriais: '',
         status: 'ativo',
         observacoes: ''
       },
@@ -455,8 +457,8 @@ const Alunos = () => {
       if (isNew) {
         const novoId = alunoId;
         
-        // Definir status inicial baseado na existência de valor de matrícula
-        const statusInicial = dadosParaSalvar.financeiro?.valorMatricula > 0 ? 'pre_matricula' : 'ativo';
+        // Definir status inicial baseado na existência de valor de matrícula ou materiais
+        const statusInicial = (dadosParaSalvar.financeiro?.valorMatricula > 0 || dadosParaSalvar.financeiro?.valorMateriais > 0) ? 'pre_matricula' : 'ativo';
         const dadosComStatus = {
           ...dadosParaSalvar,
           status: statusInicial
@@ -483,6 +485,7 @@ const Alunos = () => {
                 changes: {
                   titulosGerados: resultadoFinanceiro.titulosGerados,
                   matricula: resultadoFinanceiro.matricula,
+                  materiais: resultadoFinanceiro.materiais,
                   mensalidades: resultadoFinanceiro.mensalidades,
                   valorTotal: resultadoFinanceiro.valorTotal
                 }
@@ -978,7 +981,7 @@ const Alunos = () => {
                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                           <Alert severity="info" sx={{ mb: 2 }}>
                             💰 <strong>Sistema Financeiro Automático:</strong><br />
-                            - Se informar valor de matrícula, o aluno ficará em "pré-matrícula" até o pagamento<br />
+                            - Se informar valor de matrícula ou materiais, o aluno ficará em "pré-matrícula" até o pagamento<br />
                             - Mensalidades serão geradas automaticamente do mês atual até dezembro<br />
                             - Status financeiro será atualizado automaticamente conforme pagamentos
                           </Alert>
@@ -992,6 +995,17 @@ const Alunos = () => {
                             fullWidth
                             inputProps={{ min: 0, step: 0.01 }}
                             helperText="Deixe em branco se não há taxa de matrícula"
+                          />
+                          
+                          <TextField
+                            label="Valor dos Materiais (R$)"
+                            name="financeiro.valorMateriais"
+                            type="number"
+                            value={editForm.financeiro?.valorMateriais || ''}
+                            onChange={handleFormChange}
+                            fullWidth
+                            inputProps={{ min: 0, step: 0.01 }}
+                            helperText="Deixe em branco se não há taxa de materiais"
                           />
                           
                           <TextField
@@ -1260,7 +1274,8 @@ const Alunos = () => {
                         <Alert severity="success" sx={{ mt: 1 }}>
                           <Typography variant="body2">
                             <strong>🎉 Títulos gerados com sucesso!</strong><br />
-                            • {resultadoTitulos.matricula > 0 ? `Taxa de matrícula: R$ ${(parseFloat(resultadoTitulos.detalhes.find(t => t.tipo === 'matricula')?.valor) || 0).toFixed(2)}` : 'Sem taxa de matrícula'}<br />
+                            {resultadoTitulos.matricula > 0 && `• Taxa de matrícula: R$ ${(parseFloat(resultadoTitulos.detalhes.find(t => t.tipo === 'matricula')?.valor) || 0).toFixed(2)}`}<br />
+                            {resultadoTitulos.materiais > 0 && `• Taxa de materiais: R$ ${(parseFloat(resultadoTitulos.detalhes.find(t => t.tipo === 'materiais')?.valor) || 0).toFixed(2)}`}<br />
                             • Mensalidades: {resultadoTitulos.mensalidades} títulos<br />
                             • <strong>Total: R$ {(parseFloat(resultadoTitulos.valorTotal) || 0).toFixed(2)}</strong>
                           </Typography>

@@ -25,6 +25,14 @@ function AppWithLoading({ children }) {
   );
 }
 
+function BodyWrapper({ children, className }) {
+  return (
+    <body className={className} suppressHydrationWarning={true}>
+      {children}
+    </body>
+  );
+}
+
 export default function RootLayout({ children }) {
   return (
     <html lang="pt-BR">
@@ -39,13 +47,13 @@ export default function RootLayout({ children }) {
         <meta name="theme-color" content="#667eea" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
       </head>
-      <body className={inter.className}>
+      <BodyWrapper className={inter.className}>
         <LoadingProvider>
           <AppWithLoading>
             {children}
           </AppWithLoading>
         </LoadingProvider>
-      </body>
+      </BodyWrapper>
     </html>
   )
 }

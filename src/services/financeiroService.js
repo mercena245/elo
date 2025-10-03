@@ -36,13 +36,15 @@ export const financeiroService = {
         mensalidadeValor = 0,
         diaVencimento = 10,
         descontoPercentual = 0,
-        valorMatricula = 0
+        valorMatricula = 0,
+        valorMateriais = 0
       } = financeiro;
 
       // Converter para números para garantir cálculos corretos
       const mensalidadeNum = parseFloat(mensalidadeValor) || 0;
       const descontoNum = parseFloat(descontoPercentual) || 0;
       const valorMatriculaNum = parseFloat(valorMatricula) || 0;
+      const valorMateriaisNum = parseFloat(valorMateriais) || 0;
       const diaVencNum = parseInt(diaVencimento) || 10;
 
       if (!mensalidadeNum || mensalidadeNum <= 0) {
@@ -76,7 +78,31 @@ export const financeiroService = {
         titulosGerados.push({ id: novoTituloRef.key, tipo: 'matricula', valor: valorMatriculaNum });
       }
 
-      // 2. Gerar mensalidades do mês atual até dezembro
+      // 2. Gerar título de materiais (vencimento em 7 dias)
+      if (valorMateriaisNum > 0) {
+        const vencimentoMateriais = new Date();
+        vencimentoMateriais.setDate(hoje.getDate() + 7);
+
+        const tituloMateriais = {
+          alunoId,
+          tipo: 'materiais',
+          descricao: `Taxa de Materiais - ${nome}`,
+          valor: valorMateriaisNum,
+          valorOriginal: valorMateriaisNum,
+          vencimento: vencimentoMateriais.toISOString().split('T')[0],
+          status: 'pendente',
+          observacoes: 'Pagamento para aquisição de materiais escolares',
+          dataGeracao: new Date().toISOString(),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+
+        const titulosRef = ref(db, 'titulos_financeiros');
+        const novoTituloRef = await push(titulosRef, tituloMateriais);
+        titulosGerados.push({ id: novoTituloRef.key, tipo: 'materiais', valor: valorMateriaisNum });
+      }
+
+      // 3. Gerar mensalidades do mês atual até dezembro
       const valorMensalidadeComDesconto = mensalidadeNum * (1 - descontoNum / 100);
       const mesAtual = hoje.getMonth(); // 0-11 (Janeiro=0, Dezembro=11)
       const anoAtual = hoje.getFullYear();
@@ -111,6 +137,7 @@ export const financeiroService = {
         success: true, 
         titulosGerados: titulosGerados.length,
         matricula: titulosGerados.filter(t => t.tipo === 'matricula').length,
+        materiais: titulosGerados.filter(t => t.tipo === 'materiais').length,
         mensalidades: titulosGerados.filter(t => t.tipo === 'mensalidade').length,
         valorTotal: titulosGerados.reduce((sum, t) => sum + t.valor, 0),
         detalhes: titulosGerados
@@ -121,7 +148,7 @@ export const financeiroService = {
     }
   },
 
-  // Verificar se aluno pode ser ativado (matrícula paga)
+  // Verificar se aluno pode ser ativado (matrícula e materiais pagos)
   async verificarStatusMatricula(alunoId) {
     try {
       const titulosRef = ref(db, 'titulos_financeiros');
@@ -131,21 +158,35 @@ export const financeiroService = {
         return { success: true, status: 'sem_titulos', podeAtivar: false };
       }
 
-      const titulos = Object.entries(snapshot.val())
-        .filter(([id, titulo]) => titulo.alunoId === alunoId && titulo.tipo === 'matricula')
+      const titulosObrigatorios = Object.entries(snapshot.val())
+        .filter(([id, titulo]) => titulo.alunoId === alunoId && (titulo.tipo === 'matricula' || titulo.tipo === 'materiais'))
         .map(([id, titulo]) => ({ id, ...titulo }));
 
-      if (titulos.length === 0) {
-        return { success: true, status: 'sem_matricula', podeAtivar: true };
+      if (titulosObrigatorios.length === 0) {
+        return { success: true, status: 'sem_pagamentos_obrigatorios', podeAtivar: true };
       }
 
-      const matriculaPaga = titulos.some(titulo => titulo.status === 'pago');
+      const todosPagos = titulosObrigatorios.every(titulo => titulo.status === 'pago');
+      const algumPago = titulosObrigatorios.some(titulo => titulo.status === 'pago');
+      
+      let status = 'pendente';
+      if (todosPagos) {
+        status = 'todos_pagos';
+      } else if (algumPago) {
+        status = 'parcialmente_pago';
+      }
       
       return { 
         success: true, 
-        status: matriculaPaga ? 'matricula_paga' : 'matricula_pendente',
-        podeAtivar: matriculaPaga,
-        titulosMatricula: titulos
+        status,
+        podeAtivar: todosPagos,
+        titulosObrigatorios,
+        detalhes: {
+          totalTitulos: titulosObrigatorios.length,
+          titulosPagos: titulosObrigatorios.filter(t => t.status === 'pago').length,
+          valorTotal: titulosObrigatorios.reduce((sum, t) => sum + t.valor, 0),
+          valorPago: titulosObrigatorios.filter(t => t.status === 'pago').reduce((sum, t) => sum + t.valor, 0)
+        }
       };
     } catch (error) {
       console.error('Erro ao verificar status da matrícula:', error);
@@ -338,6 +379,23 @@ export const financeiroService = {
       await set(tituloRef, atualizacao);
       
       console.log('✅ Título atualizado com sucesso no Firebase');
+      
+      // Se for um título de crédito pago, adicionar crédito ao aluno
+      if (titulo.tipo === 'credito') {
+        console.log('💳 Título de crédito detectado, adicionando crédito ao aluno...');
+        const resultadoCredito = await this.adicionarCredito(
+          titulo.alunoId, 
+          titulo.valor, 
+          `Crédito gerado pelo pagamento do título: ${titulo.descricao}`,
+          baixadoPor
+        );
+        
+        if (resultadoCredito.success) {
+          console.log('✅ Crédito adicionado com sucesso:', resultadoCredito.novoSaldo);
+        } else {
+          console.error('❌ Erro ao adicionar crédito:', resultadoCredito.error);
+        }
+      }
       
       // Atualizar status financeiro do aluno
       console.log('🔄 Atualizando status financeiro do aluno:', titulo.alunoId);
@@ -672,6 +730,461 @@ export const financeiroService = {
       };
     } catch (error) {
       console.error('Erro ao gerar relatório de inadimplência:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  // Gerenciamento de Créditos
+  async adicionarCredito(alunoId, valor, motivo = '', adicionadoPor = '') {
+    try {
+      console.log('🔄 Adicionando crédito ao aluno:', alunoId, valor);
+      
+      const alunoRef = ref(db, `alunos/${alunoId}`);
+      const snapshot = await get(alunoRef);
+      
+      if (!snapshot.exists()) {
+        return { success: false, error: 'Aluno não encontrado' };
+      }
+
+      const aluno = snapshot.val();
+      const creditoAtual = aluno.creditoDisponivel || 0;
+      const novoCredito = creditoAtual + valor;
+
+      const atualizacao = {
+        ...aluno,
+        creditoDisponivel: novoCredito,
+        updatedAt: new Date().toISOString()
+      };
+
+      await set(alunoRef, atualizacao);
+
+      // Registrar histórico de crédito
+      const historicoRef = ref(db, `historico_creditos/${alunoId}`);
+      const novoHistorico = {
+        tipo: 'adicao',
+        valor: valor,
+        saldoAnterior: creditoAtual,
+        saldoNovo: novoCredito,
+        motivo: motivo || 'Crédito gerado por título pago',
+        adicionadoPor,
+        dataHora: new Date().toISOString()
+      };
+
+      await push(historicoRef, novoHistorico);
+
+      console.log('✅ Crédito adicionado com sucesso:', novoCredito);
+      return { success: true, novoSaldo: novoCredito };
+    } catch (error) {
+      console.error('❌ Erro ao adicionar crédito:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  async utilizarCredito(alunoId, valor, tituloId = '', motivoUso = '') {
+    try {
+      console.log('🔄 Utilizando crédito do aluno:', alunoId, valor);
+      
+      const alunoRef = ref(db, `alunos/${alunoId}`);
+      const snapshot = await get(alunoRef);
+      
+      if (!snapshot.exists()) {
+        return { success: false, error: 'Aluno não encontrado' };
+      }
+
+      const aluno = snapshot.val();
+      const creditoAtual = aluno.creditoDisponivel || 0;
+
+      if (creditoAtual < valor) {
+        return { 
+          success: false, 
+          error: `Crédito insuficiente. Disponível: R$ ${creditoAtual.toFixed(2)}` 
+        };
+      }
+
+      const novoCredito = creditoAtual - valor;
+
+      const atualizacao = {
+        ...aluno,
+        creditoDisponivel: novoCredito,
+        updatedAt: new Date().toISOString()
+      };
+
+      await set(alunoRef, atualizacao);
+
+      // Registrar histórico de crédito
+      const historicoRef = ref(db, `historico_creditos/${alunoId}`);
+      const novoHistorico = {
+        tipo: 'utilizacao',
+        valor: valor,
+        saldoAnterior: creditoAtual,
+        saldoNovo: novoCredito,
+        tituloId: tituloId,
+        motivo: motivoUso || 'Crédito utilizado em pagamento',
+        dataHora: new Date().toISOString()
+      };
+
+      await push(historicoRef, novoHistorico);
+
+      console.log('✅ Crédito utilizado com sucesso:', novoCredito);
+      return { success: true, novoSaldo: novoCredito };
+    } catch (error) {
+      console.error('❌ Erro ao utilizar crédito:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  async obterSaldoCredito(alunoId) {
+    try {
+      const alunoRef = ref(db, `alunos/${alunoId}`);
+      const snapshot = await get(alunoRef);
+      
+      if (!snapshot.exists()) {
+        return { success: false, error: 'Aluno não encontrado' };
+      }
+
+      const aluno = snapshot.val();
+      const saldo = aluno.creditoDisponivel || 0;
+
+      return { success: true, saldo };
+    } catch (error) {
+      console.error('❌ Erro ao obter saldo de crédito:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  async obterHistoricoCreditos(alunoId) {
+    try {
+      const historicoRef = ref(db, `historico_creditos/${alunoId}`);
+      const snapshot = await get(historicoRef);
+      
+      if (!snapshot.exists()) {
+        return { success: true, historico: [] };
+      }
+
+      const historico = [];
+      snapshot.forEach((child) => {
+        historico.push({
+          id: child.key,
+          ...child.val()
+        });
+      });
+
+      // Ordenar por data (mais recente primeiro)
+      historico.sort((a, b) => new Date(b.dataHora) - new Date(a.dataHora));
+
+      return { success: true, historico };
+    } catch (error) {
+      console.error('❌ Erro ao obter histórico de créditos:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  // === FUNÇÕES DE CONTAS A PAGAR/PAGAS ===
+  
+  async criarConta(contaData, userId) {
+    try {
+      const novaConta = {
+        ...contaData,
+        id: Date.now().toString(),
+        status: 'pendente',
+        criadaPor: userId,
+        criadaEm: new Date().toISOString()
+      };
+
+      const contasRef = ref(db, 'contas_pagar');
+      const resultado = await push(contasRef, novaConta);
+      
+      // Se for conta recorrente, criar próximas ocorrências
+      if (contaData.recorrente) {
+        await this.criarContasRecorrentes(contaData, userId);
+      }
+      
+      return { success: true, id: resultado.key };
+    } catch (error) {
+      console.error('Erro ao criar conta:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  async obterContasPagar() {
+    try {
+      const contasRef = ref(db, 'contas_pagar');
+      const snapshot = await get(contasRef);
+      
+      if (!snapshot.exists()) {
+        return { success: true, contas: [] };
+      }
+
+      const contas = [];
+      snapshot.forEach((child) => {
+        contas.push({
+          id: child.key,
+          ...child.val()
+        });
+      });
+
+      // Filtrar apenas contas pendentes
+      const contasPendentes = contas.filter(conta => conta.status === 'pendente');
+      
+      return { success: true, contas: contasPendentes };
+    } catch (error) {
+      console.error('Erro ao obter contas a pagar:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  async obterContasPagas() {
+    try {
+      const contasRef = ref(db, 'contas_pagas');
+      const snapshot = await get(contasRef);
+      
+      if (!snapshot.exists()) {
+        return { success: true, contas: [] };
+      }
+
+      const contas = [];
+      snapshot.forEach((child) => {
+        contas.push({
+          id: child.key,
+          ...child.val()
+        });
+      });
+
+      return { success: true, contas };
+    } catch (error) {
+      console.error('Erro ao obter contas pagas:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  async pagarConta(conta, dadosPagamento, userId, permitirSaldoNegativo = false) {
+    try {
+      // Verificar saldo da escola
+      const saldoResult = await this.obterSaldoEscola();
+      if (!saldoResult.success) {
+        return { success: false, error: 'Erro ao verificar saldo da escola' };
+      }
+
+      // Só verificar saldo se não permitir saldo negativo
+      if (!permitirSaldoNegativo && saldoResult.saldo < conta.valor) {
+        return { success: false, error: 'Saldo insuficiente para pagamento' };
+      }
+
+      // Mover conta para contas pagas
+      const contaPaga = {
+        ...conta,
+        status: 'pago',
+        dataPagamento: dadosPagamento.dataPagamento,
+        formaPagamento: dadosPagamento.formaPagamento,
+        observacoesPagamento: dadosPagamento.observacoes,
+        pagoPor: userId,
+        pagoEm: new Date().toISOString()
+      };
+
+      // Adicionar à lista de contas pagas
+      const contasPagasRef = ref(db, 'contas_pagas');
+      await push(contasPagasRef, contaPaga);
+
+      // Remover da lista de contas a pagar
+      const contaPagarRef = ref(db, `contas_pagar/${conta.id}`);
+      await remove(contaPagarRef);
+
+      // Atualizar saldo da escola
+      const novoSaldo = saldoResult.saldo - conta.valor;
+      const escolaRef = ref(db, 'configuracoes/escola/saldoDisponivel');
+      await set(escolaRef, novoSaldo);
+
+      return { success: true };
+    } catch (error) {
+      console.error('Erro ao pagar conta:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  async obterSaldoEscola() {
+    try {
+      const mesAtual = new Date().getMonth() + 1;
+      const anoAtual = new Date().getFullYear();
+      
+      // Calcular receita mensal atual (títulos pagos do mês)
+      const titulosRef = ref(db, 'titulos_financeiros');
+      const snapshot = await get(titulosRef);
+      
+      let receitaMensal = 0;
+      
+      if (snapshot.exists()) {
+        Object.values(snapshot.val()).forEach(titulo => {
+          if (titulo.status === 'pago' && titulo.dataPagamento) {
+            const dataPagamento = new Date(titulo.dataPagamento);
+            if (dataPagamento.getMonth() + 1 === mesAtual && 
+                dataPagamento.getFullYear() === anoAtual) {
+              receitaMensal += parseFloat(titulo.valor) || 0;
+            }
+          }
+        });
+      }
+      
+      // Calcular gastos mensais (contas pagas do mês)
+      const contasPagasRef = ref(db, 'contas_pagas');
+      const contasPagasSnapshot = await get(contasPagasRef);
+      
+      let gastosMensais = 0;
+      if (contasPagasSnapshot.exists()) {
+        Object.values(contasPagasSnapshot.val()).forEach(conta => {
+          if (conta.dataPagamento) {
+            const dataPagamento = new Date(conta.dataPagamento);
+            if (dataPagamento.getMonth() + 1 === mesAtual && 
+                dataPagamento.getFullYear() === anoAtual) {
+              gastosMensais += parseFloat(conta.valor) || 0;
+            }
+          }
+        });
+      }
+      
+      // Saldo = Receita Mensal - Gastos Mensais
+      const saldoCalculado = receitaMensal - gastosMensais;
+      
+      // Atualizar saldo calculado no Firebase para cache
+      const escolaRef = ref(db, 'configuracoes/escola/saldoDisponivel');
+      await set(escolaRef, saldoCalculado);
+      
+      return { 
+        success: true, 
+        saldo: saldoCalculado,
+        receitaMensal,
+        gastosMensais
+      };
+    } catch (error) {
+      console.error('Erro ao calcular saldo da escola:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  async criarContasRecorrentes(contaData, userId) {
+    try {
+      const { tipoRecorrencia, vencimento } = contaData;
+      const dataBase = new Date(vencimento);
+      const contasRecorrentes = [];
+
+      for (let i = 1; i <= 12; i++) { // Criar 12 ocorrências futuras
+        let proximaData = new Date(dataBase);
+        
+        switch (tipoRecorrencia) {
+          case 'mensal':
+            proximaData.setMonth(proximaData.getMonth() + i);
+            break;
+          case 'trimestral':
+            proximaData.setMonth(proximaData.getMonth() + (i * 3));
+            break;
+          case 'anual':
+            proximaData.setFullYear(proximaData.getFullYear() + i);
+            break;
+        }
+
+        const contaRecorrente = {
+          ...contaData,
+          id: `${Date.now()}_${i}`,
+          vencimento: proximaData.toISOString().split('T')[0],
+          status: 'pendente',
+          criadaPor: userId,
+          criadaEm: new Date().toISOString(),
+          contaOriginal: true
+        };
+
+        contasRecorrentes.push(contaRecorrente);
+      }
+
+      // Salvar todas as contas recorrentes
+      const contasRef = ref(db, 'contas_pagar');
+      for (const conta of contasRecorrentes) {
+        await push(contasRef, conta);
+      }
+
+      return { success: true, quantidadeCriada: contasRecorrentes.length };
+    } catch (error) {
+      console.error('Erro ao criar contas recorrentes:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  // === FUNÇÕES DE FECHAMENTO MENSAL ===
+
+  async fecharMes(mesAno, userId) {
+    try {
+      const { mes, ano } = mesAno;
+      const mesId = `${ano}-${mes.toString().padStart(2, '0')}`;
+      
+      // Buscar contas pendentes do mês
+      const contasPagarRef = ref(db, 'contas_pagar');
+      const snapshot = await get(contasPagarRef);
+      
+      const contasPendentes = [];
+      if (snapshot.exists()) {
+        Object.entries(snapshot.val()).forEach(([id, conta]) => {
+          const vencimento = new Date(conta.vencimento);
+          if (vencimento.getMonth() + 1 === mes && 
+              vencimento.getFullYear() === ano && 
+              conta.status === 'pendente') {
+            contasPendentes.push({ id, ...conta });
+          }
+        });
+      }
+
+      // Migrar contas pendentes para o próximo mês
+      const proximoMes = mes === 12 ? 1 : mes + 1;
+      const proximoAno = mes === 12 ? ano + 1 : ano;
+      
+      for (const conta of contasPendentes) {
+        // Criar nova data de vencimento (próximo mês, mesmo dia)
+        const novaData = new Date(proximoAno, proximoMes - 1, new Date(conta.vencimento).getDate());
+        
+        const contaMigrada = {
+          ...conta,
+          vencimento: novaData.toISOString().split('T')[0],
+          migradaDe: `${mes}/${ano}`,
+          observacoes: `${conta.observacoes || ''} [Migrada do mês ${mes}/${ano}]`.trim()
+        };
+        
+        // Adicionar conta migrada
+        await push(contasPagarRef, contaMigrada);
+        
+        // Remover conta original
+        const contaOriginalRef = ref(db, `contas_pagar/${conta.id}`);
+        await remove(contaOriginalRef);
+      }
+
+      // Salvar dados do fechamento
+      const fechamentoRef = ref(db, `fechamentos_mensais/${mesId}`);
+      await set(fechamentoRef, {
+        mes,
+        ano,
+        dataFechamento: new Date().toISOString(),
+        fechadoPor: userId,
+        contasMigradas: contasPendentes.length,
+        contasPendentes: contasPendentes.map(c => ({
+          id: c.id,
+          descricao: c.descricao,
+          valor: c.valor,
+          vencimento: c.vencimento
+        }))
+      });
+
+      return { success: true, contasMigradas: contasPendentes.length };
+    } catch (error) {
+      console.error('Erro ao fechar mês:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  async verificarMesFechado(mes, ano) {
+    try {
+      const mesId = `${ano}-${mes.toString().padStart(2, '0')}`;
+      const fechamentoRef = ref(db, `fechamentos_mensais/${mesId}`);
+      const snapshot = await get(fechamentoRef);
+      
+      return { success: true, fechado: snapshot.exists(), dados: snapshot.val() };
+    } catch (error) {
+      console.error('Erro ao verificar fechamento do mês:', error);
       return { success: false, error: error.message };
     }
   }

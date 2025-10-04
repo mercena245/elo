@@ -3,20 +3,41 @@
 
 import React, { useEffect, useState, useRef } from 'react';
 import SidebarMenu from '../../components/SidebarMenu';
-import { Card, CardContent, Typography, List, ListItem, ListItemText, Box, CircularProgress, Select, MenuItem, InputLabel, FormControl, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Alert } from '@mui/material';
-import IconButton from '@mui/material/IconButton';
+import { 
+  Card, 
+  CardContent, 
+  Typography, 
+  List, 
+  ListItem, 
+  ListItemText, 
+  Box, 
+  CircularProgress, 
+  Select, 
+  MenuItem, 
+  InputLabel, 
+  FormControl, 
+  Dialog, 
+  DialogTitle, 
+  DialogContent, 
+  DialogActions, 
+  Button, 
+  TextField, 
+  Alert,
+  IconButton,
+  Collapse,
+  Chip
+} from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs from 'dayjs';
-import { db, ref, get, auth, onAuthStateChanged } from '../../firebase';
+import { db, ref, get, set, auth, onAuthStateChanged } from '../../firebase';
 import { storage } from '../../firebase-storage';
-import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
-import { deleteObject } from "firebase/storage";
+import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { auditService, LOG_ACTIONS } from '../../services/auditService';
 import { financeiroService } from '../../services/financeiroService';
-
-import { set } from 'firebase/database';
 
 const Alunos = () => {
   // Marcar/desmarcar anexo para exclusão (por nome)
@@ -51,6 +72,13 @@ const Alunos = () => {
   const [statusMatricula, setStatusMatricula] = useState(null);
   const [inativarDialogOpen, setInativarDialogOpen] = useState(false);
   const [inativarMotivo, setInativarMotivo] = useState('');
+  // Estados para inadimplência
+  const [inadimplenciaDialogOpen, setInadimplenciaDialogOpen] = useState(false);
+  const [titulosEmAberto, setTitulosEmAberto] = useState([]);
+  const [carregandoTitulos, setCarregandoTitulos] = useState(false);
+  const [debugModalState, setDebugModalState] = useState('fechado');
+  // Estado para controlar expansão dos cards
+  const [cardsExpandidos, setCardsExpandidos] = useState({});
   // Estado para anexos temporários
   const [anexosSelecionados, setAnexosSelecionados] = useState([]);
   const inputFileRef = useRef(null);
@@ -100,43 +128,309 @@ const Alunos = () => {
       setFormError('Erro ao remover anexo.');
     }
   };
+  
+  // Função para alternar a expansão dos cards
+  const toggleCardExpansao = (alunoId, event) => {
+    event.stopPropagation(); // Impede que o clique no dropdown abra o modal de edição
+    setCardsExpandidos(prev => ({
+      ...prev,
+      [alunoId]: !prev[alunoId]
+    }));
+  };
+  
+  // Função para verificar e atualizar status de inadimplência automaticamente
+  const verificarEAtualizarInadimplencia = async (alunos) => {
+    try {
+      console.log('🔄 Verificando inadimplência de todos os alunos...');
+      const hoje = new Date().toISOString().split('T')[0];
+      let alunosAtualizados = 0;
+      
+      for (const aluno of alunos) {
+        try {
+          // Buscar títulos pendentes do aluno
+          const resultado = await financeiroService.buscarTitulosAluno(aluno.id, { status: 'pendente' });
+          
+          if (resultado.success && resultado.titulos) {
+            // Verificar se há títulos vencidos
+            const titulosVencidos = resultado.titulos.filter(titulo => titulo.vencimento < hoje);
+            
+            const statusAtual = aluno.financeiro?.status || 'ativo';
+            const novoStatus = titulosVencidos.length > 0 ? 'inadimplente' : 'ativo';
+            
+            // Atualizar apenas se houve mudança
+            if (statusAtual !== novoStatus) {
+              console.log(`💰 Atualizando status de ${aluno.nome}: ${statusAtual} → ${novoStatus}`);
+              
+              const alunoAtualizado = {
+                ...aluno,
+                financeiro: {
+                  ...aluno.financeiro,
+                  status: novoStatus,
+                  ultimaVerificacao: new Date().toISOString(),
+                  titulosVencidos: titulosVencidos.length
+                }
+              };
+              
+              await set(ref(db, `alunos/${aluno.id}`), alunoAtualizado);
+              alunosAtualizados++;
+              
+              // Log da atualização de status
+              if (auditService && LOG_ACTIONS) {
+                await auditService.logAction(
+                  LOG_ACTIONS.STUDENT_UPDATE,
+                  userId,
+                  {
+                    entityId: aluno.id,
+                    description: `Status financeiro atualizado automaticamente: ${aluno.nome} - ${statusAtual} → ${novoStatus}`,
+                    changes: {
+                      statusFinanceiroAnterior: statusAtual,
+                      statusFinanceiroNovo: novoStatus,
+                      titulosVencidos: titulosVencidos.length,
+                      verificacaoAutomatica: true
+                    }
+                  }
+                );
+              }
+            }
+          }
+        } catch (error) {
+          console.error(`Erro ao verificar inadimplência do aluno ${aluno.nome}:`, error);
+        }
+      }
+      
+      console.log(`✅ Verificação concluída. ${alunosAtualizados} alunos atualizados.`);
+      return alunosAtualizados;
+    } catch (error) {
+      console.error('Erro na verificação automática de inadimplência:', error);
+      return 0;
+    }
+  };
+  
+  // Função para buscar títulos vencidos de um aluno específico
+  // Função para buscar títulos vencidos de um aluno específico
+  const buscarTitulosVencidos = async (alunoId) => {
+    try {
+      console.log('🔍 Buscando títulos VENCIDOS para aluno:', alunoId);
+      
+      if (!financeiroService || !financeiroService.buscarTitulosAluno) {
+        console.error('❌ FinanceiroService não está disponível');
+        return [];
+      }
+      
+      const resultado = await financeiroService.buscarTitulosAluno(alunoId, { status: 'pendente' });
+      console.log('📊 Resultado da busca de títulos:', resultado);
+      
+      if (resultado.success && resultado.titulos) {
+        const hoje = new Date().toISOString().split('T')[0];
+        console.log('📅 Data de hoje:', hoje);
+        
+        const titulosVencidos = resultado.titulos.filter(titulo => {
+          const isVencido = titulo.vencimento < hoje;
+          console.log(`📋 ${titulo.descricao} - Vencimento: ${titulo.vencimento} - VENCIDO: ${isVencido}`);
+          return isVencido;
+        });
+        
+        console.log('✅ Títulos VENCIDOS encontrados:', titulosVencidos.length);
+        return titulosVencidos;
+      }
+      
+      console.log('❌ Nenhum título encontrado');
+      return [];
+    } catch (error) {
+      console.error('💥 Erro ao buscar títulos vencidos:', error);
+      return [];
+    }
+  };
+
+  // Função para buscar títulos em aberto (mantida para compatibilidade)
+  const buscarTitulosEmAberto = async (alunoId) => {
+    try {
+      console.log('🔍 === BUSCA DE TÍTULOS INICIADA ===');
+      console.log('🆔 ID do aluno:', alunoId);
+      console.log('🛠️ FinanceiroService disponível:', !!financeiroService);
+      console.log('🛠️ Método buscarTitulosAluno disponível:', !!financeiroService?.buscarTitulosAluno);
+      
+      if (!financeiroService || !financeiroService.buscarTitulosAluno) {
+        console.error('❌ FinanceiroService não está disponível');
+        return [];
+      }
+      
+      // Fazer a busca
+      console.log('📡 Fazendo requisição ao Firebase...');
+      const resultado = await financeiroService.buscarTitulosAluno(alunoId, { status: 'pendente' });
+      console.log('📊 Resultado COMPLETO da busca:', JSON.stringify(resultado, null, 2));
+      
+      if (resultado.success) {
+        console.log('✅ Busca bem-sucedida!');
+        console.log('📋 Total de títulos pendentes encontrados:', resultado.titulos?.length || 0);
+        
+        if (resultado.titulos && resultado.titulos.length > 0) {
+          console.log('📝 Lista de todos os títulos:', resultado.titulos);
+          
+          // Filtrar títulos vencidos e próximos ao vencimento
+          const hoje = new Date().toISOString().split('T')[0];
+          console.log('📅 Data de hoje para comparação:', hoje);
+          
+          const titulosRelevantes = resultado.titulos.filter(titulo => {
+            const vencimento = titulo.vencimento;
+            const isVencido = vencimento <= hoje;
+            const dataVencimento = new Date(vencimento);
+            const dataLimite = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+            const isProximo = dataVencimento <= dataLimite;
+            
+            console.log(`📋 Analisando título:`);
+            console.log(`   - Descrição: ${titulo.descricao}`);
+            console.log(`   - Valor: R$ ${titulo.valor}`);
+            console.log(`   - Vencimento: ${vencimento}`);
+            console.log(`   - É vencido? ${isVencido}`);
+            console.log(`   - É próximo (30 dias)? ${isProximo}`);
+            console.log(`   - Será incluído? ${isVencido || isProximo}`);
+            
+            return isVencido || isProximo;
+          });
+          
+          console.log('✅ Títulos relevantes filtrados:', titulosRelevantes.length);
+          console.log('📝 Lista de títulos relevantes:', titulosRelevantes);
+          return titulosRelevantes;
+        } else {
+          console.log('ℹ️ Nenhum título pendente encontrado para este aluno');
+          return [];
+        }
+      } else {
+        console.log('❌ Busca falhou:', resultado.error || 'Erro desconhecido');
+        return [];
+      }
+    } catch (error) {
+      console.error('💥 ERRO CRÍTICO na busca de títulos:', error);
+      console.error('Stack trace:', error.stack);
+      return [];
+    }
+  };
+  
+  // Função para verificar se aluno pode ser reativado
+  const verificarSePodeReativar = async (alunoId) => {
+    try {
+      console.log('🔍 Verificando se aluno pode ser reativado...');
+      
+      if (!editForm.inativacaoPorInadimplencia) {
+        console.log('✅ Aluno não foi inativado por inadimplência, pode reativar');
+        return { podeReativar: true };
+      }
+      
+      // Se foi inativado por inadimplência, verificar se ainda há títulos vencidos
+      const titulosVencidos = await buscarTitulosVencidos(alunoId);
+      
+      if (titulosVencidos.length > 0) {
+        console.log(`❌ Ainda há ${titulosVencidos.length} títulos vencidos`);
+        return { 
+          podeReativar: false, 
+          motivo: 'Ainda há títulos vencidos que precisam ser quitados',
+          titulosVencidos 
+        };
+      }
+      
+      console.log('✅ Todos os títulos foram quitados, pode reativar');
+      return { podeReativar: true };
+    } catch (error) {
+      console.error('Erro ao verificar reativação:', error);
+      return { 
+        podeReativar: false, 
+        motivo: 'Erro ao verificar status financeiro' 
+      };
+    }
+  };
+  
   // Função para tentar inativar aluno
   const handleInativarAluno = async () => {
-    // Só pode inativar se não estiver em turma e status financeiro não for inadimplente
-    let motivoTurma = '';
-    let motivoFinanceiro = '';
+    console.log('🔄 Iniciando processo de inativação do aluno');
+    console.log('👤 Dados do aluno:', editForm.nome, editForm.matricula);
+    
+    // Verificar se está vinculado a turma
     if (editForm.turmaId && editForm.turmaId !== '') {
-      motivoTurma = `O aluno está vinculado à turma: "${getTurmaNome(editForm.turmaId)}".`;
-    }
-    if (editForm.financeiro?.status === 'inadimplente') {
-      motivoFinanceiro = 'O status financeiro do aluno está como inadimplente.';
-    }
-    if (motivoTurma || motivoFinanceiro) {
-      setInativarMotivo(`${motivoTurma}${motivoTurma && motivoFinanceiro ? '\n\n' : ''}${motivoFinanceiro}`);
+      const motivoTurma = `O aluno está vinculado à turma: "${getTurmaNome(editForm.turmaId)}".`;
+      console.log('🏫 Aluno está vinculado a turma, mostrando modal de impedimento');
+      setInativarMotivo(motivoTurma);
       setInativarDialogOpen(true);
       return;
     }
-    // Inativa o aluno
+    
+    // Verificar se há títulos vencidos
+    console.log('🔍 Verificando títulos vencidos...');
+    setCarregandoTitulos(true);
+    const titulosVencidos = await buscarTitulosVencidos(editAluno.id);
+    setTitulosEmAberto(titulosVencidos); // Usar o mesmo estado para compatibilidade
+    setCarregandoTitulos(false);
+    
+    console.log('📋 Títulos vencidos encontrados:', titulosVencidos.length);
+    
+    // Se há títulos vencidos, mostrar modal de confirmação
+    if (titulosVencidos.length > 0) {
+      console.log('⚠️ Aluno possui títulos vencidos, abrindo modal de confirmação');
+      setDebugModalState('inadimplente_com_titulos_vencidos');
+      setInadimplenciaDialogOpen(true);
+      return;
+    }
+    
+    // Se não há títulos vencidos, pode inativar normalmente
+    console.log('✅ Nenhum título vencido encontrado, prosseguindo com inativação normal');
+    await confirmarInativacao();
+  };
+  
+  // Função para confirmar inativação (com ou sem inadimplência)
+  const confirmarInativacao = async (motivoInadimplencia = null) => {
     try {
       setSaving(true);
-      const novo = { ...editForm, status: 'inativo' };
+      const dataInativacao = new Date().toISOString();
+      
+      const dadosInativacao = {
+        ...editForm, 
+        status: 'inativo',
+        dataInativacao
+      };
+      
+      // Se foi inativado por inadimplência, adicionar informações específicas
+      if (motivoInadimplencia) {
+        dadosInativacao.inativacaoPorInadimplencia = {
+          data: dataInativacao,
+          titulosEmAberto: titulosEmAberto.map(titulo => ({
+            id: titulo.id,
+            tipo: titulo.tipo,
+            descricao: titulo.descricao,
+            valor: titulo.valor,
+            vencimento: titulo.vencimento,
+            diasAtraso: Math.floor((new Date() - new Date(titulo.vencimento)) / (1000 * 60 * 60 * 24))
+          })),
+          valorTotalEmAberto: titulosEmAberto.reduce((total, titulo) => total + (titulo.valor || 0), 0),
+          quantidadeTitulos: titulosEmAberto.length,
+          motivo: motivoInadimplencia
+        };
+      }
+      
       if (editAluno && editAluno.id) {
-        await set(ref(db, `alunos/${editAluno.id}`), novo);
+        await set(ref(db, `alunos/${editAluno.id}`), dadosInativacao);
+        
         // Log da inativação do aluno
         await auditService.logAction(
           LOG_ACTIONS.STUDENT_DEACTIVATE,
           userId,
           {
             entityId: editAluno.id,
-            description: `Aluno inativado: ${editForm.nome} (${editForm.matricula})`,
+            description: motivoInadimplencia 
+              ? `Aluno inativado por inadimplência: ${editForm.nome} (${editForm.matricula}) - ${titulosEmAberto.length} títulos em aberto`
+              : `Aluno inativado: ${editForm.nome} (${editForm.matricula})`,
             changes: { 
               statusAnterior: editForm.status,
-              statusNovo: 'inativo'
+              statusNovo: 'inativo',
+              inativacaoPorInadimplencia: !!motivoInadimplencia,
+              titulosEmAberto: motivoInadimplencia ? titulosEmAberto.length : 0,
+              valorTotalEmAberto: motivoInadimplencia ? titulosEmAberto.reduce((total, titulo) => total + (titulo.valor || 0), 0) : 0
             }
           }
         );
       }
+      
       setEditOpen(false);
+      setInadimplenciaDialogOpen(false);
       await fetchData();
     } catch (err) {
       setFormError('Erro ao inativar aluno.');
@@ -168,6 +462,7 @@ const Alunos = () => {
       const turmasSnap = await get(ref(db, 'turmas'));
       let alunosArr = [];
       let turmasObj = {};
+      
       if (alunosSnap.exists()) {
         const alunosData = alunosSnap.val();
         alunosArr = Object.entries(alunosData).map(([id, aluno]) => ({ ...aluno, id }));
@@ -175,9 +470,34 @@ const Alunos = () => {
       if (turmasSnap.exists()) {
         turmasObj = turmasSnap.val();
       }
+      
+      // Primeiro definir os dados básicos
       setAlunos(alunosArr);
       setTurmas(turmasObj);
+      
+      // Em seguida, verificar e atualizar inadimplência automaticamente (apenas se há alunos)
+      if (alunosArr.length > 0 && financeiroService) {
+        console.log('🔄 Iniciando verificação automática de inadimplência...');
+        
+        // Executar verificação em background para não travar a UI
+        setTimeout(async () => {
+          const atualizados = await verificarEAtualizarInadimplencia(alunosArr);
+          
+          if (atualizados > 0) {
+            console.log(`✅ ${atualizados} alunos tiveram status atualizado. Recarregando dados...`);
+            // Recarregar dados apenas se houve atualizações
+            const alunosSnapNovo = await get(ref(db, 'alunos'));
+            if (alunosSnapNovo.exists()) {
+              const alunosDataNovo = alunosSnapNovo.val();
+              const alunosArrNovo = Object.entries(alunosDataNovo).map(([id, aluno]) => ({ ...aluno, id }));
+              setAlunos(alunosArrNovo);
+            }
+          }
+        }, 1000); // Aguardar 1 segundo para não interferir com o carregamento inicial
+      }
+      
     } catch (err) {
+      console.error('Erro ao carregar dados:', err);
       setAlunos([]);
       setTurmas({});
     }
@@ -262,12 +582,28 @@ const Alunos = () => {
   const handleAtivarAluno = async () => {
     if (!editAluno || !editAluno.id) return;
     
+    // Se é uma reativação (não uma primeira ativação), verificar se pode reativar
+    if (editForm.status === 'inativo') {
+      const verificacao = await verificarSePodeReativar(editAluno.id);
+      
+      if (!verificacao.podeReativar) {
+        setFormError(`⚠️ Não é possível reativar este aluno: ${verificacao.motivo}`);
+        return;
+      }
+    }
+    
     setSaving(true);
     try {
       const alunoAtualizado = {
         ...editForm,
         status: 'ativo',
-        dataAtivacao: new Date().toISOString()
+        dataAtivacao: new Date().toISOString(),
+        // Resetar campos de inadimplência se estava inativo por inadimplência
+        ...(editForm.inativacaoPorInadimplencia && {
+          inadimplente: false,
+          inativacaoPorInadimplencia: false,
+          ultimaVerificacaoFinanceira: Date.now()
+        })
       };
       
       await set(ref(db, `alunos/${editAluno.id}`), alunoAtualizado);
@@ -278,15 +614,17 @@ const Alunos = () => {
         userId,
         {
           entityId: editAluno.id,
-          description: `Aluno ativado após confirmação de pagamento da matrícula: ${editForm.nome}`,
+          description: `Aluno ativado: ${editForm.nome} (${editForm.matricula})`,
           changes: {
-            statusAnterior: 'pre_matricula',
+            statusAnterior: editForm.status,
             novoStatus: 'ativo',
-            dataAtivacao: alunoAtualizado.dataAtivacao
+            dataAtivacao: alunoAtualizado.dataAtivacao,
+            reativacaoAposInadimplencia: editForm.inativacaoPorInadimplencia || false
           }
         }
       );
       
+      console.log('✅ Aluno ativado com sucesso');
       setEditOpen(false);
       setStatusMatricula(null);
       fetchAlunos(); // Recarregar lista
@@ -652,6 +990,105 @@ const Alunos = () => {
               + Nova Matrícula
             </Button>
           </Box>
+          
+          {/* Debug do Modal de Inadimplência */}
+          {debugModalState !== 'fechado' && (
+            <Alert severity="info" sx={{ mb: 2 }}>
+              <Typography variant="body2">
+                🔧 DEBUG: Estado do modal = {debugModalState} | Modal aberto = {inadimplenciaDialogOpen ? 'SIM' : 'NÃO'} | Títulos = {titulosEmAberto.length}
+              </Typography>
+            </Alert>
+          )}
+          
+          {/* Botão de Teste Temporário */}
+          <Box sx={{ mb: 2, p: 2, border: '2px dashed #orange', borderRadius: 2, bgcolor: '#fff3cd' }}>
+            <Typography variant="body2" sx={{ mb: 1, fontWeight: 'bold', color: '#856404' }}>
+              🧪 TESTES - Nova Lógica de Inadimplência
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+              <Button 
+                variant="outlined" 
+                color="warning" 
+                size="small"
+                onClick={() => {
+                  console.log('🧪 Teste: Simulando títulos vencidos');
+                  setTitulosEmAberto([
+                    {
+                      id: 'teste_vencido_1',
+                      descricao: 'Mensalidade Dezembro 2024 - VENCIDA',
+                      valor: 350.00,
+                      vencimento: '2024-12-10', // Data no passado
+                      tipo: 'mensalidade'
+                    },
+                    {
+                      id: 'teste_vencido_2', 
+                      descricao: 'Taxa de Matrícula - VENCIDA',
+                      valor: 200.00,
+                      vencimento: '2024-11-20', // Data no passado
+                      tipo: 'matricula'
+                    }
+                  ]);
+                  setDebugModalState('teste_titulos_vencidos');
+                  setInadimplenciaDialogOpen(true);
+                }}
+              >
+                🧪 Simular Títulos Vencidos
+              </Button>
+              
+              <Button 
+                variant="outlined" 
+                color="success" 
+                size="small"
+                onClick={async () => {
+                  console.log('🔄 Forçando verificação de inadimplência...');
+                  if (alunos.length > 0) {
+                    const atualizados = await verificarEAtualizarInadimplencia(alunos);
+                    alert(`Verificação concluída! ${atualizados} alunos tiveram status atualizado.`);
+                    if (atualizados > 0) {
+                      fetchData(); // Recarregar dados
+                    }
+                  }
+                }}
+              >
+                🔄 Verificar Inadimplência Agora
+              </Button>
+              
+              <Button 
+                variant="outlined" 
+                color="info" 
+                size="small"
+                onClick={async () => {
+                  console.log('🔍 Teste: Buscando todos os títulos do Firebase');
+                  try {
+                    const titulosRef = ref(db, 'titulos_financeiros');
+                    const snapshot = await get(titulosRef);
+                    
+                    if (snapshot.exists()) {
+                      const todosOsTitulos = Object.entries(snapshot.val()).map(([id, titulo]) => ({ id, ...titulo }));
+                      console.log('📊 TODOS os títulos no Firebase:', todosOsTitulos);
+                      console.log('📊 Total de títulos:', todosOsTitulos.length);
+                      
+                      const titulosPendentes = todosOsTitulos.filter(t => t.status === 'pendente');
+                      const hoje = new Date().toISOString().split('T')[0];
+                      const titulosVencidos = titulosPendentes.filter(t => t.vencimento < hoje);
+                      
+                      console.log('📊 Títulos pendentes:', titulosPendentes.length);
+                      console.log('📊 Títulos vencidos:', titulosVencidos.length);
+                      alert(`Total: ${todosOsTitulos.length} | Pendentes: ${titulosPendentes.length} | Vencidos: ${titulosVencidos.length}`);
+                    } else {
+                      console.log('❌ Nenhum título encontrado no Firebase');
+                      alert('Nenhum título encontrado no Firebase');
+                    }
+                  } catch (error) {
+                    console.error('💥 Erro ao buscar títulos:', error);
+                  }
+                }}
+              >
+                🔍 Estatísticas dos Títulos
+              </Button>
+            </Box>
+          </Box>
+          
           <Card sx={{ borderRadius: 4, boxShadow: '0 4px 20px rgba(0,0,0,0.08)', border: '1px solid #f1f5f9' }}>
             <CardContent>
               {loading ? (
@@ -744,63 +1181,254 @@ const Alunos = () => {
                     </Typography>
                   ) : (
                     <List>
-                      {alunosFiltrados.map((aluno, idx) => (
-                        <ListItem 
-                          key={idx} 
-                          divider 
-                          alignItems="flex-start" 
-                          button 
-                          onClick={() => handleEditAluno(aluno)}
-                          sx={{
-                            borderRadius: 2,
-                            mb: 1,
-                            transition: 'all 0.3s ease',
-                            '&:hover': {
-                              bgcolor: '#f8fafc',
-                              transform: 'translateX(8px)',
-                              boxShadow: '0 4px 12px rgba(99, 102, 241, 0.1)',
-                              borderColor: '#e0e7ff'
-                            }
-                          }}
-                        >
-                          <ListItemText
-                            primary={
-                              <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b', mb: 0.5 }}>
-                                {aluno.nome}
-                              </Typography>
-                            }
-                            secondary={
-                              <Box sx={{ mt: 1 }}>  
-                                <Typography variant="body2" sx={{ color: '#6366f1', fontWeight: 500, mb: 0.5 }}>📋 Matrícula: {aluno.matricula || '--'}</Typography>
-                                <Typography variant="body2" sx={{ color: '#059669', mb: 0.5 }}>🏫 Turma: {getTurmaNome(aluno.turmaId)}</Typography>
-                                {aluno.dataNascimento && (
-                                  <Typography variant="body2" sx={{ color: '#64748b', mb: 0.5 }}>🎂 Nascimento: {aluno.dataNascimento}</Typography>
-                                )}
-                                {aluno.nomePai && (
-                                  <Typography variant="body2" sx={{ color: '#64748b', mb: 0.5 }}>👨 Pai: {aluno.nomePai}</Typography>
-                                )}
-                                {aluno.nomeMae && (
-                                  <Typography variant="body2" sx={{ color: '#64748b', mb: 0.5 }}>👩 Mãe: {aluno.nomeMae}</Typography>
-                                )}
-                                {aluno.responsavelUsuario && (
-                                  <Typography variant="body2" sx={{ color: '#8b5cf6', fontWeight: 500, mb: 0.5 }}>
-                                    👤 Responsável Cadastrado: {aluno.responsavelUsuario.nome} ({aluno.responsavelUsuario.email})
+                      {alunosFiltrados.map((aluno, idx) => {
+                        // Determinar se é aluno inativo e inadimplente
+                        const isInativo = aluno.status === 'inativo';
+                        const isInadimplente = aluno.financeiro?.status === 'inadimplente';
+                        const isInativoInadimplente = isInativo && aluno.inativacaoPorInadimplencia;
+                        
+                        // Definir cores baseadas no status
+                        const getBackgroundColor = () => {
+                          if (isInativoInadimplente) return '#fef2f2'; // Vermelho muito claro para inativo por inadimplência
+                          if (isInadimplente) return '#fef7f0'; // Laranja muito claro para inadimplente ativo
+                          if (isInativo) return '#f8fafc'; // Cinza claro para inativo normal
+                          return 'white'; // Branco para ativos normais
+                        };
+                        
+                        const getBorderColor = () => {
+                          if (isInativoInadimplente) return '#fecaca'; // Vermelho claro
+                          if (isInadimplente) return '#fed7aa'; // Laranja claro
+                          if (isInativo) return '#e2e8f0'; // Cinza
+                          return '#f1f5f9'; // Padrão
+                        };
+                        
+                        return (
+                        <Box key={idx} sx={{ mb: 1 }}>
+                          <ListItem 
+                            divider 
+                            alignItems="flex-start" 
+                            sx={{
+                              borderRadius: 2,
+                              bgcolor: getBackgroundColor(),
+                              border: `1px solid ${getBorderColor()}`,
+                              transition: 'all 0.3s ease',
+                              '&:hover': {
+                                bgcolor: isInativoInadimplente ? '#fee2e2' : isInadimplente ? '#fed7aa' : '#f8fafc',
+                                boxShadow: isInativoInadimplente 
+                                  ? '0 4px 12px rgba(239, 68, 68, 0.2)' 
+                                  : isInadimplente 
+                                    ? '0 4px 12px rgba(251, 146, 60, 0.2)'
+                                    : '0 4px 12px rgba(99, 102, 241, 0.1)',
+                                borderColor: isInativoInadimplente ? '#f87171' : isInadimplente ? '#fb923c' : '#e0e7ff'
+                              }
+                            }}
+                          >
+                            <ListItemText
+                              primary={
+                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flex: 1 }}>
+                                    <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b' }}>
+                                      {aluno.nome}
+                                    </Typography>
+                                    {isInativoInadimplente && (
+                                      <Chip 
+                                        label="⚠️ INATIVO (INADIMPLENTE)" 
+                                        size="small"
+                                        sx={{ 
+                                          bgcolor: '#dc2626', 
+                                          color: 'white', 
+                                          fontSize: '0.75rem',
+                                          fontWeight: 'bold'
+                                        }}
+                                      />
+                                    )}
+                                    {isInadimplente && !isInativo && (
+                                      <Chip 
+                                        label="⚠️ INADIMPLENTE" 
+                                        size="small"
+                                        sx={{ 
+                                          bgcolor: '#d97706', 
+                                          color: 'white', 
+                                          fontSize: '0.75rem',
+                                          fontWeight: 'bold'
+                                        }}
+                                      />
+                                    )}
+                                    {isInativo && !isInativoInadimplente && (
+                                      <Chip 
+                                        label="INATIVO" 
+                                        size="small"
+                                        sx={{ 
+                                          bgcolor: '#6b7280', 
+                                          color: 'white', 
+                                          fontSize: '0.75rem',
+                                          fontWeight: 'bold'
+                                        }}
+                                      />
+                                    )}
+                                    {/* Status da Matrícula */}
+                                    <Chip 
+                                      label={aluno.status === 'ativo' ? "✅ ATIVO" : aluno.status === 'inativo' ? "❌ INATIVO" : aluno.status === 'pre_matricula' ? "⏳ PRÉ-MATRÍCULA" : "❓ INDEFINIDO"} 
+                                      size="small"
+                                      variant="outlined"
+                                      sx={{ 
+                                        borderColor: aluno.status === 'ativo' ? '#059669' : aluno.status === 'inativo' ? '#dc2626' : '#d97706',
+                                        color: aluno.status === 'ativo' ? '#059669' : aluno.status === 'inativo' ? '#dc2626' : '#d97706',
+                                        fontSize: '0.7rem',
+                                        fontWeight: 'bold'
+                                      }}
+                                    />
+                                  </Box>
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <Button
+                                      variant="outlined"
+                                      size="small"
+                                      onClick={() => handleEditAluno(aluno)}
+                                      sx={{
+                                        minWidth: 'auto',
+                                        px: 2,
+                                        borderColor: '#6366f1',
+                                        color: '#6366f1',
+                                        '&:hover': {
+                                          bgcolor: '#f0f4ff',
+                                          borderColor: '#4f46e5'
+                                        }
+                                      }}
+                                    >
+                                      ✏️ Editar
+                                    </Button>
+                                    <IconButton
+                                      onClick={(e) => toggleCardExpansao(aluno.id || `${aluno.matricula}_${idx}`, e)}
+                                      sx={{
+                                        color: '#6366f1',
+                                        '&:hover': {
+                                          bgcolor: '#f0f4ff'
+                                        }
+                                      }}
+                                    >
+                                      {cardsExpandidos[aluno.id || `${aluno.matricula}_${idx}`] ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                                    </IconButton>
+                                  </Box>
+                                </Box>
+                              }
+                              secondary={
+                                <Box sx={{ mt: 1 }}>  
+                                  <Typography variant="body2" sx={{ color: '#6366f1', fontWeight: 500, mb: 0.5 }}>
+                                    📋 Matrícula: {aluno.matricula || '--'}
                                   </Typography>
-                                )}
-                                {aluno.contatoEmergencia && (
-                                  <Typography variant="body2" sx={{ color: '#dc2626', mb: 0.5 }}>🚨 Contato Emergência: {aluno.contatoEmergencia.nome} ({aluno.contatoEmergencia.telefone})</Typography>
-                                )}
-                                {aluno.financeiro?.status && (
+                                  <Typography variant="body2" sx={{ color: '#059669', mb: 0.5 }}>
+                                    🏫 Turma: {getTurmaNome(aluno.turmaId)}
+                                  </Typography>
+                                </Box>
+                              }
+                            />
+                          </ListItem>
+                          
+                          {/* Seção expansível com dados detalhados */}
+                          <Collapse in={cardsExpandidos[aluno.id || `${aluno.matricula}_${idx}`]} timeout="auto" unmountOnExit>
+                            <Box sx={{ 
+                              mt: 1, 
+                              p: 2, 
+                              bgcolor: '#fafbff', 
+                              borderRadius: 2, 
+                              border: '1px solid #e0e7ff',
+                              boxShadow: 'inset 0 2px 4px rgba(0, 0, 0, 0.05)'
+                            }}>
+                              <Typography variant="subtitle2" sx={{ color: '#4f46e5', fontWeight: 'bold', mb: 2 }}>
+                                📊 Informações Detalhadas
+                              </Typography>
+                              
+                              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
+                                {/* Dados Pessoais */}
+                                <Box>
+                                  <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#1e293b', mb: 1 }}>
+                                    👤 Dados Pessoais
+                                  </Typography>
+                                  {aluno.dataNascimento && (
+                                    <Typography variant="body2" sx={{ color: '#64748b', mb: 0.5 }}>
+                                      🎂 Nascimento: {aluno.dataNascimento}
+                                    </Typography>
+                                  )}
+                                  {aluno.cpf && (
+                                    <Typography variant="body2" sx={{ color: '#64748b', mb: 0.5 }}>
+                                      🆔 CPF: {aluno.cpf}
+                                    </Typography>
+                                  )}
+                                  {aluno.endereco && (
+                                    <Typography variant="body2" sx={{ color: '#64748b', mb: 0.5 }}>
+                                      🏠 Endereço: {aluno.endereco}
+                                    </Typography>
+                                  )}
+                                  {aluno.telefone && (
+                                    <Typography variant="body2" sx={{ color: '#64748b', mb: 0.5 }}>
+                                      📞 Telefone: {aluno.telefone}
+                                    </Typography>
+                                  )}
+                                </Box>
+                                
+                                {/* Dados Familiares */}
+                                <Box>
+                                  <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#1e293b', mb: 1 }}>
+                                    👨‍👩‍👧‍👦 Família
+                                  </Typography>
+                                  {aluno.nomePai && (
+                                    <Typography variant="body2" sx={{ color: '#64748b', mb: 0.5 }}>
+                                      👨 Pai: {aluno.nomePai}
+                                    </Typography>
+                                  )}
+                                  {aluno.nomeMae && (
+                                    <Typography variant="body2" sx={{ color: '#64748b', mb: 0.5 }}>
+                                      👩 Mãe: {aluno.nomeMae}
+                                    </Typography>
+                                  )}
+                                  {aluno.responsavelUsuario && (
+                                    <Typography variant="body2" sx={{ color: '#8b5cf6', fontWeight: 500, mb: 0.5 }}>
+                                      👤 Responsável: {aluno.responsavelUsuario.nome} ({aluno.responsavelUsuario.email})
+                                    </Typography>
+                                  )}
+                                  {aluno.contatoEmergencia && (
+                                    <Typography variant="body2" sx={{ color: '#dc2626', mb: 0.5 }}>
+                                      🚨 Emergência: {aluno.contatoEmergencia.nome} ({aluno.contatoEmergencia.telefone})
+                                    </Typography>
+                                  )}
+                                </Box>
+                              </Box>
+                              
+                              {/* Status Financeiro */}
+                              {aluno.financeiro && (
+                                <Box sx={{ mt: 2, p: 2, bgcolor: 'white', borderRadius: 1, border: '1px solid #e2e8f0' }}>
+                                  <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#1e293b', mb: 1 }}>
+                                    💰 Informações Financeiras
+                                  </Typography>
                                   <Typography variant="body2" sx={{ 
                                     color: aluno.financeiro.status === 'ativo' ? '#059669' : aluno.financeiro.status === 'inadimplente' ? '#d97706' : '#dc2626',
-                                    fontWeight: 500 
-                                  }}>💰 Status Financeiro: {aluno.financeiro.status}</Typography>
-                                )}
-                              </Box>
-                            }
-                          />
-                        </ListItem>
-                      ))}
+                                    fontWeight: 500,
+                                    mb: 0.5
+                                  }}>
+                                    Status: {aluno.financeiro.status?.toUpperCase() || 'INDEFINIDO'}
+                                  </Typography>
+                                  {aluno.financeiro.mensalidadeValor && (
+                                    <Typography variant="body2" sx={{ color: '#64748b', mb: 0.5 }}>
+                                      💵 Mensalidade: R$ {parseFloat(aluno.financeiro.mensalidadeValor).toFixed(2)}
+                                    </Typography>
+                                  )}
+                                  {aluno.financeiro.descontoPercentual && (
+                                    <Typography variant="body2" sx={{ color: '#059669', mb: 0.5 }}>
+                                      💸 Desconto: {aluno.financeiro.descontoPercentual}%
+                                    </Typography>
+                                  )}
+                                  {aluno.financeiro.diaVencimento && (
+                                    <Typography variant="body2" sx={{ color: '#64748b', mb: 0.5 }}>
+                                      📅 Vencimento: Dia {aluno.financeiro.diaVencimento}
+                                    </Typography>
+                                  )}
+                                </Box>
+                              )}
+                            </Box>
+                          </Collapse>
+                        </Box>
+                        );
+                      })}
                     </List>
                   )}
                   <Dialog open={editOpen} onClose={() => setEditOpen(false)} maxWidth="sm" fullWidth>
@@ -1201,45 +1829,20 @@ const Alunos = () => {
                         </Button>
                       )}
                       {formStep === 2 && !isNew && editForm.status === 'inativo' && (
-                        <Button onClick={async () => {
-                          try {
-                            setSaving(true);
-                            const novo = { ...editForm, status: 'ativo' };
-                            if (editAluno && editAluno.id) {
-                              await set(ref(db, `alunos/${editAluno.id}`), novo);
-                              // Log da ativação do aluno
-                              await auditService.logAction(
-                                LOG_ACTIONS.STUDENT_ACTIVATE,
-                                userId,
-                                {
-                                  entityId: editAluno.id,
-                                  description: `Aluno ativado: ${editForm.nome} (${editForm.matricula})`,
-                                  changes: { 
-                                    statusAnterior: editForm.status,
-                                    statusNovo: 'ativo'
-                                  }
-                                }
-                              );
+                        <Button 
+                          onClick={handleAtivarAluno}
+                          sx={{
+                            borderColor: '#059669',
+                            color: '#059669',
+                            borderRadius: 2,
+                            '&:hover': {
+                              bgcolor: '#f0fdf4',
+                              borderColor: '#047857',
+                              color: '#047857'
                             }
-                            setEditOpen(false);
-                            await fetchData();
-                          } catch (err) {
-                            setFormError('Erro ao ativar aluno.');
-                          }
-                          setSaving(false);
-                        }} 
-                        sx={{
-                          borderColor: '#059669',
-                          color: '#059669',
-                          borderRadius: 2,
-                          '&:hover': {
-                            bgcolor: '#f0fdf4',
-                            borderColor: '#047857',
-                            color: '#047857'
-                          }
-                        }}
-                        variant="outlined" 
-                        disabled={saving}
+                          }}
+                          variant="outlined" 
+                          disabled={saving}
                         >
                           ✓ Ativar
                         </Button>
@@ -1319,6 +1922,138 @@ const Alunos = () => {
                     </DialogContent>
                     <DialogActions>
                       <Button onClick={() => setInativarDialogOpen(false)} color="primary">OK</Button>
+                    </DialogActions>
+                  </Dialog>
+
+                  {/* Modal de confirmação para inadimplência */}
+                  <Dialog 
+                    open={inadimplenciaDialogOpen} 
+                    onClose={() => setInadimplenciaDialogOpen(false)}
+                    maxWidth="md"
+                    fullWidth
+                  >
+                    <DialogTitle sx={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: 2,
+                      background: 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)',
+                      color: 'white'
+                    }}>
+                      ⚠️ Aluno com Títulos Vencidos - Confirmar Inativação
+                    </DialogTitle>
+                    <DialogContent sx={{ pt: 3 }}>
+                      <Alert severity="warning" sx={{ mb: 3 }}>
+                        <Typography variant="h6" gutterBottom>
+                          🚨 O aluno <strong>{editForm?.nome || 'Nome não disponível'}</strong> possui títulos vencidos
+                        </Typography>
+                        <Typography variant="body2">
+                          Confirme se deseja inativar o aluno mesmo com títulos vencidos. 
+                          Essas informações serão armazenadas para consultas futuras.
+                        </Typography>
+                      </Alert>
+
+                      {carregandoTitulos ? (
+                        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                          <CircularProgress />
+                          <Typography sx={{ ml: 2 }}>Carregando títulos em aberto...</Typography>
+                        </Box>
+                      ) : (
+                        <>
+                          <Box sx={{ 
+                            p: 2, 
+                            borderRadius: 2, 
+                            bgcolor: '#fef2f2', 
+                            border: '1px solid #fed7d7',
+                            mb: 3
+                          }}>
+                            <Typography variant="h6" sx={{ color: '#dc2626', mb: 2 }}>
+                              📊 Títulos Vencidos
+                            </Typography>
+                            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+                              <Typography variant="body2">
+                                <strong>Títulos vencidos:</strong> {titulosEmAberto.length}
+                              </Typography>
+                              <Typography variant="body2">
+                                <strong>Valor total:</strong> R$ {titulosEmAberto.reduce((total, titulo) => total + (titulo.valor || 0), 0).toFixed(2)}
+                              </Typography>
+                            </Box>
+                          </Box>
+
+                          {titulosEmAberto.length > 0 && (
+                            <Box>
+                              <Typography variant="h6" gutterBottom sx={{ color: '#dc2626' }}>
+                                📄 Títulos Vencidos
+                              </Typography>
+                              <List dense sx={{ maxHeight: 300, overflow: 'auto', border: '1px solid #e2e8f0', borderRadius: 1 }}>
+                                {titulosEmAberto.map((titulo, idx) => {
+                                  const vencimento = new Date(titulo.vencimento);
+                                  const hoje = new Date();
+                                  const diasAtraso = Math.floor((hoje - vencimento) / (1000 * 60 * 60 * 24));
+                                  const isVencido = diasAtraso > 0;
+                                  
+                                  return (
+                                    <ListItem key={idx} divider={idx < titulosEmAberto.length - 1}>
+                                      <ListItemText
+                                        primary={
+                                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                              {titulo.descricao}
+                                            </Typography>
+                                            <Typography variant="body2" sx={{ 
+                                              color: isVencido ? '#dc2626' : '#d97706',
+                                              fontWeight: 'bold'
+                                            }}>
+                                              R$ {(titulo.valor || 0).toFixed(2)}
+                                            </Typography>
+                                          </Box>
+                                        }
+                                        secondary={
+                                          <Box sx={{ mt: 0.5 }}>
+                                            <Typography variant="caption" sx={{ 
+                                              color: isVencido ? '#dc2626' : '#64748b',
+                                              fontWeight: isVencido ? 'bold' : 'normal'
+                                            }}>
+                                              Vencimento: {vencimento.toLocaleDateString('pt-BR')}
+                                              {isVencido && ` (${diasAtraso} dias em atraso)`}
+                                              {!isVencido && diasAtraso < 0 && ` (vence em ${Math.abs(diasAtraso)} dias)`}
+                                            </Typography>
+                                            <Typography variant="caption" sx={{ display: 'block', color: '#6366f1' }}>
+                                              Tipo: {titulo.tipo}
+                                            </Typography>
+                                          </Box>
+                                        }
+                                      />
+                                    </ListItem>
+                                  );
+                                })}
+                              </List>
+                            </Box>
+                          )}
+                        </>
+                      )}
+                    </DialogContent>
+                    <DialogActions sx={{ p: 3 }}>
+                      <Button 
+                        onClick={() => setInadimplenciaDialogOpen(false)} 
+                        color="inherit"
+                        variant="outlined"
+                      >
+                        Cancelar
+                      </Button>
+                      <Button 
+                        onClick={() => confirmarInativacao('Inativado por inadimplência - possui títulos vencidos')} 
+                        sx={{
+                          bgcolor: '#dc2626',
+                          color: 'white',
+                          '&:hover': {
+                            bgcolor: '#b91c1c'
+                          }
+                        }}
+                        variant="contained"
+                        disabled={saving || carregandoTitulos}
+                      >
+                        {saving ? '⏳ Inativando...' : '✓ Inativar com Títulos Vencidos'}
+                      </Button>
                     </DialogActions>
                   </Dialog>
                   </Dialog>

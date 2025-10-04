@@ -1,6 +1,6 @@
 import { db, ref, get, set, push, update, remove } from '../firebase';
 
-export const financeiroService = {
+const financeiroService = {
   // Gerar título financeiro
   async gerarTitulo(tituloData) {
     try {
@@ -1190,4 +1190,5 @@ export const financeiroService = {
   }
 };
 
+export { financeiroService };
 export default financeiroService;

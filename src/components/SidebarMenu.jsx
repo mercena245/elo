@@ -138,6 +138,9 @@ const SidebarMenu = () => {
     ...(userRole === 'coordenadora' ? [
       { icon: FaSchool, label: 'Escola', path: '/escola', color: '#EF4444' }
     ] : []),
+    ...(userRole === 'pai' ? [
+      { icon: FaGraduationCap, label: 'Turma do Filho', path: '/turma-filho', color: '#2563EB' }
+    ] : []),
     { icon: FaStore, label: 'Loja', path: '/loja', color: '#06B6D4' },
     ...(userRole === 'coordenadora' ? [
       { icon: FaUsers, label: 'Colaboradores', path: '/colaboradores', color: '#84CC16' }

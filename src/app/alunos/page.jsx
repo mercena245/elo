@@ -76,7 +76,6 @@ const Alunos = () => {
   const [inadimplenciaDialogOpen, setInadimplenciaDialogOpen] = useState(false);
   const [titulosEmAberto, setTitulosEmAberto] = useState([]);
   const [carregandoTitulos, setCarregandoTitulos] = useState(false);
-  const [debugModalState, setDebugModalState] = useState('fechado');
   // Estado para controlar expansão dos cards
   const [cardsExpandidos, setCardsExpandidos] = useState({});
   // Estado para anexos temporários
@@ -366,7 +365,6 @@ const Alunos = () => {
     // Se há títulos vencidos, mostrar modal de confirmação
     if (titulosVencidos.length > 0) {
       console.log('⚠️ Aluno possui títulos vencidos, abrindo modal de confirmação');
-      setDebugModalState('inadimplente_com_titulos_vencidos');
       setInadimplenciaDialogOpen(true);
       return;
     }
@@ -989,104 +987,6 @@ const Alunos = () => {
             >
               + Nova Matrícula
             </Button>
-          </Box>
-          
-          {/* Debug do Modal de Inadimplência */}
-          {debugModalState !== 'fechado' && (
-            <Alert severity="info" sx={{ mb: 2 }}>
-              <Typography variant="body2">
-                🔧 DEBUG: Estado do modal = {debugModalState} | Modal aberto = {inadimplenciaDialogOpen ? 'SIM' : 'NÃO'} | Títulos = {titulosEmAberto.length}
-              </Typography>
-            </Alert>
-          )}
-          
-          {/* Botão de Teste Temporário */}
-          <Box sx={{ mb: 2, p: 2, border: '2px dashed #orange', borderRadius: 2, bgcolor: '#fff3cd' }}>
-            <Typography variant="body2" sx={{ mb: 1, fontWeight: 'bold', color: '#856404' }}>
-              🧪 TESTES - Nova Lógica de Inadimplência
-            </Typography>
-            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-              <Button 
-                variant="outlined" 
-                color="warning" 
-                size="small"
-                onClick={() => {
-                  console.log('🧪 Teste: Simulando títulos vencidos');
-                  setTitulosEmAberto([
-                    {
-                      id: 'teste_vencido_1',
-                      descricao: 'Mensalidade Dezembro 2024 - VENCIDA',
-                      valor: 350.00,
-                      vencimento: '2024-12-10', // Data no passado
-                      tipo: 'mensalidade'
-                    },
-                    {
-                      id: 'teste_vencido_2', 
-                      descricao: 'Taxa de Matrícula - VENCIDA',
-                      valor: 200.00,
-                      vencimento: '2024-11-20', // Data no passado
-                      tipo: 'matricula'
-                    }
-                  ]);
-                  setDebugModalState('teste_titulos_vencidos');
-                  setInadimplenciaDialogOpen(true);
-                }}
-              >
-                🧪 Simular Títulos Vencidos
-              </Button>
-              
-              <Button 
-                variant="outlined" 
-                color="success" 
-                size="small"
-                onClick={async () => {
-                  console.log('🔄 Forçando verificação de inadimplência...');
-                  if (alunos.length > 0) {
-                    const atualizados = await verificarEAtualizarInadimplencia(alunos);
-                    alert(`Verificação concluída! ${atualizados} alunos tiveram status atualizado.`);
-                    if (atualizados > 0) {
-                      fetchData(); // Recarregar dados
-                    }
-                  }
-                }}
-              >
-                🔄 Verificar Inadimplência Agora
-              </Button>
-              
-              <Button 
-                variant="outlined" 
-                color="info" 
-                size="small"
-                onClick={async () => {
-                  console.log('🔍 Teste: Buscando todos os títulos do Firebase');
-                  try {
-                    const titulosRef = ref(db, 'titulos_financeiros');
-                    const snapshot = await get(titulosRef);
-                    
-                    if (snapshot.exists()) {
-                      const todosOsTitulos = Object.entries(snapshot.val()).map(([id, titulo]) => ({ id, ...titulo }));
-                      console.log('📊 TODOS os títulos no Firebase:', todosOsTitulos);
-                      console.log('📊 Total de títulos:', todosOsTitulos.length);
-                      
-                      const titulosPendentes = todosOsTitulos.filter(t => t.status === 'pendente');
-                      const hoje = new Date().toISOString().split('T')[0];
-                      const titulosVencidos = titulosPendentes.filter(t => t.vencimento < hoje);
-                      
-                      console.log('📊 Títulos pendentes:', titulosPendentes.length);
-                      console.log('📊 Títulos vencidos:', titulosVencidos.length);
-                      alert(`Total: ${todosOsTitulos.length} | Pendentes: ${titulosPendentes.length} | Vencidos: ${titulosVencidos.length}`);
-                    } else {
-                      console.log('❌ Nenhum título encontrado no Firebase');
-                      alert('Nenhum título encontrado no Firebase');
-                    }
-                  } catch (error) {
-                    console.error('💥 Erro ao buscar títulos:', error);
-                  }
-                }}
-              >
-                🔍 Estatísticas dos Títulos
-              </Button>
-            </Box>
           </Box>
           
           <Card sx={{ borderRadius: 4, boxShadow: '0 4px 20px rgba(0,0,0,0.08)', border: '1px solid #f1f5f9' }}>

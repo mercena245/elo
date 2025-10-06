@@ -1,4 +1,4 @@
-
+﻿
 "use client";
 
 import React, { useEffect, useState, useRef } from 'react';
@@ -25,11 +25,7 @@ import {
   Alert,
   IconButton,
   Collapse,
-  Chip,
-  FormControlLabel,
-  Checkbox,
-  Radio,
-  RadioGroup
+  Chip
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -42,226 +38,6 @@ import { storage } from '../../firebase-storage';
 import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { auditService, LOG_ACTIONS } from '../../services/auditService';
 import { financeiroService } from '../../services/financeiroService';
-
-// Componente para indicador de pré-matrícula
-const PreMatriculaIndicator = ({ aluno }) => {
-  const [info, setInfo] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const buscarInfo = async () => {
-      try {
-        if (!financeiroService || !financeiroService.buscarTitulosAluno) {
-          setLoading(false);
-          return;
-        }
-
-        const resultado = await financeiroService.buscarTitulosAluno(aluno.id);
-        
-        if (resultado.success && resultado.titulos) {
-          const tituloMatricula = resultado.titulos.find(t => t.tipo === 'matricula');
-          const tituloMateriais = resultado.titulos.find(t => t.tipo === 'materiais');
-          
-          const pendencias = [];
-          if (tituloMatricula && tituloMatricula.status === 'pendente') {
-            pendencias.push(`💳 R$ ${(tituloMatricula.valor || 0).toFixed(2)}`);
-          }
-          if (tituloMateriais && tituloMateriais.status === 'pendente') {
-            pendencias.push(`📚 R$ ${(tituloMateriais.valor || 0).toFixed(2)}`);
-          }
-          
-          setInfo({
-            pendencias,
-            temPendencias: pendencias.length > 0,
-            matriculaPaga: !tituloMatricula || tituloMatricula.status === 'pago',
-            materiaisPago: !tituloMateriais || tituloMateriais.status === 'pago'
-          });
-        }
-      } catch (error) {
-        console.error('Erro ao buscar info pré-matrícula:', error);
-      }
-      setLoading(false);
-    };
-
-    buscarInfo();
-  }, [aluno.id]);
-
-  if (loading) {
-    return (
-      <Chip 
-        label="🔄" 
-        size="small"
-        sx={{ 
-          bgcolor: '#f3f4f6', 
-          color: '#6b7280',
-          fontSize: '0.7rem',
-          minWidth: '32px'
-        }}
-      />
-    );
-  }
-
-  if (!info || !info.temPendencias) {
-    return (
-      <Chip 
-        label="✅" 
-        size="small"
-        sx={{ 
-          bgcolor: '#dcfce7', 
-          color: '#16a34a',
-          fontSize: '0.7rem',
-          fontWeight: 'bold',
-          minWidth: '32px'
-        }}
-      />
-    );
-  }
-
-  const tooltipText = `Pendente: ${info.pendencias.join(', ')}`;
-
-  return (
-    <Chip 
-      label={`💰 ${info.pendencias.length}`}
-      size="small"
-      title={tooltipText}
-      sx={{ 
-        bgcolor: '#fef3c7', 
-        color: '#d97706',
-        fontSize: '0.7rem',
-        fontWeight: 'bold',
-        minWidth: '40px',
-        cursor: 'help'
-      }}
-    />
-  );
-};
-
-// Componente para detalhes de pré-matrícula
-const PreMatriculaDetalhes = ({ aluno }) => {
-  const [detalhes, setDetalhes] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const buscarDetalhes = async () => {
-      try {
-        if (!financeiroService || !financeiroService.buscarTitulosAluno) {
-          setLoading(false);
-          return;
-        }
-
-        const resultado = await financeiroService.buscarTitulosAluno(aluno.id);
-        
-        if (resultado.success && resultado.titulos) {
-          const tituloMatricula = resultado.titulos.find(t => t.tipo === 'matricula');
-          const tituloMateriais = resultado.titulos.find(t => t.tipo === 'materiais');
-          
-          setDetalhes({
-            matricula: tituloMatricula,
-            materiais: tituloMateriais,
-            totalPendente: [tituloMatricula, tituloMateriais]
-              .filter(t => t && t.status === 'pendente')
-              .reduce((sum, t) => sum + (t.valor || 0), 0)
-          });
-        }
-      } catch (error) {
-        console.error('Erro ao buscar detalhes pré-matrícula:', error);
-      }
-      setLoading(false);
-    };
-
-    buscarDetalhes();
-  }, [aluno.id]);
-
-  if (loading) {
-    return (
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-        <CircularProgress size={16} />
-        <Typography variant="body2" sx={{ color: '#64748b' }}>
-          Carregando informações de pagamento...
-        </Typography>
-      </Box>
-    );
-  }
-
-  if (!detalhes) {
-    return (
-      <Typography variant="body2" sx={{ color: '#dc2626' }}>
-        ❌ Erro ao carregar informações de pagamento
-      </Typography>
-    );
-  }
-
-  const getStatusIcon = (titulo) => {
-    if (!titulo) return '➖';
-    return titulo.status === 'pago' ? '✅' : '⏳';
-  };
-
-  const getStatusText = (titulo) => {
-    if (!titulo) return 'Não aplicável';
-    return titulo.status === 'pago' ? 'PAGO' : 'PENDENTE';
-  };
-
-  const getStatusColor = (titulo) => {
-    if (!titulo) return '#6b7280';
-    return titulo.status === 'pago' ? '#059669' : '#d97706';
-  };
-
-  return (
-    <Box>
-      <Typography variant="body2" sx={{ color: '#92400e', mb: 1 }}>
-        📋 <strong>Situação dos Pagamentos Obrigatórios</strong>
-      </Typography>
-      
-      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1, mb: 2 }}>
-        <Box>
-          <Typography variant="body2" sx={{ 
-            color: getStatusColor(detalhes.matricula),
-            fontWeight: 500 
-          }}>
-            {getStatusIcon(detalhes.matricula)} Taxa de Matrícula: {getStatusText(detalhes.matricula)}
-          </Typography>
-          {detalhes.matricula && (
-            <Typography variant="caption" sx={{ color: '#64748b', display: 'block' }}>
-              Valor: R$ {(detalhes.matricula.valor || 0).toFixed(2)}
-              {detalhes.matricula.vencimento && ` | Vencimento: ${new Date(detalhes.matricula.vencimento).toLocaleDateString('pt-BR')}`}
-            </Typography>
-          )}
-        </Box>
-        
-        <Box>
-          <Typography variant="body2" sx={{ 
-            color: getStatusColor(detalhes.materiais),
-            fontWeight: 500 
-          }}>
-            {getStatusIcon(detalhes.materiais)} Taxa de Materiais: {getStatusText(detalhes.materiais)}
-          </Typography>
-          {detalhes.materiais && (
-            <Typography variant="caption" sx={{ color: '#64748b', display: 'block' }}>
-              Valor: R$ {(detalhes.materiais.valor || 0).toFixed(2)}
-              {detalhes.materiais.vencimento && ` | Vencimento: ${new Date(detalhes.materiais.vencimento).toLocaleDateString('pt-BR')}`}
-            </Typography>
-          )}
-        </Box>
-      </Box>
-      
-      {detalhes.totalPendente > 0 ? (
-        <Alert severity="warning" sx={{ mt: 1 }}>
-          <Typography variant="body2">
-            💰 <strong>Total pendente: R$ {detalhes.totalPendente.toFixed(2)}</strong><br />
-            ⚠️ O aluno será ativado automaticamente após quitação dos valores obrigatórios.
-          </Typography>
-        </Alert>
-      ) : (
-        <Alert severity="success" sx={{ mt: 1 }}>
-          <Typography variant="body2">
-            🎉 <strong>Todos os pagamentos obrigatórios foram realizados!</strong><br />
-            ✅ O aluno será ativado automaticamente na próxima verificação.
-          </Typography>
-        </Alert>
-      )}
-    </Box>
-  );
-};
 
 const Alunos = () => {
   // Marcar/desmarcar anexo para exclusão (por nome)
@@ -289,7 +65,7 @@ const Alunos = () => {
   const [formError, setFormError] = useState('');
   const [filtroNome, setFiltroNome] = useState('');
   const [filtroMatricula, setFiltroMatricula] = useState('');
- // const [formStep, setFormStep] = useState(1); // 1 = dados pessoais, 2 = dados financeiros
+  const [formStep, setFormStep] = useState(1); // 1 = dados pessoais, 2 = dados financeiros
   const [financeiroError, setFinanceiroError] = useState('');
   const [gerandoTitulos, setGerandoTitulos] = useState(false);
   const [resultadoTitulos, setResultadoTitulos] = useState(null);
@@ -302,19 +78,9 @@ const Alunos = () => {
   const [carregandoTitulos, setCarregandoTitulos] = useState(false);
   // Estado para controlar expansão dos cards
   const [cardsExpandidos, setCardsExpandidos] = useState({});
-  // Estados para anexos temporários
+  // Estado para anexos temporários
   const [anexosSelecionados, setAnexosSelecionados] = useState([]);
   const inputFileRef = useRef(null);
-  // Estados para informações de pré-matrícula
-  const [infoPreMatricula, setInfoPreMatricula] = useState({});
-  const [verificandoPagamentos, setVerificandoPagamentos] = useState(false);
-  // Estados para o novo formulário
-  const [formStep, setFormStep] = useState(1); // 1=pessoais, 2=mãe, 3=pai, 4=emergência, 5=saúde
-  const [dadosTurma, setDadosTurma] = useState(null);
-  const [buscandoCep, setBuscandoCep] = useState(false);
-  const [validacaoCpf, setValidacaoCpf] = useState({});
-  const [fotoAluno, setFotoAluno] = useState(null);
-  const inputFotoRef = useRef(null);
 
   // Remover anexo do Storage e do registro do aluno
   const handleRemoverAnexo = async (anexo, idx) => {
@@ -362,96 +128,6 @@ const Alunos = () => {
     }
   };
   
-  // Função para buscar informações de pré-matrícula
-  const buscarInfoPreMatricula = async (alunoId) => {
-    try {
-      if (!financeiroService) return null;
-      
-      const verificacao = await verificarPagamentosPreMatricula(alunoId);
-      return verificacao;
-    } catch (error) {
-      console.error('Erro ao buscar info pré-matrícula:', error);
-      return null;
-    }
-  };
-
-  // Função para validar CPF
-  const validarCPF = (cpf) => {
-    if (!cpf) return false;
-    
-    // Remove caracteres não numéricos
-    cpf = cpf.replace(/[^\d]/g, '');
-    
-    // Verifica se tem 11 dígitos
-    if (cpf.length !== 11) return false;
-    
-    // Verifica se todos os dígitos são iguais
-    if (/^(\d)\1{10}$/.test(cpf)) return false;
-    
-    // Validação do primeiro dígito verificador
-    let soma = 0;
-    for (let i = 0; i < 9; i++) {
-      soma += parseInt(cpf.charAt(i)) * (10 - i);
-    }
-    let digito1 = 11 - (soma % 11);
-    if (digito1 >= 10) digito1 = 0;
-    
-    // Validação do segundo dígito verificador
-    soma = 0;
-    for (let i = 0; i < 10; i++) {
-      soma += parseInt(cpf.charAt(i)) * (11 - i);
-    }
-    let digito2 = 11 - (soma % 11);
-    if (digito2 >= 10) digito2 = 0;
-    
-    return parseInt(cpf.charAt(9)) === digito1 && parseInt(cpf.charAt(10)) === digito2;
-  };
-
-  // Função para buscar endereço por CEP
-  const buscarEnderecoPorCep = async (cep, tipo) => {
-    if (!cep || cep.length < 8) return;
-    
-    setBuscandoCep(true);
-    try {
-      const response = await fetch(`https://viacep.com.br/ws/${cep.replace(/\D/g, '')}/json/`);
-      const data = await response.json();
-      
-      if (!data.erro) {
-        setEditForm(prev => ({
-          ...prev,
-          [tipo]: {
-            ...prev[tipo],
-            endereco: {
-              ...prev[tipo]?.endereco,
-              rua: data.logradouro || '',
-              bairro: data.bairro || '',
-              cidade: data.localidade || '',
-              uf: data.uf || ''
-            }
-          }
-        }));
-      }
-    } catch (error) {
-      console.error('Erro ao buscar CEP:', error);
-    }
-    setBuscandoCep(false);
-  };
-
-  // Função para buscar dados da turma
-  const buscarDadosTurma = async (turmaId) => {
-    if (!turmaId || !turmas[turmaId]) return;
-    
-    const turma = turmas[turmaId];
-    setDadosTurma(turma);
-    
-    // Atualizar form com dados da turma
-    setEditForm(prev => ({
-      ...prev,
-      serie: turma.serie || '',
-      turno: turma.turno || ''
-    }));
-  };
-
   // Função para alternar a expansão dos cards
   const toggleCardExpansao = (alunoId, event) => {
     event.stopPropagation(); // Impede que o clique no dropdown abra o modal de edição
@@ -662,96 +338,6 @@ const Alunos = () => {
       };
     }
   };
-
-  // Função para verificar se títulos de matrícula e materiais foram pagos
-  const verificarPagamentosPreMatricula = async (alunoId) => {
-    try {
-      console.log('🔍 Verificando pagamentos de pré-matrícula para:', alunoId);
-      
-      if (!financeiroService || !financeiroService.buscarTitulosAluno) {
-        return { matriculaPaga: false, materiaisPago: false, erro: 'Serviço financeiro indisponível' };
-      }
-
-      // Buscar todos os títulos do aluno
-      const resultado = await financeiroService.buscarTitulosAluno(alunoId);
-      
-      if (!resultado.success || !resultado.titulos) {
-        return { matriculaPaga: false, materiaisPago: false, erro: 'Erro ao buscar títulos' };
-      }
-
-      // Verificar títulos de matrícula e materiais
-      const tituloMatricula = resultado.titulos.find(t => t.tipo === 'matricula');
-      const tituloMateriais = resultado.titulos.find(t => t.tipo === 'materiais');
-
-      const matriculaPaga = !tituloMatricula || tituloMatricula.status === 'pago';
-      const materiaisPago = !tituloMateriais || tituloMateriais.status === 'pago';
-
-      console.log('📊 Status dos pagamentos:', { matriculaPaga, materiaisPago });
-      
-      return {
-        matriculaPaga,
-        materiaisPago,
-        tituloMatricula,
-        tituloMateriais,
-        podeAtivar: matriculaPaga && materiaisPago
-      };
-    } catch (error) {
-      console.error('Erro ao verificar pagamentos:', error);
-      return { matriculaPaga: false, materiaisPago: false, erro: error.message };
-    }
-  };
-
-  // Função para ativar automaticamente aluno após pagamentos obrigatórios
-  const ativarAutomaticamenteSeAprovado = async (alunoData) => {
-    try {
-      if (alunoData.status !== 'pre_matricula') {
-        return false; // Só processa alunos em pré-matrícula
-      }
-
-      const verificacao = await verificarPagamentosPreMatricula(alunoData.id);
-      
-      if (verificacao.podeAtivar) {
-        console.log('✅ Ativando aluno automaticamente:', alunoData.nome);
-        
-        const alunoAtualizado = {
-          ...alunoData,
-          status: 'ativo',
-          dataAtivacao: new Date().toISOString(),
-          ativacaoAutomatica: {
-            data: new Date().toISOString(),
-            motivo: 'Pagamentos de matrícula e materiais confirmados',
-            verificacao
-          }
-        };
-        
-        await set(ref(db, `alunos/${alunoData.id}`), alunoAtualizado);
-        
-        // Log da ativação automática
-        await auditService.logAction(
-          'student_auto_activated',
-          userId,
-          {
-            entityId: alunoData.id,
-            description: `Aluno ativado automaticamente: ${alunoData.nome} - pagamentos confirmados`,
-            changes: {
-              statusAnterior: 'pre_matricula',
-              novoStatus: 'ativo',
-              ativacaoAutomatica: true,
-              matriculaPaga: verificacao.matriculaPaga,
-              materiaisPago: verificacao.materiaisPago
-            }
-          }
-        );
-        
-        return true;
-      }
-      
-      return false;
-    } catch (error) {
-      console.error('Erro na ativação automática:', error);
-      return false;
-    }
-  };
   
   // Função para tentar inativar aluno
   const handleInativarAluno = async () => {
@@ -887,43 +473,25 @@ const Alunos = () => {
       setAlunos(alunosArr);
       setTurmas(turmasObj);
       
-      // Verificar ativações automáticas para alunos em pré-matrícula
+      // Em seguida, verificar e atualizar inadimplência automaticamente (apenas se há alunos)
       if (alunosArr.length > 0 && financeiroService) {
-        console.log('🔄 Verificando ativações automáticas...');
+        console.log('🔄 Iniciando verificação automática de inadimplência...');
         
-        const alunosPreMatricula = alunosArr.filter(aluno => aluno.status === 'pre_matricula');
-        let ativacoesRealizadas = 0;
-        
-        for (const aluno of alunosPreMatricula) {
-          const ativado = await ativarAutomaticamenteSeAprovado(aluno);
-          if (ativado) ativacoesRealizadas++;
-        }
-        
-        // Se houver ativações, recarregar dados
-        if (ativacoesRealizadas > 0) {
-          console.log(`✅ ${ativacoesRealizadas} alunos ativados automaticamente. Recarregando...`);
-          const alunosSnapNovo = await get(ref(db, 'alunos'));
-          if (alunosSnapNovo.exists()) {
-            const alunosDataNovo = alunosSnapNovo.val();
-            const alunosArrNovo = Object.entries(alunosDataNovo).map(([id, aluno]) => ({ ...aluno, id }));
-            setAlunos(alunosArrNovo);
-          }
-        }
-        
-        // Verificar e atualizar inadimplência automaticamente
+        // Executar verificação em background para não travar a UI
         setTimeout(async () => {
           const atualizados = await verificarEAtualizarInadimplencia(alunosArr);
           
           if (atualizados > 0) {
             console.log(`✅ ${atualizados} alunos tiveram status atualizado. Recarregando dados...`);
-            const alunosSnapFinal = await get(ref(db, 'alunos'));
-            if (alunosSnapFinal.exists()) {
-              const alunosDataFinal = alunosSnapFinal.val();
-              const alunosArrFinal = Object.entries(alunosDataFinal).map(([id, aluno]) => ({ ...aluno, id }));
-              setAlunos(alunosArrFinal);
+            // Recarregar dados apenas se houve atualizações
+            const alunosSnapNovo = await get(ref(db, 'alunos'));
+            if (alunosSnapNovo.exists()) {
+              const alunosDataNovo = alunosSnapNovo.val();
+              const alunosArrNovo = Object.entries(alunosDataNovo).map(([id, aluno]) => ({ ...aluno, id }));
+              setAlunos(alunosArrNovo);
             }
           }
-        }, 1500);
+        }, 1000); // Aguardar 1 segundo para não interferir com o carregamento inicial
       }
       
     } catch (err) {
@@ -979,86 +547,9 @@ const Alunos = () => {
   const handleEditAluno = async aluno => {
     setEditAluno(aluno);
     
-    // Preparar dados com estrutura completa, mantendo compatibilidade
-    const dadosCompletos = {
-      // Dados pessoais
-      nome: aluno.nome || '',
-      matricula: aluno.matricula || '',
-      turmaId: aluno.turmaId || '',
-      serie: aluno.serie || '',
-      turno: aluno.turno || '',
-      dataNascimento: aluno.dataNascimento || '',
-      cpf: aluno.cpf || '',
-      endereco: aluno.endereco || {
-        rua: '',
-        bairro: '',
-        cep: '',
-        cidade: '',
-        uf: ''
-      },
-      foto: aluno.foto || '',
-      
-      // Dados da mãe (compatibilidade com campo antigo)
-      mae: aluno.mae || {
-        nome: aluno.nomeMae || '',
-        rg: '',
-        cpf: '',
-        nacionalidade: '',
-        escolaridade: '',
-        profissao: '',
-        celular: '',
-        email: '',
-        endereco: {
-          rua: '',
-          bairro: '',
-          cep: '',
-          cidade: '',
-          uf: ''
-        },
-        responsavelFinanceiro: false,
-        responsavelLegal: false
-      },
-      
-      // Dados do pai (compatibilidade com campo antigo)
-      pai: aluno.pai || {
-        nome: aluno.nomePai || '',
-        rg: '',
-        cpf: '',
-        nacionalidade: '',
-        escolaridade: '',
-        profissao: '',
-        celular: '',
-        email: '',
-        endereco: {
-          rua: '',
-          bairro: '',
-          cep: '',
-          cidade: '',
-          uf: ''
-        },
-        responsavelFinanceiro: false,
-        responsavelLegal: false
-      },
-      
-      // Contato de emergência
-      contatoEmergencia: aluno.contatoEmergencia || { 
-        nome: '', 
-        parentesco: '',
-        telefone: '' 
-      },
-      
-      // Informações de saúde
-      saude: aluno.saude || {
-        doencasJaTeve: { tem: false, quais: '' },
-        alergias: { tem: false, quais: '' },
-        alergiaRemedio: { tem: false, quais: '' },
-        problemaSaude: { tem: false, quais: '' },
-        acompanhamentoTerapeutico: { tem: false, quais: '' },
-        medicacaoContinua: { tem: false, quais: '' },
-        acompanhamentoMedico: { tem: false, quais: '' }
-      },
-      
-      // Dados financeiros
+    // Garante estrutura financeira ao editar, mesmo que não exista ainda
+    setEditForm({ 
+      ...aluno,
       financeiro: {
         mensalidadeValor: aluno.financeiro?.mensalidadeValor || '',
         descontoPercentual: aluno.financeiro?.descontoPercentual || '',
@@ -1067,27 +558,14 @@ const Alunos = () => {
         valorMatricula: aluno.financeiro?.valorMatricula || '',
         valorMateriais: aluno.financeiro?.valorMateriais || '',
         observacoes: aluno.financeiro?.observacoes || ''
-      },
-      
-      // Outros campos
-      status: aluno.status || 'ativo',
-      anexos: aluno.anexos || []
-    };
+      }
+    });
     
-    setEditForm(dadosCompletos);
     setIsNew(false);
     setEditOpen(true);
     setFormError('');
     setFormStep(1);
     setResultadoTitulos(null);
-    setDadosTurma(null);
-    setFotoAluno(null);
-    setValidacaoCpf({});
-    
-    // Buscar dados da turma se houver
-    if (dadosCompletos.turmaId) {
-      await buscarDadosTurma(dadosCompletos.turmaId);
-    }
     
     // Verificar status da matrícula se o aluno estiver em pré-matrícula
     if (aluno.status === 'pre_matricula') {
@@ -1165,84 +643,13 @@ const Alunos = () => {
     const novaMatricula = `S${String(lastMatricula + 1).padStart(3, '0')}`;
     setEditAluno(null);
     setEditForm({ 
-      // Dados pessoais
       nome: '', 
       matricula: novaMatricula, 
       turmaId: '', 
-      serie: '',
-      turno: '',
       dataNascimento: '', 
-      cpf: '',
-      endereco: {
-        rua: '',
-        bairro: '',
-        cep: '',
-        cidade: '',
-        uf: ''
-      },
-      foto: '',
-      
-      // Dados da mãe
-      mae: {
-        nome: '',
-        rg: '',
-        cpf: '',
-        nacionalidade: '',
-        escolaridade: '',
-        profissao: '',
-        celular: '',
-        email: '',
-        endereco: {
-          rua: '',
-          bairro: '',
-          cep: '',
-          cidade: '',
-          uf: ''
-        },
-        responsavelFinanceiro: false,
-        responsavelLegal: false
-      },
-      
-      // Dados do pai
-      pai: {
-        nome: '',
-        rg: '',
-        cpf: '',
-        nacionalidade: '',
-        escolaridade: '',
-        profissao: '',
-        celular: '',
-        email: '',
-        endereco: {
-          rua: '',
-          bairro: '',
-          cep: '',
-          cidade: '',
-          uf: ''
-        },
-        responsavelFinanceiro: false,
-        responsavelLegal: false
-      },
-      
-      // Contato de emergência
-      contatoEmergencia: { 
-        nome: '', 
-        parentesco: '',
-        telefone: '' 
-      },
-      
-      // Informações de saúde
-      saude: {
-        doencasJaTeve: { tem: false, quais: '' },
-        alergias: { tem: false, quais: '' },
-        alergiaRemedio: { tem: false, quais: '' },
-        problemaSaude: { tem: false, quais: '' },
-        acompanhamentoTerapeutico: { tem: false, quais: '' },
-        medicacaoContinua: { tem: false, quais: '' },
-        acompanhamentoMedico: { tem: false, quais: '' }
-      },
-      
-      // Dados financeiros (mantidos)
+      nomePai: '', 
+      nomeMae: '', 
+      contatoEmergencia: { nome: '', telefone: '' },
       financeiro: {
         mensalidadeValor: '',
         descontoPercentual: '',
@@ -1259,160 +666,17 @@ const Alunos = () => {
     setIsNew(true);
     setEditOpen(true);
     setFormError('');
-    setFormStep(1); // Começar na primeira aba
+    setFormStep(1);
     setResultadoTitulos(null);
     setStatusMatricula(null);
-    setDadosTurma(null);
-    setFotoAluno(null);
-    setValidacaoCpf({});
   };
 
-  const handleFormChange = async (e) => {
-    const { name, value, type, checked } = e.target;
-    
-    // Tratamento especial para checkboxes de responsabilidade
-    if (name === 'mae.responsavelFinanceiro' || name === 'pai.responsavelFinanceiro') {
-      const [pessoa] = name.split('.');
-      setEditForm(prev => ({
-        ...prev,
-        mae: {
-          ...prev.mae,
-          responsavelFinanceiro: pessoa === 'mae' ? checked : false
-        },
-        pai: {
-          ...prev.pai,
-          responsavelFinanceiro: pessoa === 'pai' ? checked : false
-        }
-      }));
-      return;
-    }
-    
-    // Tratamento para checkboxes de responsável legal
-    if (name === 'mae.responsavelLegal' || name === 'pai.responsavelLegal') {
-      const [pessoa] = name.split('.');
-      setEditForm(prev => ({
-        ...prev,
-        [pessoa]: {
-          ...prev[pessoa],
-          responsavelLegal: checked
-        }
-      }));
-      return;
-    }
-    
-    // Tratamento para mudança de turma
-    if (name === 'turmaId') {
-      setEditForm(prev => ({ ...prev, turmaId: value }));
-      if (value) {
-        await buscarDadosTurma(value);
-      }
-      return;
-    }
-    
-    // Tratamento para CEP com busca automática
-    if (name.endsWith('.endereco.cep') || name === 'endereco.cep') {
-      const cepLimpo = value.replace(/\D/g, '');
-      if (name.includes('.')) {
-        const [pessoa, , campo] = name.split('.');
-        setEditForm(prev => ({
-          ...prev,
-          [pessoa]: {
-            ...prev[pessoa],
-            endereco: {
-              ...prev[pessoa].endereco,
-              [campo]: cepLimpo
-            }
-          }
-        }));
-        
-        if (cepLimpo.length === 8) {
-          await buscarEnderecoPorCep(cepLimpo, pessoa);
-        }
-      } else {
-        setEditForm(prev => ({
-          ...prev,
-          endereco: {
-            ...prev.endereco,
-            cep: cepLimpo
-          }
-        }));
-        
-        if (cepLimpo.length === 8) {
-          await buscarEnderecoPorCep(cepLimpo, 'endereco');
-        }
-      }
-      return;
-    }
-    
-    // Tratamento para validação de CPF
-    if (name === 'cpf' || name.endsWith('.cpf')) {
-      const cpfLimpo = value.replace(/\D/g, '');
-      const isValido = validarCPF(cpfLimpo);
-      
-      if (name.includes('.')) {
-        const [pessoa] = name.split('.');
-        setEditForm(prev => ({
-          ...prev,
-          [pessoa]: {
-            ...prev[pessoa],
-            cpf: cpfLimpo
-          }
-        }));
-        setValidacaoCpf(prev => ({
-          ...prev,
-          [pessoa]: isValido
-        }));
-      } else {
-        setEditForm(prev => ({ ...prev, cpf: cpfLimpo }));
-        setValidacaoCpf(prev => ({
-          ...prev,
-          aluno: isValido
-        }));
-      }
-      return;
-    }
-    
-    // Tratamento para campos aninhados (pessoa.campo ou pessoa.endereco.campo)
-    if (name.includes('.')) {
-      const partes = name.split('.');
-      
-      if (partes.length === 2) {
-        // pessoa.campo
-        const [pessoa, campo] = partes;
-        setEditForm(prev => ({
-          ...prev,
-          [pessoa]: {
-            ...prev[pessoa],
-            [campo]: value
-          }
-        }));
-      } else if (partes.length === 3) {
-        // pessoa.endereco.campo ou saude.item.campo
-        const [pessoa, subObj, campo] = partes;
-        setEditForm(prev => ({
-          ...prev,
-          [pessoa]: {
-            ...prev[pessoa],
-            [subObj]: {
-              ...prev[pessoa][subObj],
-              [campo]: value
-            }
-          }
-        }));
-      }
-      return;
-    }
-    
-    // Tratamento para contato de emergência
+  const handleFormChange = e => {
+    const { name, value } = e.target;
     if (name === 'contatoEmergenciaNome') {
       setEditForm(prev => ({
         ...prev,
         contatoEmergencia: { ...prev.contatoEmergencia, nome: value }
-      }));
-    } else if (name === 'contatoEmergenciaParentesco') {
-      setEditForm(prev => ({
-        ...prev,
-        contatoEmergencia: { ...prev.contatoEmergencia, parentesco: value }
       }));
     } else if (name === 'contatoEmergenciaTelefone') {
       setEditForm(prev => ({
@@ -1420,10 +684,10 @@ const Alunos = () => {
         contatoEmergencia: { ...prev.contatoEmergencia, telefone: value }
       }));
     } else if (name.startsWith('financeiro.')) {
-      // Campos financeiros (mantém lógica existente)
       const key = name.split('.')[1];
       let val = value;
       if (key === 'diaVencimento') {
+        // Mantém apenas dígitos
         val = val.replace(/\D/g, '');
         if (val) {
           let num = parseInt(val, 10);
@@ -1446,7 +710,6 @@ const Alunos = () => {
         }
       }
     } else {
-      // Campos simples do nível raiz
       setEditForm(prev => ({ ...prev, [name]: value }));
     }
   };
@@ -1458,53 +721,9 @@ const Alunos = () => {
     editForm.matricula?.trim() &&
     editForm.turmaId?.trim() &&
     editForm.dataNascimento?.trim() &&
-    editForm.cpf?.trim() &&
-    validacaoCpf.aluno &&
-    editForm.endereco?.rua?.trim() &&
-    editForm.endereco?.bairro?.trim() &&
-    editForm.endereco?.cep?.trim() &&
-    editForm.endereco?.cidade?.trim()
-  );
-
-  const isMaeValid = () => (
-    !editForm.mae?.responsavelFinanceiro || (
-      editForm.mae?.nome?.trim() &&
-      editForm.mae?.rg?.trim() &&
-      editForm.mae?.cpf?.trim() &&
-      validacaoCpf.mae &&
-      editForm.mae?.nacionalidade?.trim() &&
-      editForm.mae?.escolaridade?.trim() &&
-      editForm.mae?.profissao?.trim() &&
-      editForm.mae?.celular?.trim() &&
-      editForm.mae?.email?.trim() &&
-      editForm.mae?.endereco?.rua?.trim() &&
-      editForm.mae?.endereco?.bairro?.trim() &&
-      editForm.mae?.endereco?.cep?.trim() &&
-      editForm.mae?.endereco?.cidade?.trim()
-    )
-  );
-
-  const isPaiValid = () => (
-    !editForm.pai?.responsavelFinanceiro || (
-      editForm.pai?.nome?.trim() &&
-      editForm.pai?.rg?.trim() &&
-      editForm.pai?.cpf?.trim() &&
-      validacaoCpf.pai &&
-      editForm.pai?.nacionalidade?.trim() &&
-      editForm.pai?.escolaridade?.trim() &&
-      editForm.pai?.profissao?.trim() &&
-      editForm.pai?.celular?.trim() &&
-      editForm.pai?.email?.trim() &&
-      editForm.pai?.endereco?.rua?.trim() &&
-      editForm.pai?.endereco?.bairro?.trim() &&
-      editForm.pai?.endereco?.cep?.trim() &&
-      editForm.pai?.endereco?.cidade?.trim()
-    )
-  );
-
-  const isEmergenciaValid = () => (
+    editForm.nomePai?.trim() &&
+    editForm.nomeMae?.trim() &&
     editForm.contatoEmergencia?.nome?.trim() &&
-    editForm.contatoEmergencia?.parentesco?.trim() &&
     editForm.contatoEmergencia?.telefone?.trim()
   );
 
@@ -1516,14 +735,7 @@ const Alunos = () => {
     !financeiroError
   );
 
-  const isFinalFormValid = () => (
-    isStep1Valid() && 
-    isMaeValid() && 
-    isPaiValid() && 
-    isEmergenciaValid() && 
-    isStep2Valid() &&
-    (editForm.mae?.responsavelFinanceiro || editForm.pai?.responsavelFinanceiro)
-  );
+  const isFinalFormValid = () => isStep1Valid() && isStep2Valid();
 
   const valorMensalidadeNumber = parseFloat(editForm.financeiro?.mensalidadeValor || '0') || 0;
   const descontoPercent = parseFloat(editForm.financeiro?.descontoPercentual || '0') || 0;
@@ -1756,60 +968,25 @@ const Alunos = () => {
         <Box sx={{ maxWidth: 700, mx: 'auto', mt: 4 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, p: 3, borderRadius: 3, background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)', color: 'white', boxShadow: '0 8px 32px rgba(99, 102, 241, 0.2)' }}>
             <Typography variant="h4" fontWeight="bold" gutterBottom={false}>👥 Gestão de Alunos</Typography>
-            <Box sx={{ display: 'flex', gap: 1 }}>
-              <Button 
-                variant="outlined" 
-                size="small"
-                onClick={async () => {
-                  setVerificandoPagamentos(true);
-                  const alunosPreMatricula = alunos.filter(a => a.status === 'pre_matricula');
-                  let ativados = 0;
-                  for (const aluno of alunosPreMatricula) {
-                    const ativado = await ativarAutomaticamenteSeAprovado(aluno);
-                    if (ativado) ativados++;
-                  }
-                  if (ativados > 0) {
-                    await fetchData();
-                  }
-                  setVerificandoPagamentos(false);
-                }}
-                disabled={verificandoPagamentos}
-                sx={{ 
-                  bgcolor: 'rgba(255,255,255,0.1)', 
-                  color: 'white',
-                  borderColor: 'rgba(255,255,255,0.3)',
-                  backdropFilter: 'blur(10px)',
-                  border: '1px solid rgba(255,255,255,0.2)',
-                  borderRadius: 2,
-                  fontSize: '0.75rem',
-                  '&:hover': { 
-                    bgcolor: 'rgba(255,255,255,0.2)',
-                    borderColor: 'rgba(255,255,255,0.4)'
-                  }
-                }} 
-              >
-                {verificandoPagamentos ? '🔄 Verificando...' : '🔍 Verificar Pagamentos'}
-              </Button>
-              <Button 
-                variant="contained" 
-                sx={{ 
-                  bgcolor: 'rgba(255,255,255,0.15)', 
-                  color: 'white',
-                  backdropFilter: 'blur(10px)',
-                  border: '1px solid rgba(255,255,255,0.2)',
-                  borderRadius: 2,
-                  '&:hover': { 
-                    bgcolor: 'rgba(255,255,255,0.25)',
-                    transform: 'translateY(-2px)',
-                    boxShadow: '0 8px 25px rgba(0,0,0,0.15)'
-                  },
-                  transition: 'all 0.3s ease'
-                }} 
-                onClick={handleAddAluno}
-              >
-                + Nova Matrícula
-              </Button>
-            </Box>
+            <Button 
+              variant="contained" 
+              sx={{ 
+                bgcolor: 'rgba(255,255,255,0.15)', 
+                color: 'white',
+                backdropFilter: 'blur(10px)',
+                border: '1px solid rgba(255,255,255,0.2)',
+                borderRadius: 2,
+                '&:hover': { 
+                  bgcolor: 'rgba(255,255,255,0.25)',
+                  transform: 'translateY(-2px)',
+                  boxShadow: '0 8px 25px rgba(0,0,0,0.15)'
+                },
+                transition: 'all 0.3s ease'
+              }} 
+              onClick={handleAddAluno}
+            >
+              + Nova Matrícula
+            </Button>
           </Box>
           
           <Card sx={{ borderRadius: 4, boxShadow: '0 4px 20px rgba(0,0,0,0.08)', border: '1px solid #f1f5f9' }}>
@@ -1955,61 +1132,52 @@ const Alunos = () => {
                                     </Typography>
                                     {isInativoInadimplente && (
                                       <Chip 
-                                        label="⚠️" 
+                                        label="⚠️ INATIVO (INADIMPLENTE)" 
                                         size="small"
                                         sx={{ 
                                           bgcolor: '#dc2626', 
                                           color: 'white', 
                                           fontSize: '0.75rem',
-                                          fontWeight: 'bold',
-                                          minWidth: '32px'
+                                          fontWeight: 'bold'
                                         }}
                                       />
                                     )}
                                     {isInadimplente && !isInativo && (
                                       <Chip 
-                                        label="⚠️" 
+                                        label="⚠️ INADIMPLENTE" 
                                         size="small"
                                         sx={{ 
                                           bgcolor: '#d97706', 
                                           color: 'white', 
                                           fontSize: '0.75rem',
-                                          fontWeight: 'bold',
-                                          minWidth: '32px'
+                                          fontWeight: 'bold'
                                         }}
                                       />
                                     )}
                                     {isInativo && !isInativoInadimplente && (
                                       <Chip 
-                                        label="❌" 
+                                        label="INATIVO" 
                                         size="small"
                                         sx={{ 
                                           bgcolor: '#6b7280', 
                                           color: 'white', 
                                           fontSize: '0.75rem',
-                                          fontWeight: 'bold',
-                                          minWidth: '32px'
+                                          fontWeight: 'bold'
                                         }}
                                       />
                                     )}
                                     {/* Status da Matrícula */}
                                     <Chip 
-                                      label={aluno.status === 'ativo' ? "✅" : aluno.status === 'inativo' ? "❌" : aluno.status === 'pre_matricula' ? "⏳" : "❓"} 
+                                      label={aluno.status === 'ativo' ? "✅ ATIVO" : aluno.status === 'inativo' ? "❌ INATIVO" : aluno.status === 'pre_matricula' ? "⏳ PRÉ-MATRÍCULA" : "❓ INDEFINIDO"} 
                                       size="small"
                                       variant="outlined"
                                       sx={{ 
                                         borderColor: aluno.status === 'ativo' ? '#059669' : aluno.status === 'inativo' ? '#dc2626' : '#d97706',
                                         color: aluno.status === 'ativo' ? '#059669' : aluno.status === 'inativo' ? '#dc2626' : '#d97706',
                                         fontSize: '0.7rem',
-                                        fontWeight: 'bold',
-                                        minWidth: '32px'
+                                        fontWeight: 'bold'
                                       }}
                                     />
-                                    
-                                    {/* Indicador de pendências para pré-matrícula */}
-                                    {aluno.status === 'pre_matricula' && (
-                                      <PreMatriculaIndicator aluno={aluno} />
-                                    )}
                                   </Box>
                                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                                     <Button
@@ -2018,7 +1186,7 @@ const Alunos = () => {
                                       onClick={() => handleEditAluno(aluno)}
                                       sx={{
                                         minWidth: 'auto',
-                                        px: 1.5,
+                                        px: 2,
                                         borderColor: '#6366f1',
                                         color: '#6366f1',
                                         '&:hover': {
@@ -2027,7 +1195,7 @@ const Alunos = () => {
                                         }
                                       }}
                                     >
-                                      ✏️
+                                      ✏️ Editar
                                     </Button>
                                     <IconButton
                                       onClick={(e) => toggleCardExpansao(aluno.id || `${aluno.matricula}_${idx}`, e)}
@@ -2069,22 +1237,6 @@ const Alunos = () => {
                               <Typography variant="subtitle2" sx={{ color: '#4f46e5', fontWeight: 'bold', mb: 2 }}>
                                 📊 Informações Detalhadas
                               </Typography>
-                              
-                              {/* Seção especial para pré-matrícula */}
-                              {aluno.status === 'pre_matricula' && (
-                                <Box sx={{ 
-                                  mb: 2, 
-                                  p: 2, 
-                                  bgcolor: '#fef7f0', 
-                                  borderRadius: 2, 
-                                  border: '1px solid #fed7aa' 
-                                }}>
-                                  <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#d97706', mb: 1 }}>
-                                    ⏳ Status de Pré-Matrícula
-                                  </Typography>
-                                  <PreMatriculaDetalhes aluno={aluno} />
-                                </Box>
-                              )}
                               
                               <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
                                 {/* Dados Pessoais */}
@@ -2179,7 +1331,7 @@ const Alunos = () => {
                       })}
                     </List>
                   )}
-                  <Dialog open={editOpen} onClose={() => setEditOpen(false)} maxWidth="md" fullWidth>
+                  <Dialog open={editOpen} onClose={() => setEditOpen(false)} maxWidth="sm" fullWidth>
                     <DialogTitle sx={{ 
                       display: 'flex', 
                       alignItems: 'center', 
@@ -2189,84 +1341,38 @@ const Alunos = () => {
                       color: 'white',
                       borderRadius: '4px 4px 0 0'
                     }}>
-                      <span>
-                        {isNew ? "Nova Matrícula" : "Editar Aluno"} 
-                        {formStep === 1 && ' - Dados Pessoais'}
-                        {formStep === 2 && ' - Dados da Mãe'}
-                        {formStep === 3 && ' - Dados do Pai'}
-                        {formStep === 4 && ' - Contato de Emergência'}
-                        {formStep === 5 && ' - Informações de Saúde'}
-                        {formStep === 6 && ' - Dados Financeiros'}
-                      </span>
+                      <span>{isNew ? "Nova Matrícula" : "Editar Aluno"} {formStep === 2 && ' - Dados Financeiros'}</span>
                       <IconButton aria-label="fechar" onClick={() => setEditOpen(false)} size="small" sx={{ ml: 2 }}>
                         <span style={{ fontSize: 22, fontWeight: 'bold' }}>&times;</span>
                       </IconButton>
                     </DialogTitle>
                     <DialogContent>
                       {formError && <Box sx={{ mb: 2 }}><Alert severity="error">{formError}</Alert></Box>}
-                      
-                      {/* Aba 1: Dados Pessoais */}
                       {formStep === 1 && (
                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                          <Typography variant="h6" sx={{ color: '#6366f1', mb: 1 }}>
-                            👤 Informações Pessoais do Aluno
-                          </Typography>
-                          
-                          {/* Foto do aluno */}
-                          <Box sx={{ textAlign: 'center', mb: 2 }}>
-                            <input
-                              type="file"
-                              accept="image/*"
-                              style={{ display: 'none' }}
-                              ref={inputFotoRef}
-                              onChange={(e) => {
-                                const file = e.target.files[0];
-                                if (file) {
-                                  setFotoAluno(file);
-                                  const reader = new FileReader();
-                                  reader.onload = (e) => {
-                                    setEditForm(prev => ({ ...prev, foto: e.target.result }));
-                                  };
-                                  reader.readAsDataURL(file);
-                                }
-                              }}
-                            />
-                            <Box 
-                              sx={{ 
-                                width: 120, 
-                                height: 120, 
-                                border: '2px dashed #d1d5db', 
-                                borderRadius: '50%',
-                                mx: 'auto',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                cursor: 'pointer',
-                                backgroundImage: editForm.foto ? `url(${editForm.foto})` : 'none',
-                                backgroundSize: 'cover',
-                                backgroundPosition: 'center',
-                                '&:hover': { borderColor: '#6366f1' }
-                              }}
-                              onClick={() => inputFotoRef.current?.click()}
-                            >
-                              {!editForm.foto && (
-                                <Box sx={{ textAlign: 'center', color: '#9ca3af' }}>
-                                  <Typography variant="body2">📷</Typography>
-                                  <Typography variant="caption">Foto</Typography>
-                                </Box>
-                              )}
-                            </Box>
-                          </Box>
-
                           <TextField
-                            label="Nome Completo"
+                            label="Nome"
                             name="nome"
                             value={editForm.nome || ''}
                             onChange={handleFormChange}
                             fullWidth
                             required
+                            sx={{
+                              '& .MuiOutlinedInput-root': {
+                                borderRadius: 2,
+                                '&:hover': {
+                                  '& > fieldset': {
+                                    borderColor: '#6366f1'
+                                  }
+                                },
+                                '&.Mui-focused': {
+                                  '& > fieldset': {
+                                    borderColor: '#6366f1'
+                                  }
+                                }
+                              }
+                            }}
                           />
-                          
                           <TextField
                             label="Matrícula"
                             name="matricula"
@@ -2274,81 +1380,72 @@ const Alunos = () => {
                             fullWidth
                             InputProps={{ readOnly: true }}
                             required
+                            sx={{
+                              '& .MuiOutlinedInput-root': {
+                                borderRadius: 2,
+                                bgcolor: '#f8fafc'
+                              }
+                            }}
                           />
-                          
-                          <Box sx={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 2 }}>
-                            <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="pt-br">
-                              <DatePicker
-                                label="Data de Nascimento"
-                                format="DD/MM/YYYY"
-                                value={editForm.dataNascimento ? dayjs(editForm.dataNascimento, 'DD/MM/YYYY') : null}
-                                onChange={newValue => setEditForm(prev => ({ ...prev, dataNascimento: newValue ? newValue.format('DD/MM/YYYY') : '' }))}
-                                slotProps={{ textField: { fullWidth: true, required: true } }}
-                              />
-                            </LocalizationProvider>
-                            
-                            <TextField
-                              label="CPF"
-                              name="cpf"
-                              value={editForm.cpf || ''}
-                              onChange={handleFormChange}
-                              fullWidth
-                              required
-                              error={editForm.cpf && !validacaoCpf.aluno}
-                              helperText={editForm.cpf && !validacaoCpf.aluno ? 'CPF inválido' : ''}
+                          <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="pt-br">
+                            <DatePicker
+                              label="Data de Nascimento"
+                              format="DD/MM/YYYY"
+                              value={editForm.dataNascimento ? dayjs(editForm.dataNascimento, 'DD/MM/YYYY') : null}
+                              onChange={newValue => setEditForm(prev => ({ ...prev, dataNascimento: newValue ? newValue.format('DD/MM/YYYY') : '' }))}
+                              slotProps={{ textField: { fullWidth: true, required: true } }}
                             />
-                          </Box>
-                          
-                          <Typography variant="subtitle2" sx={{ color: '#374151', mt: 2 }}>
-                            🏠 Endereço Residencial
-                          </Typography>
-                          
-                          <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 120px', gap: 2 }}>
-                            <TextField
-                              label="CEP"
-                              name="endereco.cep"
-                              value={editForm.endereco?.cep || ''}
-                              onChange={handleFormChange}
-                              required
-                              disabled={buscandoCep}
-                              helperText={buscandoCep ? 'Buscando endereço...' : ''}
-                            />
-                            {buscandoCep && <CircularProgress size={20} />}
-                          </Box>
-                          
+                          </LocalizationProvider>
                           <TextField
-                            label="Rua/Logradouro"
-                            name="endereco.rua"
-                            value={editForm.endereco?.rua || ''}
+                            label="Nome do Pai"
+                            name="nomePai"
+                            value={editForm.nomePai || ''}
                             onChange={handleFormChange}
                             fullWidth
                             required
+                            sx={{
+                              '& .MuiOutlinedInput-root': {
+                                borderRadius: 2,
+                                '&:hover': {
+                                  '& > fieldset': {
+                                    borderColor: '#6366f1'
+                                  }
+                                },
+                                '&.Mui-focused': {
+                                  '& > fieldset': {
+                                    borderColor: '#6366f1'
+                                  }
+                                }
+                              }
+                            }}
                           />
-                          
-                          <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
-                            <TextField
-                              label="Bairro"
-                              name="endereco.bairro"
-                              value={editForm.endereco?.bairro || ''}
-                              onChange={handleFormChange}
-                              required
-                            />
-                            <TextField
-                              label="Cidade"
-                              name="endereco.cidade"
-                              value={editForm.endereco?.cidade || ''}
-                              onChange={handleFormChange}
-                              required
-                            />
-                          </Box>
-                          
-                          <Typography variant="subtitle2" sx={{ color: '#374151', mt: 2 }}>
-                            🏫 Informações Escolares
-                          </Typography>
-                          
+                          <TextField
+                            label="Nome da Mãe"
+                            name="nomeMae"
+                            value={editForm.nomeMae || ''}
+                            onChange={handleFormChange}
+                            fullWidth
+                            required
+                            sx={{
+                              '& .MuiOutlinedInput-root': {
+                                borderRadius: 2,
+                                '&:hover': {
+                                  '& > fieldset': {
+                                    borderColor: '#6366f1'
+                                  }
+                                },
+                                '&.Mui-focused': {
+                                  '& > fieldset': {
+                                    borderColor: '#6366f1'
+                                  }
+                                }
+                              }
+                            }}
+                          />
                           <FormControl fullWidth required>
-                            <InputLabel>Turma</InputLabel>
+                            <InputLabel id="turma-modal-select-label">Turma</InputLabel>
                             <Select
+                              labelId="turma-modal-select-label"
                               name="turmaId"
                               value={editForm.turmaId || ''}
                               label="Turma"
@@ -2360,450 +1457,62 @@ const Alunos = () => {
                               ))}
                             </Select>
                           </FormControl>
-                          
-                          {dadosTurma && (
-                            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
-                              <TextField
-                                label="Série"
-                                value={dadosTurma.serie || ''}
-                                InputProps={{ readOnly: true }}
-                                sx={{ bgcolor: '#f8fafc' }}
-                              />
-                              <TextField
-                                label="Turno"
-                                value={dadosTurma.turno || ''}
-                                InputProps={{ readOnly: true }}
-                                sx={{ bgcolor: '#f8fafc' }}
-                              />
-                            </Box>
-                          )}
-                        </Box>
-                      )}
-                      
-                      {/* Aba 2: Dados da Mãe */}
-                      {formStep === 2 && (
-                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-                            <Typography variant="h6" sx={{ color: '#6366f1' }}>
-                              👩 Informações da Mãe
-                            </Typography>
-                            <Box sx={{ display: 'flex', gap: 2 }}>
-                              <FormControlLabel
-                                control={
-                                  <Checkbox
-                                    name="mae.responsavelFinanceiro"
-                                    checked={editForm.mae?.responsavelFinanceiro || false}
-                                    onChange={handleFormChange}
-                                  />
-                                }
-                                label="Responsável Financeiro"
-                              />
-                              <FormControlLabel
-                                control={
-                                  <Checkbox
-                                    name="mae.responsavelLegal"
-                                    checked={editForm.mae?.responsavelLegal || false}
-                                    onChange={handleFormChange}
-                                  />
-                                }
-                                label="Responsável Legal"
-                              />
-                            </Box>
-                          </Box>
-                          
                           <TextField
-                            label="Nome Completo"
-                            name="mae.nome"
-                            value={editForm.mae?.nome || ''}
-                            onChange={handleFormChange}
-                            fullWidth
-                            required={editForm.mae?.responsavelFinanceiro}
-                          />
-                          
-                          <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 2 }}>
-                            <TextField
-                              label="RG"
-                              name="mae.rg"
-                              value={editForm.mae?.rg || ''}
-                              onChange={handleFormChange}
-                              required={editForm.mae?.responsavelFinanceiro}
-                            />
-                            <TextField
-                              label="CPF"
-                              name="mae.cpf"
-                              value={editForm.mae?.cpf || ''}
-                              onChange={handleFormChange}
-                              required={editForm.mae?.responsavelFinanceiro}
-                              error={editForm.mae?.cpf && !validacaoCpf.mae}
-                              helperText={editForm.mae?.cpf && !validacaoCpf.mae ? 'CPF inválido' : ''}
-                            />
-                            <TextField
-                              label="Nacionalidade"
-                              name="mae.nacionalidade"
-                              value={editForm.mae?.nacionalidade || ''}
-                              onChange={handleFormChange}
-                              required={editForm.mae?.responsavelFinanceiro}
-                            />
-                          </Box>
-                          
-                          <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
-                            <TextField
-                              label="Escolaridade"
-                              name="mae.escolaridade"
-                              value={editForm.mae?.escolaridade || ''}
-                              onChange={handleFormChange}
-                              required={editForm.mae?.responsavelFinanceiro}
-                            />
-                            <TextField
-                              label="Profissão"
-                              name="mae.profissao"
-                              value={editForm.mae?.profissao || ''}
-                              onChange={handleFormChange}
-                              required={editForm.mae?.responsavelFinanceiro}
-                            />
-                          </Box>
-                          
-                          <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
-                            <TextField
-                              label="Celular"
-                              name="mae.celular"
-                              value={editForm.mae?.celular || ''}
-                              onChange={handleFormChange}
-                              required={editForm.mae?.responsavelFinanceiro}
-                            />
-                            <TextField
-                              label="Email"
-                              name="mae.email"
-                              type="email"
-                              value={editForm.mae?.email || ''}
-                              onChange={handleFormChange}
-                              required={editForm.mae?.responsavelFinanceiro}
-                            />
-                          </Box>
-                          
-                          <Typography variant="subtitle2" sx={{ color: '#374151', mt: 2 }}>
-                            🏠 Endereço da Mãe
-                          </Typography>
-                          
-                          <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 120px', gap: 2 }}>
-                            <TextField
-                              label="CEP"
-                              name="mae.endereco.cep"
-                              value={editForm.mae?.endereco?.cep || ''}
-                              onChange={handleFormChange}
-                              required={editForm.mae?.responsavelFinanceiro}
-                              disabled={buscandoCep}
-                            />
-                            {buscandoCep && <CircularProgress size={20} />}
-                          </Box>
-                          
-                          <TextField
-                            label="Rua/Logradouro"
-                            name="mae.endereco.rua"
-                            value={editForm.mae?.endereco?.rua || ''}
-                            onChange={handleFormChange}
-                            fullWidth
-                            required={editForm.mae?.responsavelFinanceiro}
-                          />
-                          
-                          <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
-                            <TextField
-                              label="Bairro"
-                              name="mae.endereco.bairro"
-                              value={editForm.mae?.endereco?.bairro || ''}
-                              onChange={handleFormChange}
-                              required={editForm.mae?.responsavelFinanceiro}
-                            />
-                            <TextField
-                              label="Cidade"
-                              name="mae.endereco.cidade"
-                              value={editForm.mae?.endereco?.cidade || ''}
-                              onChange={handleFormChange}
-                              required={editForm.mae?.responsavelFinanceiro}
-                            />
-                          </Box>
-                        </Box>
-                      )}
-                      
-                      {/* Aba 3: Dados do Pai */}
-                      {formStep === 3 && (
-                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-                            <Typography variant="h6" sx={{ color: '#6366f1' }}>
-                              👨 Informações do Pai
-                            </Typography>
-                            <Box sx={{ display: 'flex', gap: 2 }}>
-                              <FormControlLabel
-                                control={
-                                  <Checkbox
-                                    name="pai.responsavelFinanceiro"
-                                    checked={editForm.pai?.responsavelFinanceiro || false}
-                                    onChange={handleFormChange}
-                                  />
-                                }
-                                label="Responsável Financeiro"
-                              />
-                              <FormControlLabel
-                                control={
-                                  <Checkbox
-                                    name="pai.responsavelLegal"
-                                    checked={editForm.pai?.responsavelLegal || false}
-                                    onChange={handleFormChange}
-                                  />
-                                }
-                                label="Responsável Legal"
-                              />
-                            </Box>
-                          </Box>
-                          
-                          <TextField
-                            label="Nome Completo"
-                            name="pai.nome"
-                            value={editForm.pai?.nome || ''}
-                            onChange={handleFormChange}
-                            fullWidth
-                            required={editForm.pai?.responsavelFinanceiro}
-                          />
-                          
-                          <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 2 }}>
-                            <TextField
-                              label="RG"
-                              name="pai.rg"
-                              value={editForm.pai?.rg || ''}
-                              onChange={handleFormChange}
-                              required={editForm.pai?.responsavelFinanceiro}
-                            />
-                            <TextField
-                              label="CPF"
-                              name="pai.cpf"
-                              value={editForm.pai?.cpf || ''}
-                              onChange={handleFormChange}
-                              required={editForm.pai?.responsavelFinanceiro}
-                              error={editForm.pai?.cpf && !validacaoCpf.pai}
-                              helperText={editForm.pai?.cpf && !validacaoCpf.pai ? 'CPF inválido' : ''}
-                            />
-                            <TextField
-                              label="Nacionalidade"
-                              name="pai.nacionalidade"
-                              value={editForm.pai?.nacionalidade || ''}
-                              onChange={handleFormChange}
-                              required={editForm.pai?.responsavelFinanceiro}
-                            />
-                          </Box>
-                          
-                          <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
-                            <TextField
-                              label="Escolaridade"
-                              name="pai.escolaridade"
-                              value={editForm.pai?.escolaridade || ''}
-                              onChange={handleFormChange}
-                              required={editForm.pai?.responsavelFinanceiro}
-                            />
-                            <TextField
-                              label="Profissão"
-                              name="pai.profissao"
-                              value={editForm.pai?.profissao || ''}
-                              onChange={handleFormChange}
-                              required={editForm.pai?.responsavelFinanceiro}
-                            />
-                          </Box>
-                          
-                          <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
-                            <TextField
-                              label="Celular"
-                              name="pai.celular"
-                              value={editForm.pai?.celular || ''}
-                              onChange={handleFormChange}
-                              required={editForm.pai?.responsavelFinanceiro}
-                            />
-                            <TextField
-                              label="Email"
-                              name="pai.email"
-                              type="email"
-                              value={editForm.pai?.email || ''}
-                              onChange={handleFormChange}
-                              required={editForm.pai?.responsavelFinanceiro}
-                            />
-                          </Box>
-                          
-                          <Typography variant="subtitle2" sx={{ color: '#374151', mt: 2 }}>
-                            🏠 Endereço do Pai
-                          </Typography>
-                          
-                          <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 120px', gap: 2 }}>
-                            <TextField
-                              label="CEP"
-                              name="pai.endereco.cep"
-                              value={editForm.pai?.endereco?.cep || ''}
-                              onChange={handleFormChange}
-                              required={editForm.pai?.responsavelFinanceiro}
-                              disabled={buscandoCep}
-                            />
-                            {buscandoCep && <CircularProgress size={20} />}
-                          </Box>
-                          
-                          <TextField
-                            label="Rua/Logradouro"
-                            name="pai.endereco.rua"
-                            value={editForm.pai?.endereco?.rua || ''}
-                            onChange={handleFormChange}
-                            fullWidth
-                            required={editForm.pai?.responsavelFinanceiro}
-                          />
-                          
-                          <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
-                            <TextField
-                              label="Bairro"
-                              name="pai.endereco.bairro"
-                              value={editForm.pai?.endereco?.bairro || ''}
-                              onChange={handleFormChange}
-                              required={editForm.pai?.responsavelFinanceiro}
-                            />
-                            <TextField
-                              label="Cidade"
-                              name="pai.endereco.cidade"
-                              value={editForm.pai?.endereco?.cidade || ''}
-                              onChange={handleFormChange}
-                              required={editForm.pai?.responsavelFinanceiro}
-                            />
-                          </Box>
-                        </Box>
-                      )}
-                      
-                      {/* Aba 4: Contato de Emergência */}
-                      {formStep === 4 && (
-                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                          <Typography variant="h6" sx={{ color: '#6366f1', mb: 2 }}>
-                            🚨 Contato de Emergência
-                          </Typography>
-                          
-                          <TextField
-                            label="Nome Completo"
+                            label="Contato Emergência (Nome)"
                             name="contatoEmergenciaNome"
                             value={editForm.contatoEmergencia?.nome || ''}
                             onChange={handleFormChange}
                             fullWidth
                             required
+                            sx={{
+                              '& .MuiOutlinedInput-root': {
+                                borderRadius: 2,
+                                '&:hover': {
+                                  '& > fieldset': {
+                                    borderColor: '#6366f1'
+                                  }
+                                },
+                                '&.Mui-focused': {
+                                  '& > fieldset': {
+                                    borderColor: '#6366f1'
+                                  }
+                                }
+                              }
+                            }}
                           />
-                          
                           <TextField
-                            label="Parentesco"
-                            name="contatoEmergenciaParentesco"
-                            value={editForm.contatoEmergencia?.parentesco || ''}
-                            onChange={handleFormChange}
-                            fullWidth
-                            required
-                            placeholder="Ex: Tio(a), Avô(ó), Irmão(ã)"
-                          />
-                          
-                          <TextField
-                            label="Telefone/Celular"
+                            label="Contato Emergência (Telefone)"
                             name="contatoEmergenciaTelefone"
                             value={editForm.contatoEmergencia?.telefone || ''}
                             onChange={handleFormChange}
                             fullWidth
                             required
+                            sx={{
+                              '& .MuiOutlinedInput-root': {
+                                borderRadius: 2,
+                                '&:hover': {
+                                  '& > fieldset': {
+                                    borderColor: '#6366f1'
+                                  }
+                                },
+                                '&.Mui-focused': {
+                                  '& > fieldset': {
+                                    borderColor: '#6366f1'
+                                  }
+                                }
+                              }
+                            }}
                           />
-                          
-                          <Alert severity="info">
-                            📞 Este contato será acionado em casos de emergência quando não for possível localizar os responsáveis diretos.
-                          </Alert>
                         </Box>
                       )}
-                      
-                      {/* Aba 5: Informações de Saúde */}
-                      {formStep === 5 && (
-                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                          <Typography variant="h6" sx={{ color: '#6366f1', mb: 2 }}>
-                            🏥 Informações de Saúde
-                          </Typography>
-                          
-                          {/* Componente para questões de saúde */}
-                          {[
-                            { key: 'doencasJaTeve', label: 'Doenças que a criança já teve' },
-                            { key: 'alergias', label: 'Alergias alimentares ou outras' },
-                            { key: 'alergiaRemedio', label: 'Alergia a medicamentos' },
-                            { key: 'problemaSaude', label: 'Problema de saúde atual' },
-                            { key: 'acompanhamentoTerapeutico', label: 'Acompanhamento terapêutico' },
-                            { key: 'medicacaoContinua', label: 'Medicação contínua' },
-                            { key: 'acompanhamentoMedico', label: 'Acompanhamento médico regular' }
-                          ].map((item) => (
-                            <Box key={item.key} sx={{ 
-                              p: 2, 
-                              border: '1px solid #e5e7eb', 
-                              borderRadius: 2,
-                              '&:hover': { borderColor: '#6366f1' }
-                            }}>
-                              <Typography variant="body2" sx={{ fontWeight: 500, mb: 1 }}>
-                                {item.label}
-                              </Typography>
-                              
-                              <RadioGroup
-                                row
-                                value={editForm.saude?.[item.key]?.tem ? 'sim' : 'nao'}
-                                onChange={(e) => {
-                                  const tem = e.target.value === 'sim';
-                                  setEditForm(prev => ({
-                                    ...prev,
-                                    saude: {
-                                      ...prev.saude,
-                                      [item.key]: {
-                                        tem,
-                                        quais: tem ? prev.saude?.[item.key]?.quais || '' : ''
-                                      }
-                                    }
-                                  }));
-                                }}
-                              >
-                                <FormControlLabel value="nao" control={<Radio />} label="Não" />
-                                <FormControlLabel value="sim" control={<Radio />} label="Sim" />
-                              </RadioGroup>
-                              
-                              {editForm.saude?.[item.key]?.tem && (
-                                <TextField
-                                  label="Quais?"
-                                  name={`saude.${item.key}.quais`}
-                                  value={editForm.saude?.[item.key]?.quais || ''}
-                                  onChange={handleFormChange}
-                                  fullWidth
-                                  multiline
-                                  rows={2}
-                                  sx={{ mt: 1 }}
-                                  placeholder="Descreva detalhadamente..."
-                                />
-                              )}
-                            </Box>
-                          ))}
-                          
-                          <Alert severity="warning">
-                            ⚠️ <strong>Importante:</strong> Todas as informações de saúde são confidenciais e serão utilizadas apenas para garantir o bem-estar e segurança do aluno.
-                          </Alert>
-                        </Box>
-                      )}
-                      
-                      {/* Aba 6: Dados Financeiros */}
-                      {formStep === 6 && (
+                      {formStep === 2 && (
                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                           <Alert severity="info" sx={{ mb: 2 }}>
                             💰 <strong>Sistema Financeiro Automático:</strong><br />
-                            • Se informar valor de matrícula ou materiais, o aluno ficará em "pré-matrícula" até o pagamento<br />
-                            • Mensalidades serão geradas automaticamente do mês atual até dezembro<br />
-                            • Status financeiro será atualizado automaticamente conforme pagamentos<br />
-                            <br />
-                            📋 <strong>Sobre Pré-Matrícula:</strong><br />
-                            • Aluno fica com acesso restrito até quitação dos valores obrigatórios<br />
-                            • Ativação automática após pagamento de matrícula/materiais<br />
-                            • Mensalidades continuam sendo geradas normalmente
+                            - Se informar valor de matrícula ou materiais, o aluno ficará em "pré-matrícula" até o pagamento<br />
+                            - Mensalidades serão geradas automaticamente do mês atual até dezembro<br />
+                            - Status financeiro será atualizado automaticamente conforme pagamentos
                           </Alert>
-                          
-                          {/* Alerta especial para alunos em pré-matrícula */}
-                          {!isNew && editForm.status === 'pre_matricula' && (
-                            <Alert severity="warning" sx={{ mb: 2 }}>
-                              ⏳ <strong>Este aluno está em PRÉ-MATRÍCULA</strong><br />
-                              📊 Verificar na seção "Informações Detalhadas" quais pagamentos estão pendentes.<br />
-                              ✅ O aluno será ativado automaticamente após quitação dos valores obrigatórios.
-                            </Alert>
-                          )}
                           
                           <TextField
                             label="Valor da Matrícula (R$)"
@@ -2962,62 +1671,17 @@ const Alunos = () => {
                         </Box>
                       )}
                     </DialogContent>
-                    <DialogActions sx={{ p: 2, gap: 1 }}>
-                      {/* Botão Voltar */}
-                      {formStep > 1 && (
-                        <IconButton 
-                          onClick={() => setFormStep(formStep - 1)} 
-                          color="inherit" 
-                          size="small" 
-                          sx={{ mr: 1 }} 
-                          aria-label="voltar"
-                        >
+                    <DialogActions>
+                      {formStep === 2 && (
+                        <IconButton onClick={() => setFormStep(1)} color="inherit" size="small" sx={{ mr: 1 }} aria-label="voltar">
                           <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
                             <path d="M12 15L7 10L12 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                           </svg>
                         </IconButton>
                       )}
-                      
-                      {/* Indicador de progresso */}
-                      <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
-                        {[1, 2, 3, 4, 5, 6].map((step) => (
-                          <Box
-                            key={step}
-                            sx={{
-                              width: 8,
-                              height: 8,
-                              borderRadius: '50%',
-                              bgcolor: step <= formStep ? '#6366f1' : '#e5e7eb',
-                              transition: 'all 0.3s ease'
-                            }}
-                          />
-                        ))}
-                        <Typography variant="body2" sx={{ ml: 1, color: '#6b7280' }}>
-                          {formStep}/6
-                        </Typography>
-                      </Box>
-
-                      {/* Verificação de responsável financeiro */}
-                      {(formStep === 2 || formStep === 3) && (
-                        <Alert severity="warning" size="small" sx={{ maxWidth: 300 }}>
-                          {!editForm.mae?.responsavelFinanceiro && !editForm.pai?.responsavelFinanceiro ? 
-                            '⚠️ É obrigatório marcar um responsável financeiro!' : 
-                            `✅ ${editForm.mae?.responsavelFinanceiro ? 'Mãe' : 'Pai'} é o responsável financeiro`
-                          }
-                        </Alert>
-                      )}
-                      
-                      {/* Botões de ação */}
-                      {formStep < 6 && (
+                      {formStep === 1 && (
                         <Button 
-                          onClick={() => setFormStep(formStep + 1)}
-                          disabled={
-                            (formStep === 1 && !isStep1Valid()) ||
-                            (formStep === 2 && editForm.mae?.responsavelFinanceiro && !isMaeValid()) ||
-                            (formStep === 3 && editForm.pai?.responsavelFinanceiro && !isPaiValid()) ||
-                            (formStep === 4 && !isEmergenciaValid()) ||
-                            ((formStep === 2 || formStep === 3) && !editForm.mae?.responsavelFinanceiro && !editForm.pai?.responsavelFinanceiro)
-                          }
+                          onClick={() => { if (isStep1Valid()) { setFormError(''); setFormStep(2); } else { setFormError('Preencha os campos obrigatórios do passo 1.'); } }} 
                           sx={{
                             bgcolor: '#6366f1',
                             color: 'white',
@@ -3033,112 +1697,80 @@ const Alunos = () => {
                           Avançar →
                         </Button>
                       )}
-                      
-                      {/* Botões de ação da última aba */}
-                      {formStep === 6 && (
-                        <>
-                          {!isNew && editForm.turmaId && editForm.turmaId !== '' && (
-                            <Button
-                              onClick={async () => {
-                                const turmaAnterior = getTurmaNome(editForm.turmaId);
-                                setEditForm(prev => ({ ...prev, turmaId: '' }));
-                                
-                                // Log da desvinculação de turma
-                                if (editAluno && editAluno.id) {
-                                  await auditService.logAction(
-                                    LOG_ACTIONS.CLASS_REMOVE_STUDENT,
-                                    userId,
-                                    {
-                                      entityId: editAluno.id,
-                                      description: `Aluno ${editForm.nome} desvinculado da turma ${turmaAnterior}`,
-                                      changes: {
-                                        turmaAnterior: turmaAnterior,
-                                        turmaNova: 'Sem turma'
-                                      }
-                                    }
-                                  );
+                      {formStep === 2 && !isNew && editForm.turmaId && editForm.turmaId !== '' && (
+                        <Button
+                          onClick={async () => {
+                            const turmaAnterior = getTurmaNome(editForm.turmaId);
+                            setEditForm(prev => ({ ...prev, turmaId: '' }));
+                            
+                            // Log da desvinculação de turma
+                            if (editAluno && editAluno.id) {
+                              await auditService.logAction(
+                                LOG_ACTIONS.CLASS_REMOVE_STUDENT,
+                                userId,
+                                {
+                                  entityId: editAluno.id,
+                                  description: `Aluno ${editForm.nome} desvinculado da turma ${turmaAnterior}`,
+                                  changes: {
+                                    turmaAnterior: turmaAnterior,
+                                    turmaNova: 'Sem turma'
+                                  }
                                 }
-                              }}
-                              color="info"
-                              variant="outlined"
-                              size="small"
-                              disabled={saving}
-                              sx={{ fontSize: '0.80rem', textTransform: 'none', py: 0.5, px: 1.2 }}
-                            >
-                              Desvincular Turma
-                            </Button>
-                          )}
-                          
-                          {!isNew && editForm.status === 'inativo' && (
-                            <Button 
-                              onClick={handleAtivarAluno}
-                              sx={{
-                                borderColor: '#059669',
-                                color: '#059669',
-                                borderRadius: 2,
-                                '&:hover': {
-                                  bgcolor: '#f0fdf4',
-                                  borderColor: '#047857',
-                                  color: '#047857'
-                                }
-                              }}
-                              variant="outlined" 
-                              disabled={saving}
-                            >
-                              ✓ Ativar
-                            </Button>
-                          )}
-                          
-                          {!isNew && editForm.status !== 'inativo' && (
-                            <Button 
-                              onClick={handleInativarAluno} 
-                              sx={{
-                                borderColor: '#d97706',
-                                color: '#d97706',
-                                borderRadius: 2,
-                                '&:hover': {
-                                  bgcolor: '#fffbeb',
-                                  borderColor: '#b45309',
-                                  color: '#b45309'
-                                }
-                              }}
-                              variant="outlined" 
-                              disabled={saving}
-                            >
-                              ⚠ Inativar
-                            </Button>
-                          )}
-                          
-                          {gerandoTitulos && (
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: 'primary.main' }}>
-                              <CircularProgress size={16} />
-                              <Typography variant="body2">Gerando títulos financeiros...</Typography>
-                            </Box>
-                          )}
-                          
-                          <Button 
-                            onClick={handleSaveEdit} 
-                            sx={{
-                              bgcolor: '#059669',
-                              color: 'white',
-                              borderRadius: 2,
-                              minWidth: 100,
-                              '&:hover': {
-                                bgcolor: '#047857',
-                                transform: 'translateY(-1px)',
-                                boxShadow: '0 4px 12px rgba(5, 150, 105, 0.3)'
-                              },
-                              '&:disabled': {
-                                bgcolor: '#94a3b8',
-                                color: 'white'
-                              },
-                              transition: 'all 0.3s ease'
-                            }}
-                            disabled={saving || !isFinalFormValid() || gerandoTitulos}
-                          >
-                            {saving ? '💾 Salvando...' : gerandoTitulos ? '🔄 Gerando títulos...' : isNew ? '✓ Criar Matrícula' : '✓ Salvar'}
-                          </Button>
-                        </>
+                              );
+                            }
+                          }}
+                          color="info"
+                          variant="outlined"
+                          size="small"
+                          disabled={saving}
+                          sx={{ fontSize: '0.80rem', textTransform: 'none', py: 0.5, px: 1.2 }}
+                        >
+                          Desvincular Turma
+                        </Button>
+                      )}
+                      {formStep === 2 && !isNew && editForm.status === 'inativo' && (
+                        <Button 
+                          onClick={handleAtivarAluno}
+                          sx={{
+                            borderColor: '#059669',
+                            color: '#059669',
+                            borderRadius: 2,
+                            '&:hover': {
+                              bgcolor: '#f0fdf4',
+                              borderColor: '#047857',
+                              color: '#047857'
+                            }
+                          }}
+                          variant="outlined" 
+                          disabled={saving}
+                        >
+                          ✓ Ativar
+                        </Button>
+                      )}
+                      {formStep === 2 && !isNew && editForm.status !== 'inativo' && (
+                        <Button 
+                          onClick={handleInativarAluno} 
+                          sx={{
+                            borderColor: '#d97706',
+                            color: '#d97706',
+                            borderRadius: 2,
+                            '&:hover': {
+                              bgcolor: '#fffbeb',
+                              borderColor: '#b45309',
+                              color: '#b45309'
+                            }
+                          }}
+                          variant="outlined" 
+                          disabled={saving}
+                        >
+                          ⚠ Inativar
+                        </Button>
+                      )}
+                      {gerandoTitulos && (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: 'primary.main' }}>
+                          <CircularProgress size={16} />
+                          <Typography variant="body2">Gerando títulos financeiros...</Typography>
+                        </Box>
                       )}
                       
                       {resultadoTitulos && (
@@ -3151,6 +1783,31 @@ const Alunos = () => {
                             • <strong>Total: R$ {(parseFloat(resultadoTitulos.valorTotal) || 0).toFixed(2)}</strong>
                           </Typography>
                         </Alert>
+                      )}
+                      
+                      {formStep === 2 && (
+                        <Button 
+                          onClick={handleSaveEdit} 
+                          sx={{
+                            bgcolor: '#059669',
+                            color: 'white',
+                            borderRadius: 2,
+                            minWidth: 100,
+                            '&:hover': {
+                              bgcolor: '#047857',
+                              transform: 'translateY(-1px)',
+                              boxShadow: '0 4px 12px rgba(5, 150, 105, 0.3)'
+                            },
+                            '&:disabled': {
+                              bgcolor: '#94a3b8',
+                              color: 'white'
+                            },
+                            transition: 'all 0.3s ease'
+                          }}
+                          disabled={saving || !isFinalFormValid() || gerandoTitulos}
+                        >
+                          {saving ? '💾 Salvando...' : gerandoTitulos ? '🔄 Gerando títulos...' : isNew ? '✓ Criar Matrícula' : '✓ Salvar'}
+                        </Button>
                       )}
                     </DialogActions>
                   {/* Modal de impedimento para inativação */}

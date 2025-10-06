@@ -53,7 +53,7 @@ export default function GaleriaFotos() {
   const [fotoSelecionada, setFotoSelecionada] = useState(null);
   const [fotos, setFotos] = useState([]);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
-  const [novaFoto, setNovaFoto] = useState({ nome: '', descricao: '', url: '', file: null });
+  const [novaFoto, setNovaFoto] = useState({ nome: '', descricao: '', url: '', files: [] });
   const [turmas, setTurmas] = useState([]);
   const [turmasSelecionadas, setTurmasSelecionadas] = useState([]);
   const [turmaUsuario, setTurmaUsuario] = useState('todos');
@@ -71,6 +71,13 @@ export default function GaleriaFotos() {
   const [loadingCreator, setLoadingCreator] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [carouselIndices, setCarouselIndices] = useState({}); // Para controlar índice de cada carrossel
+  const [modalCarouselIndex, setModalCarouselIndex] = useState(0); // Para controlar carrossel no modal
+  
+  // Estados para o novo modal de carrossel
+  const [carouselModalOpen, setCarouselModalOpen] = useState(false);
+  const [selectedCarouselPost, setSelectedCarouselPost] = useState(null);
+  const [carouselImageIndex, setCarouselImageIndex] = useState(0);
   
   const userId = typeof window !== 'undefined' && localStorage.getItem('userId')
     ? localStorage.getItem('userId')
@@ -216,9 +223,17 @@ export default function GaleriaFotos() {
   };
 
   const handleOpenFoto = (foto) => {
+    // Se o post tem múltiplas imagens, abrir o modal de carrossel
+    if (foto.isCarousel && foto.urls && foto.urls.length > 1) {
+      handleOpenCarouselModal(foto);
+      return;
+    }
+    
+    // Para imagens únicas, usar o modal original
     const index = fotosFiltradas.findIndex(f => f.id === foto.id);
     setCurrentPhotoIndex(index);
     setFotoSelecionada(foto);
+    setModalCarouselIndex(0); // Resetar carrossel do modal
     setOpen(true);
     setIsTransitioning(false); // Reset transition state
     // Buscar informações do criador
@@ -234,6 +249,7 @@ export default function GaleriaFotos() {
     setFotoSelecionada(null);
     setCreatorInfo(null);
     setCurrentPhotoIndex(0);
+    setModalCarouselIndex(0); // Reset do carrossel do modal
     setIsTransitioning(false); // Reset transition state
   };
 
@@ -373,11 +389,11 @@ export default function GaleriaFotos() {
       return;
     }
     setUploadDialogOpen(true);
-    setNovaFoto({ nome: '', descricao: '', url: '', file: null });
+    setNovaFoto({ nome: '', descricao: '', url: '', files: [] });
   };
 
   const handleUploadFoto = async () => {
-    if (novaFoto.nome && novaFoto.file) {
+    if (novaFoto.nome && novaFoto.files.length > 0) {
       try {
         setUploading(true);
         
@@ -393,16 +409,24 @@ export default function GaleriaFotos() {
           }
         }
         
-        const file = novaFoto.file;
-        const filePath = `fotos/${Date.now()}_${file.name}`;
-        const fileRef = storageRef(storage, filePath);
-        await uploadBytes(fileRef, file);
-        const url = await getDownloadURL(fileRef);
+        // Upload de múltiplas imagens
+        const uploadPromises = novaFoto.files.map(async (file, index) => {
+          const filePath = `fotos/${Date.now()}_${index}_${file.name}`;
+          const fileRef = storageRef(storage, filePath);
+          await uploadBytes(fileRef, file);
+          return await getDownloadURL(fileRef);
+        });
+        
+        const urls = await Promise.all(uploadPromises);
+        
         const fotosRef = ref(db, 'fotos');
         await push(fotosRef, {
           nome: novaFoto.nome,
           descricao: novaFoto.descricao || '',
-          url,
+          urls: urls, // Array de URLs para múltiplas imagens
+          url: urls[0], // Manter compatibilidade com código existente
+          isCarousel: urls.length > 1, // Flag para identificar carrosseis
+          imageCount: urls.length,
           turmas: turmasSelecionadas.length > 0 ? turmasSelecionadas : ['todos'],
           likes: [],
           likesCount: 0,
@@ -411,7 +435,7 @@ export default function GaleriaFotos() {
         });
         setUploadDialogOpen(false);
         setTurmasSelecionadas([]);
-        setNovaFoto({ nome: '', descricao: '', url: '', file: null });
+        setNovaFoto({ nome: '', descricao: '', url: '', files: [] });
         await fetchFotos();
       } catch (error) {
         console.error('Erro ao fazer upload:', error);
@@ -420,6 +444,108 @@ export default function GaleriaFotos() {
       }
     }
   };
+
+  // Funções para navegação do carrossel
+  const handleCarouselNext = (fotoId, totalImages) => {
+    setCarouselIndices(prev => ({
+      ...prev,
+      [fotoId]: ((prev[fotoId] || 0) + 1) % totalImages
+    }));
+  };
+
+  const handleCarouselPrev = (fotoId, totalImages) => {
+    setCarouselIndices(prev => ({
+      ...prev,
+      [fotoId]: ((prev[fotoId] || 0) - 1 + totalImages) % totalImages
+    }));
+  };
+
+  const handleCarouselDot = (fotoId, index) => {
+    setCarouselIndices(prev => ({
+      ...prev,
+      [fotoId]: index
+    }));
+  };
+
+  // Funções para navegação do carrossel no modal
+  const handleModalCarouselNext = () => {
+    if (fotoSelecionada?.urls && fotoSelecionada.urls.length > 1) {
+      setModalCarouselIndex(prev => (prev + 1) % fotoSelecionada.urls.length);
+    }
+  };
+
+  const handleModalCarouselPrev = () => {
+    if (fotoSelecionada?.urls && fotoSelecionada.urls.length > 1) {
+      setModalCarouselIndex(prev => (prev - 1 + fotoSelecionada.urls.length) % fotoSelecionada.urls.length);
+    }
+  };
+
+  const handleModalCarouselDot = (index) => {
+    setModalCarouselIndex(index);
+  };
+
+  // Funções para o novo modal de carrossel
+  const handleOpenCarouselModal = (foto) => {
+    setSelectedCarouselPost(foto);
+    setCarouselImageIndex(0);
+    setCarouselModalOpen(true);
+  };
+
+  const handleCloseCarouselModal = () => {
+    setCarouselModalOpen(false);
+    setSelectedCarouselPost(null);
+    setCarouselImageIndex(0);
+  };
+
+  const handleCarouselModalNext = () => {
+    if (selectedCarouselPost?.urls) {
+      setCarouselImageIndex(prev => 
+        (prev + 1) % selectedCarouselPost.urls.length
+      );
+    }
+  };
+
+  const handleCarouselModalPrev = () => {
+    if (selectedCarouselPost?.urls) {
+      setCarouselImageIndex(prev => 
+        (prev - 1 + selectedCarouselPost.urls.length) % selectedCarouselPost.urls.length
+      );
+    }
+  };
+
+  const handleCarouselModalDotClick = (index) => {
+    setCarouselImageIndex(index);
+  };
+
+  // Navegação por teclado para o modal de carrossel
+  useEffect(() => {
+    const handleCarouselKeyPress = (e) => {
+      if (!carouselModalOpen) return;
+      
+      switch (e.key) {
+        case 'ArrowLeft':
+          e.preventDefault();
+          handleCarouselModalPrev();
+          break;
+        case 'ArrowRight':
+          e.preventDefault();
+          handleCarouselModalNext();
+          break;
+        case 'Escape':
+          e.preventDefault();
+          handleCloseCarouselModal();
+          break;
+      }
+    };
+
+    if (carouselModalOpen) {
+      window.addEventListener('keydown', handleCarouselKeyPress);
+    }
+
+    return () => {
+      window.removeEventListener('keydown', handleCarouselKeyPress);
+    };
+  }, [carouselModalOpen]);
 
   const handleLike = async (fotoId) => {
     try {
@@ -777,7 +903,7 @@ export default function GaleriaFotos() {
                     </Box>
                   </Box>
 
-                  {/* Imagem do Post */}
+                  {/* Imagem do Post ou Carrossel */}
                   <Box 
                     sx={{ 
                       position: 'relative',
@@ -788,18 +914,167 @@ export default function GaleriaFotos() {
                     }}
                     onClick={() => handleOpenFoto(foto)}
                   >
-                    <img 
-                      src={foto.url} 
-                      alt={foto.nome}
-                      style={{
-                        width: '100%',
-                        height: '100%',
-                        objectFit: 'cover',
-                        transition: 'transform 0.3s ease'
-                      }}
-                      onMouseEnter={(e) => e.target.style.transform = 'scale(1.02)'}
-                      onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
-                    />
+                    {foto.isCarousel && foto.urls && foto.urls.length > 1 ? (
+                      // Carrossel estilo Instagram
+                      <>
+                        {/* Container das imagens */}
+                        <Box
+                          sx={{
+                            display: 'flex',
+                            width: `${foto.urls.length * 100}%`,
+                            height: '100%',
+                            transform: `translateX(-${(carouselIndices[foto.id] || 0) * (100 / foto.urls.length)}%)`,
+                            transition: 'transform 0.3s ease-in-out'
+                          }}
+                        >
+                          {foto.urls.map((url, index) => (
+                            <Box
+                              key={index}
+                              sx={{
+                                width: `${100 / foto.urls.length}%`,
+                                height: '100%',
+                                flexShrink: 0
+                              }}
+                            >
+                              <img 
+                                src={url} 
+                                alt={`${foto.nome} - ${index + 1}`}
+                                style={{
+                                  width: '100%',
+                                  height: '100%',
+                                  objectFit: 'cover'
+                                }}
+                              />
+                            </Box>
+                          ))}
+                        </Box>
+
+                        {/* Indicador de múltiplas fotos */}
+                        <Box
+                          sx={{
+                            position: 'absolute',
+                            top: 12,
+                            right: 12,
+                            backgroundColor: 'rgba(0, 0, 0, 0.6)',
+                            color: 'white',
+                            borderRadius: '12px',
+                            px: 1,
+                            py: 0.5,
+                            fontSize: '0.75rem',
+                            fontWeight: 'bold',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 0.5
+                          }}
+                        >
+                          <Photo sx={{ fontSize: 12 }} />
+                          {(carouselIndices[foto.id] || 0) + 1}/{foto.urls.length}
+                        </Box>
+
+                        {/* Botões de navegação */}
+                        {foto.urls.length > 1 && (
+                          <>
+                            <IconButton
+                              sx={{
+                                position: 'absolute',
+                                left: 8,
+                                top: '50%',
+                                transform: 'translateY(-50%)',
+                                backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                                color: '#333',
+                                width: 32,
+                                height: 32,
+                                '&:hover': {
+                                  backgroundColor: 'white'
+                                },
+                                boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+                              }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCarouselPrev(foto.id, foto.urls.length);
+                              }}
+                              size="small"
+                            >
+                              <ArrowBackIos sx={{ fontSize: 14, ml: 0.5 }} />
+                            </IconButton>
+
+                            <IconButton
+                              sx={{
+                                position: 'absolute',
+                                right: 8,
+                                top: '50%',
+                                transform: 'translateY(-50%)',
+                                backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                                color: '#333',
+                                width: 32,
+                                height: 32,
+                                '&:hover': {
+                                  backgroundColor: 'white'
+                                },
+                                boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+                              }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCarouselNext(foto.id, foto.urls.length);
+                              }}
+                              size="small"
+                            >
+                              <ArrowForwardIos sx={{ fontSize: 14 }} />
+                            </IconButton>
+                          </>
+                        )}
+
+                        {/* Indicadores de posição (dots) */}
+                        {foto.urls.length > 1 && (
+                          <Box
+                            sx={{
+                              position: 'absolute',
+                              bottom: 12,
+                              left: '50%',
+                              transform: 'translateX(-50%)',
+                              display: 'flex',
+                              gap: 0.5,
+                              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                              borderRadius: '12px',
+                              px: 1,
+                              py: 0.5
+                            }}
+                          >
+                            {foto.urls.map((_, index) => (
+                              <Box
+                                key={index}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleCarouselDot(foto.id, index);
+                                }}
+                                sx={{
+                                  width: 6,
+                                  height: 6,
+                                  borderRadius: '50%',
+                                  backgroundColor: (carouselIndices[foto.id] || 0) === index ? 'white' : 'rgba(255, 255, 255, 0.5)',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.2s ease'
+                                }}
+                              />
+                            ))}
+                          </Box>
+                        )}
+                      </>
+                    ) : (
+                      // Imagem única (comportamento original)
+                      <img 
+                        src={foto.url || (foto.urls && foto.urls[0])} 
+                        alt={foto.nome}
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover',
+                          transition: 'transform 0.3s ease'
+                        }}
+                        onMouseEnter={(e) => e.target.style.transform = 'scale(1.02)'}
+                        onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
+                      />
+                    )}
                   </Box>
 
                   {/* Footer do Post */}
@@ -1268,12 +1543,13 @@ export default function GaleriaFotos() {
                 
                 <Box>
                   <Typography variant="subtitle2" gutterBottom fontWeight="bold">
-                    Selecionar Arquivo
+                    Selecionar Arquivos
                   </Typography>
                   <input
                     type="file"
                     accept="image/*"
-                    onChange={e => setNovaFoto({ ...novaFoto, file: e.target.files[0] })}
+                    multiple
+                    onChange={e => setNovaFoto({ ...novaFoto, files: Array.from(e.target.files) })}
                     style={{ 
                       width: '100%',
                       padding: '12px',
@@ -1283,6 +1559,28 @@ export default function GaleriaFotos() {
                       fontSize: '16px'
                     }}
                   />
+                  {novaFoto.files.length > 0 && (
+                    <Box sx={{ mt: 2 }}>
+                      <Typography variant="caption" color="primary">
+                        {novaFoto.files.length} arquivo(s) selecionado(s)
+                      </Typography>
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
+                        {novaFoto.files.map((file, index) => (
+                          <Chip 
+                            key={index}
+                            label={file.name}
+                            size="small"
+                            color="primary"
+                            variant="outlined"
+                            onDelete={() => {
+                              const newFiles = novaFoto.files.filter((_, i) => i !== index);
+                              setNovaFoto({ ...novaFoto, files: newFiles });
+                            }}
+                          />
+                        ))}
+                      </Box>
+                    </Box>
+                  )}
                 </Box>
 
                 <FormControl fullWidth>
@@ -1335,7 +1633,7 @@ export default function GaleriaFotos() {
               <Button 
                 onClick={handleUploadFoto}
                 variant="contained"
-                disabled={!novaFoto.nome || !novaFoto.file || uploading}
+                disabled={!novaFoto.nome || novaFoto.files.length === 0 || uploading}
                 startIcon={uploading ? <CircularProgress size={20} /> : <CloudUpload />}
                 sx={{ borderRadius: 3, minWidth: 120 }}
               >
@@ -1431,6 +1729,249 @@ export default function GaleriaFotos() {
                 Excluir
               </Button>
             </DialogActions>
+          </Dialog>
+
+          {/* Novo Modal de Carrossel para múltiplas imagens */}
+          <Dialog
+            open={carouselModalOpen}
+            onClose={handleCloseCarouselModal}
+            maxWidth={false}
+            fullScreen
+            PaperProps={{
+              sx: {
+                backgroundColor: '#000',
+                margin: 0,
+                maxHeight: '100vh',
+                height: '100vh'
+              }
+            }}
+          >
+            {/* Header do Modal de Carrossel */}
+            <Box sx={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              zIndex: 30,
+              p: 2,
+              background: 'linear-gradient(180deg, rgba(0,0,0,0.8) 0%, transparent 100%)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <Box display="flex" alignItems="center" gap={2}>
+                <Typography variant="h6" sx={{ color: 'white', fontWeight: 600 }}>
+                  {selectedCarouselPost?.nome || 'Galeria de Fotos'}
+                </Typography>
+                <Chip
+                  icon={<Photo sx={{ fontSize: 16 }} />}
+                  label={`${carouselImageIndex + 1}/${selectedCarouselPost?.urls?.length || 0}`}
+                  size="small"
+                  sx={{
+                    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                    color: 'white',
+                    '& .MuiChip-icon': { color: 'white' }
+                  }}
+                />
+              </Box>
+              
+              <Box display="flex" alignItems="center" gap={1}>
+                {/* Botão de Like */}
+                <IconButton
+                  onClick={() => selectedCarouselPost?.id && handleLike(selectedCarouselPost.id)}
+                  disabled={likingPhoto === selectedCarouselPost?.id}
+                  sx={{ color: selectedCarouselPost?.likes?.includes(userId) ? '#e53935' : 'white' }}
+                >
+                  {likingPhoto === selectedCarouselPost?.id ? (
+                    <CircularProgress size={20} sx={{ color: 'white' }} />
+                  ) : selectedCarouselPost?.likes?.includes(userId) ? (
+                    <Favorite />
+                  ) : (
+                    <FavoriteBorder />
+                  )}
+                </IconButton>
+                
+                {/* Botão de Fechar */}
+                <IconButton
+                  onClick={handleCloseCarouselModal}
+                  sx={{ color: 'white' }}
+                >
+                  <Close />
+                </IconButton>
+              </Box>
+            </Box>
+
+            {/* Conteúdo Principal */}
+            <Box sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              height: '100vh',
+              position: 'relative',
+              overflow: 'hidden'
+            }}
+            onTouchStart={(e) => {
+              const touch = e.touches[0];
+              e.currentTarget.touchStartX = touch.clientX;
+            }}
+            onTouchEnd={(e) => {
+              const touch = e.changedTouches[0];
+              const startX = e.currentTarget.touchStartX;
+              const endX = touch.clientX;
+              const diff = startX - endX;
+              
+              if (Math.abs(diff) > 50) {
+                if (diff > 0) {
+                  handleCarouselModalNext(); // Swipe esquerda = próxima
+                } else {
+                  handleCarouselModalPrev(); // Swipe direita = anterior
+                }
+              }
+            }}
+            >
+              {selectedCarouselPost?.urls && (
+                <>
+                  {/* Imagem Atual */}
+                  <img
+                    src={selectedCarouselPost.urls[carouselImageIndex]}
+                    alt={`${selectedCarouselPost.nome} - ${carouselImageIndex + 1}`}
+                    style={{
+                      maxWidth: '90%',
+                      maxHeight: '80%',
+                      objectFit: 'contain',
+                      borderRadius: '8px'
+                    }}
+                  />
+
+                  {/* Botões de Navegação */}
+                  {selectedCarouselPost.urls.length > 1 && (
+                    <>
+                      <IconButton
+                        onClick={handleCarouselModalPrev}
+                        sx={{
+                          position: 'absolute',
+                          left: { xs: 8, md: 16 },
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          backgroundColor: 'rgba(0,0,0,0.5)',
+                          color: 'white',
+                          '&:hover': { 
+                            backgroundColor: 'rgba(0,0,0,0.7)',
+                            transform: 'translateY(-50%) scale(1.1)'
+                          },
+                          transition: 'all 0.2s ease',
+                          p: { xs: 1, md: 1.5 }
+                        }}
+                      >
+                        <ArrowBackIos sx={{ fontSize: { xs: 18, md: 24 }, ml: 0.5 }} />
+                      </IconButton>
+
+                      <IconButton
+                        onClick={handleCarouselModalNext}
+                        sx={{
+                          position: 'absolute',
+                          right: { xs: 8, md: 16 },
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          backgroundColor: 'rgba(0,0,0,0.5)',
+                          color: 'white',
+                          '&:hover': { 
+                            backgroundColor: 'rgba(0,0,0,0.7)',
+                            transform: 'translateY(-50%) scale(1.1)'
+                          },
+                          transition: 'all 0.2s ease',
+                          p: { xs: 1, md: 1.5 }
+                        }}
+                      >
+                        <ArrowForwardIos sx={{ fontSize: { xs: 18, md: 24 } }} />
+                      </IconButton>
+                    </>
+                  )}
+                </>
+              )}
+            </Box>
+
+            {/* Footer com informações e navegação */}
+            <Box sx={{
+              position: 'absolute',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              zIndex: 30,
+              p: 3,
+              background: 'linear-gradient(0deg, rgba(0,0,0,0.9) 0%, transparent 100%)',
+              color: 'white'
+            }}>
+              {/* Indicadores de posição */}
+              {selectedCarouselPost?.urls && selectedCarouselPost.urls.length > 1 && (
+                <Box sx={{
+                  display: 'flex',
+                  justifyContent: 'center',
+                  gap: 1,
+                  mb: 2
+                }}>
+                  {selectedCarouselPost.urls.map((_, index) => (
+                    <Box
+                      key={index}
+                      onClick={() => handleCarouselModalDotClick(index)}
+                      sx={{
+                        width: 12,
+                        height: 12,
+                        borderRadius: '50%',
+                        backgroundColor: carouselImageIndex === index ? 'white' : 'rgba(255, 255, 255, 0.4)',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        '&:hover': {
+                          backgroundColor: carouselImageIndex === index ? 'white' : 'rgba(255, 255, 255, 0.7)',
+                          transform: 'scale(1.2)'
+                        }
+                      }}
+                    />
+                  ))}
+                </Box>
+              )}
+
+              {/* Informações do post */}
+              <Box sx={{ textAlign: 'center' }}>
+                {selectedCarouselPost?.descricao && (
+                  <Typography variant="body1" sx={{ mb: 2, opacity: 0.9 }}>
+                    {selectedCarouselPost.descricao}
+                  </Typography>
+                )}
+                
+                <Box display="flex" justifyContent="center" alignItems="center" gap={2}>
+                  {/* Contador de curtidas */}
+                  {selectedCarouselPost?.likesCount > 0 && (
+                    <Typography variant="body2" fontWeight="bold">
+                      {selectedCarouselPost.likesCount} curtida{selectedCarouselPost.likesCount !== 1 ? 's' : ''}
+                    </Typography>
+                  )}
+                  
+                  {/* Data */}
+                  <Typography variant="body2" sx={{ opacity: 0.7 }}>
+                    {formatarData(selectedCarouselPost?.createdAt)}
+                  </Typography>
+                  
+                  {/* Turmas */}
+                  {selectedCarouselPost?.turmas && (
+                    <Box display="flex" gap={1}>
+                      {selectedCarouselPost.turmas.map((turma, idx) => (
+                        <Chip 
+                          key={idx}
+                          label={turma === 'todos' ? 'Público' : turma}
+                          size="small"
+                          sx={{ 
+                            backgroundColor: 'rgba(255,255,255,0.2)',
+                            color: 'white',
+                            fontSize: '0.75rem'
+                          }}
+                        />
+                      ))}
+                    </Box>
+                  )}
+                </Box>
+              </Box>
+            </Box>
           </Dialog>
         </Box>
       </Box>

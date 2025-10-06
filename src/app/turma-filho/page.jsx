@@ -742,54 +742,6 @@ const TurmaFilho = () => {
                 </CardContent>
               </Card>
             </Grid>
-
-            {/* Informações Adicionais */}
-            <Grid item xs={12}>
-              <Card sx={{ borderRadius: 3 }}>
-                <CardContent>
-                  <Typography variant="h6" gutterBottom sx={{ color: '#2563eb', fontWeight: 'bold' }}>
-                    📊 Informações Adicionais da Turma
-                  </Typography>
-                  <Divider sx={{ mb: 3 }} />
-                  
-                  <Grid container spacing={3}>
-                    {/* Estatísticas da Turma */}
-                    <Grid item xs={12} md={4}>
-                      <Paper sx={{ p: 2, textAlign: 'center', borderRadius: 2, bgcolor: '#f0f9ff' }}>
-                        <Typography variant="h3" sx={{ color: '#2563eb', fontWeight: 'bold' }}>
-                          {turmaData?.totalAlunos || '0'}
-                        </Typography>
-                        <Typography variant="body2" color="textSecondary">
-                          Total de Alunos
-                        </Typography>
-                      </Paper>
-                    </Grid>
-
-                    <Grid item xs={12} md={4}>
-                      <Paper sx={{ p: 2, textAlign: 'center', borderRadius: 2, bgcolor: '#f0fdf4' }}>
-                        <Typography variant="h3" sx={{ color: '#059669', fontWeight: 'bold' }}>
-                          {periodosAula.length}
-                        </Typography>
-                        <Typography variant="body2" color="textSecondary">
-                          Períodos de Aula
-                        </Typography>
-                      </Paper>
-                    </Grid>
-
-                    <Grid item xs={12} md={4}>
-                      <Paper sx={{ p: 2, textAlign: 'center', borderRadius: 2, bgcolor: '#fef7f0' }}>
-                        <Typography variant="h3" sx={{ color: '#d97706', fontWeight: 'bold' }}>
-                          {avisosTurma.length}
-                        </Typography>
-                        <Typography variant="body2" color="textSecondary">
-                          Avisos Recentes
-                        </Typography>
-                      </Paper>
-                    </Grid>
-                  </Grid>
-                </CardContent>
-              </Card>
-            </Grid>
           </Grid>
         </Box>
       </main>

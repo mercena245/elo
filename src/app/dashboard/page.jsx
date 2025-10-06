@@ -1029,10 +1029,10 @@ const Dashboard = () => {
 
               {/* Ações Rápidas movidas para cima */}
 
-              {/* Seção de Informações */}
+              {/* Seção da Galeria de Fotos */}
               <Grid item xs={12} md={8} order={{ xs: 2, md: 1 }}>
                 <Grid container spacing={{ xs: 2, sm: 3 }}>
-                  {/* Destaques */}
+                  {/* Carrossel da Galeria de Fotos */}
                   <Grid item xs={12}>
                     <Card sx={{ height: '100%', position: 'relative', overflow: 'hidden' }}>
                       <Box 
@@ -1042,44 +1042,319 @@ const Dashboard = () => {
                           right: 0, 
                           width: { xs: 40, md: 60 }, 
                           height: { xs: 40, md: 60 }, 
-                          background: 'linear-gradient(135deg, #4ECDC4, #44A08D)', 
+                          background: 'linear-gradient(135deg, #F59E0B, #F97316)', 
                           borderRadius: '0 0 0 100%' 
                         }} 
                       />
                       <CardContent sx={{ position: 'relative', zIndex: 1, p: { xs: 2, sm: 3 } }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                          <EmojiEvents sx={{ color: '#4ECDC4', mr: 1, fontSize: { xs: 20, md: 24 } }} />
+                          <PhotoLibrary sx={{ color: '#F59E0B', mr: 1, fontSize: { xs: 20, md: 24 } }} />
                           <Typography variant="h6" fontWeight={600} sx={{ fontSize: { xs: '1rem', md: '1.25rem' } }}>
-                            🏆 Destaques
+                            📸 Galeria de Fotos
                           </Typography>
                         </Box>
-                        <Divider sx={{ mb: 2 }} />
-                        <Grid container spacing={2}>
-                          {[
-                            'Alunos do 5º ano premiados em olimpíada de matemática.',
-                            'Projeto "Verde na Escola" ganha destaque regional.',
-                            'Sistema ELO implementado com sucesso!'
-                          ].map((destaque, idx) => (
-                            <Grid item xs={12} md={4} key={idx}>
-                              <Box sx={{ 
-                                p: { xs: 1.5, sm: 2 }, 
-                                bgcolor: '#f0fdf4', 
-                                borderRadius: 2, 
-                                borderLeft: '4px solid #10B981',
-                                height: '100%',
-                                display: 'flex',
-                                alignItems: 'center'
-                              }}>
-                                <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
-                                  <Star sx={{ color: '#F59E0B', fontSize: { xs: 14, md: 16 }, mr: 1, flexShrink: 0 }} />
-                                  <Typography variant="body2" color="text.primary" sx={{ fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>
-                                    {destaque}
-                                  </Typography>
+                        <Divider sx={{ mb: 3 }} />
+                        
+                        {fotosVisiveis.length > 0 ? (
+                          <Box sx={{ position: 'relative', px: { xs: 0, sm: 1 } }}>
+                            <Swiper
+                              modules={[Navigation, Pagination, Autoplay, EffectCoverflow]}
+                              spaceBetween={20}
+                              slidesPerView={1}
+                              navigation={{
+                                enabled: fotosVisiveis.length > 1,
+                                nextEl: '.swiper-button-next-gallery',
+                                prevEl: '.swiper-button-prev-gallery'
+                              }}
+                              pagination={{
+                                clickable: true,
+                                enabled: fotosVisiveis.length > 1
+                              }}
+                              autoplay={fotosVisiveis.length > 1 ? {
+                                delay: 5000,
+                                disableOnInteraction: false,
+                                pauseOnMouseEnter: true,
+                              } : false}
+                              loop={fotosVisiveis.length > 2}
+                              effect="slide"
+                              breakpoints={{
+                                640: {
+                                  slidesPerView: fotosVisiveis.length >= 2 ? 2 : 1,
+                                  spaceBetween: 15,
+                                },
+                                1024: {
+                                  slidesPerView: fotosVisiveis.length >= 3 ? 3 : fotosVisiveis.length,
+                                  spaceBetween: 20,
+                                },
+                                1280: {
+                                  slidesPerView: fotosVisiveis.length >= 4 ? 4 : fotosVisiveis.length,
+                                  spaceBetween: 25,
+                                },
+                              }}
+                              style={{
+                                paddingLeft: '6px',
+                                paddingRight: '6px',
+                                paddingBottom: fotosVisiveis.length > 1 ? '40px' : '10px'
+                              }}
+                            >
+                              {fotosVisiveis.slice(0, 8).map((foto, idx) => (
+                                <SwiperSlide key={foto.id || idx}>
+                                  <Card 
+                                    sx={{ 
+                                      cursor: 'pointer',
+                                      borderRadius: 3,
+                                      transition: 'all 0.4s ease',
+                                      height: { xs: 200, sm: 220, md: 240 },
+                                      overflow: 'hidden',
+                                      position: 'relative',
+                                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                                      '&:hover': {
+                                        transform: 'translateY(-6px) scale(1.02)',
+                                        boxShadow: '0 15px 30px rgba(245, 158, 11, 0.3)',
+                                        '& .foto-overlay': {
+                                          opacity: 1
+                                        },
+                                        '& .foto-image': {
+                                          transform: 'scale(1.1)'
+                                        }
+                                      }
+                                    }}
+                                    onClick={() => router.push('/galeriafotos')}
+                                  >
+                                    <Box
+                                      sx={{
+                                        position: 'relative',
+                                        width: '100%',
+                                        height: '100%',
+                                        overflow: 'hidden'
+                                      }}
+                                    >
+                                      <img 
+                                        className="foto-image"
+                                        src={foto.url} 
+                                        alt={foto.nome || `Foto ${idx + 1}`}
+                                        style={{
+                                          width: '100%',
+                                          height: '100%',
+                                          objectFit: 'cover',
+                                          transition: 'transform 0.4s ease'
+                                        }}
+                                      />
+                                      
+                                      {/* Overlay com informações */}
+                                      <Box 
+                                        className="foto-overlay"
+                                        sx={{
+                                          position: 'absolute',
+                                          bottom: 0,
+                                          left: 0,
+                                          right: 0,
+                                          background: 'linear-gradient(transparent, rgba(0,0,0,0.8))',
+                                          color: 'white',
+                                          p: { xs: 1.5, sm: 2 },
+                                          opacity: 0,
+                                          transition: 'opacity 0.3s ease'
+                                        }}
+                                      >
+                                        <Typography 
+                                          variant="subtitle2" 
+                                          fontWeight={600}
+                                          sx={{ 
+                                            fontSize: { xs: '0.8rem', sm: '0.9rem' },
+                                            mb: 0.5,
+                                            display: '-webkit-box',
+                                            WebkitLineClamp: 1,
+                                            WebkitBoxOrient: 'vertical',
+                                            overflow: 'hidden'
+                                          }}
+                                        >
+                                          {foto.nome || 'Foto da Escola'}
+                                        </Typography>
+                                        {foto.descricao && (
+                                          <Typography 
+                                            variant="caption"
+                                            sx={{ 
+                                              fontSize: { xs: '0.7rem', sm: '0.75rem' },
+                                              opacity: 0.9,
+                                              display: '-webkit-box',
+                                              WebkitLineClamp: 2,
+                                              WebkitBoxOrient: 'vertical',
+                                              overflow: 'hidden'
+                                            }}
+                                          >
+                                            {foto.descricao}
+                                          </Typography>
+                                        )}
+                                      </Box>
+                                      
+                                      {/* Ícone de visualização */}
+                                      <Box
+                                        sx={{
+                                          position: 'absolute',
+                                          top: 12,
+                                          right: 12,
+                                          background: 'rgba(255, 255, 255, 0.9)',
+                                          borderRadius: '50%',
+                                          width: 32,
+                                          height: 32,
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
+                                        }}
+                                      >
+                                        <PhotoLibrary sx={{ fontSize: 16, color: '#F59E0B' }} />
+                                      </Box>
+                                    </Box>
+                                  </Card>
+                                </SwiperSlide>
+                              ))}
+                            </Swiper>
+                            
+                            {/* Botões de navegação customizados */}
+                            {fotosVisiveis.length > 1 && (
+                              <>
+                                <Box
+                                  className="swiper-button-prev-gallery"
+                                  sx={{
+                                    position: 'absolute',
+                                    left: -20,
+                                    top: '50%',
+                                    transform: 'translateY(-50%)',
+                                    width: 40,
+                                    height: 40,
+                                    borderRadius: '50%',
+                                    background: 'rgba(255, 255, 255, 0.9)',
+                                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    cursor: 'pointer',
+                                    zIndex: 10,
+                                    transition: 'all 0.3s ease',
+                                    '&:hover': {
+                                      background: 'white',
+                                      transform: 'translateY(-50%) scale(1.1)',
+                                      boxShadow: '0 6px 20px rgba(0, 0, 0, 0.2)'
+                                    },
+                                    '&::after': {
+                                      content: '""',
+                                      display: 'none'
+                                    }
+                                  }}
+                                >
+                                  <ChevronRight sx={{ 
+                                    fontSize: 20, 
+                                    color: '#F59E0B',
+                                    transform: 'rotate(180deg)'
+                                  }} />
                                 </Box>
-                              </Box>
-                            </Grid>
-                          ))}
-                        </Grid>
+                                
+                                <Box
+                                  className="swiper-button-next-gallery"
+                                  sx={{
+                                    position: 'absolute',
+                                    right: -20,
+                                    top: '50%',
+                                    transform: 'translateY(-50%)',
+                                    width: 40,
+                                    height: 40,
+                                    borderRadius: '50%',
+                                    background: 'rgba(255, 255, 255, 0.9)',
+                                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    cursor: 'pointer',
+                                    zIndex: 10,
+                                    transition: 'all 0.3s ease',
+                                    '&:hover': {
+                                      background: 'white',
+                                      transform: 'translateY(-50%) scale(1.1)',
+                                      boxShadow: '0 6px 20px rgba(0, 0, 0, 0.2)'
+                                    },
+                                    '&::after': {
+                                      content: '""',
+                                      display: 'none'
+                                    }
+                                  }}
+                                >
+                                  <ChevronRight sx={{ 
+                                    fontSize: 20, 
+                                    color: '#F59E0B'
+                                  }} />
+                                </Box>
+                              </>
+                            )}
+                            
+                            {/* Botão para ver toda a galeria */}
+                            <Box sx={{ textAlign: 'center', mt: 3 }}>
+                              <Button
+                                variant="outlined"
+                                startIcon={<PhotoLibrary />}
+                                onClick={() => router.push('/galeriafotos')}
+                                sx={{
+                                  borderColor: '#F59E0B',
+                                  color: '#F59E0B',
+                                  borderRadius: 3,
+                                  px: 3,
+                                  py: 1,
+                                  fontWeight: 600,
+                                  fontSize: { xs: '0.8rem', sm: '0.9rem' },
+                                  textTransform: 'none',
+                                  transition: 'all 0.3s ease',
+                                  '&:hover': {
+                                    borderColor: '#F97316',
+                                    backgroundColor: '#F59E0B',
+                                    color: 'white',
+                                    transform: 'translateY(-2px)',
+                                    boxShadow: '0 8px 20px rgba(245, 158, 11, 0.3)'
+                                  }
+                                }}
+                              >
+                                Ver toda a galeria
+                              </Button>
+                            </Box>
+                          </Box>
+                        ) : (
+                          <Box sx={{ 
+                            textAlign: 'center', 
+                            py: 6,
+                            bgcolor: '#fef3c7',
+                            borderRadius: 3,
+                            border: '2px dashed #F59E0B'
+                          }}>
+                            <PhotoLibrary sx={{ fontSize: 48, color: '#D97706', mb: 2 }} />
+                            <Typography color="text.secondary" variant="h6" sx={{ mb: 1 }}>
+                              Nenhuma foto disponível
+                            </Typography>
+                            <Typography color="text.secondary" variant="body2" sx={{ mb: 2 }}>
+                              Aguarde novas fotos da turma serem adicionadas
+                            </Typography>
+                            <Button
+                              variant="contained"
+                              startIcon={<PhotoLibrary />}
+                              onClick={() => router.push('/galeriafotos')}
+                              sx={{
+                                backgroundColor: '#F59E0B',
+                                color: 'white',
+                                borderRadius: 3,
+                                px: 3,
+                                py: 1,
+                                fontWeight: 600,
+                                fontSize: '0.9rem',
+                                textTransform: 'none',
+                                '&:hover': {
+                                  backgroundColor: '#D97706',
+                                  transform: 'translateY(-2px)',
+                                  boxShadow: '0 8px 20px rgba(245, 158, 11, 0.3)'
+                                }
+                              }}
+                            >
+                              Ir para galeria
+                            </Button>
+                          </Box>
+                        )}
                       </CardContent>
                     </Card>
                   </Grid>

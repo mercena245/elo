@@ -1880,25 +1880,54 @@ const FinanceiroPage = () => {
       <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: '#f5f6fa' }}>
         <SidebarMenu />
         
-        <Box component="main" sx={{ flexGrow: 1, p: 3 }}>
+        <Box 
+          component="main" 
+          sx={{ 
+            flexGrow: 1, 
+            p: { xs: 1, sm: 2, md: 3 },
+            width: 0 // Força o flex item a não exceder o container
+          }}
+        >
           {/* Header */}
           <Box sx={{
             background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
-            borderRadius: 3,
-            p: 3,
+            borderRadius: { xs: 2, md: 3 },
+            p: { xs: 2, md: 3 },
             mb: 3,
             color: 'white',
             textAlign: 'center'
           }}>
-            <Typography variant="h4" gutterBottom fontWeight="bold">
+            <Typography 
+              variant="h4" 
+              gutterBottom 
+              fontWeight="bold"
+              sx={{
+                fontSize: { xs: '1.5rem', sm: '2rem', md: '2.125rem' }
+              }}
+            >
               💰 Sistema Financeiro
             </Typography>
-            <Typography variant="subtitle1" sx={{ opacity: 0.9 }}>
+            <Typography 
+              variant="subtitle1" 
+              sx={{ 
+                opacity: 0.9,
+                fontSize: { xs: '0.875rem', md: '1rem' },
+                px: { xs: 1, md: 0 }
+              }}
+            >
               {isCoordenador() && 'Gestão completa do financeiro escolar'}
               {isProfessor() && 'Consulta de status financeiro dos alunos'}
               {isPai() && 'Seus títulos e pagamentos'}
               <br />
-              <Typography component="span" variant="caption" sx={{ opacity: 0.6, fontSize: '0.7rem' }}>
+              <Typography 
+                component="span" 
+                variant="caption" 
+                sx={{ 
+                  opacity: 0.6, 
+                  fontSize: { xs: '0.6rem', md: '0.7rem' },
+                  display: { xs: 'none', md: 'inline' }
+                }}
+              >
                 🐛 Debug: Role="{userRole}" | Coordenador={isCoordenador() ? 'Sim' : 'Não'}
               </Typography>
             </Typography>
@@ -1914,19 +1943,29 @@ const FinanceiroPage = () => {
               <Grid container spacing={3} sx={{ mb: 3 }}>
                 {isCoordenador() && (
                   <>
-                    <Grid item xs={12} sm={6} md={3}>
+                    <Grid item xs={12} sm={6} lg={3}>
                       <Card sx={{ background: 'linear-gradient(135deg, #3B82F6, #1E40AF)' }}>
-                        <CardContent sx={{ color: 'white' }}>
+                        <CardContent sx={{ color: 'white', p: { xs: 2, md: 3 } }}>
                           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                             <Box>
-                              <Typography variant="h4" fontWeight="bold">
+                              <Typography 
+                                variant="h4" 
+                                fontWeight="bold"
+                                sx={{ fontSize: { xs: '1.5rem', md: '2.125rem' } }}
+                              >
                                 {formatCurrency(metricas.receitaMensal)}
                               </Typography>
-                              <Typography variant="body2" sx={{ opacity: 0.8 }}>
+                              <Typography 
+                                variant="body2" 
+                                sx={{ 
+                                  opacity: 0.8,
+                                  fontSize: { xs: '0.75rem', md: '0.875rem' }
+                                }}
+                              >
                                 Receita Mensal
                               </Typography>
                             </Box>
-                            <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)' }}>
+                            <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', display: { xs: 'none', sm: 'flex' } }}>
                               <AttachMoney />
                             </Avatar>
                           </Box>
@@ -1934,19 +1973,29 @@ const FinanceiroPage = () => {
                       </Card>
                     </Grid>
 
-                    <Grid item xs={12} sm={6} md={3}>
+                    <Grid item xs={12} sm={6} lg={3}>
                       <Card sx={{ background: 'linear-gradient(135deg, #8B5CF6, #7C3AED)' }}>
-                        <CardContent sx={{ color: 'white' }}>
+                        <CardContent sx={{ color: 'white', p: { xs: 2, md: 3 } }}>
                           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                             <Box>
-                              <Typography variant="h4" fontWeight="bold">
+                              <Typography 
+                                variant="h4" 
+                                fontWeight="bold"
+                                sx={{ fontSize: { xs: '1.5rem', md: '2.125rem' } }}
+                              >
                                 {formatCurrency(metricas.receitaAnual)}
                               </Typography>
-                              <Typography variant="body2" sx={{ opacity: 0.8 }}>
+                              <Typography 
+                                variant="body2" 
+                                sx={{ 
+                                  opacity: 0.8,
+                                  fontSize: { xs: '0.75rem', md: '0.875rem' }
+                                }}
+                              >
                                 Receita Anual
                               </Typography>
                             </Box>
-                            <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)' }}>
+                            <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', display: { xs: 'none', sm: 'flex' } }}>
                               <AccountBalance />
                             </Avatar>
                           </Box>
@@ -1954,19 +2003,29 @@ const FinanceiroPage = () => {
                       </Card>
                     </Grid>
 
-                    <Grid item xs={12} sm={6} md={3}>
+                    <Grid item xs={12} sm={6} lg={3}>
                       <Card sx={{ background: 'linear-gradient(135deg, #EF4444, #DC2626)' }}>
-                        <CardContent sx={{ color: 'white' }}>
+                        <CardContent sx={{ color: 'white', p: { xs: 2, md: 3 } }}>
                           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                             <Box>
-                              <Typography variant="h4" fontWeight="bold">
+                              <Typography 
+                                variant="h4" 
+                                fontWeight="bold"
+                                sx={{ fontSize: { xs: '1.5rem', md: '2.125rem' } }}
+                              >
                                 {metricas.taxaInadimplencia.toFixed(1)}%
                               </Typography>
-                              <Typography variant="body2" sx={{ opacity: 0.8 }}>
+                              <Typography 
+                                variant="body2" 
+                                sx={{ 
+                                  opacity: 0.8,
+                                  fontSize: { xs: '0.75rem', md: '0.875rem' }
+                                }}
+                              >
                                 Taxa Inadimplência
                               </Typography>
                             </Box>
-                            <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)' }}>
+                            <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', display: { xs: 'none', sm: 'flex' } }}>
                               <Warning />
                             </Avatar>
                           </Box>
@@ -1976,19 +2035,29 @@ const FinanceiroPage = () => {
                   </>
                 )}
 
-                <Grid item xs={12} sm={6} md={3}>
+                <Grid item xs={12} sm={6} lg={isCoordenador() ? 3 : 6}>
                   <Card sx={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}>
-                    <CardContent sx={{ color: 'white' }}>
+                    <CardContent sx={{ color: 'white', p: { xs: 2, md: 3 } }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                         <Box>
-                          <Typography variant="h4" fontWeight="bold">
+                          <Typography 
+                            variant="h4" 
+                            fontWeight="bold"
+                            sx={{ fontSize: { xs: '1.5rem', md: '2.125rem' } }}
+                          >
                             {metricas.alunosAtivos}
                           </Typography>
-                          <Typography variant="body2" sx={{ opacity: 0.8 }}>
+                          <Typography 
+                            variant="body2" 
+                            sx={{ 
+                              opacity: 0.8,
+                              fontSize: { xs: '0.75rem', md: '0.875rem' }
+                            }}
+                          >
                             Alunos Ativos
                           </Typography>
                         </Box>
-                        <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)' }}>
+                        <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', display: { xs: 'none', sm: 'flex' } }}>
                           <CheckCircle />
                         </Avatar>
                       </Box>
@@ -1996,19 +2065,29 @@ const FinanceiroPage = () => {
                   </Card>
                 </Grid>
 
-                <Grid item xs={12} sm={6} md={3}>
+                <Grid item xs={12} sm={6} lg={isCoordenador() ? 3 : 6}>
                   <Card sx={{ background: 'linear-gradient(135deg, #F59E0B, #D97706)' }}>
-                    <CardContent sx={{ color: 'white' }}>
+                    <CardContent sx={{ color: 'white', p: { xs: 2, md: 3 } }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                         <Box>
-                          <Typography variant="h4" fontWeight="bold">
+                          <Typography 
+                            variant="h4" 
+                            fontWeight="bold"
+                            sx={{ fontSize: { xs: '1.5rem', md: '2.125rem' } }}
+                          >
                             {metricas.alunosInadimplentes}
                           </Typography>
-                          <Typography variant="body2" sx={{ opacity: 0.8 }}>
+                          <Typography 
+                            variant="body2" 
+                            sx={{ 
+                              opacity: 0.8,
+                              fontSize: { xs: '0.75rem', md: '0.875rem' }
+                            }}
+                          >
                             Inadimplentes
                           </Typography>
                         </Box>
-                        <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)' }}>
+                        <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', display: { xs: 'none', sm: 'flex' } }}>
                           <TrendingDown />
                         </Avatar>
                       </Box>
@@ -2018,7 +2097,7 @@ const FinanceiroPage = () => {
               </Grid>
 
               {/* Tabs de Navegação */}
-              <Paper sx={{ mb: 3 }}>
+              <Paper sx={{ mb: 3, overflow: 'hidden' }}>
                 <Tabs 
                   value={tabValue} 
                   onChange={(e, newValue) => setTabValue(newValue)}
@@ -2029,31 +2108,72 @@ const FinanceiroPage = () => {
                     borderBottom: 1, 
                     borderColor: 'divider',
                     '& .MuiTab-root': {
-                      fontSize: { xs: '0.875rem', md: '1rem' },
-                      minWidth: { xs: 120, md: 160 }
+                      fontSize: { xs: '0.75rem', sm: '0.875rem', md: '1rem' },
+                      minWidth: { xs: 100, sm: 120, md: 160 },
+                      padding: { xs: '8px 12px', md: '12px 24px' },
+                      minHeight: { xs: 40, md: 48 }
+                    },
+                    '& .MuiTabs-scrollButtons': {
+                      width: { xs: 32, md: 40 }
                     }
                   }}
                 >
                   <Tab 
-                    label="📊 Dashboard" 
+                    label={
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        <span>📊</span>
+                        <span style={{ display: { xs: 'none', sm: 'inline' } }}>Dashboard</span>
+                      </Box>
+                    }
                     disabled={userRole === 'pai'}
                   />
                   <Tab 
-                    label="📋 Títulos" 
+                    label={
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        <span>📋</span>
+                        <span>Títulos</span>
+                      </Box>
+                    }
                     disabled={userRole === 'professora'}
                   />
                   <Tab 
-                    label="💳 Créditos" 
+                    label={
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        <span>💳</span>
+                        <span style={{ display: { xs: 'none', sm: 'inline' } }}>Créditos</span>
+                      </Box>
+                    }
                     disabled={userRole === 'professora'}
                   />
                   {userRole === 'coordenadora' && (
-                    <Tab label="📅 Contas a Pagar" />
+                    <Tab 
+                      label={
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          <span>📅</span>
+                          <span style={{ fontSize: { xs: '0.7rem', md: '0.875rem' } }}>C. Pagar</span>
+                        </Box>
+                      }
+                    />
                   )}
                   {userRole === 'coordenadora' && (
-                    <Tab label="🟢 Contas Pagas" />
+                    <Tab 
+                      label={
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          <span>🟢</span>
+                          <span style={{ fontSize: { xs: '0.7rem', md: '0.875rem' } }}>C. Pagas</span>
+                        </Box>
+                      }
+                    />
                   )}
                   {userRole === 'coordenadora' && (
-                    <Tab label="📊 Relatórios" />
+                    <Tab 
+                      label={
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          <span>📊</span>
+                          <span style={{ fontSize: { xs: '0.7rem', md: '0.875rem' } }}>Relatórios</span>
+                        </Box>
+                      }
+                    />
                   )}
                 </Tabs>
               </Paper>
@@ -2067,8 +2187,15 @@ const FinanceiroPage = () => {
               {tabValue === 1 && !isProfessor() && (
                 <Card>
                   <CardContent>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-                      <Typography variant="h6">
+                    <Box sx={{ 
+                      display: 'flex', 
+                      justifyContent: 'space-between', 
+                      alignItems: { xs: 'flex-start', sm: 'center' },
+                      mb: 3,
+                      flexDirection: { xs: 'column', sm: 'row' },
+                      gap: { xs: 2, sm: 0 }
+                    }}>
+                      <Typography variant="h6" sx={{ fontSize: { xs: '1.1rem', md: '1.25rem' } }}>
                         📋 Gestão de Títulos
                       </Typography>
                       {isCoordenador() && (
@@ -2076,6 +2203,12 @@ const FinanceiroPage = () => {
                           variant="contained"
                           startIcon={<Add />}
                           onClick={() => setNovoTituloDialog(true)}
+                          sx={{
+                            width: { xs: '100%', sm: 'auto' },
+                            fontSize: { xs: '0.875rem', md: '1rem' },
+                            py: { xs: 1, md: 1.5 },
+                            px: { xs: 2, md: 3 }
+                          }}
                         >
                           Novo Título
                         </Button>
@@ -2084,13 +2217,19 @@ const FinanceiroPage = () => {
 
                     {/* Filtros */}
                     <Card sx={{ mb: 3, maxWidth: 'none' }}>
-                      <CardContent sx={{ p: 3 }}>
-                        <Typography variant="subtitle1" fontWeight={600} gutterBottom color="primary">
+                      <CardContent sx={{ p: { xs: 2, md: 3 } }}>
+                        <Typography 
+                          variant="subtitle1" 
+                          fontWeight={600} 
+                          gutterBottom 
+                          color="primary"
+                          sx={{ fontSize: { xs: '1rem', md: '1.1rem' } }}
+                        >
                           🔍 Filtros de Busca
                         </Typography>
                         
-                        <Grid container spacing={3} sx={{ width: '100%' }}>
-                          <Grid item xs={12} md={6} lg={4} sx={{ minWidth: '300px' }}>
+                        <Grid container spacing={{ xs: 2, md: 3 }} sx={{ width: '100%' }}>
+                          <Grid item xs={12} sx={{ minWidth: '300px' }}>
                             <FormControl fullWidth sx={{ minWidth: '250px' }}>
                               <InputLabel>Turma</InputLabel>
                               <Select
@@ -2108,7 +2247,7 @@ const FinanceiroPage = () => {
                             </FormControl>
                           </Grid>
                           
-                          <Grid item xs={12} md={6} lg={4} sx={{ minWidth: '300px' }}>
+                          <Grid item xs={12} sx={{ minWidth: '300px' }}>
                             <TextField
                               label="Nome do Aluno"
                               fullWidth
@@ -2119,7 +2258,7 @@ const FinanceiroPage = () => {
                             />
                           </Grid>
                           
-                          <Grid item xs={12} md={6} lg={4} sx={{ minWidth: '300px' }}>
+                          <Grid item xs={12} sx={{ minWidth: '300px' }}>
                             <FormControl fullWidth sx={{ minWidth: '250px' }}>
                               <InputLabel>Tipo de Título</InputLabel>
                               <Select
@@ -2140,7 +2279,7 @@ const FinanceiroPage = () => {
                             </FormControl>
                           </Grid>
                           
-                          <Grid item xs={12} md={6} lg={4} sx={{ minWidth: '300px' }}>
+                          <Grid item xs={12} sx={{ minWidth: '300px' }}>
                             <FormControl fullWidth sx={{ minWidth: '250px' }}>
                               <InputLabel>Status</InputLabel>
                               <Select
@@ -2157,7 +2296,7 @@ const FinanceiroPage = () => {
                             </FormControl>
                           </Grid>
                           
-                          <Grid item xs={12} md={6} lg={4} sx={{ minWidth: '300px' }}>
+                          <Grid item xs={12} sx={{ minWidth: '300px' }}>
                             <TextField
                               label="Data Início"
                               type="date"
@@ -2169,7 +2308,7 @@ const FinanceiroPage = () => {
                             />
                           </Grid>
                           
-                          <Grid item xs={12} md={6} lg={4} sx={{ minWidth: '300px' }}>
+                          <Grid item xs={12} sx={{ minWidth: '300px' }}>
                             <TextField
                               label="Data Fim"
                               type="date"
@@ -2181,7 +2320,7 @@ const FinanceiroPage = () => {
                             />
                           </Grid>
                           
-                          <Grid item xs={12} md={6} lg={4} sx={{ minWidth: '300px' }}>
+                          <Grid item xs={12} sx={{ minWidth: '300px' }}>
                             <Button
                               variant="outlined"
                               fullWidth
@@ -2193,7 +2332,10 @@ const FinanceiroPage = () => {
                                 dataInicio: '',
                                 dataFim: ''
                               })}
-                              sx={{ height: '56px', minWidth: '250px' }}
+                              sx={{ 
+                                height: { xs: '40px', md: '56px' },
+                                minWidth: '250px'
+                              }}
                             >
                               🗑️ Limpar Filtros
                             </Button>
@@ -2205,15 +2347,18 @@ const FinanceiroPage = () => {
                     {/* Paginação - Topo */}
                     {filtrarTitulos().length > 0 && (
                       <Card sx={{ mb: 2 }}>
-                        <CardContent>
+                        <CardContent sx={{ p: { xs: 2, md: 3 } }}>
                           <Stack 
-                            direction="row" 
+                            direction={{ xs: 'column', sm: 'row' }}
                             justifyContent="space-between" 
-                            alignItems="center"
-                            flexWrap="wrap"
+                            alignItems={{ xs: 'stretch', sm: 'center' }}
                             gap={2}
                           >
-                            <Typography variant="body2" color="text.secondary">
+                            <Typography 
+                              variant="body2" 
+                              color="text.secondary"
+                              sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}
+                            >
                               Exibindo {Math.min((paginacao.paginaAtual - 1) * paginacao.itensPorPagina + 1, filtrarTitulos().length)} - {Math.min(paginacao.paginaAtual * paginacao.itensPorPagina, filtrarTitulos().length)} de {filtrarTitulos().length} títulos
                             </Typography>
                             <Pagination
@@ -2223,103 +2368,147 @@ const FinanceiroPage = () => {
                               color="primary"
                               showFirstButton
                               showLastButton
+                              size="small"
+                              sx={{
+                                '& .MuiPagination-ul': {
+                                  justifyContent: { xs: 'center', sm: 'flex-end' }
+                                }
+                              }}
                             />
                           </Stack>
                         </CardContent>
                       </Card>
                     )}
 
-                    <TableContainer>
-                      <Table>
+                    <TableContainer sx={{ 
+                      overflowX: 'auto',
+                      '& .MuiTable-root': {
+                        minWidth: { xs: 600, md: 'auto' }
+                      }
+                    }}>
+                      <Table size="small">
                         <TableHead>
                           <TableRow>
-                            <TableCell>Aluno</TableCell>
-                            <TableCell>Tipo</TableCell>
-                            <TableCell>Descrição</TableCell>
-                            <TableCell>Valor</TableCell>
-                            <TableCell>Vencimento</TableCell>
-                            <TableCell>Status</TableCell>
-                            {(isCoordenador() || isPai()) && <TableCell>Ações</TableCell>}
+                            <TableCell sx={{ whiteSpace: 'nowrap' }}>Aluno</TableCell>
+                            <TableCell sx={{ whiteSpace: 'nowrap' }}>Tipo</TableCell>
+                            <TableCell sx={{ whiteSpace: 'nowrap' }}>Descrição</TableCell>
+                            <TableCell sx={{ whiteSpace: 'nowrap' }}>Valor</TableCell>
+                            <TableCell sx={{ whiteSpace: 'nowrap' }}>Vencimento</TableCell>
+                            <TableCell sx={{ whiteSpace: 'nowrap' }}>Status</TableCell>
+                            {(isCoordenador() || isPai()) && <TableCell sx={{ whiteSpace: 'nowrap' }}>Ações</TableCell>}
                           </TableRow>
                         </TableHead>
                         <TableBody>
                           {obterTitulosPaginados().map((titulo) => (
                             <TableRow key={titulo.id}>
-                              <TableCell>
+                              <TableCell sx={{ 
+                                whiteSpace: 'nowrap',
+                                fontSize: { xs: '0.75rem', md: '0.875rem' }
+                              }}>
                                 {alunos.find(a => a.id === titulo.alunoId)?.nome || 'Aluno não encontrado'}
                               </TableCell>
-                              <TableCell>{titulo.tipo}</TableCell>
-                              <TableCell>{titulo.descricao}</TableCell>
-                              <TableCell>{formatCurrency(titulo.valor)}</TableCell>
-                              <TableCell>{formatDate(titulo.vencimento)}</TableCell>
+                              <TableCell sx={{ 
+                                whiteSpace: 'nowrap',
+                                fontSize: { xs: '0.75rem', md: '0.875rem' }
+                              }}>
+                                {titulo.tipo}
+                              </TableCell>
+                              <TableCell sx={{ 
+                                maxWidth: { xs: 150, md: 'none' },
+                                fontSize: { xs: '0.75rem', md: '0.875rem' },
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis'
+                              }}>
+                                {titulo.descricao}
+                              </TableCell>
+                              <TableCell sx={{ 
+                                whiteSpace: 'nowrap',
+                                fontSize: { xs: '0.75rem', md: '0.875rem' },
+                                fontWeight: 'bold'
+                              }}>
+                                {formatCurrency(titulo.valor)}
+                              </TableCell>
+                              <TableCell sx={{ 
+                                whiteSpace: 'nowrap',
+                                fontSize: { xs: '0.75rem', md: '0.875rem' }
+                              }}>
+                                {formatDate(titulo.vencimento)}
+                              </TableCell>
                               <TableCell>
                                 <Chip
                                   label={getStatusLabel(titulo.status)}
                                   color={getStatusColor(titulo.status)}
                                   size="small"
+                                  sx={{ fontSize: { xs: '0.6rem', md: '0.75rem' } }}
                                 />
                               </TableCell>
                               {(isCoordenador() || isPai()) && (
                                 <TableCell>
-                                  {isCoordenador() && (
-                                    <>
-                                      {titulo.status === 'pendente' && (
-                                        <Tooltip title="Dar Baixa">
-                                          <IconButton
-                                            onClick={() => {
-                                              setTituloSelecionado(titulo);
-                                              setBaixaDialog(true);
-                                            }}
-                                            color="primary"
+                                  <Box sx={{ 
+                                    display: 'flex', 
+                                    gap: 0.5,
+                                    flexWrap: 'wrap'
+                                  }}>
+                                    {isCoordenador() && (
+                                      <>
+                                        {titulo.status === 'pendente' && (
+                                          <Tooltip title="Dar Baixa">
+                                            <IconButton
+                                              onClick={() => {
+                                                setTituloSelecionado(titulo);
+                                                setBaixaDialog(true);
+                                              }}
+                                              color="primary"
+                                              size="small"
+                                            >
+                                              <Payment />
+                                            </IconButton>
+                                          </Tooltip>
+                                        )}
+                                        {titulo.status === 'em_analise' && (
+                                          <>
+                                            <Tooltip title="Aprovar Pagamento">
+                                              <IconButton
+                                                onClick={() => aprovarPagamento(titulo)}
+                                                color="success"
+                                                size="small"
+                                              >
+                                                <CheckCircleOutlined />
+                                              </IconButton>
+                                            </Tooltip>
+                                            <Tooltip title="Rejeitar Pagamento">
+                                              <IconButton
+                                                onClick={() => rejeitarPagamento(titulo)}
+                                                color="error"
+                                                size="small"
+                                              >
+                                                <CancelOutlined />
+                                              </IconButton>
+                                            </Tooltip>
+                                          </>
+                                        )}
+                                        <Tooltip title="Ver Detalhes">
+                                          <IconButton 
                                             size="small"
+                                            onClick={() => visualizarDetalhes(titulo)}
                                           >
-                                            <Payment />
+                                            <Visibility />
                                           </IconButton>
                                         </Tooltip>
-                                      )}
-                                      {titulo.status === 'em_analise' && (
-                                        <>
-                                          <Tooltip title="Aprovar Pagamento">
-                                            <IconButton
-                                              onClick={() => aprovarPagamento(titulo)}
-                                              color="success"
-                                              size="small"
-                                            >
-                                              <CheckCircleOutlined />
-                                            </IconButton>
-                                          </Tooltip>
-                                          <Tooltip title="Rejeitar Pagamento">
-                                            <IconButton
-                                              onClick={() => rejeitarPagamento(titulo)}
-                                              color="error"
-                                              size="small"
-                                            >
-                                              <CancelOutlined />
-                                            </IconButton>
-                                          </Tooltip>
-                                        </>
-                                      )}
-                                      <Tooltip title="Ver Detalhes">
-                                        <IconButton 
+                                      </>
+                                    )}
+                                    {isPai() && titulo.status === 'pendente' && (
+                                      <Tooltip title="Pagar">
+                                        <IconButton
+                                          onClick={() => abrirDialogPagamento(titulo)}
+                                          color="primary"
                                           size="small"
-                                          onClick={() => visualizarDetalhes(titulo)}
                                         >
-                                          <Visibility />
+                                          <Payment />
                                         </IconButton>
                                       </Tooltip>
-                                    </>
-                                  )}
-                                  {isPai() && titulo.status === 'pendente' && (
-                                    <Tooltip title="Pagar">
-                                      <IconButton
-                                        onClick={() => abrirDialogPagamento(titulo)}
-                                        color="primary"
-                                        size="small"
-                                      >
-                                        <Payment />
-                                      </IconButton>
-                                    </Tooltip>
-                                  )}
+                                    )}
+                                  </Box>
                                 </TableCell>
                               )}
                             </TableRow>
@@ -2331,15 +2520,18 @@ const FinanceiroPage = () => {
                     {/* Paginação - Final */}
                     {filtrarTitulos().length > 0 && (
                       <Card sx={{ mt: 2 }}>
-                        <CardContent>
+                        <CardContent sx={{ p: { xs: 2, md: 3 } }}>
                           <Stack 
-                            direction="row" 
+                            direction={{ xs: 'column', sm: 'row' }}
                             justifyContent="space-between" 
-                            alignItems="center"
-                            flexWrap="wrap"
+                            alignItems={{ xs: 'stretch', sm: 'center' }}
                             gap={2}
                           >
-                            <Typography variant="body2" color="text.secondary">
+                            <Typography 
+                              variant="body2" 
+                              color="text.secondary"
+                              sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}
+                            >
                               Exibindo {Math.min((paginacao.paginaAtual - 1) * paginacao.itensPorPagina + 1, filtrarTitulos().length)} - {Math.min(paginacao.paginaAtual * paginacao.itensPorPagina, filtrarTitulos().length)} de {filtrarTitulos().length} títulos
                             </Typography>
                             <Pagination
@@ -2349,6 +2541,12 @@ const FinanceiroPage = () => {
                               color="primary"
                               showFirstButton
                               showLastButton
+                              size="small"
+                              sx={{
+                                '& .MuiPagination-ul': {
+                                  justifyContent: { xs: 'center', sm: 'flex-end' }
+                                }
+                              }}
                             />
                           </Stack>
                         </CardContent>
@@ -3257,19 +3455,46 @@ const FinanceiroPage = () => {
         </Box>
 
         {/* Dialog - Novo Título */}
-        <Dialog open={novoTituloDialog} onClose={() => setNovoTituloDialog(false)} maxWidth="sm" fullWidth>
-          <DialogTitle>💰 Gerar Novo Título</DialogTitle>
-          <DialogContent>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
+        <Dialog 
+          open={novoTituloDialog} 
+          onClose={() => setNovoTituloDialog(false)} 
+          maxWidth="sm" 
+          fullWidth
+          fullScreen={typeof window !== 'undefined' && window.innerWidth < 600}
+          PaperProps={{
+            sx: {
+              borderRadius: { xs: 0, sm: 2 }
+            }
+          }}
+        >
+          <DialogTitle sx={{ 
+            fontSize: { xs: '1.1rem', md: '1.25rem' },
+            p: { xs: 2, md: 3 }
+          }}>
+            💰 Gerar Novo Título
+          </DialogTitle>
+          <DialogContent sx={{ p: { xs: 2, md: 3 } }}>
+            <Box sx={{ 
+              display: 'flex', 
+              flexDirection: 'column', 
+              gap: { xs: 2, md: 2 }, 
+              mt: 1 
+            }}>
               <Autocomplete
                 options={alunos}
                 getOptionLabel={(aluno) => `${aluno.nome} - ${aluno.matricula}`}
                 value={alunos.find(a => a.id === novoTitulo.alunoId) || null}
                 onChange={(e, value) => setNovoTitulo(prev => ({ ...prev, alunoId: value?.id || '' }))}
-                renderInput={(params) => <TextField {...params} label="Aluno" required />}
+                renderInput={(params) => 
+                  <TextField 
+                    {...params} 
+                    label="Aluno" 
+                    required 
+                  />
+                }
               />
               
-              <FormControl fullWidth required sx={{ minWidth: '250px' }}>
+              <FormControl fullWidth required>
                 <InputLabel>Tipo</InputLabel>
                 <Select
                   value={novoTitulo.tipo}
@@ -3323,12 +3548,22 @@ const FinanceiroPage = () => {
               />
             </Box>
           </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setNovoTituloDialog(false)}>Cancelar</Button>
+          <DialogActions sx={{ 
+            p: { xs: 2, md: 3 },
+            gap: 1,
+            flexDirection: { xs: 'column', sm: 'row' }
+          }}>
+            <Button 
+              onClick={() => setNovoTituloDialog(false)}
+              fullWidth={typeof window !== 'undefined' && window.innerWidth < 600}
+            >
+              Cancelar
+            </Button>
             <Button 
               onClick={handleGerarTitulo} 
               variant="contained"
               disabled={!novoTitulo.alunoId || !novoTitulo.descricao || !novoTitulo.valor || !novoTitulo.vencimento}
+              fullWidth={typeof window !== 'undefined' && window.innerWidth < 600}
             >
               Gerar Título
             </Button>
@@ -3341,11 +3576,20 @@ const FinanceiroPage = () => {
           onClose={() => setPagamentoDialog(false)}
           maxWidth="sm"
           fullWidth
+          fullScreen={typeof window !== 'undefined' && window.innerWidth < 600}
+          PaperProps={{
+            sx: {
+              borderRadius: { xs: 0, sm: 2 }
+            }
+          }}
         >
-          <DialogTitle>
+          <DialogTitle sx={{ 
+            fontSize: { xs: '1.1rem', md: '1.25rem' },
+            p: { xs: 2, md: 3 }
+          }}>
             Enviar Comprovante de Pagamento
           </DialogTitle>
-          <DialogContent>
+          <DialogContent sx={{ p: { xs: 2, md: 3 } }}>
             {tituloSelecionado && (
               <Box sx={{ mb: 3 }}>
                 <Typography variant="subtitle2" color="text.secondary">
@@ -3379,7 +3623,7 @@ const FinanceiroPage = () => {
                 component="label"
                 startIcon={<PhotoCamera />}
                 fullWidth
-                sx={{ py: 2 }}
+                sx={{ py: { xs: 1.5, md: 2 } }}
               >
                 {pagamento.comprovante ? pagamento.comprovante.name : 'Selecionar Arquivo'}
                 <input
@@ -3394,10 +3638,15 @@ const FinanceiroPage = () => {
               </Typography>
             </Box>
           </DialogContent>
-          <DialogActions>
+          <DialogActions sx={{ 
+            p: { xs: 2, md: 3 },
+            gap: 1,
+            flexDirection: { xs: 'column', sm: 'row' }
+          }}>
             <Button 
               onClick={() => setPagamentoDialog(false)}
               disabled={pagamento.carregando}
+              fullWidth={typeof window !== 'undefined' && window.innerWidth < 600}
             >
               Cancelar
             </Button>
@@ -3406,6 +3655,7 @@ const FinanceiroPage = () => {
               variant="contained"
               disabled={!pagamento.comprovante || pagamento.carregando}
               startIcon={pagamento.carregando ? <CircularProgress size={20} /> : <Payment />}
+              fullWidth={typeof window !== 'undefined' && window.innerWidth < 600}
             >
               {pagamento.carregando ? 'Enviando...' : 'Enviar Pagamento'}
             </Button>
@@ -3432,7 +3682,15 @@ const FinanceiroPage = () => {
         {userRole === 'coordenadora' && (
           <SpeedDial
             ariaLabel="Ações Rápidas"
-            sx={{ position: 'fixed', bottom: 16, right: 16 }}
+            sx={{ 
+              position: 'fixed', 
+              bottom: { xs: 70, md: 16 }, 
+              right: { xs: 16, md: 16 },
+              '& .MuiFab-root': {
+                width: { xs: 48, md: 56 },
+                height: { xs: 48, md: 56 }
+              }
+            }}
             icon={<SpeedDialIcon />}
           >
             <SpeedDialAction

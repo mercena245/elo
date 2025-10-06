@@ -417,19 +417,38 @@ const Alunos = () => {
       const data = await response.json();
       
       if (!data.erro) {
-        setEditForm(prev => ({
-          ...prev,
-          [tipo]: {
-            ...prev[tipo],
-            endereco: {
-              ...prev[tipo]?.endereco,
-              rua: data.logradouro || '',
-              bairro: data.bairro || '',
-              cidade: data.localidade || '',
-              uf: data.uf || ''
-            }
+        setEditForm(prev => {
+          if (tipo === 'endereco') {
+            // Para o endereço do aluno - preservar CEP
+            return {
+              ...prev,
+              endereco: {
+                ...prev.endereco,
+                cep: cep, // Preservar o CEP digitado
+                rua: data.logradouro || '',
+                bairro: data.bairro || '',
+                cidade: data.localidade || '',
+                uf: data.uf || ''
+              }
+            };
+          } else {
+            // Para endereços de responsáveis (mae, pai) - preservar CEP
+            return {
+              ...prev,
+              [tipo]: {
+                ...prev[tipo],
+                endereco: {
+                  ...prev[tipo]?.endereco,
+                  cep: cep, // Preservar o CEP digitado
+                  rua: data.logradouro || '',
+                  bairro: data.bairro || '',
+                  cidade: data.localidade || '',
+                  uf: data.uf || ''
+                }
+              }
+            };
           }
-        }));
+        });
       }
     } catch (error) {
       console.error('Erro ao buscar CEP:', error);
@@ -1267,7 +1286,7 @@ const Alunos = () => {
     setValidacaoCpf({});
   };
 
-  const handleFormChange = async (e) => {
+  const handleFormChange = (e) => {
     const { name, value, type, checked } = e.target;
     
     // Tratamento especial para checkboxes de responsabilidade
@@ -1304,43 +1323,15 @@ const Alunos = () => {
     if (name === 'turmaId') {
       setEditForm(prev => ({ ...prev, turmaId: value }));
       if (value) {
-        await buscarDadosTurma(value);
+        buscarDadosTurma(value);
       }
       return;
     }
     
-    // Tratamento para CEP com busca automática
+    // Tratamento para CEP com busca automática (mantido para compatibilidade)
     if (name.endsWith('.endereco.cep') || name === 'endereco.cep') {
-      const cepLimpo = value.replace(/\D/g, '');
-      if (name.includes('.')) {
-        const [pessoa, , campo] = name.split('.');
-        setEditForm(prev => ({
-          ...prev,
-          [pessoa]: {
-            ...prev[pessoa],
-            endereco: {
-              ...prev[pessoa].endereco,
-              [campo]: cepLimpo
-            }
-          }
-        }));
-        
-        if (cepLimpo.length === 8) {
-          await buscarEnderecoPorCep(cepLimpo, pessoa);
-        }
-      } else {
-        setEditForm(prev => ({
-          ...prev,
-          endereco: {
-            ...prev.endereco,
-            cep: cepLimpo
-          }
-        }));
-        
-        if (cepLimpo.length === 8) {
-          await buscarEnderecoPorCep(cepLimpo, 'endereco');
-        }
-      }
+      // Esta lógica agora é tratada diretamente nos campos onChange
+      // Mantido apenas para compatibilidade com outros campos que ainda usam handleFormChange
       return;
     }
     
@@ -2308,10 +2299,23 @@ const Alunos = () => {
                               label="CEP"
                               name="endereco.cep"
                               value={editForm.endereco?.cep || ''}
-                              onChange={handleFormChange}
+                              onChange={(e) => {
+                                const value = e.target.value.replace(/\D/g, '').substring(0, 8);
+                                setEditForm(prev => ({
+                                  ...prev,
+                                  endereco: {
+                                    ...(prev.endereco || {}),
+                                    cep: value
+                                  }
+                                }));
+                                
+                                // Buscar endereço automaticamente quando CEP estiver completo
+                                if (value.length === 8) {
+                                  buscarEnderecoPorCep(value, 'endereco');
+                                }
+                              }}
                               required
-                              disabled={buscandoCep}
-                              helperText={buscandoCep ? 'Buscando endereço...' : ''}
+                              helperText={buscandoCep ? 'Buscando endereço...' : 'Digite o CEP (apenas números)'}
                             />
                             {buscandoCep && <CircularProgress size={20} />}
                           </Box>
@@ -2490,9 +2494,26 @@ const Alunos = () => {
                               label="CEP"
                               name="mae.endereco.cep"
                               value={editForm.mae?.endereco?.cep || ''}
-                              onChange={handleFormChange}
+                              onChange={(e) => {
+                                const value = e.target.value.replace(/\D/g, '').substring(0, 8);
+                                setEditForm(prev => ({
+                                  ...prev,
+                                  mae: {
+                                    ...(prev.mae || {}),
+                                    endereco: {
+                                      ...(prev.mae?.endereco || {}),
+                                      cep: value
+                                    }
+                                  }
+                                }));
+                                
+                                // Buscar endereço automaticamente quando CEP estiver completo
+                                if (value.length === 8) {
+                                  buscarEnderecoPorCep(value, 'mae');
+                                }
+                              }}
                               required={editForm.mae?.responsavelFinanceiro}
-                              disabled={buscandoCep}
+                              helperText={buscandoCep ? 'Buscando endereço...' : ''}
                             />
                             {buscandoCep && <CircularProgress size={20} />}
                           </Box>
@@ -2635,9 +2656,26 @@ const Alunos = () => {
                               label="CEP"
                               name="pai.endereco.cep"
                               value={editForm.pai?.endereco?.cep || ''}
-                              onChange={handleFormChange}
+                              onChange={(e) => {
+                                const value = e.target.value.replace(/\D/g, '').substring(0, 8);
+                                setEditForm(prev => ({
+                                  ...prev,
+                                  pai: {
+                                    ...(prev.pai || {}),
+                                    endereco: {
+                                      ...(prev.pai?.endereco || {}),
+                                      cep: value
+                                    }
+                                  }
+                                }));
+                                
+                                // Buscar endereço automaticamente quando CEP estiver completo
+                                if (value.length === 8) {
+                                  buscarEnderecoPorCep(value, 'pai');
+                                }
+                              }}
                               required={editForm.pai?.responsavelFinanceiro}
-                              disabled={buscandoCep}
+                              helperText={buscandoCep ? 'Buscando endereço...' : ''}
                             />
                             {buscandoCep && <CircularProgress size={20} />}
                           </Box>

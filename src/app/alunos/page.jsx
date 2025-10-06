@@ -19,6 +19,7 @@ import {
   Dialog, 
   DialogTitle, 
   DialogContent, 
+  DialogContentText,
   DialogActions, 
   Button, 
   TextField, 
@@ -42,6 +43,7 @@ import { storage } from '../../firebase-storage';
 import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { auditService, LOG_ACTIONS } from '../../services/auditService';
 import { financeiroService } from '../../services/financeiroService';
+import FichaMatricula from '../../components/FichaMatricula';
 
 // Componente para indicador de pré-matrícula
 const PreMatriculaIndicator = ({ aluno }) => {
@@ -176,7 +178,7 @@ const PreMatriculaDetalhes = ({ aluno }) => {
     return (
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
         <CircularProgress size={16} />
-        <Typography variant="body2" sx={{ color: '#64748b' }}>
+        <Typography component="span" variant="body2" sx={{ color: '#64748b' }}>
           Carregando informações de pagamento...
         </Typography>
       </Box>
@@ -185,7 +187,7 @@ const PreMatriculaDetalhes = ({ aluno }) => {
 
   if (!detalhes) {
     return (
-      <Typography variant="body2" sx={{ color: '#dc2626' }}>
+      <Typography component="div" variant="body2" sx={{ color: '#dc2626' }}>
         ❌ Erro ao carregar informações de pagamento
       </Typography>
     );
@@ -208,20 +210,20 @@ const PreMatriculaDetalhes = ({ aluno }) => {
 
   return (
     <Box>
-      <Typography variant="body2" sx={{ color: '#92400e', mb: 1 }}>
-        📋 <strong>Situação dos Pagamentos Obrigatórios</strong>
+      <Typography component="div" variant="body2" sx={{ color: '#92400e', mb: 1 }}>
+        📋 Situação dos Pagamentos Obrigatórios
       </Typography>
       
       <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1, mb: 2 }}>
         <Box>
-          <Typography variant="body2" sx={{ 
+          <Typography component="div" variant="body2" sx={{ 
             color: getStatusColor(detalhes.matricula),
             fontWeight: 500 
           }}>
             {getStatusIcon(detalhes.matricula)} Taxa de Matrícula: {getStatusText(detalhes.matricula)}
           </Typography>
           {detalhes.matricula && (
-            <Typography variant="caption" sx={{ color: '#64748b', display: 'block' }}>
+            <Typography component="span" variant="caption" sx={{ color: '#64748b', display: 'block' }}>
               Valor: R$ {(detalhes.matricula.valor || 0).toFixed(2)}
               {detalhes.matricula.vencimento && ` | Vencimento: ${new Date(detalhes.matricula.vencimento).toLocaleDateString('pt-BR')}`}
             </Typography>
@@ -229,14 +231,14 @@ const PreMatriculaDetalhes = ({ aluno }) => {
         </Box>
         
         <Box>
-          <Typography variant="body2" sx={{ 
+          <Typography component="div" variant="body2" sx={{ 
             color: getStatusColor(detalhes.materiais),
             fontWeight: 500 
           }}>
             {getStatusIcon(detalhes.materiais)} Taxa de Materiais: {getStatusText(detalhes.materiais)}
           </Typography>
           {detalhes.materiais && (
-            <Typography variant="caption" sx={{ color: '#64748b', display: 'block' }}>
+            <Typography component="span" variant="caption" sx={{ color: '#64748b', display: 'block' }}>
               Valor: R$ {(detalhes.materiais.valor || 0).toFixed(2)}
               {detalhes.materiais.vencimento && ` | Vencimento: ${new Date(detalhes.materiais.vencimento).toLocaleDateString('pt-BR')}`}
             </Typography>
@@ -246,17 +248,17 @@ const PreMatriculaDetalhes = ({ aluno }) => {
       
       {detalhes.totalPendente > 0 ? (
         <Alert severity="warning" sx={{ mt: 1 }}>
-          <Typography variant="body2">
+          <span style={{ fontSize: '0.875rem' }}>
             💰 <strong>Total pendente: R$ {detalhes.totalPendente.toFixed(2)}</strong><br />
             ⚠️ O aluno será ativado automaticamente após quitação dos valores obrigatórios.
-          </Typography>
+          </span>
         </Alert>
       ) : (
         <Alert severity="success" sx={{ mt: 1 }}>
-          <Typography variant="body2">
+          <span style={{ fontSize: '0.875rem' }}>
             🎉 <strong>Todos os pagamentos obrigatórios foram realizados!</strong><br />
             ✅ O aluno será ativado automaticamente na próxima verificação.
-          </Typography>
+          </span>
         </Alert>
       )}
     </Box>
@@ -315,6 +317,12 @@ const Alunos = () => {
   const [validacaoCpf, setValidacaoCpf] = useState({});
   const [fotoAluno, setFotoAluno] = useState(null);
   const inputFotoRef = useRef(null);
+  // Estado para ficha de matrícula
+  const [fichaMatriculaOpen, setFichaMatriculaOpen] = useState(false);
+  const [alunoSelecionadoFicha, setAlunoSelecionadoFicha] = useState(null);
+  // Estados para confirmação de fechamento do modal
+  const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
+  const [pendingClose, setPendingClose] = useState(false);
 
   // Remover anexo do Storage e do registro do aluno
   const handleRemoverAnexo = async (anexo, idx) => {
@@ -1286,6 +1294,44 @@ const Alunos = () => {
     setValidacaoCpf({});
   };
 
+  // Função para abrir ficha de matrícula
+  const handleAbrirFichaMatricula = (aluno) => {
+    setAlunoSelecionadoFicha(aluno);
+    setFichaMatriculaOpen(true);
+  };
+
+  const handleFecharFichaMatricula = () => {
+    setFichaMatriculaOpen(false);
+    setAlunoSelecionadoFicha(null);
+  };
+
+  // Função para tentar fechar o modal com confirmação
+  const handleTentarFecharModal = () => {
+    setConfirmCloseOpen(true);
+    setPendingClose(true);
+  };
+
+  // Função para confirmar fechamento e perder dados
+  const handleConfirmarFechamento = () => {
+    setConfirmCloseOpen(false);
+    setPendingClose(false);
+    setEditOpen(false);
+    // Limpar dados do formulário
+    setEditForm({});
+    setEditAluno(null);
+    setFormError('');
+    setFormStep(1);
+    setDadosTurma(null);
+    setFotoAluno(null);
+    setValidacaoCpf({});
+  };
+
+  // Função para cancelar fechamento
+  const handleCancelarFechamento = () => {
+    setConfirmCloseOpen(false);
+    setPendingClose(false);
+  };
+
   const handleFormChange = (e) => {
     const { name, value, type, checked } = e.target;
     
@@ -1321,7 +1367,11 @@ const Alunos = () => {
     
     // Tratamento para mudança de turma
     if (name === 'turmaId') {
-      setEditForm(prev => ({ ...prev, turmaId: value }));
+      setEditForm(prev => ({ 
+        ...prev, 
+        turmaId: value,
+        turno: value ? (turmas[value]?.turno || '') : '' // Atualiza turno automaticamente
+      }));
       if (value) {
         buscarDadosTurma(value);
       }
@@ -1886,11 +1936,11 @@ const Alunos = () => {
                     />
                   </Box>
                   {turmaSelecionada === '' ? (
-                    <Typography variant="body2" color="text.secondary" align="center">
+                    <Typography component="div" variant="body2" color="text.secondary" align="center">
                       Selecione uma turma para ver os alunos.
                     </Typography>
                   ) : alunosFiltrados.length === 0 ? (
-                    <Typography variant="body2" color="text.secondary" align="center">
+                    <Typography component="div" variant="body2" color="text.secondary" align="center">
                       Nenhum aluno encontrado para esta turma.
                     </Typography>
                   ) : (
@@ -2020,6 +2070,24 @@ const Alunos = () => {
                                     >
                                       ✏️
                                     </Button>
+                                    <Button
+                                      variant="outlined"
+                                      size="small"
+                                      onClick={() => handleAbrirFichaMatricula(aluno)}
+                                      sx={{
+                                        minWidth: 'auto',
+                                        px: 1.5,
+                                        borderColor: '#059669',
+                                        color: '#059669',
+                                        '&:hover': {
+                                          bgcolor: '#f0fdf4',
+                                          borderColor: '#047857'
+                                        }
+                                      }}
+                                      title="Imprimir Ficha de Matrícula"
+                                    >
+                                      🖨️
+                                    </Button>
                                     <IconButton
                                       onClick={(e) => toggleCardExpansao(aluno.id || `${aluno.matricula}_${idx}`, e)}
                                       sx={{
@@ -2035,14 +2103,14 @@ const Alunos = () => {
                                 </Box>
                               }
                               secondary={
-                                <Box sx={{ mt: 1 }}>  
-                                  <Typography variant="body2" sx={{ color: '#6366f1', fontWeight: 500, mb: 0.5 }}>
+                                <>
+                                  <Typography component="span" variant="body2" sx={{ color: '#6366f1', fontWeight: 500, mb: 0.5, display: 'block', mt: 1 }}>
                                     📋 Matrícula: {aluno.matricula || '--'}
                                   </Typography>
-                                  <Typography variant="body2" sx={{ color: '#059669', mb: 0.5 }}>
+                                  <Typography component="span" variant="body2" sx={{ color: '#059669', mb: 0.5, display: 'block' }}>
                                     🏫 Turma: {getTurmaNome(aluno.turmaId)}
                                   </Typography>
-                                </Box>
+                                </>
                               }
                             />
                           </ListItem>
@@ -2057,7 +2125,7 @@ const Alunos = () => {
                               border: '1px solid #e0e7ff',
                               boxShadow: 'inset 0 2px 4px rgba(0, 0, 0, 0.05)'
                             }}>
-                              <Typography variant="subtitle2" sx={{ color: '#4f46e5', fontWeight: 'bold', mb: 2 }}>
+                              <Typography component="div" variant="subtitle2" sx={{ color: '#4f46e5', fontWeight: 'bold', mb: 2 }}>
                                 📊 Informações Detalhadas
                               </Typography>
                               
@@ -2070,7 +2138,7 @@ const Alunos = () => {
                                   borderRadius: 2, 
                                   border: '1px solid #fed7aa' 
                                 }}>
-                                  <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#d97706', mb: 1 }}>
+                                  <Typography component="div" variant="body2" sx={{ fontWeight: 'bold', color: '#d97706', mb: 1 }}>
                                     ⏳ Status de Pré-Matrícula
                                   </Typography>
                                   <PreMatriculaDetalhes aluno={aluno} />
@@ -2080,26 +2148,29 @@ const Alunos = () => {
                               <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
                                 {/* Dados Pessoais */}
                                 <Box>
-                                  <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#1e293b', mb: 1 }}>
+                                  <Typography component="div" variant="body2" sx={{ fontWeight: 'bold', color: '#1e293b', mb: 1 }}>
                                     👤 Dados Pessoais
                                   </Typography>
                                   {aluno.dataNascimento && (
-                                    <Typography variant="body2" sx={{ color: '#64748b', mb: 0.5 }}>
+                                    <Typography component="span" variant="body2" sx={{ color: '#64748b', mb: 0.5, display: 'block' }}>
                                       🎂 Nascimento: {aluno.dataNascimento}
                                     </Typography>
                                   )}
                                   {aluno.cpf && (
-                                    <Typography variant="body2" sx={{ color: '#64748b', mb: 0.5 }}>
+                                    <Typography component="span" variant="body2" sx={{ color: '#64748b', mb: 0.5, display: 'block' }}>
                                       🆔 CPF: {aluno.cpf}
                                     </Typography>
                                   )}
                                   {aluno.endereco && (
-                                    <Typography variant="body2" sx={{ color: '#64748b', mb: 0.5 }}>
-                                      🏠 Endereço: {aluno.endereco}
+                                    <Typography component="span" variant="body2" sx={{ color: '#64748b', mb: 0.5, display: 'block' }}>
+                                      🏠 Endereço: {typeof aluno.endereco === 'string' 
+                                        ? aluno.endereco 
+                                        : `${aluno.endereco.rua || ''}, ${aluno.endereco.bairro || ''}, ${aluno.endereco.cidade || ''} - ${aluno.endereco.uf || ''}, CEP: ${aluno.endereco.cep || ''}`
+                                      }
                                     </Typography>
                                   )}
                                   {aluno.telefone && (
-                                    <Typography variant="body2" sx={{ color: '#64748b', mb: 0.5 }}>
+                                    <Typography component="span" variant="body2" sx={{ color: '#64748b', mb: 0.5, display: 'block' }}>
                                       📞 Telefone: {aluno.telefone}
                                     </Typography>
                                   )}
@@ -2107,26 +2178,26 @@ const Alunos = () => {
                                 
                                 {/* Dados Familiares */}
                                 <Box>
-                                  <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#1e293b', mb: 1 }}>
+                                  <Typography component="div" variant="body2" sx={{ fontWeight: 'bold', color: '#1e293b', mb: 1 }}>
                                     👨‍👩‍👧‍👦 Família
                                   </Typography>
-                                  {aluno.nomePai && (
-                                    <Typography variant="body2" sx={{ color: '#64748b', mb: 0.5 }}>
-                                      👨 Pai: {aluno.nomePai}
+                                  {(aluno.nomePai || aluno.pai?.nome) && (
+                                    <Typography component="span" variant="body2" sx={{ color: '#64748b', mb: 0.5, display: 'block' }}>
+                                      👨 Pai: {aluno.nomePai || aluno.pai?.nome}
                                     </Typography>
                                   )}
-                                  {aluno.nomeMae && (
-                                    <Typography variant="body2" sx={{ color: '#64748b', mb: 0.5 }}>
-                                      👩 Mãe: {aluno.nomeMae}
+                                  {(aluno.nomeMae || aluno.mae?.nome) && (
+                                    <Typography component="span" variant="body2" sx={{ color: '#64748b', mb: 0.5, display: 'block' }}>
+                                      👩 Mãe: {aluno.nomeMae || aluno.mae?.nome}
                                     </Typography>
                                   )}
                                   {aluno.responsavelUsuario && (
-                                    <Typography variant="body2" sx={{ color: '#8b5cf6', fontWeight: 500, mb: 0.5 }}>
+                                    <Typography component="span" variant="body2" sx={{ color: '#8b5cf6', fontWeight: 500, mb: 0.5, display: 'block' }}>
                                       👤 Responsável: {aluno.responsavelUsuario.nome} ({aluno.responsavelUsuario.email})
                                     </Typography>
                                   )}
-                                  {aluno.contatoEmergencia && (
-                                    <Typography variant="body2" sx={{ color: '#dc2626', mb: 0.5 }}>
+                                  {aluno.contatoEmergencia && aluno.contatoEmergencia.nome && (
+                                    <Typography component="span" variant="body2" sx={{ color: '#dc2626', mb: 0.5, display: 'block' }}>
                                       🚨 Emergência: {aluno.contatoEmergencia.nome} ({aluno.contatoEmergencia.telefone})
                                     </Typography>
                                   )}
@@ -2136,28 +2207,29 @@ const Alunos = () => {
                               {/* Status Financeiro */}
                               {aluno.financeiro && (
                                 <Box sx={{ mt: 2, p: 2, bgcolor: 'white', borderRadius: 1, border: '1px solid #e2e8f0' }}>
-                                  <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#1e293b', mb: 1 }}>
+                                  <Typography component="div" variant="body2" sx={{ fontWeight: 'bold', color: '#1e293b', mb: 1 }}>
                                     💰 Informações Financeiras
                                   </Typography>
-                                  <Typography variant="body2" sx={{ 
+                                  <Typography component="span" variant="body2" sx={{ 
                                     color: aluno.financeiro.status === 'ativo' ? '#059669' : aluno.financeiro.status === 'inadimplente' ? '#d97706' : '#dc2626',
                                     fontWeight: 500,
-                                    mb: 0.5
+                                    mb: 0.5,
+                                    display: 'block'
                                   }}>
                                     Status: {aluno.financeiro.status?.toUpperCase() || 'INDEFINIDO'}
                                   </Typography>
                                   {aluno.financeiro.mensalidadeValor && (
-                                    <Typography variant="body2" sx={{ color: '#64748b', mb: 0.5 }}>
+                                    <Typography component="span" variant="body2" sx={{ color: '#64748b', mb: 0.5, display: 'block' }}>
                                       💵 Mensalidade: R$ {parseFloat(aluno.financeiro.mensalidadeValor).toFixed(2)}
                                     </Typography>
                                   )}
                                   {aluno.financeiro.descontoPercentual && (
-                                    <Typography variant="body2" sx={{ color: '#059669', mb: 0.5 }}>
+                                    <Typography component="span" variant="body2" sx={{ color: '#059669', mb: 0.5, display: 'block' }}>
                                       💸 Desconto: {aluno.financeiro.descontoPercentual}%
                                     </Typography>
                                   )}
                                   {aluno.financeiro.diaVencimento && (
-                                    <Typography variant="body2" sx={{ color: '#64748b', mb: 0.5 }}>
+                                    <Typography component="span" variant="body2" sx={{ color: '#64748b', mb: 0.5, display: 'block' }}>
                                       📅 Vencimento: Dia {aluno.financeiro.diaVencimento}
                                     </Typography>
                                   )}
@@ -2170,7 +2242,7 @@ const Alunos = () => {
                       })}
                     </List>
                   )}
-                  <Dialog open={editOpen} onClose={() => setEditOpen(false)} maxWidth="md" fullWidth>
+                  <Dialog open={editOpen} onClose={handleTentarFecharModal} maxWidth="md" fullWidth>
                     <DialogTitle sx={{ 
                       display: 'flex', 
                       alignItems: 'center', 
@@ -2189,7 +2261,7 @@ const Alunos = () => {
                         {formStep === 5 && ' - Informações de Saúde'}
                         {formStep === 6 && ' - Dados Financeiros'}
                       </span>
-                      <IconButton aria-label="fechar" onClick={() => setEditOpen(false)} size="small" sx={{ ml: 2 }}>
+                      <IconButton aria-label="fechar" onClick={handleTentarFecharModal} size="small" sx={{ ml: 2 }}>
                         <span style={{ fontSize: 22, fontWeight: 'bold' }}>&times;</span>
                       </IconButton>
                     </DialogTitle>
@@ -2365,22 +2437,22 @@ const Alunos = () => {
                             </Select>
                           </FormControl>
                           
-                          {dadosTurma && (
-                            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
-                              <TextField
-                                label="Série"
-                                value={dadosTurma.serie || ''}
-                                InputProps={{ readOnly: true }}
-                                sx={{ bgcolor: '#f8fafc' }}
-                              />
-                              <TextField
-                                label="Turno"
-                                value={dadosTurma.turno || ''}
-                                InputProps={{ readOnly: true }}
-                                sx={{ bgcolor: '#f8fafc' }}
-                              />
-                            </Box>
-                          )}
+                          <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+                            <TextField
+                              label="Série"
+                              name="serie"
+                              value={editForm.serie || ''}
+                              onChange={handleFormChange}
+                              placeholder="Ex: 1º Ano, 2º Ano, etc."
+                            />
+                            <TextField
+                              label="Turno"
+                              value={dadosTurma?.turno || ''}
+                              InputProps={{ readOnly: true }}
+                              sx={{ bgcolor: '#f8fafc' }}
+                              helperText="Turno vem automaticamente da turma selecionada"
+                            />
+                          </Box>
                         </Box>
                       )}
                       
@@ -2814,7 +2886,7 @@ const Alunos = () => {
                           ))}
                           
                           <Alert severity="warning">
-                            ⚠️ <strong>Importante:</strong> Todas as informações de saúde são confidenciais e serão utilizadas apenas para garantir o bem-estar e segurança do aluno.
+                            ⚠️ Importante: Todas as informações de saúde são confidenciais e serão utilizadas apenas para garantir o bem-estar e segurança do aluno.
                           </Alert>
                         </Box>
                       )}
@@ -2823,23 +2895,13 @@ const Alunos = () => {
                       {formStep === 6 && (
                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                           <Alert severity="info" sx={{ mb: 2 }}>
-                            💰 <strong>Sistema Financeiro Automático:</strong><br />
-                            • Se informar valor de matrícula ou materiais, o aluno ficará em "pré-matrícula" até o pagamento<br />
-                            • Mensalidades serão geradas automaticamente do mês atual até dezembro<br />
-                            • Status financeiro será atualizado automaticamente conforme pagamentos<br />
-                            <br />
-                            📋 <strong>Sobre Pré-Matrícula:</strong><br />
-                            • Aluno fica com acesso restrito até quitação dos valores obrigatórios<br />
-                            • Ativação automática após pagamento de matrícula/materiais<br />
-                            • Mensalidades continuam sendo geradas normalmente
+                            Sistema Financeiro Automático:\n\nSe informar valor de matrícula ou materiais, o aluno ficará em "pré-matrícula" até o pagamento.\nMensalidades serão geradas automaticamente do mês atual até dezembro.\nStatus financeiro será atualizado automaticamente conforme pagamentos.\n\nSobre Pré-Matrícula:\nAluno fica com acesso restrito até quitação dos valores obrigatórios.\nAtivação automática após pagamento de matrícula/materiais.\nMensalidades continuam sendo geradas normalmente.
                           </Alert>
                           
                           {/* Alerta especial para alunos em pré-matrícula */}
                           {!isNew && editForm.status === 'pre_matricula' && (
                             <Alert severity="warning" sx={{ mb: 2 }}>
-                              ⏳ <strong>Este aluno está em PRÉ-MATRÍCULA</strong><br />
-                              📊 Verificar na seção "Informações Detalhadas" quais pagamentos estão pendentes.<br />
-                              ✅ O aluno será ativado automaticamente após quitação dos valores obrigatórios.
+                              ⏳ Este aluno está em PRÉ-MATRÍCULA\n📊 Verificar na seção "Informações Detalhadas" quais pagamentos estão pendentes.\n✅ O aluno será ativado automaticamente após quitação dos valores obrigatórios.
                             </Alert>
                           )}
                           
@@ -3181,13 +3243,13 @@ const Alunos = () => {
                       
                       {resultadoTitulos && (
                         <Alert severity="success" sx={{ mt: 1 }}>
-                          <Typography variant="body2">
-                            <strong>🎉 Títulos gerados com sucesso!</strong><br />
-                            {resultadoTitulos.matricula > 0 && `• Taxa de matrícula: R$ ${(parseFloat(resultadoTitulos.detalhes.find(t => t.tipo === 'matricula')?.valor) || 0).toFixed(2)}`}<br />
-                            {resultadoTitulos.materiais > 0 && `• Taxa de materiais: R$ ${(parseFloat(resultadoTitulos.detalhes.find(t => t.tipo === 'materiais')?.valor) || 0).toFixed(2)}`}<br />
-                            • Mensalidades: {resultadoTitulos.mensalidades} títulos<br />
-                            • <strong>Total: R$ {(parseFloat(resultadoTitulos.valorTotal) || 0).toFixed(2)}</strong>
-                          </Typography>
+                          <span>
+                            🎉 Títulos gerados com sucesso!{'\n'}
+                            {resultadoTitulos.matricula > 0 && `• Taxa de matrícula: R$ ${(parseFloat(resultadoTitulos.detalhes.find(t => t.tipo === 'matricula')?.valor) || 0).toFixed(2)}\n`}
+                            {resultadoTitulos.materiais > 0 && `• Taxa de materiais: R$ ${(parseFloat(resultadoTitulos.detalhes.find(t => t.tipo === 'materiais')?.valor) || 0).toFixed(2)}\n`}
+                            • Mensalidades: {resultadoTitulos.mensalidades} títulos{'\n'}
+                            • Total: R$ {(parseFloat(resultadoTitulos.valorTotal) || 0).toFixed(2)}
+                          </span>
                         </Alert>
                       )}
                     </DialogActions>
@@ -3276,32 +3338,34 @@ const Alunos = () => {
                                     <ListItem key={idx} divider={idx < titulosEmAberto.length - 1}>
                                       <ListItemText
                                         primary={
-                                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                            <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                          <span style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <Typography component="span" variant="body2" sx={{ fontWeight: 500 }}>
                                               {titulo.descricao}
                                             </Typography>
-                                            <Typography variant="body2" sx={{ 
+                                            <Typography component="span" variant="body2" sx={{ 
                                               color: isVencido ? '#dc2626' : '#d97706',
                                               fontWeight: 'bold'
                                             }}>
                                               R$ {(titulo.valor || 0).toFixed(2)}
                                             </Typography>
-                                          </Box>
+                                          </span>
                                         }
                                         secondary={
-                                          <Box sx={{ mt: 0.5 }}>
-                                            <Typography variant="caption" sx={{ 
+                                          <>
+                                            <Typography component="span" variant="caption" sx={{ 
                                               color: isVencido ? '#dc2626' : '#64748b',
-                                              fontWeight: isVencido ? 'bold' : 'normal'
+                                              fontWeight: isVencido ? 'bold' : 'normal',
+                                              display: 'block',
+                                              mt: 0.5
                                             }}>
                                               Vencimento: {vencimento.toLocaleDateString('pt-BR')}
                                               {isVencido && ` (${diasAtraso} dias em atraso)`}
                                               {!isVencido && diasAtraso < 0 && ` (vence em ${Math.abs(diasAtraso)} dias)`}
                                             </Typography>
-                                            <Typography variant="caption" sx={{ display: 'block', color: '#6366f1' }}>
+                                            <Typography component="span" variant="caption" sx={{ display: 'block', color: '#6366f1' }}>
                                               Tipo: {titulo.tipo}
                                             </Typography>
-                                          </Box>
+                                          </>
                                         }
                                       />
                                     </ListItem>
@@ -3337,6 +3401,64 @@ const Alunos = () => {
                       </Button>
                     </DialogActions>
                   </Dialog>
+                  </Dialog>
+
+                  {/* Modal de Confirmação de Fechamento */}
+                  <Dialog
+                    open={confirmCloseOpen}
+                    onClose={handleCancelarFechamento}
+                    aria-labelledby="confirm-close-dialog-title"
+                    aria-describedby="confirm-close-dialog-description"
+                  >
+                    <DialogTitle id="confirm-close-dialog-title">
+                      Confirmar Fechamento
+                    </DialogTitle>
+                    <DialogContent>
+                      <DialogContentText id="confirm-close-dialog-description">
+                        Os dados preenchidos no formulário serão perdidos. Deseja realmente fechar?
+                      </DialogContentText>
+                    </DialogContent>
+                    <DialogActions>
+                      <Button onClick={handleCancelarFechamento} color="inherit">
+                        Cancelar
+                      </Button>
+                      <Button 
+                        onClick={handleConfirmarFechamento} 
+                        color="error" 
+                        variant="contained"
+                        autoFocus
+                      >
+                        Sim, Fechar
+                      </Button>
+                    </DialogActions>
+                  </Dialog>
+
+                  {/* Dialog Ficha de Matrícula */}
+                  <Dialog 
+                    open={fichaMatriculaOpen} 
+                    onClose={handleFecharFichaMatricula}
+                    maxWidth="md"
+                    fullWidth
+                    PaperProps={{
+                      sx: { 
+                        width: '90vw', 
+                        height: '90vh',
+                        maxWidth: 'none'
+                      }
+                    }}
+                  >
+                    <DialogTitle sx={{ p: 0 }}>
+                      {/* Título será renderizado dentro do componente FichaMatricula */}
+                    </DialogTitle>
+                    <DialogContent sx={{ p: 0 }}>
+                      {alunoSelecionadoFicha && (
+                        <FichaMatricula 
+                          aluno={alunoSelecionadoFicha}
+                          turmas={turmas}
+                          onClose={handleFecharFichaMatricula}
+                        />
+                      )}
+                    </DialogContent>
                   </Dialog>
                 </>
               )}

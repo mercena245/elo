@@ -18,7 +18,8 @@ export function AuthProvider({ children }) {
         const userRef = ref(db, `usuarios/${firebaseUser.uid}`);
         const snap = await get(userRef);
         if (snap.exists()) {
-          setRole(snap.val().role);
+          const userData = snap.val();
+          setRole(userData.role);
         } else {
           setRole(null);
         }

@@ -11,6 +11,7 @@ import { getStorage, ref as storageRef, uploadBytes, getDownloadURL, deleteObjec
 const firebaseConfig = {
   apiKey: "AIzaSyBoY8kGVTZjRnneyxPRfyLaq_ePjgFNNrY", // Chave de API do projeto
   authDomain: "elo-school.firebaseapp.com", // Domínio de autenticação
+  databaseURL: "https://elo-school-default-rtdb.firebaseio.com/", // URL do Realtime Database
   projectId: "elo-school", // ID do projeto
   storageBucket: "elo-school.firebasestorage.app", // Bucket de storage
   messagingSenderId: "403961922767", // ID do serviço de mensagens

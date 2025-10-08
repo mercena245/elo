@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../../../../context/AuthContext';
 import {
   Dialog,
   DialogTitle,
@@ -10,10 +11,6 @@ import {
   Button,
   Box,
   Typography,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   Chip,
   Grid,
   Card,
@@ -27,7 +24,8 @@ import {
   List,
   ListItem,
   ListItemText,
-  ListItemSecondaryAction
+  ListItemSecondaryAction,
+  Autocomplete
 } from '@mui/material';
 import {
   Close as CloseIcon,
@@ -56,6 +54,8 @@ const EditorPlanoAula = ({
   minhasDisciplinas,
   isEditing = false
 }) => {
+  const { user, role: userRole } = useAuth();
+  
   const [formData, setFormData] = useState({
     titulo: '',
     turmaId: '',
@@ -63,6 +63,7 @@ const EditorPlanoAula = ({
     data: '',
     horaInicio: '',
     horaFim: '',
+    bncc: [],
     objetivos: [],
     conteudoProgramatico: '',
     metodologia: '',
@@ -73,6 +74,9 @@ const EditorPlanoAula = ({
     leituraObrigatoria: '',
     tarefaCasa: '',
     statusAprovacao: 'pendente',
+    observacoesAprovacao: '',
+    aprovadoPor: '',
+    dataAprovacao: '',
     publicado: false
   });
 
@@ -88,6 +92,30 @@ const EditorPlanoAula = ({
   const [dataMinima, setDataMinima] = useState('');
   const [dataMaxima, setDataMaxima] = useState('');
 
+  // Competências BNCC simplificadas (principais áreas)
+  const competenciasBNCC = [
+    { codigo: 'EF01LP01', descricao: 'Reconhecer que textos são lidos e escritos da esquerda para a direita e de cima para baixo da página.' },
+    { codigo: 'EF01LP02', descricao: 'Escrever, espontaneamente ou por ditado, palavras e frases de forma alfabética.' },
+    { codigo: 'EF01MA01', descricao: 'Utilizar números naturais como indicador de quantidade ou de ordem em diferentes situações cotidianas.' },
+    { codigo: 'EF01MA02', descricao: 'Contar de maneira exata ou aproximada, utilizando diferentes estratégias.' },
+    { codigo: 'EF02LP01', descricao: 'Utilizar, ao produzir o texto, grafia correta de palavras conhecidas.' },
+    { codigo: 'EF02MA01', descricao: 'Comparar e ordenar números naturais (até a ordem de centenas).' },
+    { codigo: 'EF03LP01', descricao: 'Ler e escrever palavras com correspondências regulares diretas entre letras e fonemas.' },
+    { codigo: 'EF03MA01', descricao: 'Ler, escrever e comparar números naturais de até a ordem de unidade de milhar.' },
+    { codigo: 'EF04LP01', descricao: 'Grafar palavras utilizando regras de correspondência fonema-grafema regulares.' },
+    { codigo: 'EF04MA01', descricao: 'Ler, escrever e ordenar números naturais até a ordem de dezenas de milhar.' },
+    { codigo: 'EF05LP01', descricao: 'Grafar palavras utilizando regras de correspondência fonema-grafema regulares, contextuais e morfológicas.' },
+    { codigo: 'EF05MA01', descricao: 'Ler, escrever e ordenar números naturais até a ordem de centenas de milhar.' },
+    { codigo: 'EF06LP01', descricao: 'Reconhecer a impossibilidade de uma neutralidade absoluta no relato de fatos.' },
+    { codigo: 'EF06MA01', descricao: 'Comparar, ordenar, ler e escrever números naturais e números racionais.' },
+    { codigo: 'EF07LP01', descricao: 'Distinguir diferentes propostas editoriais.' },
+    { codigo: 'EF07MA01', descricao: 'Resolver e elaborar problemas com números inteiros e racionais.' },
+    { codigo: 'EF08LP01', descricao: 'Identificar e comparar as várias editorias de jornais impressos e digitais.' },
+    { codigo: 'EF08MA01', descricao: 'Efetuar cálculos com potências de expoentes inteiros e aplicar esse conhecimento.' },
+    { codigo: 'EF09LP01', descricao: 'Analisar o fenômeno da disseminação de informações e opiniões nos meios digitais.' },
+    { codigo: 'EF09MA01', descricao: 'Reconhecer que, uma vez fixada uma unidade de comprimento, existem segmentos de reta cujo comprimento não é expresso por número racional.' }
+  ];
+
   useEffect(() => {
     if (open) {
       if (isEditing && plano) {
@@ -99,6 +127,7 @@ const EditorPlanoAula = ({
           data: plano.data || '',
           horaInicio: plano.horaInicio || '',
           horaFim: plano.horaFim || '',
+          periodoAula: plano.periodoAula || '',
           objetivos: plano.objetivos || [],
           conteudoProgramatico: plano.conteudoProgramatico || '',
           metodologia: plano.metodologia || '',
@@ -120,6 +149,7 @@ const EditorPlanoAula = ({
           data: '',
           horaInicio: '',
           horaFim: '',
+          periodoAula: '',
           objetivos: [],
           conteudoProgramatico: '',
           metodologia: '',
@@ -142,7 +172,8 @@ const EditorPlanoAula = ({
             disciplinaId: dadosIniciais.disciplinaId || '',
             data: dadosIniciais.data || '',
             horaInicio: dadosIniciais.horaInicio || '',
-            horaFim: dadosIniciais.horaFim || ''
+            horaFim: dadosIniciais.horaFim || '',
+            periodoAula: dadosIniciais.periodoAula || ''
           }));
           console.log('🎯 EditorPlanoAula - FormData após aplicar dados iniciais');
         } else {
@@ -191,6 +222,21 @@ const EditorPlanoAula = ({
 
     buscarPeriodoLetivo();
   }, [formData.turmaId, turmas]);
+
+  // Funções para obter nomes para exibição
+  const getNomeTurma = () => {
+    if (!formData.turmaId || !turmas) return '';
+    const turma = turmas[formData.turmaId];
+    if (!turma) return formData.turmaId;
+    return `${turma.nome} ${turma.ano ? `- ${turma.ano}` : ''} ${turma.turno ? `(${turma.turno})` : ''}`.trim();
+  };
+
+  const getNomeDisciplina = () => {
+    if (!formData.disciplinaId || !disciplinas) return '';
+    const disciplina = disciplinas[formData.disciplinaId];
+    if (!disciplina) return formData.disciplinaId;
+    return disciplina.nome || disciplina.nomeDisciplina || 'Nome não definido';
+  };
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
@@ -325,6 +371,56 @@ const EditorPlanoAula = ({
     return dataMaxima || `${new Date().getFullYear()}-12-31`;
   };
 
+  // Funções de aprovação
+  const isCoordinator = () => {
+    return userRole === 'coordenador' || userRole === 'coordenadora';
+  };
+
+  const canEdit = () => {
+    if (isCoordinator()) return true;
+    return formData.statusAprovacao === 'rejeitado' || formData.statusAprovacao === 'pendente';
+  };
+
+  const handleApprovar = () => {
+    setFormData(prev => ({
+      ...prev,
+      statusAprovacao: 'aprovado',
+      aprovadoPor: user?.uid || '',
+      dataAprovacao: new Date().toISOString(),
+      observacoesAprovacao: ''
+    }));
+  };
+
+  const handleRejeitar = (observacoes = '') => {
+    setFormData(prev => ({
+      ...prev,
+      statusAprovacao: 'rejeitado',
+      aprovadoPor: user?.uid || '',
+      dataAprovacao: new Date().toISOString(),
+      observacoesAprovacao: observacoes
+    }));
+  };
+
+  const getStatusColor = () => {
+    switch (formData.statusAprovacao) {
+      case 'aprovado': return 'success';
+      case 'rejeitado': return 'error';
+      case 'pendente': return 'warning';
+      default: return 'default';
+    }
+  };
+
+  const getStatusText = () => {
+    switch (formData.statusAprovacao) {
+      case 'aprovado': return 'Aprovado';
+      case 'rejeitado': return 'Rejeitado';
+      case 'pendente': return 'Pendente de Aprovação';
+      default: return 'Desconhecido';
+    }
+  };
+
+
+
   return (
     <Dialog 
       open={open} 
@@ -344,6 +440,14 @@ const EditorPlanoAula = ({
           <Typography variant="h6">
             {isEditing ? 'Editar Plano de Aula' : 'Novo Plano de Aula'}
           </Typography>
+          {isEditing && (
+            <Chip 
+              label={getStatusText()} 
+              color={getStatusColor()} 
+              size="small"
+              variant="outlined"
+            />
+          )}
         </Box>
         <IconButton onClick={onClose}>
           <CloseIcon />
@@ -371,53 +475,44 @@ const EditorPlanoAula = ({
                       error={!!errors.titulo}
                       helperText={errors.titulo}
                       placeholder="Ex: Introdução às Funções Quadráticas"
+                      disabled={!canEdit()}
                     />
                   </Grid>
                   
                   <Grid item xs={12} sm={6}>
-                    <FormControl fullWidth sx={{ minWidth: '250px' }}>
-                      <InputLabel>Turma</InputLabel>
-                      <Select
-                        value={formData.turmaId}
-                        onChange={(e) => handleInputChange('turmaId', e.target.value)}
-                        label="Turma"
-                        error={!!errors.turmaId}
-                      >
-                        {getTurmasDisponiveis().map((turma) => (
-                          <MenuItem key={turma.id} value={turma.id}>
-                            {turma.nome} {turma.ano && `- ${turma.ano}`} {turma.turno && `(${turma.turno})`}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                      {errors.turmaId && (
-                        <Typography variant="caption" color="error" sx={{ ml: 2, mt: 0.5 }}>
-                          {errors.turmaId}
-                        </Typography>
-                      )}
-                    </FormControl>
+                    <TextField
+                      fullWidth
+                      label="Turma"
+                      value={getNomeTurma()}
+                      InputProps={{
+                        readOnly: true,
+                      }}
+                      helperText="Definido pela grade horária"
+                    />
                   </Grid>
                   
                   <Grid item xs={12} sm={6}>
-                    <FormControl fullWidth sx={{ minWidth: '250px' }}>
-                      <InputLabel>Disciplina</InputLabel>
-                      <Select
-                        value={formData.disciplinaId}
-                        onChange={(e) => handleInputChange('disciplinaId', e.target.value)}
-                        label="Disciplina"
-                        error={!!errors.disciplinaId}
-                      >
-                        {getDisciplinasDisponiveis().map((disciplina) => (
-                          <MenuItem key={disciplina.id} value={disciplina.id}>
-                            {disciplina.nome || disciplina.nomeDisciplina || 'Nome não definido'}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                      {errors.disciplinaId && (
-                        <Typography variant="caption" color="error" sx={{ ml: 2, mt: 0.5 }}>
-                          {errors.disciplinaId}
-                        </Typography>
-                      )}
-                    </FormControl>
+                    <TextField
+                      fullWidth
+                      label="Disciplina"
+                      value={getNomeDisciplina()}
+                      InputProps={{
+                        readOnly: true,
+                      }}
+                      helperText="Definido pela grade horária"
+                    />
+                  </Grid>
+                  
+                  <Grid item xs={12} sm={6} md={4}>
+                    <TextField
+                      fullWidth
+                      label="Período da Aula"
+                      value={formData.periodoAula}
+                      InputProps={{
+                        readOnly: true,
+                      }}
+                      helperText="Definido pela grade horária"
+                    />
                   </Grid>
                   
                   <Grid item xs={12} sm={6} md={4}>
@@ -430,6 +525,7 @@ const EditorPlanoAula = ({
                       error={!!errors.data}
                       helperText={errors.data || 'Data deve estar dentro do período letivo da turma'}
                       InputLabelProps={{ shrink: true }}
+                      disabled={!canEdit()}
                       inputProps={{
                         min: getDataMinima(),
                         max: getDataMaxima()
@@ -459,6 +555,66 @@ const EditorPlanoAula = ({
                     />
                   </Grid>
                 </Grid>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          {/* Competências BNCC */}
+          <Grid item xs={12}>
+            <Card variant="outlined">
+              <CardContent>
+                <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <SchoolIcon color="primary" />
+                  Competências BNCC
+                </Typography>
+                
+                <Autocomplete
+                  multiple
+                  options={competenciasBNCC}
+                  value={formData.bncc || []}
+                  onChange={(event, newValue) => {
+                    handleInputChange('bncc', newValue);
+                  }}
+                  getOptionLabel={(option) => `${option.codigo} - ${option.descricao}`}
+                  filterOptions={(options, { inputValue }) => {
+                    return options.filter(option =>
+                      option.codigo.toLowerCase().includes(inputValue.toLowerCase()) ||
+                      option.descricao.toLowerCase().includes(inputValue.toLowerCase())
+                    );
+                  }}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="Selecione as competências BNCC"
+                      placeholder="Digite para buscar (ex: EF01LP01)"
+                      variant="outlined"
+                      size="small"
+                    />
+                  )}
+                  renderTags={(value, getTagProps) =>
+                    value.map((option, index) => (
+                      <Chip
+                        variant="outlined"
+                        label={option.codigo}
+                        {...getTagProps({ index })}
+                        key={option.codigo}
+                        size="small"
+                        color="primary"
+                      />
+                    ))
+                  }
+                  renderOption={(props, option) => (
+                    <Box component="li" {...props} sx={{ display: 'block !important' }}>
+                      <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                        {option.codigo}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {option.descricao}
+                      </Typography>
+                    </Box>
+                  )}
+                  sx={{ mb: 1 }}
+                />
               </CardContent>
             </Card>
           </Grid>
@@ -666,17 +822,47 @@ const EditorPlanoAula = ({
       </DialogContent>
 
       <DialogActions sx={{ p: 3, borderTop: '1px solid #e0e0e0' }}>
-        <Button onClick={onClose} color="inherit">
-          Cancelar
-        </Button>
-        <Button 
-          onClick={handleSave} 
-          variant="contained" 
-          startIcon={<SaveIcon />}
-          sx={{ minWidth: 120 }}
-        >
-          {isEditing ? 'Salvar Alterações' : 'Criar Plano'}
-        </Button>
+        <Box sx={{ display: 'flex', gap: 1, width: '100%', justifyContent: 'space-between' }}>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            {/* Botões de aprovação - só para coordenadores */}
+            {isCoordinator() && isEditing && formData.statusAprovacao === 'pendente' && (
+              <>
+                <Button 
+                  onClick={handleApprovar} 
+                  variant="contained" 
+                  color="success"
+                  size="small"
+                >
+                  Aprovar
+                </Button>
+                <Button 
+                  onClick={() => handleRejeitar()} 
+                  variant="contained" 
+                  color="error"
+                  size="small"
+                >
+                  Rejeitar
+                </Button>
+              </>
+            )}
+          </Box>
+          
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Button onClick={onClose} color="inherit">
+              Cancelar
+            </Button>
+            {canEdit() && (
+              <Button 
+                onClick={handleSave} 
+                variant="contained" 
+                startIcon={<SaveIcon />}
+                sx={{ minWidth: 120 }}
+              >
+                {isEditing ? 'Salvar Alterações' : 'Criar Plano'}
+              </Button>
+            )}
+          </Box>
+        </Box>
       </DialogActions>
     </Dialog>
   );

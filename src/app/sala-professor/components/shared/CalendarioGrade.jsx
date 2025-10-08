@@ -26,6 +26,8 @@ import {
   ChevronRight,
   School as SchoolIcon
 } from '@mui/icons-material';
+import { ref, get } from 'firebase/database';
+import { db } from '../../../../firebase';
 
 const CalendarioGrade = ({
   gradeHoraria = {},
@@ -38,6 +40,7 @@ const CalendarioGrade = ({
 }) => {
   const [semanaAtual, setSemanaAtual] = useState(new Date());
   const [aulasOrganizadas, setAulasOrganizadas] = useState({});
+  const [periodosAula, setPeriodosAula] = useState({}); // Para buscar horários dos períodos
   const [minhasAulas, setMinhasAulas] = useState([]);
 
   const diasSemana = [
@@ -55,6 +58,23 @@ const CalendarioGrade = ({
   useEffect(() => {
     organizarAulasPorDia();
   }, [minhasAulas, semanaAtual]);
+
+  // Carregar períodos de aula para obter horários
+  useEffect(() => {
+    const carregarPeriodosAula = async () => {
+      try {
+        const periodosRef = ref(db, 'Escola/PeriodosAula');
+        const snapshot = await get(periodosRef);
+        if (snapshot.exists()) {
+          setPeriodosAula(snapshot.val());
+        }
+      } catch (error) {
+        console.error('Erro ao carregar períodos de aula:', error);
+      }
+    };
+    
+    carregarPeriodosAula();
+  }, []);
 
   const processarGradeHoraria = () => {
     console.log('🎯 CalendarioGrade - Processando grade horária:', {
@@ -178,6 +198,11 @@ const CalendarioGrade = ({
     const turma = turmas[aula.turmaId];
     const periodoLetivoId = turma?.periodoId;
     
+    // Buscar horários do período de aula
+    const periodo = periodosAula[aula.periodoAula];
+    const horaInicio = periodo?.inicio || '';
+    const horaFim = periodo?.fim || '';
+    
     // Dados que o EditorPlanoAula espera receber
     const dadosPlano = {
       turmaId: aula.turmaId,
@@ -187,14 +212,10 @@ const CalendarioGrade = ({
       diaSemana: aula.diaSemana,
       periodoAula: aula.periodoAula,
       periodoLetivoId: periodoLetivoId, // Para buscar datas do período
-      // Horários - por enquanto vazios, mas estrutura está pronta
-      horaInicio: '',
-      horaFim: ''
+      // Horários vindos do período de aula
+      horaInicio: horaInicio,
+      horaFim: horaFim
     };
-    
-    console.log('📝 Dados para criar plano:', dadosPlano);
-    console.log('📝 Turma selecionada:', turma);
-    console.log('📝 Período letivo ID:', periodoLetivoId);
     
     if (onCriarPlano) {
       onCriarPlano(dadosPlano);

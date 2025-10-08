@@ -26,20 +26,21 @@ import {
   ListItemText,
   ListItemSecondaryAction,
   IconButton,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
+  Tooltip,
   Divider
 } from '@mui/material';
 import {
-  ExpandMore as ExpandMoreIcon,
   Add as AddIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
+  Close as CloseIcon,
+  ChevronLeft,
+  ChevronRight,
   School as SchoolIcon,
   CalendarToday as CalendarIcon,
   Assignment as AssignmentIcon,
-  Class as ClassIcon
+  Class as ClassIcon,
+  Visibility as VisibilityIcon
 } from '@mui/icons-material';
 import { ref, onValue, push, update, remove, get } from 'firebase/database';
 import { db } from '../../../firebase';
@@ -47,7 +48,7 @@ import { useAuthUser } from '../../../hooks/useAuthUser';
 import { auditService } from '../../../services/auditService';
 
 // Imports diretos dos componentes com caminhos absolutos
-import EditorPlanoAula from '../../../app/sala-professor/components/shared/EditorPlanoAula';
+import EditorPlanoAula from './shared/EditorPlanoAula';
 import CalendarioGrade from '../../../app/sala-professor/components/shared/CalendarioGrade';
 import SeletorTurmaAluno from './SeletorTurmaAluno';
 import SeletorPeriodoLetivo from '../../components/shared/SeletorPeriodoLetivo';
@@ -67,6 +68,12 @@ const PlanejamentoAulas = () => {
   const [selectedAlunos, setSelectedAlunos] = useState([]);
   const [minhasTurmas, setMinhasTurmas] = useState([]);
   const [minhasDisciplinas, setMinhasDisciplinas] = useState([]); // Nova state para disciplinas do professor
+  
+  // Estados para modal de visualização
+  const [modalVisualizacao, setModalVisualizacao] = useState(false);
+  const [planoVisualizacao, setPlanoVisualizacao] = useState(null);
+  const [planosGrupoVisualizacao, setPlanosGrupoVisualizacao] = useState([]);
+  const [indiceAtualVisualizacao, setIndiceAtualVisualizacao] = useState(0);
   
   // Estados do editor
   const [editorOpen, setEditorOpen] = useState(false);
@@ -309,7 +316,24 @@ const PlanejamentoAulas = () => {
       return (a.horario || '').localeCompare(b.horario || '');
     });
 
-    setPlanosOrganizados(planosFiltrados);
+    // Agrupar planos por turma
+    const planosAgrupados = planosFiltrados.reduce((grupos, plano) => {
+      const turmaId = plano.turmaId;
+      if (!grupos[turmaId]) {
+        grupos[turmaId] = [];
+      }
+      grupos[turmaId].push(plano);
+      return grupos;
+    }, {});
+
+    // Converter para array de grupos
+    const gruposArray = Object.entries(planosAgrupados).map(([turmaId, planos]) => ({
+      turmaId,
+      turma: turmas[turmaId],
+      planos: planos.sort((a, b) => new Date(b.data || 0) - new Date(a.data || 0))
+    }));
+
+    setPlanosOrganizados(gruposArray);
   };
 
   const abrirEditor = (plano = null, dadosIniciais = null) => {
@@ -387,6 +411,32 @@ const PlanejamentoAulas = () => {
     }
   };
 
+  // Função para abrir modal de visualização
+  const abrirVisualizacao = (plano, planosDoGrupo = []) => {
+    const grupo = planosDoGrupo.length > 0 ? planosDoGrupo : [plano];
+    const indice = grupo.findIndex(p => p.id === plano.id);
+    
+    setPlanosGrupoVisualizacao(grupo);
+    setIndiceAtualVisualizacao(indice >= 0 ? indice : 0);
+    setPlanoVisualizacao(grupo[indice >= 0 ? indice : 0]);
+    setModalVisualizacao(true);
+  };
+
+  const fecharVisualizacao = () => {
+    setModalVisualizacao(false);
+    setPlanoVisualizacao(null);
+    setPlanosGrupoVisualizacao([]);
+    setIndiceAtualVisualizacao(0);
+  };
+
+  const navegarVisualizacao = (direcao) => {
+    const novoIndice = indiceAtualVisualizacao + direcao;
+    if (novoIndice >= 0 && novoIndice < planosGrupoVisualizacao.length) {
+      setIndiceAtualVisualizacao(novoIndice);
+      setPlanoVisualizacao(planosGrupoVisualizacao[novoIndice]);
+    }
+  };
+
   if (loading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
@@ -396,20 +446,23 @@ const PlanejamentoAulas = () => {
   }
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+    <Box sx={{ 
+      p: 3,
+      maxWidth: '1400px',
+      margin: '0 auto',
+      width: '100%'
+    }}>
+      <Box sx={{ 
+        display: 'flex', 
+        justifyContent: 'flex-start', 
+        alignItems: 'center', 
+        mb: 4,
+        textAlign: 'center'
+      }}>
         <Typography variant="h4" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <SchoolIcon color="primary" />
           Planejamento de Aulas
         </Typography>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => abrirEditor()}
-          sx={{ borderRadius: 2 }}
-        >
-          Novo Plano
-        </Button>
       </Box>
 
       {/* Seletor de Período Letivo */}
@@ -423,7 +476,7 @@ const PlanejamentoAulas = () => {
       </Box>
 
       {/* Grade horária agora carrega automaticamente baseada nas turmas */}
-      <Grid container spacing={3}>
+      <Grid container spacing={4} sx={{ mt: 1 }}>
         {/* Filtros */}
         <Grid item xs={12} md={4}>
           <Card>
@@ -479,106 +532,165 @@ const PlanejamentoAulas = () => {
                     📝 <strong>Nenhum plano de aula encontrado</strong>
                   </Typography>
                   <Typography variant="body2">
-                    Use o calendário ao lado para criar planos baseados na sua grade de horários, 
-                    ou clique em "Novo Plano" para criar um plano personalizado.
+                    Use o calendário ao lado para criar planos baseados na sua grade de horários.
                   </Typography>
                 </Alert>
               ) : (
-                <Box sx={{ mt: 2 }}>
-                  {planosOrganizados.map((plano) => (
-                    <Accordion key={plano.id} sx={{ mb: 1 }}>
-                      <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, width: '100%' }}>
-                          <Typography variant="subtitle1" sx={{ fontWeight: 'bold', flex: 1 }}>
-                            {plano.titulo || 'Plano sem título'}
-                          </Typography>
+                <Box sx={{ 
+                  mt: 2, 
+                  display: 'flex', 
+                  justifyContent: 'center',
+                  width: '100%'
+                }}>
+                  <Box sx={{ 
+                    maxWidth: '1200px', 
+                    width: '100%',
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    gap: 3 
+                  }}>
+                    {planosOrganizados.map((grupo) => (
+                      <Card 
+                        key={grupo.turmaId} 
+                        sx={{ 
+                          '&:hover': { boxShadow: 6 }, 
+                          transition: 'box-shadow 0.3s',
+                          boxShadow: 2
+                        }}
+                      >
+                      <CardContent>
+                        {/* Cabeçalho da Turma */}
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3, pb: 2, borderBottom: '2px solid #e0e0e0' }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                            <SchoolIcon color="primary" sx={{ fontSize: 32 }} />
+                            <Box>
+                              <Typography variant="h5" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+                                {grupo.turma?.nome || `Turma ${grupo.turmaId}`}
+                              </Typography>
+                              <Typography variant="body2" color="text.secondary">
+                                {grupo.planos.length} plano(s) de aula
+                              </Typography>
+                            </Box>
+                          </Box>
                           <Chip
-                            label={turmas[plano.turmaId]?.nome || 'Turma'}
-                            size="small"
+                            label={grupo.planos.length}
                             color="primary"
-                            variant="outlined"
+                            variant="filled"
+                            sx={{ fontSize: '1rem', height: 32, minWidth: 60 }}
                           />
-                          <Chip
-                            label={disciplinas[plano.disciplinaId]?.nome || 'Disciplina'}
-                            size="small"
-                            color="secondary"
-                          />
-                          <Typography variant="caption" color="text.secondary">
-                            {plano.data ? new Date(plano.data).toLocaleDateString('pt-BR') : 'Sem data'}
-                            {plano.horario && ` - ${plano.horario}`}
-                          </Typography>
                         </Box>
-                      </AccordionSummary>
-                      <AccordionDetails>
+
+                        {/* Lista de Planos da Turma */}
                         <Grid container spacing={2}>
-                          <Grid item xs={12} md={6}>
-                            <Typography variant="subtitle2" gutterBottom>
-                              <strong>Objetivos:</strong>
-                            </Typography>
-                            <Typography variant="body2" sx={{ mb: 2 }}>
-                              {plano.objetivos || 'Não informado'}
-                            </Typography>
-                          </Grid>
-                          <Grid item xs={12} md={6}>
-                            <Typography variant="subtitle2" gutterBottom>
-                              <strong>Conteúdo:</strong>
-                            </Typography>
-                            <Typography variant="body2" sx={{ mb: 2 }}>
-                              {plano.conteudo || 'Não informado'}
-                            </Typography>
-                          </Grid>
-                          <Grid item xs={12} md={6}>
-                            <Typography variant="subtitle2" gutterBottom>
-                              <strong>Metodologia:</strong>
-                            </Typography>
-                            <Typography variant="body2" sx={{ mb: 2 }}>
-                              {plano.metodologia || 'Não informado'}
-                            </Typography>
-                          </Grid>
-                          <Grid item xs={12} md={6}>
-                            <Typography variant="subtitle2" gutterBottom>
-                              <strong>Recursos:</strong>
-                            </Typography>
-                            <Typography variant="body2" sx={{ mb: 2 }}>
-                              {plano.recursos || 'Não informado'}
-                            </Typography>
-                          </Grid>
-                          <Grid item xs={12}>
-                            <Typography variant="subtitle2" gutterBottom>
-                              <strong>Avaliação:</strong>
-                            </Typography>
-                            <Typography variant="body2" sx={{ mb: 2 }}>
-                              {plano.avaliacao || 'Não informado'}
-                            </Typography>
-                          </Grid>
-                          {plano.observacoes && (
-                            <Grid item xs={12}>
-                              <Typography variant="subtitle2" gutterBottom>
-                                <strong>Observações:</strong>
-                              </Typography>
-                              <Typography variant="body2" sx={{ mb: 2 }}>
-                                {plano.observacoes}
-                              </Typography>
+                          {grupo.planos.map((plano, index) => (
+                            <Grid item xs={12} key={plano.id}>
+                              <Box 
+                                sx={{ 
+                                  p: 3, 
+                                  border: '2px solid #e0e0e0', 
+                                  borderRadius: 3,
+                                  bgcolor: index % 2 === 0 ? '#fafafa' : '#ffffff',
+                                  '&:hover': { 
+                                    bgcolor: '#f0f7ff', 
+                                    borderColor: 'primary.main',
+                                    boxShadow: 2,
+                                    transform: 'translateY(-2px)'
+                                  },
+                                  transition: 'all 0.3s ease',
+                                  boxShadow: 1
+                                }}
+                              >
+                              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <Box sx={{ flex: 1 }}>
+                                  <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 0.5 }}>
+                                    {plano.titulo || 'Plano sem título'}
+                                  </Typography>
+                                  
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                                    <Chip
+                                      label={disciplinas[plano.disciplinaId]?.nome || 'Disciplina'}
+                                      size="small"
+                                      color="secondary"
+                                      variant="outlined"
+                                    />
+                                    {plano.statusAprovacao && (
+                                      <Chip
+                                        label={
+                                          plano.statusAprovacao === 'aprovado' ? 'Aprovado' :
+                                          plano.statusAprovacao === 'rejeitado' ? 'Rejeitado' :
+                                          'Pendente'
+                                        }
+                                        size="small"
+                                        color={
+                                          plano.statusAprovacao === 'aprovado' ? 'success' :
+                                          plano.statusAprovacao === 'rejeitado' ? 'error' :
+                                          'warning'
+                                        }
+                                        variant="filled"
+                                      />
+                                    )}
+                                  </Box>
+                                  
+                                  <Typography variant="body2" color="text.secondary">
+                                    📅 {plano.data ? new Date(plano.data).toLocaleDateString('pt-BR') : 'Sem data'}
+                                    {plano.horaInicio && plano.horaFim && ` • ⏰ ${plano.horaInicio} às ${plano.horaFim}`}
+                                  </Typography>
+                                  
+                                  {/* Preview rápido dos objetivos */}
+                                  <Typography variant="body2" color="text.secondary" sx={{ 
+                                    mt: 1,
+                                    display: '-webkit-box',
+                                    WebkitLineClamp: 1,
+                                    WebkitBoxOrient: 'vertical',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    fontStyle: 'italic'
+                                  }}>
+                                    {Array.isArray(plano.objetivos) && plano.objetivos.length > 0 
+                                      ? `📝 ${plano.objetivos[0]}${plano.objetivos.length > 1 ? ' (+' + (plano.objetivos.length - 1) + ' mais)' : ''}`
+                                      : '📝 Sem objetivos definidos'
+                                    }
+                                  </Typography>
+                                </Box>
+                                
+                                <Box sx={{ display: 'flex', gap: 1, ml: 2 }}>
+                                  <Tooltip title="Visualizar Plano">
+                                    <IconButton 
+                                      color="primary" 
+                                      onClick={() => abrirVisualizacao(plano, grupo.planos)}
+                                      sx={{ '&:hover': { backgroundColor: 'primary.light', color: 'white' } }}
+                                    >
+                                      <VisibilityIcon />
+                                    </IconButton>
+                                  </Tooltip>
+                                  <Tooltip title="Editar Plano">
+                                    <IconButton 
+                                      color="secondary" 
+                                      onClick={() => abrirEditor(plano)}
+                                      sx={{ '&:hover': { backgroundColor: 'secondary.light', color: 'white' } }}
+                                    >
+                                      <EditIcon />
+                                    </IconButton>
+                                  </Tooltip>
+                                  <Tooltip title="Excluir Plano">
+                                    <IconButton 
+                                      color="error" 
+                                      onClick={() => excluirPlano(plano.id, plano.titulo)}
+                                      sx={{ '&:hover': { backgroundColor: 'error.light', color: 'white' } }}
+                                    >
+                                      <DeleteIcon />
+                                    </IconButton>
+                                  </Tooltip>
+                                </Box>
+                              </Box>
+                              </Box>
                             </Grid>
-                          )}
+                          ))}
                         </Grid>
-                        <Divider sx={{ my: 2 }} />
-                        <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
-                          <Button size="small" startIcon={<EditIcon />} onClick={() => abrirEditor(plano)}>
-                            Editar
-                          </Button>
-                          <Button 
-                            size="small" 
-                            color="error" 
-                            startIcon={<DeleteIcon />}
-                            onClick={() => excluirPlano(plano.id, plano.titulo)}
-                          >
-                            Excluir
-                          </Button>
-                        </Box>
-                      </AccordionDetails>
-                    </Accordion>
-                  ))}
+                      </CardContent>
+                    </Card>
+                    ))}
+                  </Box>
                 </Box>
               )}
             </CardContent>
@@ -586,8 +698,359 @@ const PlanejamentoAulas = () => {
         </Grid>
         </Grid>
 
+      {/* Modal de Visualização de Plano como Documento */}
+      <Dialog 
+        open={modalVisualizacao} 
+        onClose={fecharVisualizacao} 
+        maxWidth="md" 
+        fullWidth
+        PaperProps={{ 
+          sx: { 
+            maxHeight: '95vh',
+            bgcolor: '#fafafa',
+            background: 'linear-gradient(135deg, #fafafa 0%, #f0f0f0 100%)'
+          } 
+        }}
+      >
+        <DialogTitle sx={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center',
+          pb: 2,
+          bgcolor: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)',
+          borderBottom: '3px solid #1976d2',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+        }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Box sx={{
+              bgcolor: 'primary.main',
+              color: 'white',
+              borderRadius: '50%',
+              width: 40,
+              height: 40,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <VisibilityIcon />
+            </Box>
+            <Box>
+              <Typography variant="h5" sx={{ fontWeight: 'bold', color: '#1976d2' }}>
+                Plano de Aula
+              </Typography>
+              {planosGrupoVisualizacao.length > 1 && (
+                <Typography variant="body2" sx={{ color: '#495057' }}>
+                  {indiceAtualVisualizacao + 1} de {planosGrupoVisualizacao.length} planos • {turmas[planoVisualizacao?.turmaId]?.nome}
+                </Typography>
+              )}
+            </Box>
+          </Box>
+          
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            {/* Navegação entre planos */}
+            {planosGrupoVisualizacao.length > 1 && (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mr: 2 }}>
+                <IconButton 
+                  onClick={() => navegarVisualizacao(-1)}
+                  disabled={indiceAtualVisualizacao === 0}
+                  sx={{ bgcolor: 'primary.light', color: 'white', '&:hover': { bgcolor: 'primary.main' } }}
+                >
+                  <ChevronLeft />
+                </IconButton>
+                <Typography variant="body2" sx={{ minWidth: 80, textAlign: 'center', fontWeight: 'bold', color: '#212529' }}>
+                  {indiceAtualVisualizacao + 1} / {planosGrupoVisualizacao.length}
+                </Typography>
+                <IconButton 
+                  onClick={() => navegarVisualizacao(1)}
+                  disabled={indiceAtualVisualizacao === planosGrupoVisualizacao.length - 1}
+                  sx={{ bgcolor: 'primary.light', color: 'white', '&:hover': { bgcolor: 'primary.main' } }}
+                >
+                  <ChevronRight />
+                </IconButton>
+              </Box>
+            )}
+            
+            <IconButton onClick={fecharVisualizacao} sx={{ bgcolor: 'error.light', color: 'white', '&:hover': { bgcolor: 'error.main' } }}>
+              <CloseIcon />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+
+        <DialogContent sx={{ p: 0, bgcolor: '#ffffff' }}>
+          {planoVisualizacao && (
+            <Box sx={{
+              minHeight: '70vh',
+              bgcolor: 'white',
+              boxShadow: 'inset 0 0 20px rgba(0,0,0,0.05)',
+              position: 'relative'
+            }}>
+              {/* Cabeçalho do Documento */}
+              <Box sx={{
+                p: 4,
+                bgcolor: 'linear-gradient(135deg, #1976d2 0%, #1565c0 100%)',
+                color: 'white',
+                textAlign: 'center',
+                position: 'relative',
+                '&::after': {
+                  content: '""',
+                  position: 'absolute',
+                  bottom: -10,
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  width: 0,
+                  height: 0,
+                  borderLeft: '10px solid transparent',
+                  borderRight: '10px solid transparent',
+                  borderTop: '10px solid #1565c0'
+                }
+              }}>
+                {/* Container com fundo sólido para garantir visibilidade */}
+                <Box sx={{
+                  backgroundColor: '#1976d2',
+                  color: '#ffffff',
+                  padding: 2,
+                  borderRadius: 1,
+                  textShadow: '1px 1px 2px rgba(0,0,0,0.5)'
+                }}>
+                  <Typography variant="h4" sx={{ 
+                    fontWeight: 'bold', 
+                    mb: 1, 
+                    color: '#ffffff !important',
+                    textShadow: '2px 2px 4px rgba(0,0,0,0.7)'
+                  }}>
+                    {planoVisualizacao.titulo || 'Plano de Aula'}
+                  </Typography>
+                  <Typography variant="h6" sx={{ 
+                    color: '#ffffff !important',
+                    textShadow: '1px 1px 2px rgba(0,0,0,0.5)'
+                  }}>
+                    {turmas[planoVisualizacao.turmaId]?.nome} • {disciplinas[planoVisualizacao.disciplinaId]?.nome}
+                  </Typography>
+                  <Typography variant="body1" sx={{ 
+                    mt: 1, 
+                    color: '#ffffff !important',
+                    textShadow: '1px 1px 2px rgba(0,0,0,0.5)'
+                  }}>
+                    📅 {planoVisualizacao.data ? new Date(planoVisualizacao.data).toLocaleDateString('pt-BR', { 
+                      weekday: 'long', 
+                      year: 'numeric', 
+                      month: 'long', 
+                      day: 'numeric' 
+                    }) : 'Data não definida'}
+                    {planoVisualizacao.horaInicio && planoVisualizacao.horaFim && 
+                      ` • ⏰ ${planoVisualizacao.horaInicio} às ${planoVisualizacao.horaFim}`
+                    }
+                  </Typography>
+                </Box>
+                
+                {/* Status de Aprovação */}
+                {planoVisualizacao.statusAprovacao && (
+                  <Box sx={{ mt: 2 }}>
+                    <Chip 
+                      label={
+                        planoVisualizacao.statusAprovacao === 'aprovado' ? '✅ Aprovado' :
+                        planoVisualizacao.statusAprovacao === 'rejeitado' ? '❌ Rejeitado' :
+                        '⏳ Pendente de Aprovação'
+                      }
+                      sx={{
+                        bgcolor: planoVisualizacao.statusAprovacao === 'aprovado' ? 'success.main' :
+                               planoVisualizacao.statusAprovacao === 'rejeitado' ? 'error.main' : 'warning.main',
+                        color: 'white',
+                        fontWeight: 'bold',
+                        fontSize: '0.9rem'
+                      }}
+                    />
+                  </Box>
+                )}
+              </Box>
+
+              {/* Conteúdo do Documento */}
+              <Box sx={{ p: 4 }}>
+                {/* Competências BNCC */}
+                {planoVisualizacao.bncc && planoVisualizacao.bncc.length > 0 && (
+                  <Box sx={{ mb: 4, p: 3, bgcolor: '#e3f2fd', borderRadius: 2, border: '2px solid #1976d2' }}>
+                    <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'primary.main', mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                      📚 Competências BNCC
+                    </Typography>
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                      {planoVisualizacao.bncc.map((comp, index) => (
+                        <Chip
+                          key={index}
+                          label={`${comp.codigo} - ${comp.descricao}`}
+                          variant="filled"
+                          color="primary"
+                          size="small"
+                          sx={{ fontWeight: 'bold' }}
+                        />
+                      ))}
+                    </Box>
+                  </Box>
+                )}
+
+                {/* Objetivos - Centralizado */}
+                <Box sx={{ 
+                  display: 'flex', 
+                  justifyContent: 'center',
+                  width: '100%',
+                  mb: 4
+                }}>
+                  <Box sx={{ maxWidth: '900px', width: '100%' }}>
+                    <Box sx={{
+                      p: 4,
+                      bgcolor: '#f8f9fa',
+                      border: '3px solid #e9ecef',
+                      borderRadius: 3,
+                      boxShadow: 2,
+                      '&:hover': {
+                        boxShadow: 4,
+                        borderColor: 'primary.light'
+                      },
+                      transition: 'all 0.3s ease'
+                    }}>
+                      <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'primary.main', mb: 3, display: 'flex', alignItems: 'center', gap: 1, borderBottom: '2px solid #e0e0e0', pb: 2 }}>
+                        🎯 Objetivos da Aula
+                      </Typography>
+                      {Array.isArray(planoVisualizacao.objetivos) && planoVisualizacao.objetivos.length > 0 ? (
+                        <Box component="ol" sx={{ pl: 3, m: 0 }}>
+                          {planoVisualizacao.objetivos.map((objetivo, index) => (
+                            <Typography component="li" key={index} variant="body1" sx={{ mb: 2, lineHeight: 1.8, fontSize: '1.1rem' }}>
+                              {objetivo}
+                            </Typography>
+                          ))}
+                        </Box>
+                      ) : (
+                        <Typography variant="body1" color="text.secondary" sx={{ fontStyle: 'italic', p: 3, bgcolor: '#ffffff', borderRadius: 2, textAlign: 'center' }}>
+                          Nenhum objetivo definido para esta aula.
+                        </Typography>
+                      )}
+                    </Box>
+                  </Box>
+                </Box>
+
+                {/* Grid de Conteúdos - Centralizado */}
+                <Box sx={{ 
+                  display: 'flex', 
+                  justifyContent: 'center',
+                  width: '100%',
+                  mb: 4
+                }}>
+                  <Box sx={{ maxWidth: '1000px', width: '100%' }}>
+                    <Grid container spacing={4} sx={{ justifyContent: 'center' }}>
+                      {[
+                        { campo: 'conteudo', titulo: '📖 Conteúdo Programático', icon: '📖' },
+                        { campo: 'metodologia', titulo: '🎓 Metodologia de Ensino', icon: '🎓' },
+                        { campo: 'recursos', titulo: '🛠️ Recursos Didáticos', icon: '🛠️' },
+                        { campo: 'avaliacao', titulo: '📊 Avaliação', icon: '📊' }
+                      ].map(({ campo, titulo, icon }) => (
+                        <Grid item xs={12} sm={6} lg={6} key={campo}>
+                          <Box sx={{ 
+                            minHeight: 220,
+                            height: '100%',
+                            bgcolor: '#fafafa',
+                            border: '3px solid #e0e0e0',
+                            borderRadius: 3,
+                            p: 3,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            '&:hover': { 
+                              boxShadow: 4, 
+                              borderColor: 'primary.light',
+                              transform: 'translateY(-2px)'
+                            },
+                            transition: 'all 0.3s ease',
+                            boxShadow: 2
+                          }}>
+                        <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'primary.main', mb: 2, borderBottom: '1px solid #e0e0e0', pb: 1 }}>
+                          {titulo}
+                        </Typography>
+                        <Typography variant="body1" sx={{ 
+                          lineHeight: 1.7,
+                          whiteSpace: 'pre-wrap',
+                          color: planoVisualizacao[campo] ? 'text.primary' : 'text.secondary',
+                          fontStyle: planoVisualizacao[campo] ? 'normal' : 'italic'
+                        }}>
+                          {planoVisualizacao[campo] || 'Não informado para esta seção.'}
+                        </Typography>
+                      </Box>
+                    </Grid>
+                  ))}
+                    </Grid>
+                  </Box>
+                </Box>
+
+                {/* Observações - Centralizada */}
+                {planoVisualizacao.observacoes && (
+                  <Box sx={{ 
+                    display: 'flex', 
+                    justifyContent: 'center',
+                    width: '100%',
+                    mt: 4
+                  }}>
+                    <Box sx={{ maxWidth: '800px', width: '100%' }}>
+                      <Box sx={{ 
+                        p: 4, 
+                        bgcolor: '#fff3e0', 
+                        border: '3px solid #ff9800', 
+                        borderRadius: 3,
+                        boxShadow: 2,
+                        '&:hover': {
+                          boxShadow: 4,
+                          transform: 'translateY(-1px)'
+                        },
+                        transition: 'all 0.3s ease'
+                      }}>
+                        <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'orange.main', mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                          📝 Observações Adicionais
+                        </Typography>
+                        <Typography variant="body1" sx={{ lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
+                          {planoVisualizacao.observacoes}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  </Box>
+                )}
+
+                {/* Rodapé do Documento */}
+                <Box sx={{ mt: 4, pt: 3, borderTop: '2px solid #e0e0e0', textAlign: 'center', color: 'text.secondary' }}>
+                  <Typography variant="caption">
+                    Plano criado por: {planoVisualizacao.professorNome || 'Professor'} • 
+                    {planoVisualizacao.criadoEm && ` Criado em: ${new Date(planoVisualizacao.criadoEm).toLocaleDateString('pt-BR')}`}
+                    {planoVisualizacao.atualizadoEm && planoVisualizacao.atualizadoEm !== planoVisualizacao.criadoEm && 
+                      ` • Atualizado em: ${new Date(planoVisualizacao.atualizadoEm).toLocaleDateString('pt-BR')}`
+                    }
+                  </Typography>
+                </Box>
+              </Box>
+            </Box>
+          )}
+        </DialogContent>
+
+        <DialogActions sx={{ p: 3, bgcolor: '#f5f5f5', borderTop: '1px solid #e0e0e0' }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
+            <Typography variant="body2" color="text.secondary">
+              💡 Use as setas para navegar entre os planos da mesma turma
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 2 }}>
+              <Button onClick={fecharVisualizacao} color="inherit" variant="outlined">
+                Fechar
+              </Button>
+              <Button 
+                onClick={() => {
+                  fecharVisualizacao();
+                  abrirEditor(planoVisualizacao);
+                }} 
+                variant="contained" 
+                startIcon={<EditIcon />}
+              >
+                Editar Plano
+              </Button>
+            </Box>
+          </Box>
+        </DialogActions>
+      </Dialog>
+
       {/* Editor de Plano de Aula */}
-      <EditorPlanoAula
+              <EditorPlanoAula
         open={editorOpen}
         onClose={() => setEditorOpen(false)}
         onSave={salvarPlano}

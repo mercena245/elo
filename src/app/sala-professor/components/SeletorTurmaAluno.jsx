@@ -97,7 +97,11 @@ export default function SeletorTurmaAluno({
   }
 
   return (
-    <Card sx={{ mb: 3, bgcolor: '#f8fafc' }}>
+    <Card sx={{ 
+      mb: { xs: 2, md: 3 }, 
+      bgcolor: '#f8fafc',
+      borderRadius: { xs: 1, md: 2 }
+    }}>
       <CardContent sx={{ p: { xs: 2, md: 3 } }}>
         <Typography 
           variant="subtitle1" 
@@ -112,12 +116,13 @@ export default function SeletorTurmaAluno({
         <Grid container spacing={{ xs: 2, md: 3 }} sx={{ width: '100%' }}>
           {/* Seletor de Turma */}
           <Grid item xs={12} md={showAlunosSelector ? 6 : 12}>
-            <FormControl fullWidth sx={{ minWidth: '250px' }}>
+            <FormControl fullWidth sx={{ minWidth: { xs: '100%', md: '250px' } }}>
               <InputLabel>Turma</InputLabel>
               <Select
                 value={selectedTurma}
                 label="Turma"
                 onChange={handleTurmaChange}
+                size={window.innerWidth < 900 ? 'small' : 'medium'}
               >
                 <MenuItem value="">Todas as Turmas</MenuItem>
                 {Object.entries(turmas).map(([id, turma]) => (
@@ -138,7 +143,12 @@ export default function SeletorTurmaAluno({
                 value={selectedAluno}
                 onChange={handleAlunoChange}
                 renderInput={(params) => (
-                  <TextField {...params} label="Pesquisar aluno..." fullWidth />
+                  <TextField 
+                    {...params} 
+                    label="Pesquisar aluno..." 
+                    fullWidth 
+                    size={window.innerWidth < 900 ? 'small' : 'medium'}
+                  />
                 )}
                 isOptionEqualToValue={(option, value) => option.id === value?.id}
                 disabled={!selectedTurma || selectedTurma === ''}
@@ -149,8 +159,17 @@ export default function SeletorTurmaAluno({
         </Grid>
 
         {/* Informações da seleção */}
-        <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.100', borderRadius: 1 }}>
-          <Typography variant="body2" color="text.secondary">
+        <Box sx={{ 
+          mt: { xs: 1.5, md: 2 }, 
+          p: { xs: 1.5, md: 2 }, 
+          bgcolor: 'grey.100', 
+          borderRadius: 1 
+        }}>
+          <Typography 
+            variant="body2" 
+            color="text.secondary"
+            sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}
+          >
             <strong>Turma selecionada:</strong> {
               selectedTurma && turmas[selectedTurma] 
                 ? `${turmas[selectedTurma].nome} (${turmas[selectedTurma].ano})`
@@ -158,7 +177,11 @@ export default function SeletorTurmaAluno({
             }
           </Typography>
           {showAlunosSelector && (
-            <Typography variant="body2" color="text.secondary">
+            <Typography 
+              variant="body2" 
+              color="text.secondary"
+              sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}
+            >
               <strong>Aluno selecionado:</strong> {
                 selectedAluno 
                   ? `${selectedAluno.nome || ''} ${selectedAluno.sobrenome || ''}`.trim()
@@ -166,7 +189,11 @@ export default function SeletorTurmaAluno({
               }
             </Typography>
           )}
-          <Typography variant="body2" color="text.secondary">
+          <Typography 
+            variant="body2" 
+            color="text.secondary"
+            sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}
+          >
             <strong>Alunos disponíveis:</strong> {alunosFiltrados.length}
           </Typography>
         </Box>

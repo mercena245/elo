@@ -335,9 +335,24 @@ const RelatoriosPedagogicos = () => {
   }
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+    <Box sx={{ p: { xs: 1, sm: 2, md: 3 } }}>
+      <Box sx={{ 
+        display: 'flex', 
+        flexDirection: { xs: 'column', sm: 'row' },
+        justifyContent: 'space-between', 
+        alignItems: { xs: 'flex-start', sm: 'center' }, 
+        mb: { xs: 2, md: 3 },
+        gap: { xs: 2, sm: 0 }
+      }}>
+        <Typography 
+          variant="h4" 
+          sx={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: 1,
+            fontSize: { xs: '1.5rem', sm: '2rem', md: '2.125rem' }
+          }}
+        >
           <PsychologyIcon color="primary" />
           Relatórios Pedagógicos
         </Typography>
@@ -345,16 +360,31 @@ const RelatoriosPedagogicos = () => {
           variant="contained"
           startIcon={<AutoAwesomeIcon />}
           onClick={() => setGeradorOpen(true)}
-          sx={{ borderRadius: 2, background: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)' }}
+          sx={{ 
+            borderRadius: 2, 
+            background: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)',
+            minWidth: { xs: '100%', sm: 'auto' },
+            fontSize: { xs: '0.875rem', md: '1rem' },
+            py: { xs: 1.5, md: 1 }
+          }}
         >
           Gerar com IA
         </Button>
       </Box>
 
       {/* Filtros */}
-      <Card sx={{ mb: 3 }}>
-        <CardContent>
-          <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+      <Card sx={{ mb: { xs: 2, md: 3 }, borderRadius: { xs: 1, md: 2 } }}>
+        <CardContent sx={{ p: { xs: 2, md: 3 } }}>
+          <Typography 
+            variant="h6" 
+            sx={{ 
+              mb: 2, 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: 1,
+              fontSize: { xs: '1.125rem', md: '1.25rem' }
+            }}
+          >
             <AssignmentIcon color="primary" />
             Filtros
           </Typography>
@@ -368,9 +398,18 @@ const RelatoriosPedagogicos = () => {
       </Card>
 
       {/* Lista de Relatórios */}
-      <Card>
-        <CardContent>
-          <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+      <Card sx={{ borderRadius: { xs: 1, md: 2 } }}>
+        <CardContent sx={{ p: { xs: 2, md: 3 } }}>
+          <Typography 
+            variant="h6" 
+            sx={{ 
+              mb: 2, 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: 1,
+              fontSize: { xs: '1.125rem', md: '1.25rem' }
+            }}
+          >
             <SchoolIcon color="primary" />
             Relatórios Criados ({relatoriosOrganizados.length})
           </Typography>

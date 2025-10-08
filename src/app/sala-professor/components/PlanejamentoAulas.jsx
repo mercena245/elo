@@ -64,6 +64,7 @@ const PlanejamentoAulas = () => {
   const [selectedTurmas, setSelectedTurmas] = useState([]);
   const [selectedAlunos, setSelectedAlunos] = useState([]);
   const [minhasTurmas, setMinhasTurmas] = useState([]);
+  const [minhasDisciplinas, setMinhasDisciplinas] = useState([]); // Nova state para disciplinas do professor
   
   // Estados do editor
   const [editorOpen, setEditorOpen] = useState(false);
@@ -106,7 +107,22 @@ const PlanejamentoAulas = () => {
 
       unsubscribes.push(
         onValue(refs.gradeHoraria, (snapshot) => {
-          setGradeHoraria(snapshot.val() || {});
+          const gradeData = snapshot.val() || {};
+          console.log('📚 Grade horária carregada:', gradeData);
+          console.log('📚 Total de aulas na grade:', Object.keys(gradeData).length);
+          setGradeHoraria(gradeData);
+          
+          // Se é professor, extrair disciplinas da grade horária
+          if (userRole === 'professor' || userRole === 'professora') {
+            const disciplinasProf = new Set();
+            Object.values(gradeData).forEach(aula => {
+              if (aula.professorUid === user?.uid && aula.disciplinaId) {
+                disciplinasProf.add(aula.disciplinaId);
+              }
+            });
+            setMinhasDisciplinas(Array.from(disciplinasProf));
+            console.log('Disciplinas do professor:', Array.from(disciplinasProf));
+          }
         })
       );
 
@@ -115,14 +131,18 @@ const PlanejamentoAulas = () => {
           const turmasData = snapshot.val() || {};
           setTurmas(turmasData);
           
-          // Se é professor, filtrar só suas turmas
+          // Se é professor, filtrar suas turmas baseado na grade horária e dados do usuário
           if (userRole === 'professor' || userRole === 'professora') {
-            const minhasTurmasIds = Object.keys(turmasData).filter(turmaId => {
-              // Aqui você pode implementar a lógica para verificar se o professor leciona nesta turma
-              // Por enquanto, retorna todas (pode ser refinado conforme a estrutura de dados)
-              return true;
+            // Buscar turmas vinculadas ao professor no perfil do usuário
+            const userRef = ref(db, `usuarios/${user?.uid}`);
+            get(userRef).then(userSnap => {
+              if (userSnap.exists()) {
+                const userData = userSnap.val();
+                const turmasUsuario = userData.turmas || [];
+                setMinhasTurmas(turmasUsuario);
+                console.log('Turmas vinculadas ao professor:', turmasUsuario);
+              }
             });
-            setMinhasTurmas(minhasTurmasIds);
           }
         })
       );
@@ -297,6 +317,9 @@ const PlanejamentoAulas = () => {
                 showAlunosSelector={false}
                 title="🎯 Selecionar Turma para Planejamento"
                 onTurmaChange={(turmaId) => setSelectedTurmas([turmaId])}
+                filtrarTurmasPorProfessor={userRole === 'professora'}
+                professorUid={user?.uid}
+                userRole={userRole}
               />
             </CardContent>
           </Card>
@@ -453,7 +476,9 @@ const PlanejamentoAulas = () => {
         turmas={turmas}
         disciplinas={disciplinas}
         userRole={userRole}
-        minhasTurmas={minhasTurmas}
+        minhasTurmas={userRole === 'professor' || userRole === 'professora' ? minhasTurmas : Object.keys(turmas)}
+        minhasDisciplinas={userRole === 'professor' || userRole === 'professora' ? minhasDisciplinas : Object.keys(disciplinas)}
+        isEditing={!!planoEditando}
       />
     </Box>
   );

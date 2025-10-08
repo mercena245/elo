@@ -57,7 +57,17 @@ const CalendarioGrade = ({
   }, [minhasAulas, semanaAtual]);
 
   const processarGradeHoraria = () => {
+    console.log('🎯 Processando grade horária:', {
+      gradeHoraria,
+      gradeHorariaType: typeof gradeHoraria,
+      gradeHorariaKeys: Object.keys(gradeHoraria || {}),
+      selectedTurmas,
+      professorUid,
+      userRole
+    });
+    
     if (!gradeHoraria || typeof gradeHoraria !== 'object') {
+      console.log('❌ Grade horária inválida ou vazia');
       setMinhasAulas([]);
       return;
     }
@@ -65,20 +75,31 @@ const CalendarioGrade = ({
     const aulasArray = [];
     
     Object.entries(gradeHoraria).forEach(([id, aula]) => {
+      console.log('📝 Processando aula:', { id, aula, selectedTurmas, professorUid, userRole });
+      
       // Se é coordenador, mostra todas as aulas das turmas selecionadas
       if (userRole === 'coordenador' || userRole === 'coordenadora') {
         if (selectedTurmas.length === 0 || selectedTurmas.includes(aula.turmaId)) {
+          console.log('✅ Aula incluída (coordenador):', aula);
           aulasArray.push({ id, ...aula });
+        } else {
+          console.log('❌ Aula não incluída (turma não selecionada):', aula.turmaId);
         }
       } 
       // Se é professor, mostra apenas suas aulas
       else if (aula.professorUid === professorUid) {
         if (selectedTurmas.length === 0 || selectedTurmas.includes(aula.turmaId)) {
+          console.log('✅ Aula incluída (professor):', aula);
           aulasArray.push({ id, ...aula });
+        } else {
+          console.log('❌ Aula não incluída (turma não selecionada):', aula.turmaId);
         }
+      } else {
+        console.log('❌ Aula não incluída (não é do professor):', aula.professorUid, 'vs', professorUid);
       }
     });
 
+    console.log('📋 Total de aulas processadas:', aulasArray.length);
     setMinhasAulas(aulasArray);
   };
 
@@ -113,7 +134,6 @@ const CalendarioGrade = ({
     const novaSemana = new Date(semanaAtual);
     novaSemana.setDate(novaSemana.getDate() + (direcao * 7));
     setSemanaAtual(novaSemana);
-    setSelectedWeek(novaSemana);
   };
 
   const getDataDaSemana = (diaSemana) => {

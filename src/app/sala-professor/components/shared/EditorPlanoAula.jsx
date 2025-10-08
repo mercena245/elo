@@ -47,6 +47,7 @@ const EditorPlanoAula = ({
   onClose,
   onSave,
   plano,
+  dadosIniciais, // Dados pré-preenchidos do calendário
   turmas,
   disciplinas,
   minhasTurmas,
@@ -84,7 +85,8 @@ const EditorPlanoAula = ({
 
   useEffect(() => {
     if (open) {
-      if (plano && isEditing) {
+      if (isEditing && plano) {
+        // Editando plano existente
         setFormData({
           titulo: plano.titulo || '',
           turmaId: plano.turmaId || '',
@@ -104,20 +106,43 @@ const EditorPlanoAula = ({
           statusAprovacao: plano.statusAprovacao || 'pendente',
           publicado: plano.publicado || false
         });
-      } else if (plano) {
-        // Novo plano com dados pré-preenchidos
-        setFormData(prev => ({
-          ...prev,
-          turmaId: plano.turmaId || '',
-          disciplinaId: plano.disciplinaId || '',
-          data: plano.data || '',
-          horaInicio: plano.horaInicio || '',
-          horaFim: plano.horaFim || ''
-        }));
+      } else {
+        // Novo plano - resetar tudo primeiro
+        setFormData({
+          titulo: '',
+          turmaId: '',
+          disciplinaId: '',
+          data: '',
+          horaInicio: '',
+          horaFim: '',
+          objetivos: [],
+          conteudoProgramatico: '',
+          metodologia: '',
+          recursos: [],
+          avaliacao: '',
+          observacoes: '',
+          atividades: [],
+          leituraObrigatoria: '',
+          tarefaCasa: '',
+          statusAprovacao: 'pendente',
+          publicado: false
+        });
+        
+        // Se há dados iniciais (do calendário), aplicar
+        if (dadosIniciais) {
+          setFormData(prev => ({
+            ...prev,
+            turmaId: dadosIniciais.turmaId || '',
+            disciplinaId: dadosIniciais.disciplinaId || '',
+            data: dadosIniciais.data || '',
+            horaInicio: dadosIniciais.horaInicio || '',
+            horaFim: dadosIniciais.horaFim || ''
+          }));
+        }
       }
       setErrors({});
     }
-  }, [open, plano, isEditing]);
+  }, [open, plano, dadosIniciais, isEditing]);
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
@@ -293,17 +318,18 @@ const EditorPlanoAula = ({
                     />
                   </Grid>
                   
-                  <Grid item xs={12} md={6}>
-                    <FormControl fullWidth error={!!errors.turmaId}>
+                  <Grid item xs={12} sm={6}>
+                    <FormControl fullWidth sx={{ minWidth: '250px' }}>
                       <InputLabel>Turma</InputLabel>
                       <Select
                         value={formData.turmaId}
                         onChange={(e) => handleInputChange('turmaId', e.target.value)}
                         label="Turma"
+                        error={!!errors.turmaId}
                       >
                         {getTurmasDisponiveis().map((turma) => (
                           <MenuItem key={turma.id} value={turma.id}>
-                            {turma.nome} - {turma.serie} {turma.turno}
+                            {turma.nome} {turma.ano && `- ${turma.ano}`} {turma.turno && `(${turma.turno})`}
                           </MenuItem>
                         ))}
                       </Select>
@@ -315,17 +341,18 @@ const EditorPlanoAula = ({
                     </FormControl>
                   </Grid>
                   
-                  <Grid item xs={12} md={6}>
-                    <FormControl fullWidth error={!!errors.disciplinaId}>
+                  <Grid item xs={12} sm={6}>
+                    <FormControl fullWidth sx={{ minWidth: '250px' }}>
                       <InputLabel>Disciplina</InputLabel>
                       <Select
                         value={formData.disciplinaId}
                         onChange={(e) => handleInputChange('disciplinaId', e.target.value)}
                         label="Disciplina"
+                        error={!!errors.disciplinaId}
                       >
                         {getDisciplinasDisponiveis().map((disciplina) => (
                           <MenuItem key={disciplina.id} value={disciplina.id}>
-                            {disciplina.nome}
+                            {disciplina.nome || disciplina.nomeDisciplina || 'Nome não definido'}
                           </MenuItem>
                         ))}
                       </Select>
@@ -337,7 +364,7 @@ const EditorPlanoAula = ({
                     </FormControl>
                   </Grid>
                   
-                  <Grid item xs={12} md={4}>
+                  <Grid item xs={12} sm={6} md={4}>
                     <TextField
                       fullWidth
                       type="date"
@@ -350,7 +377,7 @@ const EditorPlanoAula = ({
                     />
                   </Grid>
                   
-                  <Grid item xs={6} md={4}>
+                  <Grid item xs={6} sm={3} md={4}>
                     <TextField
                       fullWidth
                       type="time"
@@ -361,7 +388,7 @@ const EditorPlanoAula = ({
                     />
                   </Grid>
                   
-                  <Grid item xs={6} md={4}>
+                  <Grid item xs={6} sm={3} md={4}>
                     <TextField
                       fullWidth
                       type="time"

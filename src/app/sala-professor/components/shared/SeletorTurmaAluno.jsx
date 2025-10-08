@@ -156,15 +156,7 @@ const SeletorTurmaAluno = ({
             onChange={handleTurmaChange}
             input={<OutlinedInput label="Turmas" />}
             renderValue={renderTurmaValue}
-            MenuProps={{
-              PaperProps: {
-                style: {
-                  maxHeight: 400,
-                  width: 250,
-                },
-              },
-            }}
-            sx={{ minHeight: 56 }}
+            sx={{ minHeight: 56, minWidth: '250px' }}
           >
             {turmasDisponiveis.length === 0 
               ? <MenuItem disabled>Nenhuma turma disponível</MenuItem>
@@ -233,7 +225,7 @@ const SeletorTurmaAluno = ({
             onChange={handleAlunoChange}
             input={<OutlinedInput label="Alunos" />}
             renderValue={renderAlunoValue}
-            sx={{ minHeight: 56 }}
+            sx={{ minHeight: 56, minWidth: '250px' }}
           >
             {alunosFiltrados.length === 0 
               ? <MenuItem disabled>

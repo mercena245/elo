@@ -22,7 +22,10 @@ export default function SeletorTurmaAluno({
   onTurmaChange = () => {}, 
   onAlunoChange = () => {},
   showAlunosSelector = true,
-  title = "🔍 Filtros de Seleção"
+  title = "🔍 Filtros de Seleção",
+  filtrarTurmasPorProfessor = false, // Nova prop para filtrar turmas
+  professorUid = null, // UID do professor para filtro
+  userRole = null // Role do usuário
 }) {
   const { user } = useAuthUser();
   const [turmas, setTurmas] = useState({});
@@ -30,6 +33,7 @@ export default function SeletorTurmaAluno({
   const [selectedTurma, setSelectedTurma] = useState('');
   const [selectedAluno, setSelectedAluno] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [minhasTurmas, setMinhasTurmas] = useState([]); // Turmas vinculadas ao professor
 
   useEffect(() => {
     const carregarDados = async () => {
@@ -44,7 +48,33 @@ export default function SeletorTurmaAluno({
         const turmasData = turmasSnapshot.val() || {};
         
         console.log('SeletorTurmaAluno - Turmas:', turmasData);
-        setTurmas(turmasData);
+        
+        // Se deve filtrar por professor, buscar dados do usuário
+        if (filtrarTurmasPorProfessor && professorUid && userRole === 'professora') {
+          const userRef = ref(db, `usuarios/${professorUid}`);
+          const userSnapshot = await get(userRef);
+          
+          if (userSnapshot.exists()) {
+            const userData = userSnapshot.val();
+            const turmasVinculadas = userData.turmas || [];
+            setMinhasTurmas(turmasVinculadas);
+            console.log('SeletorTurmaAluno - Turmas vinculadas ao professor:', turmasVinculadas);
+            
+            // Filtrar apenas turmas vinculadas
+            const turmasFiltradas = {};
+            turmasVinculadas.forEach(turmaId => {
+              if (turmasData[turmaId]) {
+                turmasFiltradas[turmaId] = turmasData[turmaId];
+              }
+            });
+            setTurmas(turmasFiltradas);
+          } else {
+            setTurmas({});
+          }
+        } else {
+          // Coordenadora ou sem filtro - mostrar todas
+          setTurmas(turmasData);
+        }
 
         // Carregar alunos
         const alunosRef = ref(db, 'alunos');
@@ -65,7 +95,7 @@ export default function SeletorTurmaAluno({
     };
 
     carregarDados();
-  }, [user]);
+  }, [user, filtrarTurmasPorProfessor, professorUid, userRole]);
 
   const handleTurmaChange = (event) => {
     const turmaId = event.target.value;
@@ -116,7 +146,7 @@ export default function SeletorTurmaAluno({
         <Grid container spacing={{ xs: 2, md: 3 }} sx={{ width: '100%' }}>
           {/* Seletor de Turma */}
           <Grid item xs={12} md={showAlunosSelector ? 6 : 12}>
-            <FormControl fullWidth sx={{ minWidth: { xs: '100%', md: '250px' } }}>
+            <FormControl fullWidth sx={{ minWidth: '250px' }}>
               <InputLabel>Turma</InputLabel>
               <Select
                 value={selectedTurma}
@@ -148,11 +178,17 @@ export default function SeletorTurmaAluno({
                     label="Pesquisar aluno..." 
                     fullWidth 
                     size={window.innerWidth < 900 ? 'small' : 'medium'}
+                    sx={{ minWidth: '250px' }}
                   />
                 )}
                 isOptionEqualToValue={(option, value) => option.id === value?.id}
                 disabled={!selectedTurma || selectedTurma === ''}
                 placeholder={selectedTurma ? "Selecione um aluno" : "Selecione uma turma primeiro"}
+                ListboxProps={{
+                  style: {
+                    maxHeight: 300
+                  }
+                }}
               />
             </Grid>
           )}

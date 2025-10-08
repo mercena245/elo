@@ -17,10 +17,12 @@ import {
   Select,
   MenuItem,
   CircularProgress,
-  Alert
+  Alert,
+  Grid
 } from '@mui/material';
 import { Edit, Delete, Add } from '@mui/icons-material';
 import { db, ref, get, set, remove } from '../../../firebase';
+import SeletorPeriodoLetivo from '../shared/SeletorPeriodoLetivo';
 
 const ConfigPeriodosAula = () => {
   const [periodosAula, setPeriodosAula] = useState([]);
@@ -28,25 +30,36 @@ const ConfigPeriodosAula = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [editPeriodo, setEditPeriodo] = useState(null);
   const [saving, setSaving] = useState(false);
-  const [filtroTurno, setFiltroTurno] = useState(''); // Novo estado para filtro
+  const [filtroTurno, setFiltroTurno] = useState(''); // Filtro por turno
+  const [periodoLetivoSelecionado, setPeriodoLetivoSelecionado] = useState(''); // Novo filtro por período letivo
   const [form, setForm] = useState({
     nome: '',
     inicio: '',
     fim: '',
     ordem: 1,
     tipo: 'aula', // 'aula' ou 'intervalo'
-    turno: 'Manhã' // 'Manhã', 'Tarde', 'Contra-turno Manhã', 'Contra-turno Tarde'
+    turno: 'Manhã', // 'Manhã', 'Tarde', 'Contra-turno Manhã', 'Contra-turno Tarde'
+    periodoLetivoId: '' // Novo campo para vincular ao período letivo
   });
   const [msg, setMsg] = useState('');
 
   useEffect(() => {
-    carregarPeriodos();
-  }, []);
+    if (periodoLetivoSelecionado) {
+      carregarPeriodos();
+    }
+  }, [periodoLetivoSelecionado]);
 
   const carregarPeriodos = async () => {
     setLoading(true);
+    
+    if (!periodoLetivoSelecionado) {
+      setPeriodosAula([]);
+      setLoading(false);
+      return;
+    }
+
     try {
-      const snap = await get(ref(db, 'Escola/PeriodosAula'));
+      const snap = await get(ref(db, `Escola/PeriodosAula/${periodoLetivoSelecionado.id}`));
       if (snap.exists()) {
         const data = snap.val();
         const lista = Object.entries(data)
@@ -63,8 +76,9 @@ const ConfigPeriodosAula = () => {
     } catch (err) {
       console.error('Erro ao carregar períodos:', err);
       setPeriodosAula([]);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleFormChange = (e) => {
@@ -78,26 +92,34 @@ const ConfigPeriodosAula = () => {
       return;
     }
 
+    if (!periodoLetivoSelecionado || !periodoLetivoSelecionado.id) {
+      setMsg('Selecione um período letivo válido');
+      return;
+    }
+
     setSaving(true);
     setMsg('');
     
     try {
       const periodoId = editPeriodo ? editPeriodo.id : `periodo_${Date.now()}`;
-      await set(ref(db, `Escola/PeriodosAula/${periodoId}`), {
+      
+      await set(ref(db, `Escola/PeriodosAula/${periodoLetivoSelecionado.id}/${periodoId}`), {
         nome: form.nome,
         inicio: form.inicio,
         fim: form.fim,
         ordem: parseInt(form.ordem),
         tipo: form.tipo,
-        turno: form.turno
+        turno: form.turno,
+        periodoLetivoId: periodoLetivoSelecionado.id
       });
       
       setModalOpen(false);
       setEditPeriodo(null);
-      setForm({ nome: '', inicio: '', fim: '', ordem: 1, tipo: 'aula' });
+      setForm({ nome: '', inicio: '', fim: '', ordem: 1, tipo: 'aula', turno: 'Manhã', periodoLetivoId: '' });
       await carregarPeriodos();
       setMsg('Período salvo com sucesso!');
     } catch (err) {
+      console.error('Erro ao salvar período:', err);
       setMsg('Erro ao salvar período');
     }
     setSaving(false);
@@ -111,7 +133,8 @@ const ConfigPeriodosAula = () => {
       fim: periodo.fim,
       ordem: periodo.ordem,
       tipo: periodo.tipo || 'aula',
-      turno: periodo.turno || 'Manhã'
+      turno: periodo.turno || 'Manhã',
+      periodoLetivoId: periodo.periodoLetivoId || periodoLetivoSelecionado?.id || ''
     });
     setModalOpen(true);
   };
@@ -119,8 +142,13 @@ const ConfigPeriodosAula = () => {
   const handleExcluir = async (periodo) => {
     if (!window.confirm(`Confirma a exclusão do período "${periodo.nome}"?`)) return;
     
+    if (!periodoLetivoSelecionado) {
+      setMsg('Período letivo não selecionado');
+      return;
+    }
+    
     try {
-      await remove(ref(db, `Escola/PeriodosAula/${periodo.id}`));
+      await remove(ref(db, `Escola/PeriodosAula/${periodoLetivoSelecionado.id}/${periodo.id}`));
       await carregarPeriodos();
       setMsg('Período excluído com sucesso!');
     } catch (err) {
@@ -136,7 +164,8 @@ const ConfigPeriodosAula = () => {
       fim: '', 
       ordem: periodosAula.length + 1, 
       tipo: 'aula',
-      turno: 'Manhã'
+      turno: 'Manhã',
+      periodoLetivoId: periodoLetivoSelecionado?.id || ''
     });
     setModalOpen(true);
   };
@@ -158,9 +187,20 @@ const ConfigPeriodosAula = () => {
           startIcon={<Add />}
           onClick={handleNovo}
           size="small"
+          disabled={!periodoLetivoSelecionado}
         >
           Novo Período
         </Button>
+      </Box>
+
+      {/* Seletor de Período Letivo */}
+      <Box sx={{ mb: 2 }}>
+        <SeletorPeriodoLetivo
+          value={periodoLetivoSelecionado}
+          onChange={setPeriodoLetivoSelecionado}
+          required
+          label="Período Letivo"
+        />
       </Box>
 
       {/* Filtro por turno */}
@@ -194,7 +234,10 @@ const ConfigPeriodosAula = () => {
         </Box>
       ) : periodosAula.length === 0 ? (
         <Typography color="text.secondary" align="center">
-          Nenhum período configurado. Clique em "Novo Período" para começar.
+          {periodoLetivoSelecionado 
+            ? 'Nenhum período de aula configurado para este período letivo. Clique em "Novo Período" para adicionar.'
+            : 'Selecione um período letivo para visualizar e configurar os períodos de aula.'
+          }
         </Typography>
       ) : (
         <List>

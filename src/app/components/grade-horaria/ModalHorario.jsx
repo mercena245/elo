@@ -24,7 +24,8 @@ const ModalHorario = ({
   diaSemana, 
   periodoAulaId, 
   horarioExistente = null,
-  onSalvar 
+  onSalvar,
+  periodoLetivoId
 }) => {
   const [form, setForm] = useState({
     disciplinaId: '',
@@ -89,11 +90,24 @@ const ModalHorario = ({
 
   const validarConflitos = async () => {
     try {
-      // Verificar se professor já tem aula neste horário
-      const horariosSnap = await get(ref(db, 'GradeHoraria'));
+      // Verificar se professor já tem aula neste horário no mesmo período letivo
+      const horariosSnap = await get(ref(db, `GradeHoraria/${periodoLetivoId}`));
+      
       if (horariosSnap.exists()) {
-        const horariosData = horariosSnap.val();
-        const conflitoProfessor = Object.values(horariosData).find(h => 
+        const turmasData = horariosSnap.val();
+        
+        // Buscar em todas as turmas deste período letivo
+        const todosHorarios = [];
+        Object.keys(turmasData).forEach(turmaKey => {
+          const horariosData = turmasData[turmaKey];
+          if (horariosData && typeof horariosData === 'object') {
+            Object.values(horariosData).forEach(h => {
+              todosHorarios.push(h);
+            });
+          }
+        });
+
+        const conflitoProfessor = todosHorarios.find(h => 
           h.professorId === form.professorId && 
           h.diaSemana === diaSemana && 
           h.periodoAula === periodoAulaId &&
@@ -105,7 +119,7 @@ const ModalHorario = ({
         }
 
         // Verificar se turma já tem aula neste horário
-        const conflitoTurma = Object.values(horariosData).find(h => 
+        const conflitoTurma = todosHorarios.find(h => 
           h.turmaId === turmaId && 
           h.diaSemana === diaSemana && 
           h.periodoAula === periodoAulaId &&
@@ -116,8 +130,10 @@ const ModalHorario = ({
           return 'Esta turma já tem uma aula agendada neste horário!';
         }
       }
+      
       return null;
     } catch (err) {
+      console.error('Erro ao validar conflitos:', err);
       return 'Erro ao validar conflitos.';
     }
   };
@@ -125,6 +141,11 @@ const ModalHorario = ({
   const handleSalvar = async () => {
     if (!form.disciplinaId || !form.professorId) {
       setMsg('Selecione a disciplina e o professor.');
+      return;
+    }
+
+    if (!periodoLetivoId) {
+      setMsg('Período letivo não definido.');
       return;
     }
 
@@ -147,11 +168,13 @@ const ModalHorario = ({
         professorId: form.professorId,
         diaSemana,
         periodoAula: periodoAulaId,
+        periodoLetivoId,
         createdAt: horarioExistente ? horarioExistente.createdAt : new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
 
-      await set(ref(db, `GradeHoraria/${horarioId}`), horarioData);
+      // Salvar no caminho específico do período letivo
+      await set(ref(db, `GradeHoraria/${periodoLetivoId}/${turmaId}/${horarioId}`), horarioData);
       
       // Buscar nomes para o log
       const disciplinaNome = disciplinas.find(d => d.id === form.disciplinaId)?.nome || 'Disciplina não encontrada';
@@ -202,6 +225,11 @@ const ModalHorario = ({
   const handleExcluir = async () => {
     if (!horarioExistente || !window.confirm('Confirma a exclusão desta aula?')) return;
     
+    if (!periodoLetivoId) {
+      setMsg('Período letivo não definido.');
+      return;
+    }
+    
     setLoading(true);
     try {
       // Buscar nomes para o log antes de excluir
@@ -209,7 +237,7 @@ const ModalHorario = ({
       const professorNome = professores.find(p => p.id === horarioExistente.professorId)?.nome || 'Professor não encontrado';
       const diaNome = diasSemanaLabels[diaSemana] || `Dia ${diaSemana}`;
       
-      await remove(ref(db, `GradeHoraria/${horarioExistente.id}`));
+      await remove(ref(db, `GradeHoraria/${periodoLetivoId}/${turmaId}/${horarioExistente.id}`));
       
       // Log da exclusão
       await logAction({

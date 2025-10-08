@@ -302,30 +302,48 @@ const TurmaFilho = () => {
   // Função para carregar grade horária
   const carregarGradeHoraria = async (turmaId) => {
     try {
-      // Carregar períodos de aula da estrutura correta
-      const periodosRef = ref(db, 'Escola/PeriodosAula');
-      const periodosSnapshot = await get(periodosRef);
+      // Primeiro, buscar o período letivo da turma específica
+      const turmaSnapshot = await get(ref(db, `turmas/${turmaId}`));
       
-      if (periodosSnapshot.exists()) {
-        const periodosData = Object.entries(periodosSnapshot.val()).map(([id, periodo]) => ({
+      if (!turmaSnapshot.exists()) {
+        console.log('❌ Turma não encontrada');
+        setGradeHoraria([]);
+        setPeriodosAula([]);
+        return;
+      }
+      
+      const dadosTurma = turmaSnapshot.val();
+      const periodoLetivoId = dadosTurma.periodoId;
+      
+      if (!periodoLetivoId) {
+        console.log('❌ Turma não possui período letivo associado');
+        setGradeHoraria([]);
+        setPeriodosAula([]);
+        return;
+      }
+      
+      console.log('📅 Período letivo da turma:', periodoLetivoId);
+      console.log('📅 Dados da turma:', dadosTurma);
+      
+      // Carregar períodos de aula da estrutura correta com período letivo
+      const periodosAulaRef = ref(db, `Escola/PeriodosAula/${periodoLetivoId}`);
+      const periodosAulaSnapshot = await get(periodosAulaRef);
+      
+      if (periodosAulaSnapshot.exists()) {
+        const periodosData = Object.entries(periodosAulaSnapshot.val()).map(([id, periodo]) => ({
           id,
           ...periodo
         }));
         
         // Filtrar períodos pelo turno da turma
-        const turmaSnapshot = await get(ref(db, `turmas/${turmaId}`));
         let periodosFiltrados = periodosData;
+        const turnoTurma = dadosTurma.turnoId;
         
-        if (turmaSnapshot.exists()) {
-          const dadosTurma = turmaSnapshot.val();
-          const turnoTurma = dadosTurma.turnoId;
-          
-          // Filtrar apenas períodos do turno da turma
-          if (turnoTurma && turnoTurma !== 'Integral') {
-            periodosFiltrados = periodosData.filter(periodo => 
-              periodo.turno === turnoTurma
-            );
-          }
+        // Filtrar apenas períodos do turno da turma
+        if (turnoTurma && turnoTurma !== 'Integral') {
+          periodosFiltrados = periodosData.filter(periodo => 
+            periodo.turno === turnoTurma
+          );
         }
         
         // Ordenar por ordem
@@ -335,22 +353,26 @@ const TurmaFilho = () => {
         setPeriodosAula([]);
       }
       
-      // Carregar horários da grade usando a estrutura correta
-      const horariosRef = ref(db, 'GradeHoraria');
+      // Carregar horários da grade usando a nova estrutura hierárquica
+      const horariosRef = ref(db, `GradeHoraria/${periodoLetivoId}/${turmaId}`);
       const horariosSnapshot = await get(horariosRef);
       
+      console.log('📚 Carregando grade horária do caminho:', `GradeHoraria/${periodoLetivoId}/${turmaId}`);
+      
       if (horariosSnapshot.exists()) {
-        const todosHorarios = Object.entries(horariosSnapshot.val()).map(([id, horario]) => ({
+        const horariosData = horariosSnapshot.val();
+        
+        // Converter objeto para array
+        const todosHorarios = Object.entries(horariosData).map(([id, horario]) => ({
           id,
           ...horario
         }));
         
-        // Filtrar horários da turma específica
-        const horariosDaTurma = todosHorarios.filter(horario => horario.turmaId === turmaId);
+        console.log('📚 Horários encontrados:', todosHorarios);
         
         // Buscar nomes de disciplinas e professores para cada horário
         const horariosComNomes = await Promise.all(
-          horariosDaTurma.map(async (horario) => {
+          todosHorarios.map(async (horario) => {
             const disciplinaNome = await buscarNomeDisciplina(horario.disciplinaId);
             const professorNome = await buscarNomeProfessor(horario.professorId);
             
@@ -367,7 +389,7 @@ const TurmaFilho = () => {
         // Contar total de aulas da turma
         setTotalAulas(horariosComNomes.length);
       } else {
-        console.log('❌ Nenhuma grade horária encontrada');
+        console.log('❌ Nenhuma grade horária encontrada para esta turma no período letivo da turma');
         setGradeHoraria([]);
       }
       

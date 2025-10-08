@@ -23,6 +23,7 @@ import { Add, Print } from '@mui/icons-material';
 import { db, ref, get } from '../../../firebase';
 import ModalHorario from './ModalHorario';
 import ImpressaoGradeNova from './ImpressaoGradeNova';
+import SeletorPeriodoLetivo from '../shared/SeletorPeriodoLetivo';
 
 const GradeVisualizador = () => {
   const [turmas, setTurmas] = useState([]);
@@ -30,6 +31,7 @@ const GradeVisualizador = () => {
   const [horariosAula, setHorariosAula] = useState([]);
   const [turmaSelected, setTurmaSelected] = useState('');
   const [turnoSelected, setTurnoSelected] = useState(''); // Novo estado para turno selecionado
+  const [periodoLetivoSelecionado, setPeriodoLetivoSelecionado] = useState(''); // Novo estado para período letivo
   const [loading, setLoading] = useState(true);
   const [disciplinas, setDisciplinas] = useState([]);
   const [professores, setProfessores] = useState([]);
@@ -48,6 +50,24 @@ const GradeVisualizador = () => {
   useEffect(() => {
     carregarDados();
   }, []);
+
+  // Effect para carregar períodos de aula quando período letivo é selecionado
+  useEffect(() => {
+    if (periodoLetivoSelecionado) {
+      carregarPeriodosAula();
+    } else {
+      setPeriodosAula([]);
+    }
+  }, [periodoLetivoSelecionado]);
+
+  // Effect para carregar horários quando turma e período letivo são selecionados
+  useEffect(() => {
+    if (turmaSelected && periodoLetivoSelecionado) {
+      carregarHorarios();
+    } else {
+      setHorariosAula([]);
+    }
+  }, [turmaSelected, periodoLetivoSelecionado]);
 
   // Effect para atualizar períodos quando turma ou turno mudam
   useEffect(() => {
@@ -99,20 +119,6 @@ const GradeVisualizador = () => {
         setTurmas([]);
       }
 
-      // Carregar períodos de aula
-      const periodosSnap = await get(ref(db, 'Escola/PeriodosAula'));
-      if (periodosSnap.exists()) {
-        const periodosData = periodosSnap.val();
-        const periodosArray = Object.entries(periodosData)
-          .map(([id, periodo]) => ({ 
-            id, 
-            ...periodo,
-            turno: periodo.turno || 'Manhã' // Default para compatibilidade com dados existentes
-          }))
-          .sort((a, b) => a.ordem - b.ordem);
-        setPeriodosAula(periodosArray);
-      }
-
       // Carregar disciplinas
       const disciplinasSnap = await get(ref(db, 'disciplinas'));
       if (disciplinasSnap.exists()) {
@@ -131,24 +137,63 @@ const GradeVisualizador = () => {
         setProfessores(professoresArray);
       }
 
-      // Carregar horários (quando implementado)
-      const horariosSnap = await get(ref(db, 'GradeHoraria'));
-      if (horariosSnap.exists()) {
-        const horariosData = horariosSnap.val();
-        const horariosArray = Object.entries(horariosData).map(([id, horario]) => ({ id, ...horario }));
-        setHorariosAula(horariosArray);
-      }
-
     } catch (err) {
       console.error('Erro ao carregar dados:', err);
       // Manter arrays vazios em caso de erro
       setTurmas([]);
-      setPeriodosAula([]);
       setDisciplinas([]);
       setProfessores([]);
-      setHorariosAula([]);
     }
     setLoading(false);
+  };
+
+  const carregarPeriodosAula = async () => {
+    if (!periodoLetivoSelecionado) {
+      setPeriodosAula([]);
+      return;
+    }
+
+    try {
+      const periodosSnap = await get(ref(db, `Escola/PeriodosAula/${periodoLetivoSelecionado.id}`));
+      if (periodosSnap.exists()) {
+        const periodosData = periodosSnap.val();
+        const periodosArray = Object.entries(periodosData)
+          .map(([id, periodo]) => ({ 
+            id, 
+            ...periodo,
+            turno: periodo.turno || 'Manhã' // Default para compatibilidade com dados existentes
+          }))
+          .sort((a, b) => a.ordem - b.ordem);
+        setPeriodosAula(periodosArray);
+      } else {
+        setPeriodosAula([]);
+      }
+    } catch (err) {
+      console.error('Erro ao carregar períodos:', err);
+      setPeriodosAula([]);
+    }
+  };
+
+  const carregarHorarios = async () => {
+    if (!turmaSelected || !periodoLetivoSelecionado) {
+      setHorariosAula([]);
+      return;
+    }
+
+    try {
+      const horariosSnap = await get(ref(db, `GradeHoraria/${periodoLetivoSelecionado.id}/${turmaSelected}`));
+      
+      if (horariosSnap.exists()) {
+        const horariosData = horariosSnap.val();
+        const horariosArray = Object.entries(horariosData).map(([id, horario]) => ({ id, ...horario }));
+        setHorariosAula(horariosArray);
+      } else {
+        setHorariosAula([]);
+      }
+    } catch (err) {
+      console.error('Erro ao carregar horários:', err);
+      setHorariosAula([]);
+    }
   };
 
   const getHorario = (diaSemana, periodoAulaId) => {
@@ -201,7 +246,7 @@ const GradeVisualizador = () => {
   };
 
   const handleSalvarHorario = async () => {
-    await carregarDados(); // Recarregar dados após salvar
+    await carregarHorarios(); // Recarregar horários após salvar
   };
 
   const renderCelula = (diaSemana, periodo) => {
@@ -279,7 +324,7 @@ const GradeVisualizador = () => {
         </Typography>
         
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          {turmaSelected && turnoSelected && (
+          {turmaSelected && turnoSelected && periodoLetivoSelecionado && (
             <Button
               variant="contained"
               startIcon={<Print />}
@@ -292,47 +337,73 @@ const GradeVisualizador = () => {
           <Typography variant="body2" color="text.secondary">
             {turmas.length} turma(s) disponível(is)
           </Typography>
-          <FormControl sx={{ minWidth: 200 }}>
-            <InputLabel>Selecionar Turma</InputLabel>
-            <Select
-              value={turmaSelected}
-              label="Selecionar Turma"
-              onChange={(e) => setTurmaSelected(e.target.value)}
-            >
-              {turmas.length === 0 ? (
-                <MenuItem disabled>
-                  <em>Nenhuma turma encontrada</em>
-                </MenuItem>
-              ) : (
-                turmas.map((turma) => (
-                  <MenuItem key={turma.id} value={turma.id}>
-                    {turma.nome} - {turma.turnoId}
-                  </MenuItem>
-                ))
-              )}
-            </Select>
-          </FormControl>
-          
-          {/* Seletor de turno - aparece apenas para turmas integrais */}
-          {turmaSelected && turmas.find(t => t.id === turmaSelected)?.turnoId === 'Integral' && (
-            <FormControl sx={{ minWidth: 200 }}>
-              <InputLabel>Selecionar Turno</InputLabel>
-              <Select
-                value={turnoSelected}
-                label="Selecionar Turno"
-                onChange={(e) => setTurnoSelected(e.target.value)}
-              >
-                <MenuItem value="Manhã">🌅 Manhã</MenuItem>
-                <MenuItem value="Tarde">🌞 Tarde</MenuItem>
-                <MenuItem value="Contra-turno Manhã">🌅➕ Contra-turno Manhã</MenuItem>
-                <MenuItem value="Contra-turno Tarde">🌞➕ Contra-turno Tarde</MenuItem>
-              </Select>
-            </FormControl>
-          )}
         </Box>
       </Box>
 
-      {turmas.length === 0 && !loading ? (
+      {/* Seletor de Período Letivo */}
+      <Box sx={{ mb: 2 }}>
+        <SeletorPeriodoLetivo
+          value={periodoLetivoSelecionado}
+          onChange={setPeriodoLetivoSelecionado}
+          required
+          label="Período Letivo"
+        />
+      </Box>
+
+      {/* Controles de Turma e Turno */}
+      <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+        <FormControl sx={{ minWidth: 200 }}>
+          <InputLabel>Selecionar Turma</InputLabel>
+          <Select
+            value={turmaSelected}
+            label="Selecionar Turma"
+            onChange={(e) => setTurmaSelected(e.target.value)}
+            disabled={!periodoLetivoSelecionado}
+          >
+            {turmas.length === 0 ? (
+              <MenuItem disabled>
+                <em>Nenhuma turma encontrada</em>
+              </MenuItem>
+            ) : (
+              turmas.map((turma) => (
+                <MenuItem key={turma.id} value={turma.id}>
+                  {turma.nome} - {turma.turnoId}
+                </MenuItem>
+              ))
+            )}
+          </Select>
+        </FormControl>
+        
+        {/* Seletor de turno - aparece apenas para turmas integrais */}
+        {turmaSelected && turmas.find(t => t.id === turmaSelected)?.turnoId === 'Integral' && (
+          <FormControl sx={{ minWidth: 200 }}>
+            <InputLabel>Selecionar Turno</InputLabel>
+            <Select
+              value={turnoSelected}
+              label="Selecionar Turno"
+              onChange={(e) => setTurnoSelected(e.target.value)}
+            >
+              <MenuItem value="Manhã">🌅 Manhã</MenuItem>
+              <MenuItem value="Tarde">🌞 Tarde</MenuItem>
+              <MenuItem value="Contra-turno Manhã">🌅➕ Contra-turno Manhã</MenuItem>
+              <MenuItem value="Contra-turno Tarde">🌞➕ Contra-turno Tarde</MenuItem>
+            </Select>
+          </FormControl>
+        )}
+      </Box>
+
+      {!periodoLetivoSelecionado ? (
+        <Card>
+          <CardContent sx={{ textAlign: 'center' }}>
+            <Typography variant="h6" color="info.main" gutterBottom>
+              📅 Selecione um Período Letivo
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Para visualizar e editar a grade horária, é necessário selecionar um período letivo.
+            </Typography>
+          </CardContent>
+        </Card>
+      ) : turmas.length === 0 && !loading ? (
         <Card>
           <CardContent sx={{ textAlign: 'center' }}>
             <Typography variant="h6" color="warning.main" gutterBottom>
@@ -356,7 +427,7 @@ const GradeVisualizador = () => {
               ⚠️ Períodos de Aula não Configurados
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Antes de criar a grade horária, você precisa configurar os períodos de aula na aba "Configurações".
+              Não há períodos de aula configurados para este período letivo. Configure os períodos na aba "Configurações".
             </Typography>
           </CardContent>
         </Card>
@@ -468,9 +539,10 @@ const GradeVisualizador = () => {
         periodoAulaId={modalData.periodoAulaId}
         horarioExistente={modalData.horarioExistente}
         onSalvar={handleSalvarHorario}
+        periodoLetivoId={periodoLetivoSelecionado?.id}
       />
 
-      {turmaSelected && turnoSelected && (
+      {turmaSelected && turnoSelected && periodoLetivoSelecionado && (
         <ImpressaoGradeNova
           ref={impressaoRef}
           turma={turmas.find(t => t.id === turmaSelected)}
@@ -479,6 +551,7 @@ const GradeVisualizador = () => {
           disciplinas={disciplinas}
           professores={professores}
           turnoSelecionado={turnoSelected}
+          periodoLetivo={periodoLetivoSelecionado}
         />
       )}
     </Box>

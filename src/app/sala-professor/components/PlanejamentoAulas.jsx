@@ -41,7 +41,7 @@ import {
   Assignment as AssignmentIcon,
   Class as ClassIcon
 } from '@mui/icons-material';
-import { ref, onValue, push, update, remove } from 'firebase/database';
+import { ref, onValue, push, update, remove, get } from 'firebase/database';
 import { db } from '../../../firebase';
 import { useAuthUser } from '../../../hooks/useAuthUser';
 import { auditService } from '../../../services/auditService';
@@ -50,6 +50,7 @@ import { auditService } from '../../../services/auditService';
 import EditorPlanoAula from '../../../app/sala-professor/components/shared/EditorPlanoAula';
 import CalendarioGrade from '../../../app/sala-professor/components/shared/CalendarioGrade';
 import SeletorTurmaAluno from './SeletorTurmaAluno';
+import SeletorPeriodoLetivo from '../../components/shared/SeletorPeriodoLetivo';
 
 const PlanejamentoAulas = () => {
   const { user, userRole } = useAuthUser();
@@ -59,6 +60,7 @@ const PlanejamentoAulas = () => {
   const [turmas, setTurmas] = useState({});
   const [disciplinas, setDisciplinas] = useState({});
   const [alunos, setAlunos] = useState({});
+  const [periodoLetivoSelecionado, setPeriodoLetivoSelecionado] = useState(''); // Novo estado
   
   // Estados de filtro
   const [selectedTurmas, setSelectedTurmas] = useState([]);
@@ -81,20 +83,109 @@ const PlanejamentoAulas = () => {
   }, [user]);
 
   useEffect(() => {
+    if (user?.uid && periodoLetivoSelecionado) {
+      carregarDados();
+    }
+  }, [periodoLetivoSelecionado]);
+
+  useEffect(() => {
     organizarPlanos();
   }, [planos, selectedTurmas, selectedAlunos]);
+
+  // Novo useEffect para carregar grade horária das turmas selecionadas
+  useEffect(() => {
+    if (selectedTurmas.length > 0 && Object.keys(turmas).length > 0) {
+      carregarGradeHorariaDasTurmas();
+    } else {
+      setGradeHoraria({});
+    }
+  }, [selectedTurmas, turmas]);
+
+  // Nova função para carregar grade horária baseada nas turmas selecionadas
+  const carregarGradeHorariaDasTurmas = async () => {
+    try {
+      console.log('📚 PlanejamentoAulas - Carregando grade horária das turmas selecionadas:', selectedTurmas);
+      
+      if (selectedTurmas.length === 0) {
+        setGradeHoraria({});
+        return;
+      }
+
+      const gradeCompleta = {};
+      
+      // Para cada turma selecionada, buscar sua grade horária no seu período letivo
+      for (const turmaId of selectedTurmas) {
+        const turma = turmas[turmaId];
+        if (!turma || !turma.periodoId) {
+          console.log(`❌ Turma ${turmaId} não encontrada ou sem período letivo`);
+          continue;
+        }
+
+        console.log(`📚 Carregando grade da turma ${turmaId} no período ${turma.periodoId}`);
+        
+        const gradeRef = ref(db, `GradeHoraria/${turma.periodoId}/${turmaId}`);
+        const gradeSnapshot = await get(gradeRef);
+        
+        if (gradeSnapshot.exists()) {
+          const gradeData = gradeSnapshot.val();
+          
+          // Adicionar cada horário à grade completa
+          Object.entries(gradeData).forEach(([horarioId, horario]) => {
+            gradeCompleta[horarioId] = {
+              ...horario,
+              turmaId: turmaId // Garantir que tenha o turmaId
+            };
+          });
+          
+          console.log(`✅ Grade da turma ${turmaId} carregada:`, Object.keys(gradeData).length, 'aulas');
+        } else {
+          console.log(`❌ Nenhuma grade encontrada para turma ${turmaId} no período ${turma.periodoId}`);
+        }
+      }
+      
+      console.log('📚 PlanejamentoAulas - Grade horária total carregada:', Object.keys(gradeCompleta).length, 'aulas');
+      setGradeHoraria(gradeCompleta);
+      
+      // Se é professor, extrair disciplinas da grade horária
+      if (userRole === 'professor' || userRole === 'professora') {
+        const disciplinasProf = new Set();
+        Object.values(gradeCompleta).forEach(aula => {
+          if (aula.professorUid === user?.uid && aula.disciplinaId) {
+            disciplinasProf.add(aula.disciplinaId);
+          }
+        });
+        setMinhasDisciplinas(Array.from(disciplinasProf));
+        console.log('Disciplinas do professor:', Array.from(disciplinasProf));
+      }
+      
+    } catch (error) {
+      console.error('Erro ao carregar grade horária das turmas:', error);
+      setGradeHoraria({});
+    }
+  };
 
   const carregarDados = async () => {
     try {
       setLoading(true);
       
+      // Se não há período letivo selecionado, limpar grade horária
+      if (!periodoLetivoSelecionado) {
+        setGradeHoraria({});
+        setLoading(false);
+        return;
+      }
+      
+      console.log('🎯 PlanejamentoAulas - Carregando dados para período letivo:', periodoLetivoSelecionado);
+      
       const refs = {
         planos: ref(db, 'planos-aula'),
-        gradeHoraria: ref(db, 'GradeHoraria'),
+        gradeHoraria: ref(db, `GradeHoraria/${periodoLetivoSelecionado.id}`),
         turmas: ref(db, 'turmas'),
         disciplinas: ref(db, 'disciplinas'),
         alunos: ref(db, 'alunos')
       };
+      
+      console.log('🎯 PlanejamentoAulas - Caminho da grade:', `GradeHoraria/${periodoLetivoSelecionado.id}`);
 
       // Listeners
       const unsubscribes = [];
@@ -107,9 +198,22 @@ const PlanejamentoAulas = () => {
 
       unsubscribes.push(
         onValue(refs.gradeHoraria, (snapshot) => {
-          const gradeData = snapshot.val() || {};
-          console.log('📚 Grade horária carregada:', gradeData);
-          console.log('📚 Total de aulas na grade:', Object.keys(gradeData).length);
+          const gradeDataPorTurma = snapshot.val() || {};
+          console.log('📚 PlanejamentoAulas - Caminho consultado:', refs.gradeHoraria.toString());
+          console.log('📚 PlanejamentoAulas - Dados brutos da grade horária:', gradeDataPorTurma);
+          
+          // Converter estrutura hierárquica para estrutura plana (compatibilidade)
+          const gradeData = {};
+          Object.keys(gradeDataPorTurma).forEach(turmaId => {
+            const horariosData = gradeDataPorTurma[turmaId] || {};
+            console.log(`📚 PlanejamentoAulas - Processando turma ${turmaId}:`, horariosData);
+            Object.keys(horariosData).forEach(horarioId => {
+              gradeData[horarioId] = horariosData[horarioId];
+            });
+          });
+          
+          console.log('📚 PlanejamentoAulas - Grade horária convertida para estrutura plana:', gradeData);
+          console.log('📚 PlanejamentoAulas - Total de aulas na grade:', Object.keys(gradeData).length);
           setGradeHoraria(gradeData);
           
           // Se é professor, extrair disciplinas da grade horária
@@ -209,6 +313,11 @@ const PlanejamentoAulas = () => {
   };
 
   const abrirEditor = (plano = null, dadosIniciais = null) => {
+    console.log('📝 PlanejamentoAulas - Abrindo editor com dados:', {
+      plano,
+      dadosIniciais
+    });
+    
     setPlanoEditando(plano);
     setNovoPlanoData(dadosIniciais);
     setEditorOpen(true);
@@ -303,6 +412,17 @@ const PlanejamentoAulas = () => {
         </Button>
       </Box>
 
+      {/* Seletor de Período Letivo */}
+      <Box sx={{ mb: 3 }}>
+        <SeletorPeriodoLetivo
+          value={periodoLetivoSelecionado}
+          onChange={setPeriodoLetivoSelecionado}
+          required
+          label="Período Letivo"
+        />
+      </Box>
+
+      {/* Grade horária agora carrega automaticamente baseada nas turmas */}
       <Grid container spacing={3}>
         {/* Filtros */}
         <Grid item xs={12} md={4}>
@@ -464,7 +584,7 @@ const PlanejamentoAulas = () => {
             </CardContent>
           </Card>
         </Grid>
-      </Grid>
+        </Grid>
 
       {/* Editor de Plano de Aula */}
       <EditorPlanoAula

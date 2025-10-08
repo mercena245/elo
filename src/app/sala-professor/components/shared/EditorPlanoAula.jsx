@@ -41,6 +41,8 @@ import {
   Psychology as PsychologyIcon,
   Assessment as AssessmentIcon
 } from '@mui/icons-material';
+import { ref, get } from 'firebase/database';
+import { db } from '../../../../firebase';
 
 const EditorPlanoAula = ({
   open,
@@ -82,6 +84,9 @@ const EditorPlanoAula = ({
     descricao: ''
   });
   const [errors, setErrors] = useState({});
+  const [periodoLetivo, setPeriodoLetivo] = useState(null);
+  const [dataMinima, setDataMinima] = useState('');
+  const [dataMaxima, setDataMaxima] = useState('');
 
   useEffect(() => {
     if (open) {
@@ -130,6 +135,7 @@ const EditorPlanoAula = ({
         
         // Se há dados iniciais (do calendário), aplicar
         if (dadosIniciais) {
+          console.log('🎯 EditorPlanoAula - Dados iniciais recebidos:', dadosIniciais);
           setFormData(prev => ({
             ...prev,
             turmaId: dadosIniciais.turmaId || '',
@@ -138,11 +144,53 @@ const EditorPlanoAula = ({
             horaInicio: dadosIniciais.horaInicio || '',
             horaFim: dadosIniciais.horaFim || ''
           }));
+          console.log('🎯 EditorPlanoAula - FormData após aplicar dados iniciais');
+        } else {
+          console.log('❌ EditorPlanoAula - Nenhum dado inicial recebido');
         }
       }
       setErrors({});
     }
   }, [open, plano, dadosIniciais, isEditing]);
+
+  // Buscar informações do período letivo quando turma é selecionada
+  useEffect(() => {
+    const buscarPeriodoLetivo = async () => {
+      if (formData.turmaId && turmas[formData.turmaId]) {
+        const turma = turmas[formData.turmaId];
+        const periodoId = turma.periodoId;
+        
+        if (periodoId) {
+          try {
+            console.log('🔍 Buscando período letivo:', periodoId);
+            const periodoRef = ref(db, `Escola/Periodo/${periodoId}`);
+            const periodoSnapshot = await get(periodoRef);
+            
+            if (periodoSnapshot.exists()) {
+              const periodo = periodoSnapshot.val();
+              console.log('📅 Período letivo encontrado:', periodo);
+              
+              setPeriodoLetivo(periodo);
+              setDataMinima(periodo.dataInicio || '2025-01-01');
+              setDataMaxima(periodo.dataFim || '2025-12-31');
+            } else {
+              console.log('❌ Período letivo não encontrado');
+              // Usar datas padrão
+              setDataMinima('2025-01-01');
+              setDataMaxima('2025-12-31');
+            }
+          } catch (error) {
+            console.error('Erro ao buscar período letivo:', error);
+            // Usar datas padrão em caso de erro
+            setDataMinima('2025-01-01');
+            setDataMaxima('2025-12-31');
+          }
+        }
+      }
+    };
+
+    buscarPeriodoLetivo();
+  }, [formData.turmaId, turmas]);
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
@@ -269,6 +317,14 @@ const EditorPlanoAula = ({
     return Object.values(disciplinas).filter(disc => minhasDisciplinas.includes(disc.id));
   };
 
+  const getDataMinima = () => {
+    return dataMinima || new Date().toISOString().split('T')[0];
+  };
+
+  const getDataMaxima = () => {
+    return dataMaxima || `${new Date().getFullYear()}-12-31`;
+  };
+
   return (
     <Dialog 
       open={open} 
@@ -372,8 +428,12 @@ const EditorPlanoAula = ({
                       value={formData.data}
                       onChange={(e) => handleInputChange('data', e.target.value)}
                       error={!!errors.data}
-                      helperText={errors.data}
+                      helperText={errors.data || 'Data deve estar dentro do período letivo da turma'}
                       InputLabelProps={{ shrink: true }}
+                      inputProps={{
+                        min: getDataMinima(),
+                        max: getDataMaxima()
+                      }}
                     />
                   </Grid>
                   

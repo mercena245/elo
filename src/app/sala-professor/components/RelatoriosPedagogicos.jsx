@@ -50,6 +50,7 @@ import { db } from '../../../firebase';
 import { useAuthUser } from '../../../hooks/useAuthUser';
 import { auditService } from '../../../services/auditService';
 import SeletorTurmaAluno from './SeletorTurmaAluno';
+import geminiService from '../../../services/geminiService';
 
 const RelatoriosPedagogicos = () => {
   const { user, userRole } = useAuthUser();
@@ -226,69 +227,57 @@ const RelatoriosPedagogicos = () => {
       const turma = turmas[selectedTurmas[0]];
       const template = templatesBNCC[templateSelecionado];
 
-      // Simulação de chamada para IA (Google Gemini)
-      // Em produção, isso seria uma chamada real para a API
-      const promptCompleto = `
-        ${template.prompt}
-        
-        Dados do aluno:
-        - Nome: ${aluno?.nomeCompleto || aluno?.nome || 'Aluno'}
-        - Turma: ${turma?.nome || 'N/A'}
-        - Data de nascimento: ${aluno?.dataNascimento || 'N/A'}
-        
-        Observações específicas da professora sobre o aluno:
-        ${detalhesAluno || 'Nenhuma observação específica foi fornecida.'}
-        
-        Gere um relatório de aproximadamente 300-400 palavras, profissional e construtivo, 
-        incorporando as observações específicas da professora quando relevantes.
-      `;
+      // Verificar se o serviço Gemini está configurado
+      if (!geminiService.isConfigurado()) {
+        throw new Error(
+          'IA não configurada. Configure a chave da API do Google Gemini em .env.local:\n' +
+          'NEXT_PUBLIC_GEMINI_API_KEY=sua_chave_aqui\n\n' +
+          'Obtenha sua chave gratuita em: https://aistudio.google.com/app/apikey'
+        );
+      }
 
-      // Simulação de resposta da IA (substitua por chamada real à API)
-      await new Promise(resolve => setTimeout(resolve, 3000));
-      
-      const relatorioSimulado = `
-**RELATÓRIO PEDAGÓGICO - ${template.nome.toUpperCase()}**
+      // Preparar dados do aluno para a IA
+      const dadosAluno = {
+        nome: aluno?.nomeCompleto || aluno?.nome || 'Aluno',
+        turma: turma?.nome || 'N/A',
+        dataNascimento: aluno?.dataNascimento || 'Não informado',
+        professor: user?.displayName || user?.email || 'Professor(a)'
+      };
 
-**Aluno:** ${aluno?.nomeCompleto || aluno?.nome || 'Aluno'}
-**Turma:** ${turma?.nome || 'N/A'}
-**Período:** ${new Date().toLocaleDateString('pt-BR')}
-**Professora:** ${user?.displayName || user?.email}
+      console.log('🤖 Gerando relatório com Google Gemini AI...');
+      console.log('📋 Dados do aluno:', dadosAluno);
+      console.log('📝 Template:', template.nome);
+      console.log('💬 Detalhes personalizados:', detalhesAluno ? 'Sim' : 'Não');
 
-**DESENVOLVIMENTO OBSERVADO:**
+      // Chamar o serviço Gemini AI
+      const resultado = await geminiService.gerarRelatorioEducacional(
+        dadosAluno,
+        template,
+        detalhesAluno
+      );
 
-Durante o período avaliado, ${aluno?.nome || 'o(a) aluno(a)'} demonstrou evolução significativa em diversos aspectos do desenvolvimento. ${detalhesAluno ? `Conforme observado pela professora: "${detalhesAluno.slice(0, 150)}${detalhesAluno.length > 150 ? '...' : ''}". ` : ''}No âmbito cognitivo, observa-se crescimento na capacidade de concentração e resolução de problemas, alinhado com as competências gerais da BNCC.
-
-**ASPECTOS SOCIOEMOCIONAIS:**
-
-${aluno?.nome || 'O(a) estudante'} apresenta boa capacidade de relacionamento interpessoal, demonstrando empatia e colaboração nas atividades em grupo. Tem desenvolvido gradualmente a autorregulação emocional e a autonomia nas tarefas acadêmicas.
-
-**PARTICIPAÇÃO E ENGAJAMENTO:**
-
-A participação em atividades tem sido consistente, com contribuições relevantes durante as discussões em sala. ${detalhesAluno && detalhesAluno.toLowerCase().includes('participaç') ? 'As observações específicas da professora reforçam este aspecto positivo do desenvolvimento do aluno. ' : ''}Demonstra curiosidade e interesse pelas atividades propostas, mantendo uma postura proativa no processo de aprendizagem.
-
-**PONTOS DE DESTAQUE:**
-
-• Excelente capacidade de comunicação oral
-• Criatividade na resolução de atividades
-• Responsabilidade com as tarefas escolares
-• Relacionamento respeitoso com colegas e professores${detalhesAluno ? '\n• Características específicas observadas pela professora foram consideradas nesta avaliação' : ''}
-
-**SUGESTÕES PARA DESENVOLVIMENTO:**
-
-Recomenda-se continuar estimulando a leitura diversificada e atividades que desenvolvam o pensamento crítico. O trabalho em equipe pode ser fortalecido através de projetos colaborativos que explorem diferentes linguagens e formas de expressão.
-
-**CONSIDERAÇÕES FINAIS:**
-
-${aluno?.nome || 'O(a) aluno(a)'} está em trajetória positiva de desenvolvimento, demonstrando potencial para alcançar os objetivos de aprendizagem estabelecidos. ${detalhesAluno ? 'As observações detalhadas da professora foram fundamentais para esta análise personalizada. ' : ''}O acompanhamento contínuo e o apoio familiar são fundamentais para a consolidação dos avanços observados.
-
-*Relatório elaborado em conformidade com a Base Nacional Comum Curricular (BNCC) e diretrizes pedagógicas da instituição.*
-      `;
-
-      setRelatorioGerado(relatorioSimulado);
+      if (resultado.sucesso) {
+        console.log('✅ Relatório gerado com sucesso!');
+        setRelatorioGerado(resultado.relatorio);
+      } else {
+        throw new Error(resultado.erro || 'Erro desconhecido na geração do relatório');
+      }
 
     } catch (error) {
-      console.error('Erro ao gerar relatório:', error);
-      alert('Erro ao gerar relatório. Tente novamente.');
+      console.error('❌ Erro ao gerar relatório:', error);
+      
+      // Mostrar erro amigável para o usuário
+      let mensagemErro = 'Erro ao gerar relatório com IA.';
+      
+      if (error.message.includes('API key')) {
+        mensagemErro = 'Configuração da IA necessária. Verifique as configurações do sistema.';
+      } else if (error.message.includes('quota')) {
+        mensagemErro = 'Limite de uso da IA atingido. Tente novamente mais tarde.';
+      } else if (error.message.includes('network')) {
+        mensagemErro = 'Erro de conexão. Verifique sua internet e tente novamente.';
+      }
+      
+      alert(`${mensagemErro}\n\nDetalhes técnicos: ${error.message}`);
     } finally {
       setGerandoRelatorio(false);
     }
@@ -498,12 +487,25 @@ ${aluno?.nome || 'O(a) aluno(a)'} está em trajetória positiva de desenvolvimen
                 </Typography>
               </Alert>
             </Grid>
+            <Grid item xs={12} md={6}>
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={async () => {
+                  const teste = await geminiService.testarConexao();
+                  alert(teste.mensagem);
+                }}
+                sx={{ width: '100%' }}
+              >
+                🔧 Testar Conexão com IA
+              </Button>
+            </Grid>
           </Grid>
 
           {gerandoRelatorio && (
             <Box sx={{ mt: 3 }}>
               <Typography variant="body2" gutterBottom>
-                Gerando relatório com IA... Isso pode levar alguns segundos.
+                🤖 Gerando relatório com Google Gemini AI... Isso pode levar alguns segundos.
               </Typography>
               <LinearProgress />
             </Box>

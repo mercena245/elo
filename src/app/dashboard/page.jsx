@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import SidebarMenu from '../../components/SidebarMenu';
 import ProtectedRoute from '../../components/ProtectedRoute';
 import SimpleCarousel from '../../components/SimpleCarousel';
+import SchoolSelector from '../../components/SchoolSelector';
 // Importações do Swiper
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Navigation, Pagination, Autoplay, EffectCoverflow } from 'swiper/modules';
@@ -349,20 +350,24 @@ const Dashboard = () => {
                     <Typography variant="h6" sx={{ opacity: 0.9, fontWeight: 400, fontSize: { xs: '0.9rem', sm: '1rem', md: '1.25rem' } }}>
                       Sistema Educacional ELO - {roleLabels[userRole] || 'Usuário'}
                     </Typography>
-                    <Chip 
-                      icon={<Lightbulb />}
-                      label="Dashboard Inteligente" 
-                      size="medium"
-                      sx={{ 
-                        mt: 2, 
-                        bgcolor: 'rgba(255,255,255,0.2)', 
-                        color: 'white',
-                        '& .MuiChip-icon': { color: 'white' },
-                        '& .MuiChip-label': { 
-                          fontSize: { xs: '0.75rem', sm: '0.8125rem' }
-                        }
-                      }}
-                    />
+                    <Box sx={{ mt: 2, display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+                      <Chip 
+                        icon={<Lightbulb />}
+                        label="Dashboard Inteligente" 
+                        size="medium"
+                        sx={{ 
+                          bgcolor: 'rgba(255,255,255,0.2)', 
+                          color: 'white',
+                          '& .MuiChip-icon': { color: 'white' },
+                          '& .MuiChip-label': { 
+                            fontSize: { xs: '0.75rem', sm: '0.8125rem' }
+                          }
+                        }}
+                      />
+                      <Box sx={{ bgcolor: 'rgba(255,255,255,0.1)', borderRadius: 2, p: 1 }}>
+                        <SchoolSelector />
+                      </Box>
+                    </Box>
                   </Box>
                   <Avatar 
                     sx={{ 

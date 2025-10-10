@@ -9,6 +9,9 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [role, setRole] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [selectedSchool, setSelectedSchool] = useState(null);
+  const [accessType, setAccessType] = useState(null); // 'school' ou 'management'
+  const [showAccessSelector, setShowAccessSelector] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -23,16 +26,79 @@ export function AuthProvider({ children }) {
         } else {
           setRole(null);
         }
+
+        // Verificar se precisa mostrar seletor de acesso
+        checkAccessSelector(firebaseUser);
       } else {
         setRole(null);
+        setSelectedSchool(null);
+        setAccessType(null);
+        setShowAccessSelector(false);
       }
       setLoading(false);
     });
     return () => unsubscribe();
   }, []);
 
+  const checkAccessSelector = (firebaseUser) => {
+    const superAdminId = 'qD6UucWtcgPC9GHA41OB8rSaghZ2';
+    const isSuperAdmin = firebaseUser?.uid === superAdminId;
+    
+    // Verificar se há escola já selecionada
+    const savedSchool = localStorage.getItem('selectedSchool');
+    const savedAccessType = localStorage.getItem('accessType');
+    
+    if (savedSchool && savedAccessType) {
+      setSelectedSchool(JSON.parse(savedSchool));
+      setAccessType(savedAccessType);
+      setShowAccessSelector(false);
+    } else if (isSuperAdmin) {
+      // Super admin sempre deve escolher tipo de acesso
+      setShowAccessSelector(true);
+    } else {
+      // Usuário normal, verificar se tem múltiplas escolas
+      // Por enquanto, assumir que tem apenas uma escola
+      setShowAccessSelector(false);
+      setAccessType('school');
+    }
+  };
+
+  const handleSchoolSelect = (school) => {
+    setSelectedSchool(school);
+    setAccessType('school');
+    localStorage.setItem('selectedSchool', JSON.stringify(school));
+    localStorage.setItem('accessType', 'school');
+    setShowAccessSelector(false);
+  };
+
+  const handleManagementSelect = () => {
+    setSelectedSchool(null);
+    setAccessType('management');
+    localStorage.removeItem('selectedSchool');
+    localStorage.setItem('accessType', 'management');
+    setShowAccessSelector(false);
+  };
+
+  const resetAccessType = () => {
+    setSelectedSchool(null);
+    setAccessType(null);
+    localStorage.removeItem('selectedSchool');
+    localStorage.removeItem('accessType');
+    setShowAccessSelector(true);
+  };
+
   return (
-    <AuthContext.Provider value={{ user, role, loading }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      role, 
+      loading,
+      selectedSchool,
+      accessType,
+      showAccessSelector,
+      handleSchoolSelect,
+      handleManagementSelect,
+      resetAccessType
+    }}>
       {children}
     </AuthContext.Provider>
   );

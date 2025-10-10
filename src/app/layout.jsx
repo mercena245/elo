@@ -1,12 +1,40 @@
 'use client';
 import { Inter } from 'next/font/google'
 import './globals.css'
-import { AuthProvider } from '../context/AuthContext'
+import { AuthProvider, useAuth } from '../context/AuthContext'
 import { LoadingProvider, useLoading } from '../context/LoadingContext'
 import { useState, useEffect } from 'react'
 import SplashScreen from '../components/SplashScreen'
+import AccessTypeSelector from '../components/AccessTypeSelector'
 
 const inter = Inter({ subsets: ['latin'] })
+
+function AppContent({ children }) {
+  const { user, loading, showAccessSelector, handleSchoolSelect, handleManagementSelect } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (user && showAccessSelector) {
+    return (
+      <AccessTypeSelector
+        user={user}
+        onSchoolSelect={handleSchoolSelect}
+        onManagementSelect={handleManagementSelect}
+      />
+    );
+  }
+
+  return children;
+}
 
 function AppWithLoading({ children }) {
   const [showSplash, setShowSplash] = useState(true);
@@ -19,7 +47,9 @@ function AppWithLoading({ children }) {
     <>
       {showSplash && <SplashScreen onLoadingComplete={handleLoadingComplete} />}
       <AuthProvider>
-        {children}
+        <AppContent>
+          {children}
+        </AppContent>
       </AuthProvider>
     </>
   );

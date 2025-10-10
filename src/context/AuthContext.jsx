@@ -13,6 +13,25 @@ export function AuthProvider({ children }) {
   const [accessType, setAccessType] = useState(null); // 'school' ou 'management'
   const [showAccessSelector, setShowAccessSelector] = useState(false);
 
+  // Carregar dados do localStorage na inicialização
+  useEffect(() => {
+    const savedAccessType = localStorage.getItem('accessType');
+    const savedSchool = localStorage.getItem('selectedSchool');
+    
+    if (savedAccessType) {
+      setAccessType(savedAccessType);
+    }
+    
+    if (savedSchool) {
+      try {
+        setSelectedSchool(JSON.parse(savedSchool));
+      } catch (error) {
+        console.error('Erro ao carregar escola do localStorage:', error);
+        localStorage.removeItem('selectedSchool');
+      }
+    }
+  }, []);
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setUser(firebaseUser);
@@ -49,17 +68,19 @@ export function AuthProvider({ children }) {
     const savedAccessType = localStorage.getItem('accessType');
     
     if (savedSchool && savedAccessType) {
-      setSelectedSchool(JSON.parse(savedSchool));
-      setAccessType(savedAccessType);
+      // Dados já carregados no useEffect inicial, apenas controlar exibição
       setShowAccessSelector(false);
     } else if (isSuperAdmin) {
-      // Super admin sempre deve escolher tipo de acesso
+      // Super admin sempre deve escolher tipo de acesso se não houver dados salvos
       setShowAccessSelector(true);
     } else {
       // Usuário normal, verificar se tem múltiplas escolas
       // Por enquanto, assumir que tem apenas uma escola
       setShowAccessSelector(false);
-      setAccessType('school');
+      if (!savedAccessType) {
+        setAccessType('school');
+        localStorage.setItem('accessType', 'school');
+      }
     }
   };
 

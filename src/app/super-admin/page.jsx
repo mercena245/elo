@@ -2,14 +2,14 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuthUser } from '../../hooks/useAuthUser';
+import { useAuth } from '../../context/AuthContext';
 import SuperAdminAuth from './components/SuperAdminAuth';
 import SuperAdminDashboard from './components/SuperAdminDashboard';
 
 const SUPER_ADMIN_UID = 'qD6UucWtcgPC9GHA41OB8rSaghZ2';
 
 export default function SuperAdminPage() {
-  const { user, loading } = useAuthUser();
+  const { user, loading, accessType } = useAuth();
   const router = useRouter();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAuthorized, setIsAuthorized] = useState(false);
@@ -25,11 +25,27 @@ export default function SuperAdminPage() {
     // Verificar se é o usuário autorizado
     if (user.uid === SUPER_ADMIN_UID) {
       setIsAuthorized(true);
+      
+      // Se não há accessType definido, verificar localStorage ou forçar seleção
+      if (!accessType) {
+        const savedAccessType = localStorage.getItem('accessType');
+        if (savedAccessType !== 'management') {
+          // Redirecionar para seletor de acesso se não for management
+          localStorage.removeItem('accessType');
+          localStorage.removeItem('selectedSchool');
+          router.push('/');
+          return;
+        }
+      } else if (accessType !== 'management') {
+        // Se o tipo de acesso não for management, redirecionar
+        router.push('/dashboard');
+        return;
+      }
     } else {
-      // Usuário não autorizado - redirecionar
+      // Usuário não autorizado - redirecionar para dashboard
       router.push('/dashboard');
     }
-  }, [user, loading, router]);
+  }, [user, loading, router, accessType]);
 
   if (loading) {
     return (

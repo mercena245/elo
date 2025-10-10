@@ -1,6 +1,6 @@
 'use client';
 
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../context/AuthContext';
 
 export default function SchoolSelector() {
   const { selectedSchool, accessType, resetAccessType } = useAuth();

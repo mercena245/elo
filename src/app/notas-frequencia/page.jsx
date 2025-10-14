@@ -24,7 +24,7 @@ import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
 const NotasFrequencia = () => {
 
   // Hook para acessar banco da escola
-  const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, schoolStorage: schoolStorage } = useSchoolDatabase();
+  const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, storage: schoolStorage } = useSchoolDatabase();
 
   const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState('');

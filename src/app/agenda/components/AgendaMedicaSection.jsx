@@ -46,8 +46,7 @@ import {
   Medication,
   Person
 } from '@mui/icons-material';
-;
-import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "firebase/schoolStorage";
+import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
 
 const AgendaMedicaSection = ({ userRole, userData }) => {

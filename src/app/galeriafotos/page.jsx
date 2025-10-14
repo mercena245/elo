@@ -43,16 +43,14 @@ import {
   ArrowForwardIos
 } from '@mui/icons-material';
 
-import { getStorage, ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from "firebase/schoolStorage";
+import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { auth } from '../../firebase';
 import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
-
-const schoolStorage = getStorage();
 
 export default function GaleriaFotos() {
 
   // Hook para acessar banco da escola
-  const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, schoolStorage: schoolStorage } = useSchoolDatabase();
+  const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, storage: schoolStorage } = useSchoolDatabase();
 
   const [open, setOpen] = useState(false);
   const [fotoSelecionada, setFotoSelecionada] = useState(null);

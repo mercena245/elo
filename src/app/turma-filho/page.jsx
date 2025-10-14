@@ -4,8 +4,8 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useSecretariaAccess } from '../../hooks/useSecretariaAccess';
 import SidebarMenu from '../../components/SidebarMenu';
-import { 
 import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
+import { 
   Card, 
   CardContent, 
   Typography, 
@@ -42,7 +42,7 @@ import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
 const TurmaFilho = () => {
 
   // Hook para acessar banco da escola
-  const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, schoolStorage: schoolStorage } = useSchoolDatabase();
+  const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, storage: schoolStorage } = useSchoolDatabase();
 
   const { user, role, loading: authLoading } = useAuth();
   const { alunosVinculados, loading: secretariaLoading } = useSecretariaAccess();

@@ -16,7 +16,7 @@ import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
 export default function Configuracoes() {
 
   // Hook para acessar banco da escola
-  const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, schoolStorage: schoolStorage } = useSchoolDatabase();
+  const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, storage: schoolStorage } = useSchoolDatabase();
 
   const { user } = useAuth();
   const superAdminId = 'qD6UucWtcgPC9GHA41OB8rSaghZ2';

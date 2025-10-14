@@ -11,7 +11,7 @@ import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
 const Colaboradores = () => {
 
   // Hook para acessar banco da escola
-  const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, schoolStorage: schoolStorage } = useSchoolDatabase();
+  const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, storage: schoolStorage } = useSchoolDatabase();
 
   const [disciplinas, setDisciplinas] = useState([]);
   const [editColabDisciplinas, setEditColabDisciplinas] = useState([]);

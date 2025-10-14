@@ -35,11 +35,15 @@ import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs from 'dayjs';
 import { auth, onAuthStateChanged } from '../../firebase';
 import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
-import { auditService, LOG_ACTIONS } from '../../services/auditService';
-import { financeiroService } from '../../services/financeiroService';
+
+
 import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
+import { useSchoolServices } from '../../hooks/useSchoolServices';
 
 const Alunos = () => {
+  // Services multi-tenant
+  const { auditService, financeiroService, LOG_ACTIONS, isReady: servicesReady } = useSchoolServices();
+
   // Hook para acessar banco da escola
   const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, storage: schoolStorage } = useSchoolDatabase();
 
@@ -103,7 +107,7 @@ const Alunos = () => {
         const novoId = alunoId;
         await setData('alunos/${novoId}', dadosAtualizados);
         // Log da remoção de anexo
-        await auditService.logAction(
+        await auditService.auditService?.logAction(
           LOG_ACTIONS.STUDENT_FILE_DELETE,
           userId,
           {
@@ -115,7 +119,7 @@ const Alunos = () => {
       } else if (editAluno && editAluno.id) {
         await setData('alunos/${editAluno.id}', dadosAtualizados);
         // Log da remoção de anexo
-        await auditService.logAction(
+        await auditService.auditService?.logAction(
           LOG_ACTIONS.STUDENT_FILE_DELETE,
           userId,
           {
@@ -178,7 +182,7 @@ const Alunos = () => {
               
               // Log da atualização de status
               if (auditService && LOG_ACTIONS) {
-                await auditService.logAction(
+                await auditService.auditService?.logAction(
                   LOG_ACTIONS.STUDENT_UPDATE,
                   userId,
                   {
@@ -411,7 +415,7 @@ const Alunos = () => {
         await setData('alunos/${editAluno.id}', dadosInativacao);
         
         // Log da inativação do aluno
-        await auditService.logAction(
+        await auditService.auditService?.logAction(
           LOG_ACTIONS.STUDENT_DEACTIVATE,
           userId,
           {
@@ -610,7 +614,7 @@ const Alunos = () => {
       await setData('alunos/${editAluno.id}', alunoAtualizado);
       
       // Log da ativação
-      await auditService.logAction(
+      await auditService.auditService?.logAction(
         'student_activated',
         userId,
         {
@@ -814,7 +818,7 @@ const Alunos = () => {
             setResultadoTitulos(resultadoFinanceiro);
             
             // Log da geração de títulos
-            await auditService.logAction(
+            await auditService.auditService?.logAction(
               'financial_titles_generated',
               userId,
               {
@@ -837,7 +841,7 @@ const Alunos = () => {
         }
         
         // Log da criação do aluno
-        await auditService.logAction(
+        await auditService.auditService?.logAction(
           LOG_ACTIONS.STUDENT_CREATE,
           userId,
           {
@@ -857,7 +861,7 @@ const Alunos = () => {
         
         // Log de upload de anexos se houver
         if (anexosSelecionados.length > 0) {
-          await auditService.logAction(
+          await auditService.auditService?.logAction(
             LOG_ACTIONS.STUDENT_FILE_UPLOAD,
             userId,
             {
@@ -891,7 +895,7 @@ const Alunos = () => {
         
         // Log da atualização do aluno
         if (Object.keys(mudancas).length > 0) {
-          await auditService.logAction(
+          await auditService.auditService?.logAction(
             LOG_ACTIONS.STUDENT_UPDATE,
             userId,
             {
@@ -904,7 +908,7 @@ const Alunos = () => {
         
         // Log de exclusão de anexos se houver
         if (anexosParaExcluir.length > 0) {
-          await auditService.logAction(
+          await auditService.auditService?.logAction(
             LOG_ACTIONS.STUDENT_FILE_DELETE,
             userId,
             {
@@ -919,7 +923,7 @@ const Alunos = () => {
         
         // Log de upload de novos anexos se houver
         if (anexosSelecionados.length > 0) {
-          await auditService.logAction(
+          await auditService.auditService?.logAction(
             LOG_ACTIONS.STUDENT_FILE_UPLOAD,
             userId,
             {
@@ -1707,7 +1711,7 @@ const Alunos = () => {
                             
                             // Log da desvinculação de turma
                             if (editAluno && editAluno.id) {
-                              await auditService.logAction(
+                              await auditService.auditService?.logAction(
                                 LOG_ACTIONS.CLASS_REMOVE_STUDENT,
                                 userId,
                                 {

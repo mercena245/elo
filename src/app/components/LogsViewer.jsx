@@ -57,8 +57,9 @@ import {
   Download
 } from '@mui/icons-material';
 import { query, orderByChild, limitToLast, startAt, endAt } from '../../firebase';
-import { logAction } from '../../services/auditService';
+
 import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
+import { useSchoolServices } from '../../hooks/useSchoolServices';
 
 const LogsViewer = ({ open, onClose }) => {
   const [logs, setLogs] = useState([]);
@@ -278,6 +279,9 @@ const LogsViewer = ({ open, onClose }) => {
   };
 
   const applyFilters = () => {
+  // Services multi-tenant
+  const { auditService, financeiroService, LOG_ACTIONS, isReady: servicesReady } = useSchoolServices();
+
   // Hook para acessar banco da escola
   const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, storage: schoolStorage } = useSchoolDatabase();
 
@@ -570,14 +574,14 @@ const LogsViewer = ({ open, onClose }) => {
       }
 
       // Testar formato novo
-      await logAction('test_new_format', userData.id || userData.uid, {
+      await auditService?.logAction('test_new_format', userData.id || userData.uid, {
         entityId: 'test-entity-123',
         description: 'Teste do sistema de logs - formato novo',
         changes: { teste: 'valor teste novo' }
       });
       
       // Testar formato antigo (compatibilidade)
-      await logAction({
+      await auditService?.logAction({
         action: 'test_old_format',
         entity: 'test',
         entityId: 'test-entity-456',

@@ -35,7 +35,7 @@ import { FaTrash } from 'react-icons/fa';
 import { FaUsers, FaChalkboardTeacher } from 'react-icons/fa';
 import { db, ref, get, set, push, remove, storage, storageRef, uploadBytes, getDownloadURL, deleteObject } from '@/firebase';
 import { auth } from '@/firebase';
-import { auditService } from '../../services/auditService';
+
 const { logAction, LOG_ACTIONS } = auditService;
 import DisciplinaCard from "../components/escola/DisciplinaCard";
 import GestaoEscolarCard from "../components/escola/GestaoEscolarCard";
@@ -43,6 +43,7 @@ import NotasFrequenciaCard from "../components/escola/NotasFrequenciaCard";
 import TurmaCard from "../components/escola/TurmaCard";
 import PeriodoCard from "../components/escola/PeriodoCard";
 import GradeHorariaCard from "../components/escola/GradeHorariaCard";
+import { useSchoolServices } from '../../hooks/useSchoolServices';
 
 // Helpers
 function formatDateBR(dateStr) {
@@ -54,6 +55,9 @@ function formatDateBR(dateStr) {
 
 
 const Escola = () => {
+  // Services multi-tenant
+  const { auditService, financeiroService, LOG_ACTIONS, isReady: servicesReady } = useSchoolServices();
+
   // TURMAS
   const [turmas, setTurmas] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -341,7 +345,7 @@ const Escola = () => {
           email: auth.currentUser?.email,
           role: userRole
         };
-        await logAction({
+        await auditService?.logAction({
           action: LOG_ACTIONS.CLASS_CREATE,
           entity: 'class',
           entityId: novoId,
@@ -371,7 +375,7 @@ const Escola = () => {
             email: auth.currentUser?.email,
             role: userRole
           };
-          await logAction({
+          await auditService?.logAction({
             action: LOG_ACTIONS.CLASS_UPDATE,
             entity: 'class',
             entityId: editTurma.id,
@@ -442,7 +446,7 @@ const Escola = () => {
         email: auth.currentUser?.email,
         role: userRole
       };
-      await logAction({
+      await auditService?.logAction({
         action: LOG_ACTIONS.CLASS_DELETE,
         entity: 'class',
         entityId: turmaExcluir.id,
@@ -534,7 +538,7 @@ const Escola = () => {
       await set(ref(db, `avisos/${avisoId}`), avisoData);
       
       // Log da criação do aviso
-      await logAction({
+      await auditService?.logAction({
         action: LOG_ACTIONS.ANNOUNCEMENT_CREATE,
         entity: 'announcement',
         entityId: avisoId,
@@ -620,7 +624,7 @@ const Escola = () => {
     await set(avisoRef, null);
     
     // Log da remoção do aviso
-    await logAction({
+    await auditService?.logAction({
       action: LOG_ACTIONS.ANNOUNCEMENT_DELETE,
       entity: 'announcement',
       entityId: id,
@@ -758,7 +762,7 @@ const Escola = () => {
       });
       
       // Log da criação do período
-      await logAction({
+      await auditService?.logAction({
         action: LOG_ACTIONS.PERIOD_CREATE,
         entity: 'period',
         entityId: periodoId,
@@ -867,7 +871,7 @@ const Escola = () => {
       
       // Log da atualização do período
       if (Object.keys(mudancas).length > 0) {
-        await logAction({
+        await auditService?.logAction({
           action: LOG_ACTIONS.PERIOD_UPDATE,
           entity: 'period',
           entityId: editPeriodoForm.id,
@@ -896,7 +900,7 @@ const Escola = () => {
       await remove(periodoRef);
       
       // Log da exclusão do período
-      await logAction({
+      await auditService?.logAction({
         action: LOG_ACTIONS.PERIOD_DELETE,
         entity: 'period',
         entityId: id,
@@ -931,7 +935,7 @@ const Escola = () => {
       await set(ref(db, `disciplinas/${disciplinaId}`), { nome: novaDisciplina });
       
       // Log da criação da disciplina
-      await logAction({
+      await auditService?.logAction({
         action: LOG_ACTIONS.SUBJECT_CREATE,
         entity: 'subject',
         entityId: disciplinaId,
@@ -955,7 +959,7 @@ const Escola = () => {
       await remove(ref(db, `disciplinas/${disciplina.id}`));
       
       // Log da exclusão da disciplina
-      await logAction({
+      await auditService?.logAction({
         action: LOG_ACTIONS.SUBJECT_DELETE,
         entity: 'subject',
         entityId: disciplina.id,

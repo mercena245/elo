@@ -6,12 +6,13 @@ import LogsViewer from '../components/LogsViewer';
 import { Box, Typography, Card, CardContent, List, ListItem, ListItemText, CircularProgress, Button, FormControl, InputLabel, Select, MenuItem, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Autocomplete, Chip } from '@mui/material';
 import { useEffect, useState } from 'react';
 import { auth, deleteUserFunction } from '../../firebase';
-import { logAction, LOG_ACTIONS } from '../../services/auditService';
+
 import UserApprovalDialog from '../../components/UserApprovalDialog';
 import TwoFactorManager from '../../components/TwoFactorManager';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../context/AuthContext';
 import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
+import { useSchoolServices } from '../../hooks/useSchoolServices';
 
 export default function Configuracoes() {
 
@@ -32,7 +33,7 @@ export default function Configuracoes() {
     await set(userRef, null);
     
     // Log da rejeição do usuário
-    await logAction({
+    await auditService?.logAction({
       action: LOG_ACTIONS.USER_DELETE,
       entity: 'user',
       entityId: uid,
@@ -181,7 +182,7 @@ export default function Configuracoes() {
         }
         
         // Log da atualização do usuário
-        await logAction({
+        await auditService?.logAction({
           action: LOG_ACTIONS.USER_UPDATE,
           entity: 'user',
           entityId: editUser.uid,
@@ -209,7 +210,7 @@ export default function Configuracoes() {
           
           // Log específico da vinculação de alunos
           if (alunosSelecionados.length > 0) {
-            await logAction({
+            await auditService?.logAction({
               action: LOG_ACTIONS.USER_UPDATE,
               entity: 'user',
               entityId: editUser.uid,
@@ -260,7 +261,7 @@ export default function Configuracoes() {
       await set(userRef, { ...userData, role: 'inativo', alunosVinculados: [] });
       
       // Log da inativação do usuário
-      await logAction({
+      await auditService?.logAction({
         action: LOG_ACTIONS.USER_UPDATE,
         entity: 'user',
         entityId: editUser.uid,
@@ -301,7 +302,7 @@ export default function Configuracoes() {
       }
       
       // Log da exclusão do usuário ANTES de excluir
-      await logAction({
+      await auditService?.logAction({
         action: LOG_ACTIONS.USER_DELETE,
         entity: 'user',
         entityId: editUser.uid,
@@ -418,7 +419,7 @@ export default function Configuracoes() {
       await set(userRef, { ...userData, role });
       
       // Log da aprovação do usuário
-      await logAction({
+      await auditService?.logAction({
         action: LOG_ACTIONS.USER_CREATE,
         entity: 'user',
         entityId: uid,
@@ -437,6 +438,9 @@ export default function Configuracoes() {
 
   // Função para contar cliques no Card do título
   const handleDevCardClick = () => {
+  // Services multi-tenant
+  const { auditService, financeiroService, LOG_ACTIONS, isReady: servicesReady } = useSchoolServices();
+
     setDevClickCount(prev => {
       if (prev + 1 >= 5) {
         setDevModalOpen(true);

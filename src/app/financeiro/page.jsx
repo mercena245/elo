@@ -73,14 +73,18 @@ import {
   CancelOutlined
 } from '@mui/icons-material';
 import { auth, onAuthStateChanged } from '../../firebase';
-import { auditService } from '../../services/auditService';
-import financeiroService from '../../services/financeiroService';
+
+
 import GeradorMensalidadesDialog from '../../components/GeradorMensalidadesDialog';
 import DashboardFinanceiro from '../../components/DashboardFinanceiro';
 import BaixaTituloDialog from '../../components/BaixaTituloDialog';
 import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
+import { useSchoolServices } from '../../hooks/useSchoolServices';
 
 const FinanceiroPage = () => {
+  // Services multi-tenant
+  const { auditService, financeiroService, LOG_ACTIONS, isReady: servicesReady } = useSchoolServices();
+
 
   // Hook para acessar banco da escola
   const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, storage: schoolStorage } = useSchoolDatabase();
@@ -782,7 +786,7 @@ const FinanceiroPage = () => {
       const novoTituloRef = await push(titulosRef, tituloData);
 
       // Log da ação
-      await auditService.logAction('titulo_create', userId, {
+      await auditService.auditService?.logAction('titulo_create', userId, {
         entityId: novoTituloRef.key,
         description: `Título gerado: ${novoTitulo.tipo} - ${novoTitulo.descricao}`,
         changes: { valor: novoTitulo.valor, vencimento: novoTitulo.vencimento }
@@ -883,7 +887,7 @@ const FinanceiroPage = () => {
       await set(tituloRef, atualizacao);
 
       // Log da ação
-      await auditService.logAction('pagamento_enviado', userId, {
+      await auditService.auditService?.logAction('pagamento_enviado', userId, {
         entityId: tituloSelecionado.id,
         description: `Comprovante enviado para o título: ${tituloSelecionado.descricao}`,
         changes: { status: 'em_analise', comprovanteUrl }
@@ -919,7 +923,7 @@ const FinanceiroPage = () => {
       await set(tituloRef, atualizacao);
 
       // Log da ação
-      await auditService.logAction('pagamento_aprovado', userId, {
+      await auditService.auditService?.logAction('pagamento_aprovado', userId, {
         entityId: titulo.id,
         description: `Pagamento aprovado para o título: ${titulo.descricao}`,
         changes: { status: 'pago', dataPagamento: atualizacao.dataPagamento }
@@ -950,7 +954,7 @@ const FinanceiroPage = () => {
       await set(tituloRef, atualizacao);
 
       // Log da ação
-      await auditService.logAction('pagamento_rejeitado', userId, {
+      await auditService.auditService?.logAction('pagamento_rejeitado', userId, {
         entityId: titulo.id,
         description: `Pagamento rejeitado para o título: ${titulo.descricao}`,
         changes: { status: 'pendente' }
@@ -1283,7 +1287,7 @@ const FinanceiroPage = () => {
       }
 
       // Log da ação
-      await auditService.logAction('conta_criada', userId, {
+      await auditService.auditService?.logAction('conta_criada', userId, {
         entityId: novaContaRef.key,
         description: `Conta criada: ${novaConta.descricao}`,
         changes: { valor: novaConta.valor, vencimento: novaConta.vencimento }

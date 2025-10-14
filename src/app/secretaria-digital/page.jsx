@@ -55,10 +55,14 @@ import {
 } from '@mui/icons-material';
 import ProtectedRoute from '../../components/ProtectedRoute';
 import secretariaDigitalService from '../../services/secretariaDigitalService';
-import { logAction } from '../../services/auditService';
+
 import { useSecretariaAccess } from '../../hooks/useSecretariaAccess';
+import { useSchoolServices } from '../../hooks/useSchoolServices';
 
 const SecretariaDigital = () => {
+  // Services multi-tenant
+  const { auditService, financeiroService, LOG_ACTIONS, isReady: servicesReady } = useSchoolServices();
+
   const [loading, setLoading] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogType, setDialogType] = useState('');
@@ -202,7 +206,7 @@ const SecretariaDigital = () => {
       const pdf = await secretariaDigitalService.gerarPDF(documento);
       pdf.save(`${documento.tipo}_${documento.dadosAluno.nome}_${documento.codigoVerificacao}.pdf`);
       
-      await logAction('DIGITAL_SECRETARY_DOCUMENT_DOWNLOADED', {
+      await auditService?.logAction('DIGITAL_SECRETARY_DOCUMENT_DOWNLOADED', {
         documentoId: documento.id,
         tipoDocumento: documento.tipo,
         alunoNome: documento.dadosAluno.nome

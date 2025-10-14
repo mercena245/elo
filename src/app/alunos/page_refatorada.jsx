@@ -16,12 +16,13 @@ import {
 } from '@mui/material';
 import { auth, onAuthStateChanged } from '../../firebase';
 import { schoolStorage } from '../../firebase-schoolStorage';
-import { auditService, LOG_ACTIONS } from '../../services/auditService';
-import { financeiroService } from '../../services/financeiroService';
+
+
 
 // Importar os componentes criados
 import {
 import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
+import { useSchoolServices } from '../../hooks/useSchoolServices';
   AlunosHeader,
   AlunosFiltros,
   AlunosList,
@@ -51,6 +52,9 @@ const ConfirmDialog = ({ open, onClose, onConfirm, title, message }) => (
 );
 
 const Alunos = () => {
+  // Services multi-tenant
+  const { auditService, financeiroService, LOG_ACTIONS, isReady: servicesReady } = useSchoolServices();
+
   // Hook para acessar banco da escola
   const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, storage: schoolStorage } = useSchoolDatabase();
 

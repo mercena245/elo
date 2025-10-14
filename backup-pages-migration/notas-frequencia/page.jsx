@@ -13,19 +13,14 @@ import {
   Tab,
   Alert
 } from '@mui/material';
-import { auth } from '../../firebase';
+import { db, ref, get, auth } from '../../firebase';
 import { useRouter } from 'next/navigation';
 import LancamentoNotas from '../components/notas-frequencia/LancamentoNotas';
 import RegistroFaltas from '../components/notas-frequencia/RegistroFaltas';
 import ConsultaBoletim from '../components/notas-frequencia/ConsultaBoletim';
 import BoletimAluno from '../components/notas-frequencia/BoletimAluno';
-import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
 
 const NotasFrequencia = () => {
-
-  // Hook para acessar banco da escola
-  const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, schoolStorage: schoolStorage } = useSchoolDatabase();
-
   const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState('');
   const [userId, setUserId] = useState('');

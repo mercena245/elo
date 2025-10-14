@@ -72,19 +72,14 @@ import {
   CheckCircleOutlined,
   CancelOutlined
 } from '@mui/icons-material';
-import { auth, onAuthStateChanged } from '../../firebase';
+import { db, ref, get, set, push, auth, storage, storageRef, uploadBytes, getDownloadURL, onAuthStateChanged } from '../../firebase';
 import { auditService } from '../../services/auditService';
 import financeiroService from '../../services/financeiroService';
 import GeradorMensalidadesDialog from '../../components/GeradorMensalidadesDialog';
 import DashboardFinanceiro from '../../components/DashboardFinanceiro';
 import BaixaTituloDialog from '../../components/BaixaTituloDialog';
-import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
 
 const FinanceiroPage = () => {
-
-  // Hook para acessar banco da escola
-  const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, schoolStorage: schoolStorage } = useSchoolDatabase();
-
   const router = useRouter();
   const [userRole, setUserRole] = useState(null);
   const [roleChecked, setRoleChecked] = useState(false);
@@ -853,7 +848,7 @@ const FinanceiroPage = () => {
       // Upload real do comprovante para Firebase Storage
       const timestamp = Date.now();
       const fileName = `${timestamp}_${pagamento.comprovante.name}`;
-      const comprovanteRef = storageRef(schoolStorage, `comprovantes_pagamento/${fileName}`);
+      const comprovanteRef = storageRef(storage, `comprovantes_pagamento/${fileName}`);
       
       // Fazer upload do arquivo
       console.log('📤 Iniciando upload do comprovante...');

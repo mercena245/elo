@@ -61,16 +61,11 @@ import {
   Assessment,
   Check
 } from '@mui/icons-material';
-import { auth, onAuthStateChanged } from '../../firebase';
+import { db, ref, get, set, push, auth, storage, storageRef, uploadBytes, getDownloadURL, onAuthStateChanged } from '../../firebase';
 import ProtectedRoute from '../../components/ProtectedRoute';
 import SidebarMenu from '../../components/SidebarMenu';
-import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
 
 const LojaPage = () => {
-
-  // Hook para acessar banco da escola
-  const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, schoolStorage: schoolStorage } = useSchoolDatabase();
-
   const router = useRouter();
   const [userRole, setUserRole] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -116,7 +111,6 @@ const LojaPage = () => {
   
   // Listener de autenticação
   useEffect(() => {
-    if (!isReady) return;
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
         setUserId(user.uid);
@@ -374,7 +368,7 @@ const LojaPage = () => {
       
       // Upload da imagem se houver
       if (imageUpload) {
-        const imageRef = storageRef(schoolStorage, `loja/${Date.now()}_${imageUpload.name}`);
+        const imageRef = storageRef(storage, `loja/${Date.now()}_${imageUpload.name}`);
         await uploadBytes(imageRef, imageUpload);
         fotoUrl = await getDownloadURL(imageRef);
       }
@@ -393,7 +387,7 @@ const LojaPage = () => {
       } else {
         // Criar novo produto
         produtoData.dataCriacao = new Date().toISOString();
-        const novoProdutoRef = pushData('loja_produtos');
+        const novoProdutoRef = push(ref(db, 'loja_produtos'));
         await set(novoProdutoRef, produtoData);
       }
 
@@ -499,7 +493,7 @@ const LojaPage = () => {
         }))
       };
 
-      const novoTituloRef = pushData('titulos_financeiros');
+      const novoTituloRef = push(ref(db, 'titulos_financeiros'));
       await set(novoTituloRef, tituloData);
 
       // Limpar carrinho e fechar dialogs

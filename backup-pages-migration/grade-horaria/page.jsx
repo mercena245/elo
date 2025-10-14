@@ -12,18 +12,13 @@ import {
   Tabs,
   Tab
 } from '@mui/material';
-import { auth } from '../../firebase';
+import { db, ref, get, auth } from '../../firebase';
 import { useRouter } from 'next/navigation';
 import ConfigPeriodosAula from '../components/grade-horaria/ConfigPeriodosAula';
 import GradeVisualizador from '../components/grade-horaria/GradeVisualizador';
 import RelatoriosGrade from '../components/grade-horaria/RelatoriosGrade';
-import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
 
 const GradeHoraria = () => {
-
-  // Hook para acessar banco da escola
-  const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, schoolStorage: schoolStorage } = useSchoolDatabase();
-
   const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState('');
   const [roleChecked, setRoleChecked] = useState(false);

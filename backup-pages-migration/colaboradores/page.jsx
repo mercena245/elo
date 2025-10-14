@@ -5,14 +5,9 @@ import ProtectedRoute from '../../components/ProtectedRoute';
 import { Card, CardContent, Typography, Box, Avatar, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField, CircularProgress, FormControl, InputLabel, Select, MenuItem } from '@mui/material';
 import { fetchDisciplinas } from './disciplinasHelpers';
 import { FaUsers } from 'react-icons/fa';
-import { auth } from '../../firebase';
-import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
+import { db, ref, get, set, auth } from '../../firebase';
 
 const Colaboradores = () => {
-
-  // Hook para acessar banco da escola
-  const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, schoolStorage: schoolStorage } = useSchoolDatabase();
-
   const [disciplinas, setDisciplinas] = useState([]);
   const [editColabDisciplinas, setEditColabDisciplinas] = useState([]);
   const [colaboradores, setColaboradores] = useState([]);
@@ -30,7 +25,7 @@ const Colaboradores = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const usuariosSnap = await getData('usuarios');
+      const usuariosSnap = await get(ref(db, 'usuarios'));
       let profArr = [];
       if (usuariosSnap.exists()) {
         const usuariosData = usuariosSnap.val();
@@ -46,7 +41,6 @@ const Colaboradores = () => {
   };
 
   useEffect(() => {
-    if (!isReady) return;
     // Buscar disciplinas do banco
     const fetchAllDisciplinas = async () => {
       const lista = await fetchDisciplinas();
@@ -114,7 +108,7 @@ const Colaboradores = () => {
     try {
       if (editColab && editColab.id) {
         // Atualiza apenas as turmas da professora
-        await setData('usuarios/${editColab.id}', {
+        await set(ref(db, `usuarios/${editColab.id}`), {
           ...editColab,
           turmas: editColabTurmas,
           disciplinas: editColabDisciplinas

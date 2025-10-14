@@ -5,19 +5,14 @@ import DevClaimsAccordion from '../../components/DevClaimsAccordion';
 import LogsViewer from '../components/LogsViewer';
 import { Box, Typography, Card, CardContent, List, ListItem, ListItemText, CircularProgress, Button, FormControl, InputLabel, Select, MenuItem, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Autocomplete, Chip } from '@mui/material';
 import { useEffect, useState } from 'react';
-import { auth, deleteUserFunction } from '../../firebase';
+import { db, ref, get, set, push, remove, auth, deleteUserFunction } from '../../firebase';
 import { logAction, LOG_ACTIONS } from '../../services/auditService';
 import UserApprovalDialog from '../../components/UserApprovalDialog';
 import TwoFactorManager from '../../components/TwoFactorManager';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../context/AuthContext';
-import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
 
 export default function Configuracoes() {
-
-  // Hook para acessar banco da escola
-  const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, schoolStorage: schoolStorage } = useSchoolDatabase();
-
   const { user } = useAuth();
   const superAdminId = 'qD6UucWtcgPC9GHA41OB8rSaghZ2';
   const isSuperAdmin = user?.uid === superAdminId;

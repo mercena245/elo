@@ -32,7 +32,7 @@ import {
   CheckCircle,
   Schedule
 } from '@mui/icons-material';
-import { auth, onAuthStateChanged } from '../../firebase';
+import { db, ref, get, auth, onAuthStateChanged } from '../../firebase';
 
 // Componentes das seções
 import MensagensSection from './components/MensagensSection';
@@ -41,13 +41,8 @@ import ComportamentosSection from './components/ComportamentosSection';
 import AvisosEspecificosSection from './components/AvisosEspecificosSection';
 import AutorizacoesSection from './components/AutorizacoesSection';
 import DiarioSection from './components/DiarioSection';
-import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
 
 const Agenda = () => {
-
-  // Hook para acessar banco da escola
-  const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, schoolStorage: schoolStorage } = useSchoolDatabase();
-
   const [activeTab, setActiveTab] = useState(0);
   const [userRole, setUserRole] = useState('');
   const [userData, setUserData] = useState(null);

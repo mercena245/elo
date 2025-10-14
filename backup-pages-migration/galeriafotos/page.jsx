@@ -42,18 +42,13 @@ import {
   ArrowBackIos,
   ArrowForwardIos
 } from '@mui/icons-material';
-
-import { getStorage, ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from "firebase/schoolStorage";
+import { db, ref, get, set, push, remove } from '../../firebase';
+import { getStorage, ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { auth } from '../../firebase';
-import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
 
-const schoolStorage = getStorage();
+const storage = getStorage();
 
 export default function GaleriaFotos() {
-
-  // Hook para acessar banco da escola
-  const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, schoolStorage: schoolStorage } = useSchoolDatabase();
-
   const [open, setOpen] = useState(false);
   const [fotoSelecionada, setFotoSelecionada] = useState(null);
   const [fotos, setFotos] = useState([]);
@@ -350,12 +345,12 @@ export default function GaleriaFotos() {
         // Excluir do Storage se houver URL
         if (fotoData.url) {
           try {
-            const imageRef = storageRef(schoolStorage, fotoData.url);
+            const imageRef = storageRef(storage, fotoData.url);
             await deleteObject(imageRef);
             console.log('Foto excluída do Storage');
           } catch (storageError) {
             console.error('Erro ao excluir do Storage:', storageError);
-            // Continua com a exclusão do banco mesmo se falhar no schoolStorage
+            // Continua com a exclusão do banco mesmo se falhar no storage
           }
         }
         
@@ -417,7 +412,7 @@ export default function GaleriaFotos() {
         // Upload de múltiplas imagens
         const uploadPromises = novaFoto.files.map(async (file, index) => {
           const filePath = `fotos/${Date.now()}_${index}_${file.name}`;
-          const fileRef = storageRef(schoolStorage, filePath);
+          const fileRef = storageRef(storage, filePath);
           await uploadBytes(fileRef, file);
           return await getDownloadURL(fileRef);
         });

@@ -5,7 +5,6 @@ import { useAuth } from '../../context/AuthContext';
 import { useSecretariaAccess } from '../../hooks/useSecretariaAccess';
 import SidebarMenu from '../../components/SidebarMenu';
 import { 
-import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
   Card, 
   CardContent, 
   Typography, 
@@ -37,13 +36,9 @@ import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
   Button,
   IconButton
 } from '@mui/material';
-
+import { db, ref, get } from '../../firebase';
 
 const TurmaFilho = () => {
-
-  // Hook para acessar banco da escola
-  const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, schoolStorage: schoolStorage } = useSchoolDatabase();
-
   const { user, role, loading: authLoading } = useAuth();
   const { alunosVinculados, loading: secretariaLoading } = useSecretariaAccess();
   const [loading, setLoading] = useState(true);
@@ -61,7 +56,6 @@ const TurmaFilho = () => {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (!isReady) return;
     if (user && role === 'pai' && !secretariaLoading && alunosVinculados.length > 0) {
       carregarDadosFilho();
     }
@@ -309,7 +303,7 @@ const TurmaFilho = () => {
   const carregarGradeHoraria = async (turmaId) => {
     try {
       // Primeiro, buscar o período letivo da turma específica
-      const turmaSnapshot = await getData('turmas/${turmaId}');
+      const turmaSnapshot = await get(ref(db, `turmas/${turmaId}`));
       
       if (!turmaSnapshot.exists()) {
         console.log('❌ Turma não encontrada');

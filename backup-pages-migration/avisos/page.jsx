@@ -19,8 +19,7 @@ import {
 } from '@mui/material';
 import { AttachFile, CalendarToday, Close, Download } from '@mui/icons-material';
 import { ref, onValue } from 'firebase/database';
-import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
-
+import { db } from '../../firebase';
 
 // Estilos CSS inline para animações
 const styles = `
@@ -38,10 +37,6 @@ if (typeof document !== 'undefined') {
 }
 
 const AvisosPage = () => {
-
-  // Hook para acessar banco da escola
-  const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, schoolStorage: schoolStorage } = useSchoolDatabase();
-
   const [avisos, setAvisos] = useState([]);
   const [selectedAviso, setSelectedAviso] = useState(null);
   const [open, setOpen] = useState(false);

@@ -12,8 +12,7 @@ import {
   CircularProgress
 } from '@mui/material';
 import { School as SchoolIcon } from '@mui/icons-material';
-import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
-;
+import { useSchoolDatabase } from '../../../hooks/useSchoolDatabase';
 
 const SeletorPeriodoLetivo = ({ 
   value = '', 
@@ -25,21 +24,31 @@ const SeletorPeriodoLetivo = ({
   fullWidth = true,
   sx = {}
 }) => {
+  // Hook para acessar banco da escola
+  const { getData, isReady, error: dbError, currentSchool } = useSchoolDatabase();
+  
   const [periodos, setPeriodos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    carregarPeriodos();
-  }, [isReady]);
+    if (isReady) {
+      carregarPeriodos();
+    }
+  }, [isReady, getData]);
 
   const carregarPeriodos = async () => {
+    if (!isReady) {
+      console.log('⏳ [SeletorPeriodo] Aguardando conexão com banco da escola...');
+      return;
+    }
+    
     setLoading(true);
     setError('');
     try {
-      const snap = await getData('Escola/Periodo');
-      if (snap.exists()) {
-        const data = snap.val();
+      console.log('📅 [SeletorPeriodo] Carregando períodos da escola:', currentSchool?.nome);
+      const data = await getData('Escola/Periodo');
+      if (data) {
         const lista = Object.entries(data)
           .map(([id, periodo]) => ({ id, ...periodo }))
           .sort((a, b) => {

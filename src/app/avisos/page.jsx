@@ -18,7 +18,6 @@ import {
   Chip
 } from '@mui/material';
 import { AttachFile, CalendarToday, Close, Download } from '@mui/icons-material';
-import { ref, onValue } from 'firebase/database';
 import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
 
 
@@ -40,7 +39,7 @@ if (typeof document !== 'undefined') {
 const AvisosPage = () => {
 
   // Hook para acessar banco da escola
-  const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, schoolStorage: schoolStorage } = useSchoolDatabase();
+  const { getData, setData, pushData, removeData, updateData, listen, isReady, error: dbError, currentSchool, storage: schoolStorage } = useSchoolDatabase();
 
   const [avisos, setAvisos] = useState([]);
   const [selectedAviso, setSelectedAviso] = useState(null);
@@ -49,9 +48,15 @@ const AvisosPage = () => {
   const router = useRouter();
 
   useEffect(() => {
-    const avisosRef = ref(db, 'avisos');
+    if (!isReady) {
+      setLoading(true);
+      return;
+    }
+
+    console.log('🔔 [Avisos] Conectando ao banco da escola:', currentSchool?.nome);
     
-    const unsubscribe = onValue(avisosRef, (snapshot) => {
+    // Usar listen do hook para listener em tempo real
+    const unsubscribe = listen('avisos', (snapshot) => {
       const data = snapshot.val();
       if (data) {
         const avisosArray = Object.entries(data).map(([key, value]) => ({
@@ -92,8 +97,10 @@ const AvisosPage = () => {
       setLoading(false);
     });
 
-    return () => unsubscribe();
-  }, []);
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, [isReady, listen, currentSchool]);
 
   const truncateText = (text, maxLength = 200) => {
     if (!text) return '';

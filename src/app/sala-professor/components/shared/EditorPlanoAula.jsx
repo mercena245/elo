@@ -40,8 +40,7 @@ import {
   Assessment as AssessmentIcon
 } from '@mui/icons-material';
 import { ref, get, update } from 'firebase/database';
-import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
-;
+import { useSchoolDatabase } from '../../../../hooks/useSchoolDatabase';
 
 const EditorPlanoAula = ({
   open,

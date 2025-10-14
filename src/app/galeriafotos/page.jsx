@@ -105,13 +105,17 @@ export default function GaleriaFotos() {
 
   // Buscar fotos do Firebase
   const fetchFotos = async () => {
+    if (!isReady) {
+      console.log('⏳ [GaleriaFotos] Aguardando conexão com banco da escola...');
+      return;
+    }
+    
     try {
       setLoading(true);
-      const fotosRef = ref(db, 'fotos');
-      const snap = await get(fotosRef);
-      if (snap.exists()) {
-        const all = snap.val();
-        const lista = Object.entries(all).map(([id, f]) => ({ id, ...f }));
+      console.log('📸 [GaleriaFotos] Carregando fotos da escola:', currentSchool?.nome);
+      const fotosData = await getData('fotos');
+      if (fotosData) {
+        const lista = Object.entries(fotosData).map(([id, f]) => ({ id, ...f }));
         setFotos(lista);
       } else {
         setFotos([]);
@@ -128,15 +132,13 @@ export default function GaleriaFotos() {
     
     // Buscar role do usuário
     const fetchUserRole = async () => {
-      if (!userId || userId === 'anon') {
+      if (!userId || userId === 'anon' || !isReady) {
         setRoleChecked(true);
         return;
       }
       try {
-        const userRef = ref(db, `usuarios/${userId}`);
-        const snap = await get(userRef);
-        if (snap.exists()) {
-          const userData = snap.val();
+        const userData = await getData(`usuarios/${userId}`);
+        if (userData) {
           console.log('Dados brutos do usuário (useEffect):', userData);
           setUserRole((userData.role || '').trim().toLowerCase());
         }
@@ -150,22 +152,20 @@ export default function GaleriaFotos() {
     fetchUserRole();
     fetchFotos();
 
-    if (userId && userId !== 'anon') {
-      const userRef = ref(db, `usuarios/${userId}`);
-      get(userRef).then(snap => {
-        if (snap.exists()) {
-          const userData = snap.val();
+    if (userId && userId !== 'anon' && isReady) {
+      getData(`usuarios/${userId}`).then(userData => {
+        if (userData) {
           console.log('Dados brutos do usuário (useEffect):', userData);
         }
       });
     }
     // Buscar turmas do banco
     const fetchTurmas = async () => {
-      const turmasRef = ref(db, 'turmas');
-      const snap = await get(turmasRef);
-      if (snap.exists()) {
-        const all = snap.val();
-        const listaTurmas = Object.entries(all).map(([id, t]) => t.nome || t);
+      if (!isReady) return;
+      
+      const turmasData = await getData('turmas');
+      if (turmasData) {
+        const listaTurmas = Object.entries(turmasData).map(([id, t]) => t.nome || t);
         setTurmas(listaTurmas);
       } else {
         setTurmas([]);
@@ -175,11 +175,10 @@ export default function GaleriaFotos() {
 
     // Buscar turmas do usuário logado
     const fetchTurmasUsuario = async () => {
-      if (!userId || userId === 'anon') return;
-      const userRef = ref(db, `usuarios/${userId}`);
-      const snap = await get(userRef);
-      if (snap.exists()) {
-        const userData = snap.val();
+      if (!userId || userId === 'anon' || !isReady) return;
+      
+      const userData = await getData(`usuarios/${userId}`);
+      if (userData) {
         console.log('Dados brutos do usuário:', userData);
         let arr = [];
         if (Array.isArray(userData.turmas)) arr = userData.turmas;
@@ -193,7 +192,7 @@ export default function GaleriaFotos() {
       }
     };
     fetchTurmasUsuario();
-  }, [userId]);
+  }, [userId, isReady, getData, currentSchool]);
 
   // Buscar informações do criador da foto
   const fetchCreatorInfo = async (creatorId) => {
@@ -202,12 +201,15 @@ export default function GaleriaFotos() {
       return;
     }
     
+    if (!isReady) {
+      setCreatorInfo({ name: 'Carregando...', role: 'carregando' });
+      return;
+    }
+    
     try {
       setLoadingCreator(true);
-      const userRef = ref(db, `usuarios/${creatorId}`);
-      const snap = await get(userRef);
-      if (snap.exists()) {
-        const userData = snap.val();
+      const userData = await getData(`usuarios/${creatorId}`);
+      if (userData) {
         setCreatorInfo({
           name: userData.name || userData.displayName || 'Usuário',
           role: userData.role || 'Usuário',
@@ -339,12 +341,9 @@ export default function GaleriaFotos() {
   const handleDeleteFoto = async (id) => {
     try {
       // Buscar dados da foto para obter a URL
-      const fotoRef = ref(db, `fotos/${id}`);
-      const snap = await get(fotoRef);
+      const fotoData = await getData(`fotos/${id}`);
       
-      if (snap.exists()) {
-        const fotoData = snap.val();
-        
+      if (fotoData) {
         // Excluir do Storage se houver URL
         if (fotoData.url) {
           try {
@@ -353,12 +352,12 @@ export default function GaleriaFotos() {
             console.log('Foto excluída do Storage');
           } catch (storageError) {
             console.error('Erro ao excluir do Storage:', storageError);
-            // Continua com a exclusão do banco mesmo se falhar no schoolStorage
+            // Continua com a exclusão do banco mesmo se falhar no storage
           }
         }
         
         // Excluir do Realtime Database
-        await remove(fotoRef);
+        await removeData(`fotos/${id}`);
         
         // Atualizar estado local
         setFotos(prevFotos => prevFotos.filter(foto => foto.id !== id));
@@ -422,8 +421,7 @@ export default function GaleriaFotos() {
         
         const urls = await Promise.all(uploadPromises);
         
-        const fotosRef = ref(db, 'fotos');
-        await push(fotosRef, {
+        const novaFotoData = {
           nome: novaFoto.nome,
           descricao: novaFoto.descricao || '',
           urls: urls, // Array de URLs para múltiplas imagens
@@ -435,7 +433,10 @@ export default function GaleriaFotos() {
           likesCount: 0,
           createdAt: new Date().toISOString(),
           createdBy: userId
-        });
+        };
+        
+        await pushData('fotos', novaFotoData);
+        
         setUploadDialogOpen(false);
         setTurmasSelecionadas([]);
         setNovaFoto({ nome: '', descricao: '', url: '', files: [] });
@@ -553,10 +554,8 @@ export default function GaleriaFotos() {
   const handleLike = async (fotoId) => {
     try {
       setLikingPhoto(fotoId);
-      const fotoRef = ref(db, `fotos/${fotoId}`);
-      const snap = await get(fotoRef);
-      if (snap.exists()) {
-        const fotoData = snap.val();
+      const fotoData = await getData(`fotos/${fotoId}`);
+      if (fotoData) {
         let likesArr = fotoData.likes || [];
         likesArr = Array.isArray(likesArr) ? likesArr : Object.values(likesArr);
         
@@ -568,7 +567,7 @@ export default function GaleriaFotos() {
         }
         
         const newLikesCount = likesArr.length;
-        await set(fotoRef, { ...fotoData, likes: likesArr, likesCount: newLikesCount });
+        await setData(`fotos/${fotoId}`, { ...fotoData, likes: likesArr, likesCount: newLikesCount });
         
         // Atualizar estado local sem refetch completo
         setFotos(prevFotos => 

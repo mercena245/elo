@@ -51,7 +51,7 @@ import { useAuthUser } from '../../../hooks/useAuthUser';
 import { auditService } from '../../../services/auditService';
 import SeletorTurmaAluno from './SeletorTurmaAluno';
 import geminiService from '../../../services/geminiService';
-import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
+import { useSchoolDatabase } from '../../../hooks/useSchoolDatabase';
 
 const RelatoriosPedagogicos = () => {
   // Hook para acessar banco da escola

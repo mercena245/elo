@@ -1,6 +1,64 @@
 {
   "rules": {
-    ".read": "auth != null",
-    ".write": "auth != null"
+    "alunos": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["nome", "turma", "ativo"]
+    },
+    "colaboradores": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["nome", "cargo", "ativo"]
+    },
+    "avisos": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["dataCreacao", "ativo"]
+    },
+    "fotos": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["dataUpload"]
+    },
+    "turmas": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["nome"]
+    },
+    "usuarios": {
+      ".read": "auth != null",
+      "$uid": {
+        ".read": "auth != null && auth.uid == $uid",
+        ".write": "auth != null && auth.uid == $uid"
+      }
+    },
+    "notas": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["alunoId", "disciplina", "data"]
+    },
+    "frequencia": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["alunoId", "data"]
+    },
+    "financeiro": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["alunoId", "status", "vencimento"]
+    },
+    "agenda": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["data", "turma"]
+    },
+    "configuracoes": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "$other": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    }
   }
 }

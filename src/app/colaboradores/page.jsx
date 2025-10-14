@@ -28,18 +28,20 @@ const Colaboradores = () => {
   const userId = auth.currentUser ? auth.currentUser.uid : null;
 
   const fetchData = async () => {
+    if (!isReady) return;
+    
     setLoading(true);
     try {
-      const usuariosSnap = await getData('usuarios');
+      const usuariosData = await getData('usuarios');
       let profArr = [];
-      if (usuariosSnap.exists()) {
-        const usuariosData = usuariosSnap.val();
+      if (usuariosData) {
         profArr = Object.entries(usuariosData)
           .filter(([_, u]) => u.role === 'professora')
           .map(([id, prof]) => ({ ...prof, id }));
       }
       setColaboradores(profArr);
-    } catch {
+    } catch (error) {
+      console.error('Erro ao buscar colaboradores:', error);
       setColaboradores([]);
     }
     setLoading(false);
@@ -47,48 +49,64 @@ const Colaboradores = () => {
 
   useEffect(() => {
     if (!isReady) return;
+    
+    console.log('👥 [Colaboradores] Conectando ao banco da escola:', currentSchool?.nome);
+    
     // Buscar disciplinas do banco
     const fetchAllDisciplinas = async () => {
-      const lista = await fetchDisciplinas();
+      const lista = await fetchDisciplinas(getData);
       setDisciplinas(lista);
     };
     fetchAllDisciplinas();
     fetchData();
-    // Buscar turmas do banco
+    
+    // Buscar turmas do banco usando getData
     const fetchTurmas = async () => {
-      const turmasRef = ref(db, 'turmas');
-      const snap = await get(turmasRef);
-      if (snap.exists()) {
-        const all = snap.val();
-        // Se turmas for objeto, transforma em array de nomes
-        const listaTurmas = Object.entries(all).map(([id, t]) => ({ id, nome: t.nome || t }));
-        setTurmas(listaTurmas);
-      } else {
+      try {
+        const turmasData = await getData('turmas');
+        if (turmasData) {
+          // Se turmas for objeto, transforma em array de nomes
+          const listaTurmas = Object.entries(turmasData).map(([id, t]) => ({ 
+            id, 
+            nome: t.nome || t 
+          }));
+          setTurmas(listaTurmas);
+        } else {
+          setTurmas([]);
+        }
+      } catch (error) {
+        console.error('Erro ao buscar turmas:', error);
         setTurmas([]);
       }
     };
     fetchTurmas();
-  }, []);
+  }, [isReady, getData, currentSchool]);
 
   useEffect(() => {
+    if (!isReady) return;
+    
     async function fetchRole() {
       if (!userId) {
         setUserRole(null);
         setRoleChecked(true);
         return;
       }
-      const userRef = ref(db, `usuarios/${userId}`);
-      const snap = await get(userRef);
-      if (snap.exists()) {
-        const userData = snap.val();
-        setUserRole((userData.role || '').trim().toLowerCase());
-      } else {
+      
+      try {
+        const userData = await getData(`usuarios/${userId}`);
+        if (userData) {
+          setUserRole((userData.role || '').trim().toLowerCase());
+        } else {
+          setUserRole(null);
+        }
+      } catch (error) {
+        console.error('Erro ao buscar role:', error);
         setUserRole(null);
       }
       setRoleChecked(true);
     }
     fetchRole();
-  }, [userId]);
+  }, [userId, isReady, getData]);
 
   const handleAddColab = () => {
     setEditColab(null);
@@ -113,8 +131,8 @@ const Colaboradores = () => {
     setSavingColab(true);
     try {
       if (editColab && editColab.id) {
-        // Atualiza apenas as turmas da professora
-        await setData('usuarios/${editColab.id}', {
+        // Atualiza apenas as turmas e disciplinas da professora
+        await setData(`usuarios/${editColab.id}`, {
           ...editColab,
           turmas: editColabTurmas,
           disciplinas: editColabDisciplinas
@@ -122,7 +140,9 @@ const Colaboradores = () => {
       }
       setOpenColabModal(false);
       await fetchData();
-    } catch (err) {}
+    } catch (err) {
+      console.error('Erro ao salvar colaborador:', err);
+    }
     setSavingColab(false);
   };
 

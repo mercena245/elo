@@ -62,11 +62,9 @@ import {
   Description as DocIcon,
   Archive as ArchiveIcon
 } from '@mui/icons-material';
-import { ref, onValue, push, update, remove } from 'firebase/database';
-;
 import { useAuthUser } from '../../../hooks/useAuthUser';
 import { auditService } from '../../../services/auditService';
-import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
+import { useSchoolDatabase } from '../../../hooks/useSchoolDatabase';
 
 const BibliotecaMateriais = () => {
   // Hook para acessar banco da escola
@@ -130,47 +128,36 @@ const BibliotecaMateriais = () => {
   };
 
   useEffect(() => {
-    if (user?.uid) {
+    if (user?.uid && isReady) {
       carregarDados();
     }
-  }, [user]);
+  }, [user, isReady, getData]);
 
   useEffect(() => {
     organizarMateriais();
   }, [materiais, categoriaFiltro, statusFiltro, tabAtual]);
 
   const carregarDados = async () => {
+    if (!isReady) {
+      console.log('⏳ [BibliotecaMateriais] Aguardando conexão com banco da escola...');
+      return;
+    }
+    
     try {
       setLoading(true);
+      console.log('📚 [BibliotecaMateriais] Carregando dados da escola:', currentSchool?.nome);
       
-      const refs = {
-        materiais: ref(db, 'biblioteca-materiais'),
-        turmas: ref(db, 'turmas'),
-        disciplinas: ref(db, 'disciplinas')
-      };
-
-      // Listeners
-      const unsubscribes = [];
-
-      unsubscribes.push(
-        onValue(refs.materiais, (snapshot) => {
-          setMateriais(snapshot.val() || {});
-        })
-      );
-
-      unsubscribes.push(
-        onValue(refs.turmas, (snapshot) => {
-          setTurmas(snapshot.val() || {});
-        })
-      );
-
-      unsubscribes.push(
-        onValue(refs.disciplinas, (snapshot) => {
-          setDisciplinas(snapshot.val() || {});
-        })
-      );
-
-      return () => unsubscribes.forEach(unsub => unsub());
+      // Carregar materiais
+      const materiaisData = await getData('biblioteca-materiais');
+      setMateriais(materiaisData || {});
+      
+      // Carregar turmas
+      const turmasData = await getData('turmas');
+      setTurmas(turmasData || {});
+      
+      // Carregar disciplinas
+      const disciplinasData = await getData('disciplinas');
+      setDisciplinas(disciplinasData || {});
       
     } catch (error) {
       console.error('Erro ao carregar dados:', error);

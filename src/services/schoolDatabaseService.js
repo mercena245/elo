@@ -3,28 +3,41 @@
  * 
  * Gerencia conexões dinâmicas aos bancos de dados específicos de cada escola.
  * Cada escola tem seu próprio Firebase Database e Storage, isolando completamente os dados.
+ * 
+ * IMPORTANTE: Para ambientes multi-tenant com múltiplos projetos Firebase,
+ * cada projeto de escola deve ter as regras de segurança configuradas adequadamente.
  */
 
 import { initializeApp, getApps } from 'firebase/app';
 import { getDatabase, ref, get, set, push, update, remove, onValue } from 'firebase/database';
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { getAuth, signInWithCustomToken } from 'firebase/auth';
 
 // Cache de instâncias do Firebase por escola
 const schoolApps = new Map();
 const schoolDatabases = new Map();
 const schoolStorages = new Map();
+const schoolAuths = new Map();
 
 // Configuração mínima do Firebase (apenas para client-side)
 const getFirebaseConfig = (schoolData) => {
-  return {
-    apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  const config = {
+    apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || 'AIzaSyBoY8kGVTZjRnneyxPRfyLaq_ePjgFNNrY',
     authDomain: `${schoolData.projectId}.firebaseapp.com`,
     databaseURL: schoolData.databaseURL,
     projectId: schoolData.projectId,
     storageBucket: schoolData.storageBucket,
-    messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-    appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID
+    messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || '403961922767',
+    appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || '1:403961922767:web:89ffe1a7ebe6be3e9a23ba'
   };
+  
+  console.log('🔧 [getFirebaseConfig] Configuração gerada:', {
+    projectId: config.projectId,
+    databaseURL: config.databaseURL,
+    storageBucket: config.storageBucket
+  });
+  
+  return config;
 };
 
 /**
@@ -71,21 +84,30 @@ export const getSchoolDatabase = (schoolData) => {
     throw new Error('Dados da escola inválidos');
   }
 
-  const { projectId } = schoolData;
+  const { projectId, databaseURL } = schoolData;
 
   // Retorna do cache se já existe
   if (schoolDatabases.has(projectId)) {
+    console.log(`♻️ [getSchoolDatabase] Usando cache para: ${schoolData.nome}`);
     return schoolDatabases.get(projectId);
   }
 
-  // Inicializa app e database
-  const app = getSchoolApp(schoolData);
-  const database = getDatabase(app);
-  
-  schoolDatabases.set(projectId, database);
-  console.log(`✅ Database conectado para: ${schoolData.nome}`);
-  
-  return database;
+  try {
+    // Inicializa app e database
+    const app = getSchoolApp(schoolData);
+    
+    // Usa a URL específica do banco da escola
+    const database = getDatabase(app, databaseURL);
+    
+    schoolDatabases.set(projectId, database);
+    console.log(`✅ [getSchoolDatabase] Database conectado para: ${schoolData.nome}`);
+    console.log(`📍 [getSchoolDatabase] Database URL: ${databaseURL}`);
+    
+    return database;
+  } catch (error) {
+    console.error(`❌ [getSchoolDatabase] Erro ao conectar database:`, error);
+    throw new Error(`Falha ao conectar ao banco da escola: ${error.message}`);
+  }
 };
 
 /**
@@ -125,15 +147,53 @@ export const schoolDatabaseOperations = (schoolData) => {
     /**
      * Cria uma referência para um caminho no database
      */
-    ref: (path) => ref(db, path),
+    ref: (path) => {
+      console.log(`🔗 [schoolDatabaseOperations.ref] Path: ${path}`);
+      return ref(db, path);
+    },
 
     /**
      * Busca dados de um caminho
      */
     get: async (path) => {
-      const dbRef = ref(db, path);
-      const snapshot = await get(dbRef);
-      return snapshot.exists() ? snapshot.val() : null;
+      try {
+        console.log(`📖 [schoolDatabaseOperations.get] Iniciando leitura: ${path}`);
+        console.log(`📍 [schoolDatabaseOperations.get] Database URL: ${schoolData.databaseURL}`);
+        
+        const dbRef = ref(db, path);
+        const snapshot = await get(dbRef);
+        
+        const exists = snapshot.exists();
+        const dataSize = exists ? JSON.stringify(snapshot.val()).length : 0;
+        
+        console.log(`✅ [schoolDatabaseOperations.get] Leitura concluída`);
+        console.log(`   - Path: ${path}`);
+        console.log(`   - Existe: ${exists}`);
+        console.log(`   - Tamanho: ${dataSize} bytes`);
+        
+        return exists ? snapshot.val() : null;
+      } catch (error) {
+        console.error(`❌ [schoolDatabaseOperations.get] Erro ao ler dados:`, {
+          path,
+          errorCode: error.code,
+          errorMessage: error.message,
+          databaseURL: schoolData.databaseURL,
+          projectId: schoolData.projectId
+        });
+        
+        // Fornecer mensagem mais clara sobre erro de permissão
+        if (error.code === 'PERMISSION_DENIED') {
+          throw new Error(
+            `Permissão negada ao acessar "${path}". ` +
+            `Verifique se:\n` +
+            `1. As regras de segurança do banco estão configuradas\n` +
+            `2. O usuário está autenticado no projeto correto\n` +
+            `3. O banco de dados "${schoolData.databaseURL}" está acessível`
+          );
+        }
+        
+        throw error;
+      }
     },
 
     /**

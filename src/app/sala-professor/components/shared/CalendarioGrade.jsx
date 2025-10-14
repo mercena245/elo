@@ -27,8 +27,7 @@ import {
   School as SchoolIcon
 } from '@mui/icons-material';
 import { ref, get } from 'firebase/database';
-import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
-;
+import { useSchoolDatabase } from '../../../../hooks/useSchoolDatabase';
 
 const CalendarioGrade = ({
   gradeHoraria = {},

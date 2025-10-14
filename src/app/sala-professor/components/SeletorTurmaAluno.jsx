@@ -16,8 +16,7 @@ import {
 } from '@mui/material';
 import { useAuthUser } from '../../../hooks/useAuthUser';
 import { get, ref } from 'firebase/database';
-import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
-;
+import { useSchoolDatabase } from '../../../hooks/useSchoolDatabase';
 
 export default function SeletorTurmaAluno({ 
   onTurmaChange = () => {}, 

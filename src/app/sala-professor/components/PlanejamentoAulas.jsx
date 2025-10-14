@@ -52,7 +52,7 @@ import EditorPlanoAula from './shared/EditorPlanoAula';
 import CalendarioGrade from '../../../app/sala-professor/components/shared/CalendarioGrade';
 import SeletorTurmaAluno from './SeletorTurmaAluno';
 import SeletorPeriodoLetivo from '../../components/shared/SeletorPeriodoLetivo';
-import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
+import { useSchoolDatabase } from '../../../hooks/useSchoolDatabase';
 
 const PlanejamentoAulas = () => {
   // Hook para acessar banco da escola

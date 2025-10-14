@@ -51,7 +51,7 @@ import { ref, onValue, push, update, remove } from 'firebase/database';
 ;
 import { useAuthUser } from '../../../hooks/useAuthUser';
 import { auditService } from '../../../services/auditService';
-import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
+import { useSchoolDatabase } from '../../../hooks/useSchoolDatabase';
 
 const CronogramaAcademico = () => {
   // Hook para acessar banco da escola

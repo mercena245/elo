@@ -340,14 +340,14 @@ const Alunos = () => {
         ? `id_aluno_${editForm.nome.replace(/\s/g, '').toLowerCase()}_${editForm.matricula}`
         : editAluno.id;
   const matricula = editForm.matricula || (editAluno && editAluno.matricula) || '';
-  const fileRef = storageRef(storage, `anexos_alunos/${alunoId}_${matricula}/${anexo.name}`);
+  const fileRef = storageRef(schoolStorage, `anexos_alunos/${alunoId}_${matricula}/${anexo.name}`);
       await deleteObject(fileRef);
       // Remove do registro do aluno
       const novosAnexos = editForm.anexos.filter((_, i) => i !== idx);
       const dadosAtualizados = { ...editForm, anexos: novosAnexos };
       if (isNew) {
         const novoId = alunoId;
-        await set(ref(db, `alunos/${novoId}`), dadosAtualizados);
+        await setData(`alunos/${novoId}`, dadosAtualizados);
         // Log da remoção de anexo
         await auditService.auditService?.logAction(
           LOG_ACTIONS.STUDENT_FILE_DELETE,
@@ -359,7 +359,7 @@ const Alunos = () => {
           }
         );
       } else if (editAluno && editAluno.id) {
-        await set(ref(db, `alunos/${editAluno.id}`), dadosAtualizados);
+        await setData(`alunos/${editAluno.id}`, dadosAtualizados);
         // Log da remoção de anexo
         await auditService.auditService?.logAction(
           LOG_ACTIONS.STUDENT_FILE_DELETE,
@@ -528,7 +528,7 @@ const Alunos = () => {
                 }
               };
               
-              await set(ref(db, `alunos/${aluno.id}`), alunoAtualizado);
+              await setData(`alunos/${aluno.id}`, alunoAtualizado);
               alunosAtualizados++;
               
               // Log da atualização de status
@@ -758,7 +758,7 @@ const Alunos = () => {
           }
         };
         
-        await set(ref(db, `alunos/${alunoData.id}`), alunoAtualizado);
+        await setData(`alunos/${alunoData.id}`, alunoAtualizado);
         
         // Log da ativação automática
         await auditService.auditService?.logAction(
@@ -853,7 +853,7 @@ const Alunos = () => {
       }
       
       if (editAluno && editAluno.id) {
-        await set(ref(db, `alunos/${editAluno.id}`), dadosInativacao);
+        await setData(`alunos/${editAluno.id}`, dadosInativacao);
         
         // Log da inativação do aluno
         await auditService.auditService?.logAction(
@@ -902,19 +902,24 @@ const Alunos = () => {
   }, []);
 
   const fetchData = async () => {
+    if (!isReady) {
+      console.log('⏳ [Alunos] Aguardando conexão com banco da escola...');
+      return;
+    }
+    
     setLoading(true);
     try {
-      const alunosSnap = await get(ref(db, 'alunos'));
-      const turmasSnap = await get(ref(db, 'turmas'));
+      console.log('👨‍🎓 [Alunos] Conectando ao banco da escola:', currentSchool?.nome);
+      const alunosData = await getData('alunos');
+      const turmasData = await getData('turmas');
       let alunosArr = [];
       let turmasObj = {};
       
-      if (alunosSnap.exists()) {
-        const alunosData = alunosSnap.val();
+      if (alunosData) {
         alunosArr = Object.entries(alunosData).map(([id, aluno]) => ({ ...aluno, id }));
       }
-      if (turmasSnap.exists()) {
-        turmasObj = turmasSnap.val();
+      if (turmasData) {
+        turmasObj = turmasData;
       }
       
       // Primeiro definir os dados básicos
@@ -936,9 +941,8 @@ const Alunos = () => {
         // Se houver ativações, recarregar dados
         if (ativacoesRealizadas > 0) {
           console.log(`✅ ${ativacoesRealizadas} alunos ativados automaticamente. Recarregando...`);
-          const alunosSnapNovo = await get(ref(db, 'alunos'));
-          if (alunosSnapNovo.exists()) {
-            const alunosDataNovo = alunosSnapNovo.val();
+          const alunosDataNovo = await getData('alunos');
+          if (alunosDataNovo) {
             const alunosArrNovo = Object.entries(alunosDataNovo).map(([id, aluno]) => ({ ...aluno, id }));
             setAlunos(alunosArrNovo);
           }
@@ -950,9 +954,8 @@ const Alunos = () => {
           
           if (atualizados > 0) {
             console.log(`✅ ${atualizados} alunos tiveram status atualizado. Recarregando dados...`);
-            const alunosSnapFinal = await get(ref(db, 'alunos'));
-            if (alunosSnapFinal.exists()) {
-              const alunosDataFinal = alunosSnapFinal.val();
+            const alunosDataFinal = await getData('alunos');
+            if (alunosDataFinal) {
               const alunosArrFinal = Object.entries(alunosDataFinal).map(([id, aluno]) => ({ ...aluno, id }));
               setAlunos(alunosArrFinal);
             }
@@ -969,22 +972,21 @@ const Alunos = () => {
   };
 
   useEffect(() => {
-    if (userId) {
+    if (isReady && userId) {
+      console.log('👨‍🎓 [Alunos] Banco pronto, carregando dados...');
       fetchData();
     }
-  }, [userId]);
+  }, [isReady, userId, getData, currentSchool]);
 
   useEffect(() => {
     async function fetchRole() {
-      if (!userId) {
+      if (!userId || !isReady) {
         setUserRole(null);
         setRoleChecked(true);
         return;
       }
-      const userRef = ref(db, `usuarios/${userId}`);
-      const snap = await get(userRef);
-      if (snap.exists()) {
-        const userData = snap.val();
+      const userData = await getData(`usuarios/${userId}`);
+      if (userData) {
         setUserRole((userData.role || '').trim().toLowerCase());
       } else {
         setUserRole(null);
@@ -992,7 +994,7 @@ const Alunos = () => {
       setRoleChecked(true);
     }
     fetchRole();
-  }, [userId]);
+  }, [userId, isReady, getData]);
 
   const getTurmaNome = turmaId => turmas[turmaId]?.nome || '---';
 
@@ -1160,7 +1162,7 @@ const Alunos = () => {
         })
       };
       
-      await set(ref(db, `alunos/${editAluno.id}`), alunoAtualizado);
+      await setData(`alunos/${editAluno.id}`, alunoAtualizado);
       
       // Log da ativação
       await auditService.auditService?.logAction(
@@ -1181,7 +1183,7 @@ const Alunos = () => {
       console.log('✅ Aluno ativado com sucesso');
       setEditOpen(false);
       setStatusMatricula(null);
-      fetchAlunos(); // Recarregar lista
+      fetchData(); // Recarregar lista
     } catch (error) {
       console.error('Erro ao ativar aluno:', error);
       setFormError('Erro ao ativar aluno. Tente novamente.');
@@ -1597,7 +1599,7 @@ const Alunos = () => {
           const nomeAnexo = anexo.name.trim().toLowerCase();
           if (anexosParaExcluir.map(n => n.trim().toLowerCase()).includes(nomeAnexo)) {
             const matricula = editForm.matricula || (editAluno && editAluno.matricula) || '';
-            const fileRef = storageRef(storage, `anexos_alunos/${alunoId}_${matricula}/${anexo.name}`);
+            const fileRef = storageRef(schoolStorage, `anexos_alunos/${alunoId}_${matricula}/${anexo.name}`);
             try {
               await deleteObject(fileRef);
             } catch (err) {
@@ -1615,7 +1617,7 @@ const Alunos = () => {
       if (anexosSelecionados.length > 0) {
         for (const file of anexosSelecionados) {
           const matricula = editForm.matricula || (editAluno && editAluno.matricula) || '';
-          const fileRef = storageRef(storage, `anexos_alunos/${alunoId}_${matricula}/${file.name}`);
+          const fileRef = storageRef(schoolStorage, `anexos_alunos/${alunoId}_${matricula}/${file.name}`);
           await uploadBytes(fileRef, file);
           const url = await getDownloadURL(fileRef);
           anexosUrls.push({ name: file.name, url });
@@ -1636,7 +1638,7 @@ const Alunos = () => {
           status: statusInicial
         };
         
-        await set(ref(db, `alunos/${novoId}`), dadosComStatus);
+        await setData(`alunos/${novoId}`, dadosComStatus);
         
         // Gerar títulos financeiros automaticamente
         if (dadosParaSalvar.financeiro?.mensalidadeValor > 0) {
@@ -1721,7 +1723,7 @@ const Alunos = () => {
         if (editAluno.financeiro?.status !== dadosParaSalvar.financeiro?.status) mudancas.statusFinanceiro = { de: editAluno.financeiro?.status, para: dadosParaSalvar.financeiro?.status };
         if (editAluno.financeiro?.diaVencimento !== dadosParaSalvar.financeiro?.diaVencimento) mudancas.diaVencimento = { de: editAluno.financeiro?.diaVencimento, para: dadosParaSalvar.financeiro?.diaVencimento };
         
-        await set(ref(db, `alunos/${editAluno.id}`), dadosParaSalvar);
+        await setData(`alunos/${editAluno.id}`, dadosParaSalvar);
         
         // Log da atualização do aluno
         if (Object.keys(mudancas).length > 0) {

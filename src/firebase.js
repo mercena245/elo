@@ -1,7 +1,7 @@
 
 // Importa os módulos principais do Firebase para uso no projeto
-import { initializeApp } from "firebase/app"; // Inicialização do app
-import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged } from "firebase/auth"; // Autenticação
+import { initializeApp, getApp, getApps } from "firebase/app"; // Inicialização do app
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "firebase/auth"; // Autenticação
 import { getDatabase, ref, get, set, push, remove, update, query, orderByChild, equalTo, limitToLast } from "firebase/database"; // Realtime Database
 import { getFunctions, httpsCallable } from "firebase/functions"; // Cloud Functions
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage"; // Firebase Storage
@@ -20,15 +20,24 @@ const firebaseConfig = {
 };
 
 
-// Inicializa o app Firebase
-const app = initializeApp(firebaseConfig);
+// Inicializa o app Firebase (verifica se já existe)
+let app;
+try {
+  app = getApp();
+} catch {
+  app = initializeApp(firebaseConfig);
+}
 
 // Inicializa o módulo de autenticação e provedor Google
 const auth = getAuth(app);
 const provider = new GoogleAuthProvider();
 
-// Inicializa o Realtime Database
+// Inicializa o Realtime Database principal
 const db = getDatabase(app);
+
+// Inicializa o banco de gerenciamento usando a URL direta
+// Como estão no mesmo projeto, usamos o mesmo app mas especificamos a URL do banco
+const managementDB = getDatabase(app, 'https://gerenciamento-elo-school.firebaseio.com/');
 
 // Inicializa o Firebase Storage
 const storage = getStorage(app);
@@ -40,11 +49,13 @@ const deleteUserFunction = httpsCallable(functions, "deleteUser");
 
 // Exporta os módulos principais para uso em todo o projeto
 export { 
-  app, 
+  app,
   auth, 
   provider, 
-  signInWithPopup, 
-  db, 
+  signInWithPopup,
+  signOut,
+  db,
+  managementDB, 
   ref, 
   get, 
   set, 
@@ -61,5 +72,7 @@ export {
   uploadBytes,
   getDownloadURL,
   deleteObject,
-  onAuthStateChanged
+  onAuthStateChanged,
+  functions,
+  httpsCallable
 };

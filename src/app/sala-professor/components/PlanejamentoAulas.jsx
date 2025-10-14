@@ -54,6 +54,7 @@ import SeletorTurmaAluno from './SeletorTurmaAluno';
 import SeletorPeriodoLetivo from '../../components/shared/SeletorPeriodoLetivo';
 
 const PlanejamentoAulas = () => {
+  const [novoPlanoData, setNovoPlanoData] = useState(null);
   const { user, userRole } = useAuthUser();
   const [loading, setLoading] = useState(true);
   const [planos, setPlanos] = useState({});
@@ -70,6 +71,9 @@ const PlanejamentoAulas = () => {
   const [minhasDisciplinas, setMinhasDisciplinas] = useState([]); // Nova state para disciplinas do professor
   
   // Estados para modal de visualização
+  // Estados para modal de confirmação/feedback
+  const [modalConfirmacao, setModalConfirmacao] = useState({ open: false, acao: null, mensagem: '', onConfirm: null });
+  const [modalFeedback, setModalFeedback] = useState({ open: false, mensagem: '' });
   const [modalVisualizacao, setModalVisualizacao] = useState(false);
   const [planoVisualizacao, setPlanoVisualizacao] = useState(null);
   const [planosGrupoVisualizacao, setPlanosGrupoVisualizacao] = useState([]);
@@ -78,10 +82,10 @@ const PlanejamentoAulas = () => {
   // Estados do editor
   const [editorOpen, setEditorOpen] = useState(false);
   const [planoEditando, setPlanoEditando] = useState(null);
-  const [novoPlanoData, setNovoPlanoData] = useState(null);
   
   // Estados de visualização
-  const [planosOrganizados, setPlanosOrganizados] = useState([]);
+  const [planosPendentes, setPlanosPendentes] = useState([]);
+  const [planosAprovados, setPlanosAprovados] = useState([]);
 
   useEffect(() => {
     if (user?.uid) {
@@ -96,7 +100,7 @@ const PlanejamentoAulas = () => {
   }, [periodoLetivoSelecionado]);
 
   useEffect(() => {
-    organizarPlanos();
+    organizarPlanosPorStatus();
   }, [planos, selectedTurmas, selectedAlunos]);
 
   // Novo useEffect para carregar grade horária das turmas selecionadas
@@ -279,61 +283,36 @@ const PlanejamentoAulas = () => {
     }
   };
 
-  const organizarPlanos = () => {
-    const planosArray = Object.entries(planos).map(([id, plano]) => ({
-      id,
-      ...plano
-    }));
-
-    // Filtrar por professor (se não for coordenador)
+  // Organiza planos em dois grupos: pendentes e aprovados, agrupados por turma
+  const organizarPlanosPorStatus = () => {
+    const planosArray = Object.entries(planos).map(([id, plano]) => ({ id, ...plano }));
+    // Filtro comum
     let planosFiltrados = planosArray;
     if (userRole !== 'coordenador' && userRole !== 'coordenadora') {
-      planosFiltrados = planosArray.filter(plano => 
-        plano.professorUid === user?.uid
-      );
+      planosFiltrados = planosArray.filter(plano => plano.professorUid === user?.uid);
     }
-
-    // Filtrar por turmas selecionadas
     if (selectedTurmas.length > 0) {
-      planosFiltrados = planosFiltrados.filter(plano => 
-        selectedTurmas.includes(plano.turmaId)
-      );
+      planosFiltrados = planosFiltrados.filter(plano => selectedTurmas.includes(plano.turmaId));
     }
-
-    // Filtrar por alunos selecionados (se for específico)
-    if (selectedAlunos.length > 0 && selectedAlunos[0] !== 'todos') {
-      // Para planos de aula, isso pode não ser aplicável diretamente
-      // mas mantemos a estrutura para futuras funcionalidades
+    // Separar por status
+    const pendentes = planosFiltrados.filter(p => !p.statusAprovacao || p.statusAprovacao === 'pendente' || p.statusAprovacao === 'rejeitado');
+    const aprovados = planosFiltrados.filter(p => p.statusAprovacao === 'aprovado');
+    // Agrupar por turma
+    function agruparPorTurma(planos) {
+      const planosAgrupados = planos.reduce((grupos, plano) => {
+        const turmaId = plano.turmaId;
+        if (!grupos[turmaId]) grupos[turmaId] = [];
+        grupos[turmaId].push(plano);
+        return grupos;
+      }, {});
+      return Object.entries(planosAgrupados).map(([turmaId, planos]) => ({
+        turmaId,
+        turma: turmas[turmaId],
+        planos: planos.sort((a, b) => new Date(b.data || 0) - new Date(a.data || 0))
+      }));
     }
-
-    // Ordenar por data e horário
-    planosFiltrados.sort((a, b) => {
-      const dataA = new Date(a.data || 0);
-      const dataB = new Date(b.data || 0);
-      if (dataA.getTime() !== dataB.getTime()) {
-        return dataB - dataA; // Mais recentes primeiro
-      }
-      return (a.horario || '').localeCompare(b.horario || '');
-    });
-
-    // Agrupar planos por turma
-    const planosAgrupados = planosFiltrados.reduce((grupos, plano) => {
-      const turmaId = plano.turmaId;
-      if (!grupos[turmaId]) {
-        grupos[turmaId] = [];
-      }
-      grupos[turmaId].push(plano);
-      return grupos;
-    }, {});
-
-    // Converter para array de grupos
-    const gruposArray = Object.entries(planosAgrupados).map(([turmaId, planos]) => ({
-      turmaId,
-      turma: turmas[turmaId],
-      planos: planos.sort((a, b) => new Date(b.data || 0) - new Date(a.data || 0))
-    }));
-
-    setPlanosOrganizados(gruposArray);
+    setPlanosPendentes(agruparPorTurma(pendentes));
+    setPlanosAprovados(agruparPorTurma(aprovados));
   };
 
   const abrirEditor = (plano = null, dadosIniciais = null) => {
@@ -347,29 +326,31 @@ const PlanejamentoAulas = () => {
     setEditorOpen(true);
   };
 
-  const salvarPlano = async (dadosPlano) => {
+  // Corrigido: sempre faz update se dadosPlano.id existir (inclusive aprovação/rejeição)
+  const salvarPlano = async (dadosPlano, idPlano = null) => {
     try {
+      const planoId = idPlano || dadosPlano.id;
       const planoData = {
         ...dadosPlano,
         professorUid: user.uid,
         professorNome: user.displayName || user.email,
-        criadoEm: new Date().toISOString(),
-        atualizadoEm: new Date().toISOString()
+        atualizadoEm: new Date().toISOString(),
       };
-
-      if (planoEditando) {
-        await update(ref(db, `planos-aula/${planoEditando.id}`), planoData);
+      if (planoId) {
+        // Atualiza plano existente
+        await update(ref(db, `planos-aula/${planoId}`), planoData);
         await auditService.logAction(
           'plano_aula_update',
           user.uid,
           {
             description: `Atualizou plano de aula: ${dadosPlano.titulo}`,
-            planoId: planoEditando.id,
+            planoId: planoId,
             turmaId: dadosPlano.turmaId,
             disciplinaId: dadosPlano.disciplinaId
           }
         );
       } else {
+        // Cria novo plano
         await push(ref(db, 'planos-aula'), planoData);
         await auditService.logAction(
           'plano_aula_create',
@@ -381,41 +362,46 @@ const PlanejamentoAulas = () => {
           }
         );
       }
-
       setEditorOpen(false);
-      alert('Plano de aula salvo com sucesso!');
-
+  setModalFeedback({ open: true, mensagem: 'Plano de aula salvo com sucesso!' });
     } catch (error) {
       console.error('Erro ao salvar plano:', error);
-      alert('Erro ao salvar plano de aula.');
+  setModalFeedback({ open: true, mensagem: 'Erro ao salvar plano de aula.' });
     }
   };
 
-  const excluirPlano = async (planoId, titulo) => {
-    if (!confirm(`Deseja excluir o plano de aula "${titulo}"?`)) return;
-
-    try {
-      await remove(ref(db, `planos-aula/${planoId}`));
-      await auditService.logAction(
-        'plano_aula_delete',
-        user.uid,
-        {
-          description: `Excluiu plano de aula: ${titulo}`,
-          planoId
-        }
-      );
-      alert('Plano de aula excluído com sucesso!');
-    } catch (error) {
-      console.error('Erro ao excluir plano:', error);
-      alert('Erro ao excluir plano de aula.');
-    }
+  const excluirPlano = (planoId, titulo) => {
+    const handleConfirm = async () => {
+      try {
+        await remove(ref(db, `planos-aula/${planoId}`));
+        await auditService.logAction(
+          'plano_aula_delete',
+          user.uid,
+          {
+            description: `Excluiu plano de aula: ${titulo}`,
+            planoId
+          }
+        );
+        setModalFeedback({ open: true, mensagem: 'Plano de aula excluído com sucesso!' });
+      } catch (error) {
+        console.error('Erro ao excluir plano:', error);
+        setModalFeedback({ open: true, mensagem: 'Erro ao excluir plano de aula.' });
+      }
+      setModalConfirmacao((prev) => ({ ...prev, open: false }));
+    };
+    setModalConfirmacao({
+      open: true,
+      acao: 'excluir',
+      mensagem: `Deseja excluir o plano de aula "${titulo}"?`,
+      onConfirm: handleConfirm
+    });
   };
+  // Modais de confirmação e feedback devem estar dentro do return principal
 
   // Função para abrir modal de visualização
   const abrirVisualizacao = (plano, planosDoGrupo = []) => {
     const grupo = planosDoGrupo.length > 0 ? planosDoGrupo : [plano];
     const indice = grupo.findIndex(p => p.id === plano.id);
-    
     setPlanosGrupoVisualizacao(grupo);
     setIndiceAtualVisualizacao(indice >= 0 ? indice : 0);
     setPlanoVisualizacao(grupo[indice >= 0 ? indice : 0]);
@@ -446,12 +432,32 @@ const PlanejamentoAulas = () => {
   }
 
   return (
-    <Box sx={{ 
-      p: 3,
-      maxWidth: '1400px',
-      margin: '0 auto',
-      width: '100%'
-    }}>
+    <>
+      <Dialog open={modalConfirmacao.open} onClose={() => setModalConfirmacao({ ...modalConfirmacao, open: false })}>
+        <DialogTitle>Confirmação</DialogTitle>
+        <DialogContent>
+          <Typography>{modalConfirmacao.mensagem}</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setModalConfirmacao({ ...modalConfirmacao, open: false })} color="inherit">Cancelar</Button>
+          <Button onClick={modalConfirmacao.onConfirm} color="error" variant="contained">Confirmar</Button>
+        </DialogActions>
+      </Dialog>
+      <Dialog open={modalFeedback.open} onClose={() => setModalFeedback({ open: false, mensagem: '' })}>
+        <DialogTitle>Informação</DialogTitle>
+        <DialogContent>
+          <Typography>{modalFeedback.mensagem}</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setModalFeedback({ open: false, mensagem: '' })} autoFocus>OK</Button>
+        </DialogActions>
+      </Dialog>
+      <Box sx={{ 
+        p: 3,
+        maxWidth: '1400px',
+        margin: '0 auto',
+        width: '100%'
+      }}>
       <Box sx={{ 
         display: 'flex', 
         justifyContent: 'flex-start', 
@@ -517,178 +523,111 @@ const PlanejamentoAulas = () => {
           </Card>
         </Grid>
 
-        {/* Lista de Planos */}
+
+        {/* Quadro de Planos Pendentes */}
         <Grid item xs={12} md={8}>
           <Card>
             <CardContent>
               <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-                <AssignmentIcon color="primary" />
-                Planos de Aula ({planosOrganizados.length})
+                <AssignmentIcon color="warning" />
+                Planos de Aulas Pendentes
               </Typography>
-
-              {planosOrganizados.length === 0 ? (
-                <Alert severity="info" sx={{ mt: 2 }}>
+              {planosPendentes.length === 0 ? (
+                <Box sx={{ mt: 2, textAlign: 'center', color: 'text.secondary', fontStyle: 'italic' }}>
                   <Typography variant="body1" gutterBottom>
-                    📝 <strong>Nenhum plano de aula encontrado</strong>
+                    📝 <strong>Nenhum plano de aula pendente</strong>
                   </Typography>
-                  <Typography variant="body2">
-                    Use o calendário ao lado para criar planos baseados na sua grade de horários.
-                  </Typography>
-                </Alert>
+                </Box>
               ) : (
-                <Box sx={{ 
-                  mt: 2, 
-                  display: 'flex', 
-                  justifyContent: 'center',
-                  width: '100%'
-                }}>
-                  <Box sx={{ 
-                    maxWidth: '1200px', 
-                    width: '100%',
-                    display: 'flex', 
-                    flexDirection: 'column', 
-                    gap: 3 
-                  }}>
-                    {planosOrganizados.map((grupo) => (
-                      <Card 
-                        key={grupo.turmaId} 
-                        sx={{ 
-                          '&:hover': { boxShadow: 6 }, 
-                          transition: 'box-shadow 0.3s',
-                          boxShadow: 2
-                        }}
-                      >
-                      <CardContent>
-                        {/* Cabeçalho da Turma */}
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3, pb: 2, borderBottom: '2px solid #e0e0e0' }}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                            <SchoolIcon color="primary" sx={{ fontSize: 32 }} />
-                            <Box>
-                              <Typography variant="h5" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
-                                {grupo.turma?.nome || `Turma ${grupo.turmaId}`}
-                              </Typography>
-                              <Typography variant="body2" color="text.secondary">
-                                {grupo.planos.length} plano(s) de aula
-                              </Typography>
+                <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center', width: '100%' }}>
+                  <Box sx={{ maxWidth: '1200px', width: '100%', display: 'flex', flexDirection: 'column', gap: 3 }}>
+                    {planosPendentes.map((grupo) => (
+                      <Card key={grupo.turmaId} sx={{ '&:hover': { boxShadow: 6 }, transition: 'box-shadow 0.3s', boxShadow: 2 }}>
+                        <CardContent>
+                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3, pb: 2, borderBottom: '2px solid #e0e0e0' }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                              <SchoolIcon color="primary" sx={{ fontSize: 32 }} />
+                              <Box>
+                                <Typography variant="h5" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+                                  {grupo.turma?.nome || `Turma ${grupo.turmaId}`}
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                  {grupo.planos.length} plano(s) de aula
+                                </Typography>
+                              </Box>
                             </Box>
+                            <Chip label={grupo.planos.length} color="warning" variant="filled" sx={{ fontSize: '1rem', height: 32, minWidth: 60 }} />
                           </Box>
-                          <Chip
-                            label={grupo.planos.length}
-                            color="primary"
-                            variant="filled"
-                            sx={{ fontSize: '1rem', height: 32, minWidth: 60 }}
-                          />
-                        </Box>
-
-                        {/* Lista de Planos da Turma */}
-                        <Grid container spacing={2}>
-                          {grupo.planos.map((plano, index) => (
-                            <Grid item xs={12} key={plano.id}>
-                              <Box 
-                                sx={{ 
-                                  p: 3, 
-                                  border: '2px solid #e0e0e0', 
-                                  borderRadius: 3,
-                                  bgcolor: index % 2 === 0 ? '#fafafa' : '#ffffff',
-                                  '&:hover': { 
-                                    bgcolor: '#f0f7ff', 
-                                    borderColor: 'primary.main',
-                                    boxShadow: 2,
-                                    transform: 'translateY(-2px)'
-                                  },
-                                  transition: 'all 0.3s ease',
-                                  boxShadow: 1
-                                }}
-                              >
-                              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                <Box sx={{ flex: 1 }}>
-                                  <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 0.5 }}>
-                                    {plano.titulo || 'Plano sem título'}
-                                  </Typography>
-                                  
-                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                                    <Chip
-                                      label={disciplinas[plano.disciplinaId]?.nome || 'Disciplina'}
-                                      size="small"
-                                      color="secondary"
-                                      variant="outlined"
-                                    />
-                                    {plano.statusAprovacao && (
-                                      <Chip
-                                        label={
-                                          plano.statusAprovacao === 'aprovado' ? 'Aprovado' :
-                                          plano.statusAprovacao === 'rejeitado' ? 'Rejeitado' :
-                                          'Pendente'
-                                        }
-                                        size="small"
-                                        color={
-                                          plano.statusAprovacao === 'aprovado' ? 'success' :
-                                          plano.statusAprovacao === 'rejeitado' ? 'error' :
-                                          'warning'
-                                        }
-                                        variant="filled"
-                                      />
-                                    )}
+                          <Grid container spacing={2}>
+                            {grupo.planos.map((plano, index) => (
+                              <Grid item xs={12} key={plano.id}>
+                                <Box sx={{ p: 3, border: '2px solid #e0e0e0', borderRadius: 3, bgcolor: index % 2 === 0 ? '#fafafa' : '#ffffff', '&:hover': { bgcolor: '#f0f7ff', borderColor: 'primary.main', boxShadow: 2, transform: 'translateY(-2px)' }, transition: 'all 0.3s ease', boxShadow: 1 }}>
+                                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                    <Box sx={{ flex: 1 }}>
+                                      <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 0.5 }}>
+                                        {plano.titulo || 'Plano sem título'}
+                                      </Typography>
+                                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                                        <Chip label={disciplinas[plano.disciplinaId]?.nome || 'Disciplina'} size="small" color="secondary" variant="outlined" />
+                                        {plano.statusAprovacao && (
+                                          <Chip label={plano.statusAprovacao === 'rejeitado' ? 'Rejeitado' : 'Pendente'} size="small" color={plano.statusAprovacao === 'rejeitado' ? 'error' : 'warning'} variant="filled" />
+                                        )}
+                                      </Box>
+                                      <Typography variant="body2" color="text.secondary">
+                                        📅 {plano.data ? new Date(plano.data).toLocaleDateString('pt-BR') : 'Sem data'}
+                                        {plano.horaInicio && plano.horaFim && ` • ⏰ ${plano.horaInicio} às ${plano.horaFim}`}
+                                      </Typography>
+                                      <Typography variant="body2" color="text.secondary" sx={{ mt: 1, display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical', overflow: 'hidden', textOverflow: 'ellipsis', fontStyle: 'italic' }}>
+                                        {Array.isArray(plano.objetivos) && plano.objetivos.length > 0 ? `📝 ${plano.objetivos[0]}${plano.objetivos.length > 1 ? ' (+' + (plano.objetivos.length - 1) + ' mais)' : ''}` : '📝 Sem objetivos definidos'}
+                                      </Typography>
+                                    </Box>
+                                    <Box sx={{ display: 'flex', gap: 1, ml: 2 }}>
+                                      <Tooltip title="Visualizar Plano">
+                                        <IconButton color="primary" onClick={() => abrirVisualizacao(plano, grupo.planos)} sx={{ '&:hover': { backgroundColor: 'primary.light', color: 'white' } }}>
+                                          <VisibilityIcon />
+                                        </IconButton>
+                                      </Tooltip>
+                                      {plano.statusAprovacao !== 'aprovado' ? (
+                                        <>
+                                          <Tooltip title="Editar Plano">
+                                            <IconButton color="secondary" onClick={() => abrirEditor(plano)} sx={{ '&:hover': { backgroundColor: 'secondary.light', color: 'white' } }}>
+                                              <EditIcon />
+                                            </IconButton>
+                                          </Tooltip>
+                                          <Tooltip title="Excluir Plano">
+                                            <IconButton color="error" onClick={() => excluirPlano(plano.id, plano.titulo)} sx={{ '&:hover': { backgroundColor: 'error.light', color: 'white' } }}>
+                                              <DeleteIcon />
+                                            </IconButton>
+                                          </Tooltip>
+                                        </>
+                                      ) : (
+                                        role === 'professora' && (
+                                          <>
+                                            <Tooltip title="Editar Plano (inativo)">
+                                              <span>
+                                                <IconButton color="secondary" disabled>
+                                                  <EditIcon />
+                                                </IconButton>
+                                              </span>
+                                            </Tooltip>
+                                            <Tooltip title="Excluir Plano (inativo)">
+                                              <span>
+                                                <IconButton color="error" disabled>
+                                                  <DeleteIcon />
+                                                </IconButton>
+                                              </span>
+                                            </Tooltip>
+                                          </>
+                                        )
+                                      )}
+                                    </Box>
                                   </Box>
-                                  
-                                  <Typography variant="body2" color="text.secondary">
-                                    📅 {plano.data ? new Date(plano.data).toLocaleDateString('pt-BR') : 'Sem data'}
-                                    {plano.horaInicio && plano.horaFim && ` • ⏰ ${plano.horaInicio} às ${plano.horaFim}`}
-                                  </Typography>
-                                  
-                                  {/* Preview rápido dos objetivos */}
-                                  <Typography variant="body2" color="text.secondary" sx={{ 
-                                    mt: 1,
-                                    display: '-webkit-box',
-                                    WebkitLineClamp: 1,
-                                    WebkitBoxOrient: 'vertical',
-                                    overflow: 'hidden',
-                                    textOverflow: 'ellipsis',
-                                    fontStyle: 'italic'
-                                  }}>
-                                    {Array.isArray(plano.objetivos) && plano.objetivos.length > 0 
-                                      ? `📝 ${plano.objetivos[0]}${plano.objetivos.length > 1 ? ' (+' + (plano.objetivos.length - 1) + ' mais)' : ''}`
-                                      : '📝 Sem objetivos definidos'
-                                    }
-                                  </Typography>
                                 </Box>
-                                
-                                <Box sx={{ display: 'flex', gap: 1, ml: 2 }}>
-                                  <Tooltip title="Visualizar Plano">
-                                    <IconButton 
-                                      color="primary" 
-                                      onClick={() => abrirVisualizacao(plano, grupo.planos)}
-                                      sx={{ '&:hover': { backgroundColor: 'primary.light', color: 'white' } }}
-                                    >
-                                      <VisibilityIcon />
-                                    </IconButton>
-                                  </Tooltip>
-                                  <Tooltip title="Editar Plano">
-                                    <IconButton 
-                                      color="secondary" 
-                                      onClick={() => abrirEditor(plano)}
-                                      sx={{ '&:hover': { backgroundColor: 'secondary.light', color: 'white' } }}
-                                    >
-                                      <EditIcon />
-                                    </IconButton>
-                                  </Tooltip>
-                                  <Tooltip title="Excluir Plano">
-                                    <IconButton 
-                                      color="error" 
-                                      onClick={() => excluirPlano(plano.id, plano.titulo)}
-                                      sx={{ '&:hover': { backgroundColor: 'error.light', color: 'white' } }}
-                                    >
-                                      <DeleteIcon />
-                                    </IconButton>
-                                  </Tooltip>
-                                </Box>
-                              </Box>
-                              </Box>
-                            </Grid>
-                          ))}
-                        </Grid>
-                      </CardContent>
-                    </Card>
+                              </Grid>
+                            ))}
+                          </Grid>
+                        </CardContent>
+                      </Card>
                     ))}
                   </Box>
                 </Box>
@@ -696,7 +635,115 @@ const PlanejamentoAulas = () => {
             </CardContent>
           </Card>
         </Grid>
+
+        {/* Quadro de Planos Aprovados */}
+        <Grid item xs={12} md={8}>
+          <Card>
+            <CardContent>
+              <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                <AssignmentIcon color="success" />
+                Planos de Aulas Aprovados
+              </Typography>
+              {planosAprovados.length === 0 ? (
+                <Box sx={{ mt: 2, textAlign: 'center', color: 'text.secondary', fontStyle: 'italic' }}>
+                  <Typography variant="body1" gutterBottom>
+                    ✅ <strong>Nenhum plano de aula aprovado</strong>
+                  </Typography>
+                </Box>
+              ) : (
+                <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center', width: '100%' }}>
+                  <Box sx={{ maxWidth: '1200px', width: '100%', display: 'flex', flexDirection: 'column', gap: 3 }}>
+                    {planosAprovados.map((grupo) => (
+                      <Card key={grupo.turmaId} sx={{ '&:hover': { boxShadow: 6 }, transition: 'box-shadow 0.3s', boxShadow: 2 }}>
+                        <CardContent>
+                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3, pb: 2, borderBottom: '2px solid #e0e0e0' }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                              <SchoolIcon color="primary" sx={{ fontSize: 32 }} />
+                              <Box>
+                                <Typography variant="h5" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+                                  {grupo.turma?.nome || `Turma ${grupo.turmaId}`}
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                  {grupo.planos.length} plano(s) de aula
+                                </Typography>
+                              </Box>
+                            </Box>
+                            <Chip label={grupo.planos.length} color="success" variant="filled" sx={{ fontSize: '1rem', height: 32, minWidth: 60 }} />
+                          </Box>
+                          <Grid container spacing={2}>
+                            {grupo.planos.map((plano, index) => (
+                              <Grid item xs={12} key={plano.id}>
+                                <Box sx={{ p: 3, border: '2px solid #e0e0e0', borderRadius: 3, bgcolor: index % 2 === 0 ? '#fafafa' : '#ffffff', '&:hover': { bgcolor: '#e8f5e9', borderColor: 'success.main', boxShadow: 2, transform: 'translateY(-2px)' }, transition: 'all 0.3s ease', boxShadow: 1 }}>
+                                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                    <Box sx={{ flex: 1 }}>
+                                      <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 0.5 }}>
+                                        {plano.titulo || 'Plano sem título'}
+                                      </Typography>
+                                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                                        <Chip label={disciplinas[plano.disciplinaId]?.nome || 'Disciplina'} size="small" color="secondary" variant="outlined" />
+                                        <Chip label="Aprovado" size="small" color="success" variant="filled" />
+                                      </Box>
+                                      <Typography variant="body2" color="text.secondary">
+                                        📅 {plano.data ? new Date(plano.data).toLocaleDateString('pt-BR') : 'Sem data'}
+                                        {plano.horaInicio && plano.horaFim && ` • ⏰ ${plano.horaInicio} às ${plano.horaFim}`}
+                                      </Typography>
+                                      <Typography variant="body2" color="text.secondary" sx={{ mt: 1, display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical', overflow: 'hidden', textOverflow: 'ellipsis', fontStyle: 'italic' }}>
+                                        {Array.isArray(plano.objetivos) && plano.objetivos.length > 0 ? `📝 ${plano.objetivos[0]}${plano.objetivos.length > 1 ? ' (+' + (plano.objetivos.length - 1) + ' mais)' : ''}` : '📝 Sem objetivos definidos'}
+                                      </Typography>
+                                    </Box>
+                                    <Box sx={{ display: 'flex', gap: 1, ml: 2 }}>
+                                      <Tooltip title="Visualizar Plano">
+                                        <IconButton color="primary" onClick={() => abrirVisualizacao(plano, grupo.planos)} sx={{ '&:hover': { backgroundColor: 'primary.light', color: 'white' } }}>
+                                          <VisibilityIcon />
+                                        </IconButton>
+                                      </Tooltip>
+                                      {(userRole === 'professor' || userRole === 'professora') ? (
+                                        <>
+                                          <Tooltip title="Editar Plano (inativo)">
+                                            <span>
+                                              <IconButton color="secondary" disabled>
+                                                <EditIcon />
+                                              </IconButton>
+                                            </span>
+                                          </Tooltip>
+                                          <Tooltip title="Excluir Plano (inativo)">
+                                            <span>
+                                              <IconButton color="error" disabled>
+                                                <DeleteIcon />
+                                              </IconButton>
+                                            </span>
+                                          </Tooltip>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Tooltip title="Editar Plano">
+                                            <IconButton color="secondary" onClick={() => abrirEditor(plano)} sx={{ '&:hover': { backgroundColor: 'secondary.light', color: 'white' } }}>
+                                              <EditIcon />
+                                            </IconButton>
+                                          </Tooltip>
+                                          <Tooltip title="Excluir Plano">
+                                            <IconButton color="error" onClick={() => excluirPlano(plano.id, plano.titulo)} sx={{ '&:hover': { backgroundColor: 'error.light', color: 'white' } }}>
+                                              <DeleteIcon />
+                                            </IconButton>
+                                          </Tooltip>
+                                        </>
+                                      )}
+                                    </Box>
+                                  </Box>
+                                </Box>
+                              </Grid>
+                            ))}
+                          </Grid>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </Box>
+                </Box>
+              )}
+            </CardContent>
+          </Card>
         </Grid>
+      </Grid>
 
       {/* Modal de Visualização de Plano como Documento */}
       <Dialog 
@@ -1064,6 +1111,7 @@ const PlanejamentoAulas = () => {
         isEditing={!!planoEditando}
       />
     </Box>
+    </>
   );
 };
 

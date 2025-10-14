@@ -39,7 +39,7 @@ import {
   Psychology as PsychologyIcon,
   Assessment as AssessmentIcon
 } from '@mui/icons-material';
-import { ref, get } from 'firebase/database';
+import { ref, get, update } from 'firebase/database';
 import { db } from '../../../../firebase';
 
 const EditorPlanoAula = ({
@@ -343,8 +343,8 @@ const EditorPlanoAula = ({
         criadoEm: plano?.criadoEm || new Date().toISOString(),
         atualizadoEm: new Date().toISOString()
       };
-      
-      onSave(dadosPlano);
+      // Passa o id do plano para garantir update correto
+      onSave(dadosPlano, plano?.id);
       onClose();
     }
   };
@@ -381,24 +381,31 @@ const EditorPlanoAula = ({
     return formData.statusAprovacao === 'rejeitado' || formData.statusAprovacao === 'pendente';
   };
 
-  const handleApprovar = () => {
-    setFormData(prev => ({
-      ...prev,
+  // Aprovação/rejeição: atualiza apenas status e campos de aprovação no Firebase
+  const handleApprovar = async () => {
+    if (!plano?.id) return;
+    const updateData = {
       statusAprovacao: 'aprovado',
       aprovadoPor: user?.uid || '',
       dataAprovacao: new Date().toISOString(),
       observacoesAprovacao: ''
-    }));
+    };
+    await update(ref(db, `planos-aula/${plano.id}`), updateData);
+    setFormData(prev => ({ ...prev, ...updateData }));
+    if (onClose) onClose();
   };
 
-  const handleRejeitar = (observacoes = '') => {
-    setFormData(prev => ({
-      ...prev,
+  const handleRejeitar = async (observacoes = '') => {
+    if (!plano?.id) return;
+    const updateData = {
       statusAprovacao: 'rejeitado',
       aprovadoPor: user?.uid || '',
       dataAprovacao: new Date().toISOString(),
       observacoesAprovacao: observacoes
-    }));
+    };
+    await update(ref(db, `planos-aula/${plano.id}`), updateData);
+    setFormData(prev => ({ ...prev, ...updateData }));
+    if (onClose) onClose();
   };
 
   const getStatusColor = () => {

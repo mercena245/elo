@@ -1,0 +1,193 @@
+/**
+ * useSchoolDatabase Hook
+ * 
+ * Hook React que fornece acesso ao banco de dados da escola atualmente selecionada.
+ * Automaticamente se conecta ao Firebase Database correto baseado na escola do usuário.
+ */
+
+import { useEffect, useState, useCallback } from 'react';
+import { useAuth } from '../context/AuthContext';
+import { 
+  schoolDatabaseOperations, 
+  schoolStorageOperations,
+  clearSchoolCache 
+} from '../services/schoolDatabaseService';
+
+export const useSchoolDatabase = () => {
+  const { user, currentSchool, isLoadingSchool } = useAuth();
+  const [db, setDb] = useState(null);
+  const [storage, setStorage] = useState(null);
+  const [isReady, setIsReady] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const initializeDatabase = () => {
+      try {
+        console.log('🔄 [useSchoolDatabase] initializeDatabase chamado');
+        console.log('🔄 [useSchoolDatabase] currentSchool:', currentSchool);
+        console.log('🔄 [useSchoolDatabase] isLoadingSchool:', isLoadingSchool);
+        
+        // Verifica se temos escola selecionada
+        if (!currentSchool) {
+          console.log('⚠️ [useSchoolDatabase] Nenhuma escola no contexto');
+          setDb(null);
+          setStorage(null);
+          setIsReady(false);
+          return;
+        }
+
+        console.log('📋 [useSchoolDatabase] Escola encontrada:', currentSchool.nome);
+        console.log('📋 [useSchoolDatabase] Database URL:', currentSchool.databaseURL);
+        console.log('📋 [useSchoolDatabase] Storage Bucket:', currentSchool.storageBucket);
+        console.log('📋 [useSchoolDatabase] Project ID:', currentSchool.projectId);
+
+        // Valida dados da escola
+        if (!currentSchool.databaseURL || !currentSchool.storageBucket || !currentSchool.projectId) {
+          const missing = [];
+          if (!currentSchool.databaseURL) missing.push('databaseURL');
+          if (!currentSchool.storageBucket) missing.push('storageBucket');
+          if (!currentSchool.projectId) missing.push('projectId');
+          
+          throw new Error(`Configurações de banco de dados da escola incompletas. Faltando: ${missing.join(', ')}`);
+        }
+
+        console.log('🔌 [useSchoolDatabase] Conectando ao banco da escola:', currentSchool.nome);
+
+        // Inicializa operações de database e storage
+        const databaseOps = schoolDatabaseOperations(currentSchool);
+        const storageOps = schoolStorageOperations(currentSchool);
+
+        setDb(databaseOps);
+        setStorage(storageOps);
+        setIsReady(true);
+        setError(null);
+
+        console.log('✅ [useSchoolDatabase] Conectado ao banco da escola:', currentSchool.nome);
+        console.log('✅ [useSchoolDatabase] isReady:', true);
+      } catch (err) {
+        console.error('❌ [useSchoolDatabase] Erro ao conectar ao banco da escola:', err);
+        console.error('❌ [useSchoolDatabase] Erro detalhado:', err.message);
+        setError(err.message);
+        setDb(null);
+        setStorage(null);
+        setIsReady(false);
+      }
+    };
+
+    console.log('🔄 [useSchoolDatabase] useEffect triggered');
+    console.log('🔄 [useSchoolDatabase] isLoadingSchool:', isLoadingSchool);
+    
+    // Só inicializa se não estiver carregando
+    if (!isLoadingSchool) {
+      initializeDatabase();
+    }
+
+    // Cleanup ao desmontar ou trocar de escola
+    return () => {
+      if (currentSchool?.projectId) {
+        clearSchoolCache(currentSchool.projectId);
+      }
+    };
+  }, [currentSchool, isLoadingSchool]);
+
+  /**
+   * Buscar dados de um caminho
+   */
+  const getData = useCallback(async (path) => {
+    if (!db) throw new Error('Database não inicializado');
+    return await db.get(path);
+  }, [db]);
+
+  /**
+   * Salvar dados em um caminho
+   */
+  const setData = useCallback(async (path, data) => {
+    if (!db) throw new Error('Database não inicializado');
+    await db.set(path, data);
+  }, [db]);
+
+  /**
+   * Adicionar novo item (push)
+   */
+  const pushData = useCallback(async (path, data) => {
+    if (!db) throw new Error('Database não inicializado');
+    return await db.push(path, data);
+  }, [db]);
+
+  /**
+   * Atualizar dados
+   */
+  const updateData = useCallback(async (path, updates) => {
+    if (!db) throw new Error('Database não inicializado');
+    await db.update(path, updates);
+  }, [db]);
+
+  /**
+   * Remover dados
+   */
+  const removeData = useCallback(async (path) => {
+    if (!db) throw new Error('Database não inicializado');
+    await db.remove(path);
+  }, [db]);
+
+  /**
+   * Listener em tempo real
+   */
+  const listen = useCallback((path, callback) => {
+    if (!db) throw new Error('Database não inicializado');
+    return db.onValue(path, callback);
+  }, [db]);
+
+  /**
+   * Upload de arquivo
+   */
+  const uploadFile = useCallback(async (path, file, metadata = {}) => {
+    if (!storage) throw new Error('Storage não inicializado');
+    return await storage.upload(path, file, metadata);
+  }, [storage]);
+
+  /**
+   * Obter URL de arquivo
+   */
+  const getFileURL = useCallback(async (path) => {
+    if (!storage) throw new Error('Storage não inicializado');
+    return await storage.getDownloadURL(path);
+  }, [storage]);
+
+  /**
+   * Deletar arquivo
+   */
+  const deleteFile = useCallback(async (path) => {
+    if (!storage) throw new Error('Storage não inicializado');
+    await storage.delete(path);
+  }, [storage]);
+
+  return {
+    // Estado
+    isReady,
+    isLoading: isLoadingSchool,
+    error,
+    currentSchool,
+    
+    // Operações de Database
+    db,
+    getData,
+    setData,
+    pushData,
+    updateData,
+    removeData,
+    listen,
+    
+    // Operações de Storage
+    storage,
+    uploadFile,
+    getFileURL,
+    deleteFile,
+    
+    // Objetos brutos (para casos avançados)
+    databaseOperations: db,
+    storageOperations: storage
+  };
+};
+
+export default useSchoolDatabase;

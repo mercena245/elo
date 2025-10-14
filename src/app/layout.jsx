@@ -6,11 +6,26 @@ import { LoadingProvider, useLoading } from '../context/LoadingContext'
 import { useState, useEffect } from 'react'
 import SplashScreen from '../components/SplashScreen'
 import AccessTypeSelector from '../components/AccessTypeSelector'
+import TwoFactorSetup from '../components/TwoFactorSetup'
+import TwoFactorVerification from '../components/TwoFactorVerification'
 
 const inter = Inter({ subsets: ['latin'] })
 
 function AppContent({ children }) {
-  const { user, loading, showAccessSelector, handleSchoolSelect, handleManagementSelect } = useAuth();
+  const { 
+    user, 
+    loading, 
+    showAccessSelector, 
+    showTwoFactorSetup,
+    showTwoFactorVerification,
+    twoFactorRequired,
+    twoFactorAuthenticated,
+    handleSchoolSelect, 
+    handleManagementSelect,
+    handleTwoFactorSetupComplete,
+    handleTwoFactorVerificationSuccess,
+    handleTwoFactorCancel
+  } = useAuth();
 
   if (loading) {
     return (
@@ -23,6 +38,45 @@ function AppContent({ children }) {
     );
   }
 
+  // Se usuário logado e precisa configurar 2FA
+  if (user && showTwoFactorSetup) {
+    return (
+      <TwoFactorSetup
+        user={user}
+        onSetupComplete={handleTwoFactorSetupComplete}
+        onCancel={handleTwoFactorCancel}
+      />
+    );
+  }
+
+  // Se usuário logado e precisa verificar 2FA
+  if (user && showTwoFactorVerification) {
+    return (
+      <TwoFactorVerification
+        user={user}
+        onVerificationSuccess={handleTwoFactorVerificationSuccess}
+        onCancel={handleTwoFactorCancel}
+        onBackupCodeUsed={() => {
+          // Pode mostrar aviso sobre regenerar códigos
+          console.log('Código de backup usado');
+        }}
+      />
+    );
+  }
+
+  // Se usuário logado, requer 2FA mas não foi autenticado ainda
+  if (user && twoFactorRequired && !twoFactorAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Verificando autenticação...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Se usuário logado e precisa selecionar tipo de acesso
   if (user && showAccessSelector) {
     return (
       <AccessTypeSelector

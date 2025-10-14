@@ -5,6 +5,8 @@ import SidebarMenu from '../../components/SidebarMenu';
 import ProtectedRoute from '../../components/ProtectedRoute';
 import SimpleCarousel from '../../components/SimpleCarousel';
 import SchoolSelector from '../../components/SchoolSelector';
+import { useAuth } from '../../context/AuthContext';
+import useSchoolDatabase from '../../hooks/useSchoolDatabase';
 // Importações do Swiper
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Navigation, Pagination, Autoplay, EffectCoverflow } from 'swiper/modules';
@@ -29,7 +31,7 @@ import {
   Zoom,
   Button
 } from '@mui/material';
-import { db, ref, get, auth, onAuthStateChanged } from '../../firebase';
+import { auth, onAuthStateChanged } from '../../firebase';
 import { 
   People,
   School,
@@ -64,6 +66,10 @@ import '../../styles/Dashboard.css';
 import '../../styles/AvisosCarousel.css';
 
 const Dashboard = () => {
+  // Hooks para banco de dados da escola
+  const { user: authUser, currentSchool } = useAuth();
+  const { isReady, isLoading, error, getData, currentSchool: schoolData } = useSchoolDatabase();
+  
   const [qtdAlunos, setQtdAlunos] = useState(null);
   const [qtdColaboradores, setQtdColaboradores] = useState(null);
   const [avisos, setAvisos] = useState([]);
@@ -158,43 +164,73 @@ const Dashboard = () => {
 
   useEffect(() => {
     const fetchAllData = async () => {
+      // Aguardar banco de dados estar pronto
+      if (!isReady || isLoading) {
+        console.log('⏳ Aguardando conexão com banco da escola...');
+        return;
+      }
+
+      if (error) {
+        console.error('❌ Erro na conexão com banco da escola:', error);
+        setLoading(false);
+        return;
+      }
+
+      if (!schoolData) {
+        console.log('⚠️ Nenhuma escola selecionada');
+        setLoading(false);
+        return;
+      }
+
+      console.log('🔄 Carregando dados do dashboard da escola:', schoolData.nome);
+      console.log('📊 Conectado ao banco:', schoolData.databaseURL);
+
       setLoading(true);
       try {
-        // Buscar dados básicos
-        const [snapAlunos, snapColab, snapAvisos, snapFotos, snapTurmas, snapUsuarios, snapNotas, snapFrequencia] = await Promise.all([
-          get(ref(db, 'alunos')),
-          get(ref(db, 'colaboradores')),
-          get(ref(db, 'avisos')),
-          get(ref(db, 'fotos')),
-          get(ref(db, 'turmas')),
-          get(ref(db, 'usuarios')),
-          get(ref(db, 'notas')),
-          get(ref(db, 'frequencia'))
+        // Buscar dados básicos usando o hook useSchoolDatabase
+        const [
+          alunosData,
+          colaboradoresData,
+          avisosData,
+          fotosData,
+          turmasData,
+          usuariosData,
+          notasData,
+          frequenciaData
+        ] = await Promise.all([
+          getData('alunos'),
+          getData('colaboradores'),
+          getData('avisos'),
+          getData('fotos'),
+          getData('turmas'),
+          getData('usuarios'),
+          getData('notas'),
+          getData('frequencia')
         ]);
 
         // Processar alunos
-        const totalAlunos = snapAlunos.exists() ? Object.keys(snapAlunos.val()).length : 0;
+        const totalAlunos = alunosData ? Object.keys(alunosData).length : 0;
         setQtdAlunos(totalAlunos);
 
         // Processar colaboradores
-        const totalColaboradores = snapColab.exists() ? Object.keys(snapColab.val()).length : 0;
+        const totalColaboradores = colaboradoresData ? Object.keys(colaboradoresData).length : 0;
         setQtdColaboradores(totalColaboradores);
 
         // Processar turmas
-        const totalTurmas = snapTurmas.exists() ? Object.keys(snapTurmas.val()).length : 0;
+        const totalTurmas = turmasData ? Object.keys(turmasData).length : 0;
 
         // Processar professores
         let totalProfessores = 0;
-        if (snapUsuarios.exists()) {
-          const usuarios = Object.values(snapUsuarios.val());
+        if (usuariosData) {
+          const usuarios = Object.values(usuariosData);
           totalProfessores = usuarios.filter(u => u.role === 'professora').length;
         }
 
         // Processar notas
         let notasLancadas = 0;
         let mediaGeral = 0;
-        if (snapNotas.exists()) {
-          const notas = Object.values(snapNotas.val());
+        if (notasData) {
+          const notas = Object.values(notasData);
           notasLancadas = notas.length;
           const notasValidas = notas.filter(n => n.nota && !isNaN(parseFloat(n.nota)));
           if (notasValidas.length > 0) {
@@ -205,8 +241,8 @@ const Dashboard = () => {
 
         // Processar frequência
         let frequenciaMedia = 0;
-        if (snapFrequencia.exists()) {
-          const frequencias = Object.values(snapFrequencia.val());
+        if (frequenciaData) {
+          const frequencias = Object.values(frequenciaData);
           const presencas = frequencias.filter(f => f.presente).length;
           frequenciaMedia = frequencias.length > 0 ? (presencas / frequencias.length) * 100 : 0;
         }
@@ -221,8 +257,7 @@ const Dashboard = () => {
         });
 
         // Processar avisos
-        if (snapAvisos.exists()) {
-          const avisosData = snapAvisos.val();
+        if (avisosData) {
           const avisosArr = Object.entries(avisosData).map(([id, aviso]) => ({
             id,
             titulo: aviso.titulo || 'Aviso',
@@ -243,9 +278,8 @@ const Dashboard = () => {
         }
 
         // Processar fotos
-        if (snapFotos.exists()) {
-          const all = snapFotos.val();
-          const lista = Object.entries(all).map(([id, f]) => ({ id, ...f }));
+        if (fotosData) {
+          const lista = Object.entries(fotosData).map(([id, f]) => ({ id, ...f }));
           setFotos(lista);
         } else {
           setFotos([]);
@@ -253,10 +287,8 @@ const Dashboard = () => {
 
         // Buscar dados do usuário
         if (userId) {
-          const userRef = ref(db, `usuarios/${userId}`);
-          const userSnap = await get(userRef);
-          if (userSnap.exists()) {
-            const userData = userSnap.val();
+          const userData = await getData(`usuarios/${userId}`);
+          if (userData) {
             setUserRole((userData.role || '').trim().toLowerCase());
             let arr = [];
             if (Array.isArray(userData.turmas)) arr = userData.turmas;
@@ -267,8 +299,10 @@ const Dashboard = () => {
         } else {
           setTurmasUsuario(['todos']);
         }
+
+        console.log('✅ Dados do dashboard carregados com sucesso');
       } catch (error) {
-        console.error('Erro ao carregar dados do dashboard:', error);
+        console.error('❌ Erro ao carregar dados do dashboard:', error);
         setQtdAlunos(0);
         setQtdColaboradores(0);
         setAvisos([]);
@@ -278,7 +312,7 @@ const Dashboard = () => {
     };
 
     fetchAllData();
-  }, [userId]);
+  }, [isReady, isLoading, error, schoolData, userId, getData]);
 
   // Filtra as fotos conforme role/turmas
   const fotosVisiveis = fotos.filter(foto => {
@@ -303,14 +337,65 @@ const Dashboard = () => {
 
   const userName = auth.currentUser?.displayName || auth.currentUser?.email || 'Usuário';
 
-  if (loading) {
+  // Se não há escola selecionada
+  if (!currentSchool) {
     return (
       <ProtectedRoute>
         <div className="dashboard-container">
           <SidebarMenu />
           <main className="dashboard-main">
-            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '80vh' }}>
-              <DashboardIcon sx={{ fontSize: 40, color: 'primary.main', animation: 'pulse 2s infinite' }} />
+            <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', minHeight: '80vh', p: 3 }}>
+              <School sx={{ fontSize: 80, color: 'warning.main', mb: 3 }} />
+              <Typography variant="h5" color="text.secondary" gutterBottom>
+                Nenhuma escola selecionada
+              </Typography>
+              <Typography variant="body1" color="text.secondary" textAlign="center">
+                Por favor, selecione uma escola para acessar o dashboard
+              </Typography>
+            </Box>
+          </main>
+        </div>
+      </ProtectedRoute>
+    );
+  }
+
+  // Se há erro na conexão
+  if (error) {
+    return (
+      <ProtectedRoute>
+        <div className="dashboard-container">
+          <SidebarMenu />
+          <main className="dashboard-main">
+            <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', minHeight: '80vh', p: 3 }}>
+              <Assessment sx={{ fontSize: 80, color: 'error.main', mb: 3 }} />
+              <Typography variant="h5" color="error" gutterBottom>
+                Erro na conexão com o banco de dados
+              </Typography>
+              <Typography variant="body1" color="text.secondary" textAlign="center">
+                {error}
+              </Typography>
+            </Box>
+          </main>
+        </div>
+      </ProtectedRoute>
+    );
+  }
+
+  // Carregando dados
+  if (loading || isLoading || !isReady) {
+    return (
+      <ProtectedRoute>
+        <div className="dashboard-container">
+          <SidebarMenu />
+          <main className="dashboard-main">
+            <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', minHeight: '80vh' }}>
+              <DashboardIcon sx={{ fontSize: 40, color: 'primary.main', animation: 'pulse 2s infinite', mb: 2 }} />
+              <Typography variant="body1" color="text.secondary">
+                Conectando ao banco da escola...
+              </Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
+                {schoolData?.nome || 'Carregando'}
+              </Typography>
             </Box>
           </main>
         </div>

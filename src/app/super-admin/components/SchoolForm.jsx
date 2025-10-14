@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import ConfirmDialog from './ConfirmDialog';
 
 const planos = [
   { 
@@ -37,6 +38,10 @@ const modulosDisponiveis = [
 ];
 
 export default function SchoolForm({ school, onSubmit, onClose }) {
+  const [submitError, setSubmitError] = useState('');
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
   const [formData, setFormData] = useState({
     nome: '',
     cnpj: '',
@@ -53,8 +58,8 @@ export default function SchoolForm({ school, onSubmit, onClose }) {
     mensalidade: 1200,
     dataVencimento: 15,
     databaseURL: '',
-    projectId: '',
     storageBucket: '',
+    projectId: '',
     configuracoes: {
       modulosAtivos: ['financeiro', 'notas', 'alunos'],
       limiteAlunos: 200,
@@ -65,10 +70,34 @@ export default function SchoolForm({ school, onSubmit, onClose }) {
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
+  const [canSubmit, setCanSubmit] = useState(false);
+  const totalSteps = 4; // Adicionado step 4 para configurações técnicas (Database/Storage)
 
   useEffect(() => {
     if (school) {
-      setFormData(school);
+      console.log('📝 Carregando dados da escola para edição:', school);
+      
+      // Se campos técnicos não existem, gerar a partir do nome
+      const needsGeneration = !school.databaseURL || !school.storageBucket || !school.projectId;
+      
+      if (needsGeneration && school.nome) {
+        const projectName = school.nome.toLowerCase()
+          .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // Remove acentos
+          .replace(/[^a-z0-9]/g, '-')
+          .replace(/--+/g, '-')
+          .replace(/^-|-$/g, '');
+        
+        console.log('⚠️ Escola sem configurações técnicas. Gerando automaticamente...');
+        
+        setFormData({
+          ...school,
+          projectId: school.projectId || projectName,
+          databaseURL: school.databaseURL || `https://${projectName}-default-rtdb.firebaseio.com`,
+          storageBucket: school.storageBucket || `${projectName}.firebasestorage.app`
+        });
+      } else {
+        setFormData(school);
+      }
     }
   }, [school]);
 
@@ -86,6 +115,23 @@ export default function SchoolForm({ school, onSubmit, onClose }) {
       setFormData(prev => ({
         ...prev,
         [field]: value
+      }));
+    }
+    
+    // Auto-gerar URLs do Firebase quando o nome for preenchido (apenas para escolas novas)
+    if (field === 'nome' && value && !school) {
+      const projectName = value.toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // Remove acentos
+        .replace(/[^a-z0-9]/g, '-')
+        .replace(/--+/g, '-')
+        .replace(/^-|-$/g, '');
+      
+      setFormData(prev => ({
+        ...prev,
+        nome: value,
+        projectId: projectName,
+        databaseURL: `https://${projectName}-default-rtdb.firebaseio.com`,
+        storageBucket: `${projectName}.firebasestorage.app`
       }));
     }
     
@@ -149,9 +195,20 @@ export default function SchoolForm({ school, onSubmit, onClose }) {
         if (!formData.mensalidade || formData.mensalidade <= 0) newErrors.mensalidade = 'Mensalidade inválida';
         break;
       case 4:
-        if (!formData.projectId.trim()) newErrors.projectId = 'Project ID é obrigatório';
-        if (!formData.databaseURL.trim()) newErrors.databaseURL = 'Database URL é obrigatória';
-        if (!formData.storageBucket.trim()) newErrors.storageBucket = 'Storage Bucket é obrigatório';
+        console.log('🔍 Validando Step 4:');
+        console.log('  - databaseURL:', formData.databaseURL);
+        console.log('  - storageBucket:', formData.storageBucket);
+        console.log('  - projectId:', formData.projectId);
+        
+        if (!formData.databaseURL?.trim()) newErrors.databaseURL = 'URL do banco de dados é obrigatória';
+        if (!formData.storageBucket?.trim()) newErrors.storageBucket = 'Storage Bucket é obrigatório';
+        if (!formData.projectId?.trim()) newErrors.projectId = 'Project ID é obrigatório';
+        // Validar formato da URL
+        if (formData.databaseURL && !formData.databaseURL.startsWith('https://')) {
+          newErrors.databaseURL = 'URL deve começar com https://';
+        }
+        
+        console.log('  - Erros encontrados:', Object.keys(newErrors).length);
         break;
     }
     
@@ -160,8 +217,20 @@ export default function SchoolForm({ school, onSubmit, onClose }) {
   };
 
   const handleNext = () => {
+    console.log(`🔄 Tentando avançar do Step ${currentStep} para ${currentStep + 1}`);
+    
     if (validateStep(currentStep)) {
-      setCurrentStep(prev => prev + 1);
+      console.log(`✅ Validação do Step ${currentStep} passou!`);
+      
+      // Usar setTimeout para garantir que o submit não seja disparado
+      setTimeout(() => {
+        setCurrentStep(prev => prev + 1);
+      }, 0);
+    } else {
+      console.log(`❌ Validação do Step ${currentStep} falhou!`);
+      // Se validação falhar, mostrar modal de erro
+      setErrorMessage('Por favor, preencha todos os campos obrigatórios antes de continuar.');
+      setShowErrorModal(true);
     }
   };
 
@@ -169,19 +238,69 @@ export default function SchoolForm({ school, onSubmit, onClose }) {
     setCurrentStep(prev => prev - 1);
   };
 
+  // Prevenir Enter de submeter o form
+  const handleKeyDown = (e) => {
+    console.log('⌨️ Tecla pressionada:', e.key, '| Step atual:', currentStep);
+    if (e.key === 'Enter' && currentStep < totalSteps) {
+      e.preventDefault();
+      console.log('🛑 Enter interceptado! Chamando handleNext...');
+      handleNext();
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    console.log('📋 handleSubmit chamado!');
+    console.log('  - currentStep:', currentStep);
+    console.log('  - totalSteps:', totalSteps);
+    console.log('  - canSubmit:', canSubmit);
     
-    if (!validateStep(4)) return;
+    setSubmitError('');
+    setShowErrorModal(false);
+    
+    // Prevenir submit se não estiver no último step
+    if (currentStep < totalSteps) {
+      console.log('⚠️ Não está no último step. Avançando...');
+      handleNext(); // Avançar para próximo step
+      return;
+    }
+    
+    // Prevenir submit automático
+    if (!canSubmit) {
+      console.log('🛑 Submit bloqueado! canSubmit = false');
+      return;
+    }
+    
+    console.log('✅ Está no último step. Validando todos os steps...');
+    
+    // Validar todos os 4 steps
+    if (!validateStep(1) || !validateStep(2) || !validateStep(3) || !validateStep(4)) {
+      console.log('❌ Validação falhou em algum step');
+      setErrorMessage('Por favor, preencha todos os campos obrigatórios antes de continuar.');
+      setShowErrorModal(true);
+      return;
+    }
+    
+    console.log('✅ Todas as validações passaram! Submetendo...');
     
     setLoading(true);
     try {
       await onSubmit(formData);
+      setShowSuccessModal(true);
     } catch (error) {
+      const errorMsg = error.message || 'Erro ao salvar escola.';
+      setSubmitError(errorMsg);
+      setErrorMessage(errorMsg);
+      setShowErrorModal(true);
       console.error('Erro ao salvar escola:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSuccessClose = () => {
+    setShowSuccessModal(false);
+    onClose();
   };
 
   const formatCurrency = (value) => {
@@ -441,60 +560,79 @@ export default function SchoolForm({ school, onSubmit, onClose }) {
 
   const renderStep4 = () => (
     <div className="space-y-6">
-      <h3 className="text-lg font-medium text-gray-900">Configuração Firebase</h3>
-      
-      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+      <div className="bg-blue-50 border-l-4 border-blue-400 p-4 mb-6">
         <div className="flex">
-          <svg className="h-5 w-5 text-yellow-400 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          <div>
-            <h4 className="text-sm font-medium text-yellow-800">Configuração Técnica</h4>
-            <p className="text-sm text-yellow-700 mt-1">
-              Configure os detalhes do projeto Firebase para esta escola. Essas informações são necessárias para o isolamento de dados.
+          <div className="flex-shrink-0">
+            <svg className="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+            </svg>
+          </div>
+          <div className="ml-3">
+            <p className="text-sm text-blue-700">
+              <strong>Configurações Técnicas do Firebase</strong><br/>
+              Estas informações conectam o sistema ao banco de dados específico desta escola. 
+              {!school && ' As URLs são geradas automaticamente baseadas no nome da escola, mas você pode editá-las.'}
             </p>
           </div>
         </div>
       </div>
 
-      <div className="space-y-6">
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Project ID *</label>
-          <input
-            type="text"
-            value={formData.projectId}
-            onChange={(e) => handleInputChange('projectId', e.target.value)}
-            className={`mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 ${errors.projectId ? 'border-red-300' : ''}`}
-            placeholder="projeto-escola-abc"
-          />
-          {errors.projectId && <p className="mt-1 text-sm text-red-600">{errors.projectId}</p>}
-          <p className="mt-1 text-sm text-gray-500">Identificador único do projeto Firebase</p>
-        </div>
+      <h3 className="text-lg font-medium text-gray-900">Banco de Dados e Storage</h3>
+      
+      <div>
+        <label className="block text-sm font-medium text-gray-700">Project ID *</label>
+        <input
+          type="text"
+          value={formData.projectId}
+          onChange={(e) => handleInputChange('projectId', e.target.value)}
+          className={`mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 ${errors.projectId ? 'border-red-300' : ''}`}
+          placeholder="escola-exemplo"
+          readOnly={!!school}
+        />
+        {errors.projectId && <p className="mt-1 text-sm text-red-600">{errors.projectId}</p>}
+        <p className="mt-1 text-xs text-gray-500">Identificador único do projeto Firebase (sem espaços ou caracteres especiais)</p>
+      </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Database URL *</label>
-          <input
-            type="url"
-            value={formData.databaseURL}
-            onChange={(e) => handleInputChange('databaseURL', e.target.value)}
-            className={`mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 ${errors.databaseURL ? 'border-red-300' : ''}`}
-            placeholder="https://projeto-escola-abc-default-rtdb.firebaseio.com/"
-          />
-          {errors.databaseURL && <p className="mt-1 text-sm text-red-600">{errors.databaseURL}</p>}
-          <p className="mt-1 text-sm text-gray-500">URL do banco de dados Realtime Database</p>
-        </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700">Database URL *</label>
+        <input
+          type="text"
+          value={formData.databaseURL}
+          onChange={(e) => handleInputChange('databaseURL', e.target.value)}
+          className={`mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 font-mono text-sm ${errors.databaseURL ? 'border-red-300' : ''}`}
+          placeholder="https://escola-exemplo-default-rtdb.firebaseio.com"
+          readOnly={!!school}
+        />
+        {errors.databaseURL && <p className="mt-1 text-sm text-red-600">{errors.databaseURL}</p>}
+        <p className="mt-1 text-xs text-gray-500">URL do Firebase Realtime Database desta escola</p>
+      </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Storage Bucket *</label>
-          <input
-            type="text"
-            value={formData.storageBucket}
-            onChange={(e) => handleInputChange('storageBucket', e.target.value)}
-            className={`mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 ${errors.storageBucket ? 'border-red-300' : ''}`}
-            placeholder="projeto-escola-abc.firebasestorage.app"
-          />
-          {errors.storageBucket && <p className="mt-1 text-sm text-red-600">{errors.storageBucket}</p>}
-          <p className="mt-1 text-sm text-gray-500">Bucket do Firebase Storage para arquivos</p>
+      <div>
+        <label className="block text-sm font-medium text-gray-700">Storage Bucket *</label>
+        <input
+          type="text"
+          value={formData.storageBucket}
+          onChange={(e) => handleInputChange('storageBucket', e.target.value)}
+          className={`mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 font-mono text-sm ${errors.storageBucket ? 'border-red-300' : ''}`}
+          placeholder="escola-exemplo.firebasestorage.app"
+          readOnly={!!school}
+        />
+        {errors.storageBucket && <p className="mt-1 text-sm text-red-600">{errors.storageBucket}</p>}
+        <p className="mt-1 text-xs text-gray-500">Bucket do Firebase Storage para arquivos desta escola</p>
+      </div>
+
+      <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4">
+        <div className="flex">
+          <div className="flex-shrink-0">
+            <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+            </svg>
+          </div>
+          <div className="ml-3">
+            <p className="text-sm text-yellow-700">
+              <strong>Importante:</strong> {school ? 'Estas configurações não podem ser alteradas após a criação da escola.' : 'Certifique-se de que estas URLs estão corretas antes de criar a escola. Elas não poderão ser alteradas depois.'}
+            </p>
+          </div>
         </div>
       </div>
     </div>
@@ -540,13 +678,13 @@ export default function SchoolForm({ school, onSubmit, onClose }) {
           </div>
           <div className="flex justify-center mt-2">
             <span className="text-sm text-gray-600">
-              Etapa {currentStep} de 4
+              Etapa {currentStep} de {totalSteps}
             </span>
           </div>
         </div>
 
         {/* Form Content */}
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} onKeyDown={handleKeyDown}>
           <div className="py-6">
             {currentStep === 1 && renderStep1()}
             {currentStep === 2 && renderStep2()}
@@ -580,45 +718,75 @@ export default function SchoolForm({ school, onSubmit, onClose }) {
                 Cancelar
               </button>
 
-              {currentStep < 4 ? (
-                <button
-                  type="button"
-                  onClick={handleNext}
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                >
-                  Próximo
-                  <svg className="ml-2 -mr-1 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                  </svg>
-                </button>
-              ) : (
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
-                >
-                  {loading ? (
-                    <>
-                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25"></circle>
-                        <path fill="currentColor" className="opacity-75" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Salvando...
-                    </>
-                  ) : (
-                    <>
-                      <svg className="mr-2 -ml-1 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                      {school ? 'Atualizar' : 'Criar'} Escola
-                    </>
-                  )}
-                </button>
-              )}
+              {(() => {
+                console.log('🔘 Renderizando botão | currentStep:', currentStep, '| totalSteps:', totalSteps, '| currentStep < totalSteps:', currentStep < totalSteps);
+                return currentStep < totalSteps ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      console.log('🖱️ Botão PRÓXIMO clicado!');
+                      handleNext();
+                    }}
+                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  >
+                    Próximo
+                    <svg className="ml-2 -mr-1 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                    </svg>
+                  </button>
+                ) : (
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    onClick={() => {
+                      console.log('🖱️ Botão SUBMIT clicado!');
+                      setCanSubmit(true);
+                    }}
+                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+                  >
+                    {loading ? (
+                      <>
+                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                          <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25"></circle>
+                          <path fill="currentColor" className="opacity-75" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Salvando...
+                      </>
+                    ) : (
+                      <>
+                        <svg className="mr-2 -ml-1 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        {school ? 'Atualizar' : 'Criar'} Escola
+                      </>
+                    )}
+                  </button>
+                );
+              })()}
             </div>
           </div>
         </form>
       </div>
+
+      {/* Modal de Sucesso */}
+      <ConfirmDialog
+        isOpen={showSuccessModal}
+        title="Escola criada com sucesso!"
+        message="A escola foi criada e configurada no sistema. Você já pode começar a gerenciá-la."
+        type="success"
+        confirmText="OK"
+        onConfirm={handleSuccessClose}
+      />
+
+      {/* Modal de Erro */}
+      <ConfirmDialog
+        isOpen={showErrorModal}
+        title="Erro ao criar escola"
+        message={errorMessage}
+        type="error"
+        confirmText="OK"
+        onConfirm={() => setShowErrorModal(false)}
+      />
     </div>
   );
 }

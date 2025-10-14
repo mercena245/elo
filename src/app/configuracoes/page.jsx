@@ -8,9 +8,14 @@ import { useEffect, useState } from 'react';
 import { db, ref, get, set, push, remove, auth, deleteUserFunction } from '../../firebase';
 import { logAction, LOG_ACTIONS } from '../../services/auditService';
 import UserApprovalDialog from '../../components/UserApprovalDialog';
+import TwoFactorManager from '../../components/TwoFactorManager';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '../../context/AuthContext';
 
 export default function Configuracoes() {
+  const { user } = useAuth();
+  const superAdminId = 'qD6UucWtcgPC9GHA41OB8rSaghZ2';
+  const isSuperAdmin = user?.uid === superAdminId;
   // Função para recusar usuário (excluir do banco e do Auth)
   async function rejectUser(uid) {
     // Buscar dados do usuário para o log antes de excluir
@@ -546,6 +551,19 @@ export default function Configuracoes() {
               </CardContent>
             </Card>
           )}
+          
+          {/* Configurações de Segurança 2FA - apenas para super admin */}
+          {isSuperAdmin && (
+            <Card sx={{ mb: 3 }}>
+              <CardContent>
+                <Typography variant="h6" color="primary" gutterBottom align="center">
+                  Configurações de Segurança
+                </Typography>
+                <TwoFactorManager user={user} />
+              </CardContent>
+            </Card>
+          )}
+          
           <Card sx={{ mb: 3 }}>
             <CardContent>
               <Typography variant="h6" color="primary" gutterBottom align="center">

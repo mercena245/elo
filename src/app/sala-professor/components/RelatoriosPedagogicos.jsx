@@ -52,28 +52,31 @@ import { auditService } from '../../../services/auditService';
 import SeletorTurmaAluno from './SeletorTurmaAluno';
 import geminiService from '../../../services/geminiService';
 
+
 const RelatoriosPedagogicos = () => {
+  // SEMPRE declare todos os hooks no topo!
   const { user, userRole } = useAuthUser();
   const [loading, setLoading] = useState(true);
   const [relatorios, setRelatorios] = useState({});
   const [turmas, setTurmas] = useState({});
   const [disciplinas, setDisciplinas] = useState({});
   const [alunos, setAlunos] = useState({});
-  
-  // Estados de filtro
+  // Filtros
   const [selectedTurmas, setSelectedTurmas] = useState([]);
   const [selectedAlunos, setSelectedAlunos] = useState([]);
   const [minhasTurmas, setMinhasTurmas] = useState([]);
-  
-  // Estados do gerador de relatório
+  // Gerador
   const [geradorOpen, setGeradorOpen] = useState(false);
   const [gerandoRelatorio, setGerandoRelatorio] = useState(false);
   const [relatorioGerado, setRelatorioGerado] = useState('');
   const [templateSelecionado, setTemplateSelecionado] = useState('desenvolvimento');
   const [detalhesAluno, setDetalhesAluno] = useState('');
-  
-  // Estados de visualização
+  // Visualização
   const [relatoriosOrganizados, setRelatoriosOrganizados] = useState([]);
+  // Edição/feedback (devem estar aqui em cima também)
+  const [editandoRelatorio, setEditandoRelatorio] = useState(null);
+  const [conteudoEditado, setConteudoEditado] = useState('');
+  const [feedback, setFeedback] = useState('');
 
   // Templates BNCC para relatórios
   const templatesBNCC = {
@@ -334,6 +337,74 @@ const RelatoriosPedagogicos = () => {
     );
   }
 
+  // ...existing code...
+
+  // Função para aprovar relatório
+  const aprovarRelatorio = async (relatorio) => {
+    try {
+      await update(ref(db, `relatorios-pedagogicos/${relatorio.id}`), {
+        statusAprovacao: 'aprovado',
+        atualizadoEm: new Date().toISOString(),
+      });
+      await auditService.logAction('relatorio_pedagogico_aprovar', user.uid, {
+        description: `Aprovou relatório pedagógico para aluno ${alunos[relatorio.alunoId]?.nome}`,
+        alunoId: relatorio.alunoId,
+        relatorioId: relatorio.id
+      });
+      setFeedback('Relatório aprovado com sucesso!');
+    } catch (error) {
+      setFeedback('Erro ao aprovar relatório.');
+    }
+  };
+
+  // Função para baixar relatório como PDF
+  const baixarPDF = async (relatorio) => {
+    // Geração simples de PDF usando window.print para MVP
+    const win = window.open('', '_blank');
+    win.document.write(`
+      <html><head><title>Relatório Pedagógico</title></head><body>
+      <h2>Relatório Pedagógico</h2>
+      <p><b>Aluno:</b> ${alunos[relatorio.alunoId]?.nomeCompleto || alunos[relatorio.alunoId]?.nome || 'Aluno'}</p>
+      <p><b>Turma:</b> ${turmas[relatorio.turmaId]?.nome || 'Turma'}</p>
+      <p><b>Data:</b> ${new Date(relatorio.criadoEm).toLocaleDateString('pt-BR')}</p>
+      <hr />
+      <pre style="font-family:inherit;white-space:pre-wrap;">${relatorio.conteudo}</pre>
+      </body></html>
+    `);
+    win.document.close();
+    win.print();
+  };
+
+  // Função para abrir modal de edição
+  const abrirEdicao = (relatorio) => {
+    setEditandoRelatorio(relatorio);
+    setConteudoEditado(relatorio.conteudo);
+  };
+
+  // Função para salvar edição
+  const salvarEdicao = async () => {
+    if (!editandoRelatorio) return;
+    try {
+      await update(ref(db, `relatorios-pedagogicos/${editandoRelatorio.id}`), {
+        conteudo: conteudoEditado,
+        atualizadoEm: new Date().toISOString(),
+      });
+      await auditService.logAction('relatorio_pedagogico_editar', user.uid, {
+        description: `Editou relatório pedagógico para aluno ${alunos[editandoRelatorio.alunoId]?.nome}`,
+        alunoId: editandoRelatorio.alunoId,
+        relatorioId: editandoRelatorio.id
+      });
+      setFeedback('Relatório editado com sucesso!');
+      setEditandoRelatorio(null);
+      setConteudoEditado('');
+    } catch (error) {
+      setFeedback('Erro ao editar relatório.');
+    }
+  };
+
+  // Função para fechar feedback
+  const fecharFeedback = () => setFeedback('');
+
   return (
     <Box sx={{ p: { xs: 1, sm: 2, md: 3 } }}>
       <Box sx={{ 
@@ -458,14 +529,14 @@ const RelatoriosPedagogicos = () => {
                       {relatorio.conteudo}
                     </Box>
                     <Box sx={{ mt: 2, display: 'flex', gap: 1 }}>
-                      <Button size="small" startIcon={<DownloadIcon />}>
+                      <Button size="small" startIcon={<DownloadIcon />} onClick={() => baixarPDF(relatorio)}>
                         Baixar PDF
                       </Button>
-                      <Button size="small" startIcon={<EditIcon />}>
+                      <Button size="small" startIcon={<EditIcon />} onClick={() => abrirEdicao(relatorio)}>
                         Editar
                       </Button>
-                      {(userRole === 'coordenador' || userRole === 'coordenadora') && (
-                        <Button size="small" color="success" startIcon={<SendIcon />}>
+                      {(userRole === 'coordenador' || userRole === 'coordenadora') && relatorio.statusAprovacao !== 'aprovado' && (
+                        <Button size="small" color="success" startIcon={<SendIcon />} onClick={() => aprovarRelatorio(relatorio)}>
                           Aprovar
                         </Button>
                       )}
@@ -477,6 +548,36 @@ const RelatoriosPedagogicos = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Modal de Edição de Relatório */}
+      <Dialog open={!!editandoRelatorio} onClose={() => setEditandoRelatorio(null)} maxWidth="md" fullWidth>
+        <DialogTitle>Editar Relatório</DialogTitle>
+        <DialogContent>
+          <TextField
+            fullWidth
+            multiline
+            minRows={8}
+            value={conteudoEditado}
+            onChange={e => setConteudoEditado(e.target.value)}
+            label="Conteúdo do Relatório"
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEditandoRelatorio(null)}>Cancelar</Button>
+          <Button onClick={salvarEdicao} variant="contained" color="primary">Salvar</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Feedback simples */}
+      <Dialog open={!!feedback} onClose={fecharFeedback}>
+        <DialogTitle>Mensagem</DialogTitle>
+        <DialogContent>
+          <Typography>{feedback}</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={fecharFeedback}>OK</Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Modal Gerador de Relatório */}
       <Dialog open={geradorOpen} onClose={() => { setGeradorOpen(false); limparCamposGerador(); }} maxWidth="md" fullWidth>

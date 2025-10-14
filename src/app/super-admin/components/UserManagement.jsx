@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import UserForm from './UserForm';
+import { managementDB, ref, get, update, auth } from '../../../firebase';
+import ConfirmDialog from './ConfirmDialog';
 
 export default function UserManagement() {
   const [users, setUsers] = useState([]);
@@ -10,86 +12,93 @@ export default function UserManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterRole, setFilterRole] = useState('all');
   const [filterSchool, setFilterSchool] = useState('all');
+  const [filterStatus, setFilterStatus] = useState('all');
   const [showUserForm, setShowUserForm] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [pendingUsers, setPendingUsers] = useState([]);
 
   useEffect(() => {
-    loadUsers();
-    loadSchools();
+    const currentUser = auth.currentUser;
+    if (currentUser) {
+      loadUsers();
+      loadSchools();
+    }
   }, []);
 
   const loadUsers = async () => {
     try {
       setLoading(true);
-      // TODO: Implementar carregamento real do Firebase
       
-      // Dados simulados
-      const mockUsers = [
-        {
-          uid: 'user-001',
-          nome: 'Maria Silva',
-          email: 'maria@escolaabc.com',
-          telefone: '(11) 99999-9999',
-          dataRegistro: '2024-01-15',
-          status: 'ativo',
-          escolas: {
-            'escola-001': {
-              role: 'coordenador',
-              ativo: true,
-              dataVinculo: '2024-01-15',
-              permissoes: ['*']
-            }
-          }
-        },
-        {
-          uid: 'user-002',
-          nome: 'João Santos',
-          email: 'joao@colegioxyz.com',
-          telefone: '(11) 88888-8888',
-          dataRegistro: '2024-03-01',
-          status: 'ativo',
-          escolas: {
-            'escola-002': {
-              role: 'coordenador',
-              ativo: true,
-              dataVinculo: '2024-03-01',
-              permissoes: ['*']
-            }
-          }
-        },
-        {
-          uid: 'user-003',
-          nome: 'Ana Costa',
-          email: 'ana@escolaabc.com',
-          telefone: '(11) 77777-7777',
-          dataRegistro: '2024-02-10',
-          status: 'ativo',
-          escolas: {
-            'escola-001': {
-              role: 'secretaria',
-              ativo: true,
-              dataVinculo: '2024-02-10',
-              permissoes: ['financeiro', 'alunos', 'secretaria-digital']
-            }
-          }
-        }
-      ];
+      console.log('📥 Carregando usuários do banco de gerenciamento...');
       
-      setUsers(mockUsers);
+      // Buscar usuários do banco de gerenciamento
+      const usuariosRef = ref(managementDB, 'usuarios');
+      const snapshot = await get(usuariosRef);
+      
+      if (snapshot.exists()) {
+        const usuariosData = snapshot.val();
+        const usuariosArray = Object.keys(usuariosData).map(uid => ({
+          uid,
+          nome: usuariosData[uid].nome || '',
+          email: usuariosData[uid].email || '',
+          telefone: usuariosData[uid].telefone || '',
+          dataRegistro: usuariosData[uid].dataRegistro || new Date().toISOString().split('T')[0],
+          status: usuariosData[uid].status || 'ativo',
+          escolas: usuariosData[uid].escolas || {}
+        }));
+        
+        console.log('✅ Usuários carregados:', usuariosArray.length);
+        setUsers(usuariosArray);
+        
+        // Separar usuários pendentes (sem escolas vinculadas)
+        const pending = usuariosArray.filter(u => {
+          const escolas = u.escolas || {};
+          return Object.keys(escolas).length === 0;
+        });
+        setPendingUsers(pending);
+        console.log('⏳ Usuários pendentes de aprovação:', pending.length);
+      } else {
+        console.log('ℹ️ Nenhum usuário encontrado no banco');
+        setUsers([]);
+      }
     } catch (error) {
-      console.error('Erro ao carregar usuários:', error);
+      console.error('❌ Erro ao carregar usuários:', error);
+      setErrorMessage('Erro ao carregar usuários: ' + error.message);
+      setShowErrorModal(true);
     } finally {
       setLoading(false);
     }
   };
 
   const loadSchools = async () => {
-    // Dados simulados das escolas
-    const mockSchools = [
-      { id: 'escola-001', nome: 'Escola ABC' },
-      { id: 'escola-002', nome: 'Colégio XYZ' }
-    ];
-    setSchools(mockSchools);
+    try {
+      console.log('📥 Carregando escolas do banco de gerenciamento...');
+      
+      // Buscar escolas do banco de gerenciamento
+      const escolasRef = ref(managementDB, 'escolas');
+      const snapshot = await get(escolasRef);
+      
+      if (snapshot.exists()) {
+        const escolasData = snapshot.val();
+        const escolasArray = Object.keys(escolasData).map(id => ({
+          id,
+          nome: escolasData[id].nome,
+          status: escolasData[id].status
+        }));
+        
+        console.log('✅ Escolas carregadas:', escolasArray.length);
+        setSchools(escolasArray);
+      } else {
+        console.log('ℹ️ Nenhuma escola encontrada no banco');
+        setSchools([]);
+      }
+    } catch (error) {
+      console.error('❌ Erro ao carregar escolas:', error);
+    }
   };
 
   const filteredUsers = users.filter(user => {
@@ -97,34 +106,75 @@ export default function UserManagement() {
       user.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
       user.email.toLowerCase().includes(searchTerm.toLowerCase());
     
+    // Verificar se usuário está pendente (sem escolas)
+    const isPending = Object.keys(user.escolas || {}).length === 0;
+    
     const matchesRole = filterRole === 'all' || 
       Object.values(user.escolas || {}).some(escola => escola.role === filterRole);
     
     const matchesSchool = filterSchool === 'all' || 
       Object.keys(user.escolas || {}).includes(filterSchool);
     
-    return matchesSearch && matchesRole && matchesSchool;
+    const matchesStatus = filterStatus === 'all' || 
+      (filterStatus === 'pending' && isPending) ||
+      (filterStatus !== 'pending' && user.status === filterStatus);
+    
+    return matchesSearch && matchesRole && matchesSchool && matchesStatus;
   });
 
-  const handleCreateUser = (userData) => {
-    const newUser = {
-      ...userData,
-      uid: `user-${Date.now()}`,
-      dataRegistro: new Date().toISOString().split('T')[0],
-      status: 'ativo'
-    };
-    setUsers([...users, newUser]);
-    setShowUserForm(false);
+  const handleCreateUser = async (userData) => {
+    try {
+      const newUser = {
+        ...userData,
+        dataRegistro: new Date().toISOString().split('T')[0],
+        status: 'ativo'
+      };
+      
+      // Salvar no banco (usuário novo seria criado pelo Firebase Auth primeiro)
+      // Por enquanto, vamos apenas atualizar a lista local
+      setUsers([...users, newUser]);
+      setShowUserForm(false);
+      setSuccessMessage('Usuário criado com sucesso!');
+      setShowSuccessModal(true);
+    } catch (error) {
+      console.error('Erro ao criar usuário:', error);
+      setErrorMessage('Erro ao criar usuário: ' + error.message);
+      setShowErrorModal(true);
+    }
   };
 
-  const handleUpdateUser = (userData) => {
-    setUsers(users.map(user => 
-      user.uid === editingUser.uid 
-        ? { ...user, ...userData }
-        : user
-    ));
-    setEditingUser(null);
-    setShowUserForm(false);
+  const handleUpdateUser = async (userData) => {
+    try {
+      console.log('📝 Atualizando usuário:', userData.uid);
+      
+      // Atualizar no banco de gerenciamento
+      const usuarioRef = ref(managementDB, `usuarios/${userData.uid}`);
+      await update(usuarioRef, {
+        nome: userData.nome,
+        email: userData.email,
+        telefone: userData.telefone || '',
+        escolas: userData.escolas || {},
+        status: userData.status || 'ativo'
+      });
+      
+      console.log('✅ Usuário atualizado com sucesso!');
+      
+      // Atualizar lista local
+      setUsers(users.map(user => 
+        user.uid === userData.uid 
+          ? { ...user, ...userData }
+          : user
+      ));
+      
+      setEditingUser(null);
+      setShowUserForm(false);
+      setSuccessMessage('Usuário atualizado com sucesso!');
+      setShowSuccessModal(true);
+    } catch (error) {
+      console.error('❌ Erro ao atualizar usuário:', error);
+      setErrorMessage('Erro ao atualizar usuário: ' + error.message);
+      setShowErrorModal(true);
+    }
   };
 
   const handleEditUser = (user) => {
@@ -231,18 +281,77 @@ export default function UserManagement() {
           <div className="text-sm text-gray-500">Ativos</div>
         </div>
         <div className="bg-white p-4 rounded-lg border border-gray-200">
+          <div className="text-2xl font-bold text-orange-600">
+            {pendingUsers.length}
+          </div>
+          <div className="text-sm text-gray-500">Aguardando Aprovação</div>
+        </div>
+        <div className="bg-white p-4 rounded-lg border border-gray-200">
           <div className="text-2xl font-bold text-purple-600">
-            {users.filter(u => Object.values(u.escolas || {}).some(e => e.role === 'coordenador')).length}
+            {users.filter(u => Object.values(u.escolas || {}).some(e => e.role === 'coordenadora')).length}
           </div>
           <div className="text-sm text-gray-500">Coordenadores</div>
         </div>
-        <div className="bg-white p-4 rounded-lg border border-gray-200">
-          <div className="text-2xl font-bold text-blue-600">
-            {users.filter(u => Object.values(u.escolas || {}).some(e => e.role === 'professor')).length}
-          </div>
-          <div className="text-sm text-gray-500">Professores</div>
-        </div>
       </div>
+
+      {/* Usuários Pendentes - Destaque */}
+      {pendingUsers.length > 0 && (
+        <div className="bg-gradient-to-r from-orange-50 to-yellow-50 border-2 border-orange-200 rounded-lg p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center">
+              <div className="bg-orange-100 rounded-full p-3 mr-4">
+                <svg className="w-6 h-6 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-gray-900">Usuários Aguardando Aprovação</h3>
+                <p className="text-sm text-gray-600">
+                  {pendingUsers.length} {pendingUsers.length === 1 ? 'usuário precisa' : 'usuários precisam'} ser vinculado(s) a uma escola
+                </p>
+              </div>
+            </div>
+            <span className="bg-orange-500 text-white px-3 py-1 rounded-full text-sm font-semibold">
+              {pendingUsers.length}
+            </span>
+          </div>
+
+          <div className="space-y-2">
+            {pendingUsers.slice(0, 3).map((user) => (
+              <div key={user.uid} className="bg-white rounded-lg p-4 flex items-center justify-between shadow-sm hover:shadow-md transition-shadow">
+                <div className="flex items-center">
+                  <div className="h-10 w-10 rounded-full bg-orange-100 flex items-center justify-center mr-3">
+                    <span className="text-sm font-medium text-orange-800">
+                      {user.nome?.charAt(0).toUpperCase() || user.email?.charAt(0).toUpperCase()}
+                    </span>
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium text-gray-900">{user.nome || 'Sem nome'}</div>
+                    <div className="text-xs text-gray-500">{user.email}</div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleEditUser(user)}
+                  className="px-4 py-2 bg-orange-600 text-white rounded-md text-sm font-medium hover:bg-orange-700 transition-colors"
+                >
+                  Aprovar e Vincular
+                </button>
+              </div>
+            ))}
+          </div>
+
+          {pendingUsers.length > 3 && (
+            <div className="mt-3 text-center">
+              <button
+                onClick={() => setFilterStatus('pending')}
+                className="text-sm text-orange-600 hover:text-orange-800 font-medium"
+              >
+                Ver todos os {pendingUsers.length} usuários pendentes →
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Filters */}
       <div className="bg-white p-4 rounded-lg border border-gray-200">
@@ -264,15 +373,15 @@ export default function UserManagement() {
           
           <div>
             <select
-              value={filterRole}
-              onChange={(e) => setFilterRole(e.target.value)}
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
               className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
             >
-              <option value="all">Todos os Roles</option>
-              <option value="coordenador">Coordenadores</option>
-              <option value="secretaria">Secretárias</option>
-              <option value="professor">Professores</option>
-              <option value="responsavel">Responsáveis</option>
+              <option value="all">Todos os Status</option>
+              <option value="pending">⏳ Aguardando Aprovação</option>
+              <option value="ativo">Ativos</option>
+              <option value="inativo">Inativos</option>
+              <option value="suspenso">Suspensos</option>
             </select>
           </div>
 
@@ -346,14 +455,20 @@ export default function UserManagement() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="space-y-1">
-                        {userSchools.map((school) => (
-                          <div key={school.id} className="flex items-center space-x-2">
-                            <span className="text-sm text-gray-900">{school.nome}</span>
-                            <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${getRoleColor(school.role)}`}>
-                              {school.role}
-                            </span>
-                          </div>
-                        ))}
+                        {userSchools.length === 0 ? (
+                          <span className="inline-flex px-3 py-1 text-xs font-semibold rounded-full bg-orange-100 text-orange-800">
+                            ⏳ Aguardando aprovação
+                          </span>
+                        ) : (
+                          userSchools.map((school) => (
+                            <div key={school.id} className="flex items-center space-x-2">
+                              <span className="text-sm text-gray-900">{school.nome}</span>
+                              <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${getRoleColor(school.role)}`}>
+                                {school.role}
+                              </span>
+                            </div>
+                          ))
+                        )}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -411,6 +526,26 @@ export default function UserManagement() {
           }}
         />
       )}
+
+      {/* Modal de Sucesso */}
+      <ConfirmDialog
+        isOpen={showSuccessModal}
+        title="Sucesso"
+        message={successMessage}
+        type="success"
+        confirmText="OK"
+        onConfirm={() => setShowSuccessModal(false)}
+      />
+
+      {/* Modal de Erro */}
+      <ConfirmDialog
+        isOpen={showErrorModal}
+        title="Erro"
+        message={errorMessage}
+        type="error"
+        confirmText="OK"
+        onConfirm={() => setShowErrorModal(false)}
+      />
     </div>
   );
 }

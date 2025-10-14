@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { managementDB, ref, get, auth } from '../firebase';
+import { signOut } from 'firebase/auth';
 
 export default function AccessTypeSelector({ user, onSchoolSelect, onManagementSelect }) {
   const [availableSchools, setAvailableSchools] = useState([]);
@@ -15,6 +17,8 @@ export default function AccessTypeSelector({ user, onSchoolSelect, onManagementS
 
   const checkUserAccess = async () => {
     try {
+      console.log('🔍 Verificando acesso do usuário:', user?.email);
+      
       // Verificar se é super admin
       const superAdminId = 'qD6UucWtcgPC9GHA41OB8rSaghZ2';
       const isSuper = user?.uid === superAdminId;
@@ -30,62 +34,203 @@ export default function AccessTypeSelector({ user, onSchoolSelect, onManagementS
         setAvailableSchools(userSchools);
       }
     } catch (error) {
-      console.error('Erro ao verificar acesso do usuário:', error);
+      console.error('❌ Erro ao verificar acesso do usuário:', error);
     } finally {
       setLoading(false);
     }
   };
 
   const loadAllSchools = async () => {
-    // Mock data - Implementar busca real do Firebase
-    return [
-      {
-        id: 'escola1',
-        nome: 'Escola Municipal São João',
-        status: 'ativo',
-        plano: 'basico',
-        cidade: 'São Paulo',
-        logo: '🏫'
-      },
-      {
-        id: 'escola2', 
-        nome: 'Colégio Esperança',
-        status: 'ativo',
-        plano: 'premium',
-        cidade: 'Rio de Janeiro',
-        logo: '🎓'
-      },
-      {
-        id: 'escola3',
-        nome: 'Instituto Educacional Brasil',
-        status: 'ativo',
-        plano: 'empresarial',
-        cidade: 'Belo Horizonte',
-        logo: '📚'
+    try {
+      console.log('📚 [loadAllSchools] Carregando todas as escolas (Super Admin)...');
+      console.log('📍 [loadAllSchools] Caminho: gerenciamento-elo-school/escolas');
+      
+      const escolasRef = ref(managementDB, 'escolas');
+      const snapshot = await get(escolasRef);
+      
+      if (!snapshot.exists()) {
+        console.log('⚠️ [loadAllSchools] Nenhuma escola encontrada');
+        return [];
       }
-    ];
+
+      const escolasData = snapshot.val();
+      const escolas = Object.entries(escolasData).map(([id, data]) => ({
+        id,
+        nome: data.nome,
+        status: data.status || 'ativa',
+        plano: data.plano || 'basico',
+        cidade: data.endereco?.cidade || 'N/A',
+        estado: data.endereco?.estado || '',
+        logo: '🏫',
+        databaseURL: data.databaseURL,
+        storageBucket: data.storageBucket,
+        projectId: data.projectId
+      }));
+
+      console.log(`✅ [loadAllSchools] ${escolas.length} escolas carregadas`);
+      escolas.forEach(escola => {
+        console.log(`  - ${escola.nome} (${escola.id})`);
+      });
+      
+      return escolas;
+    } catch (error) {
+      console.error('❌ [loadAllSchools] Erro ao carregar escolas:', error);
+      console.error('❌ [loadAllSchools] Detalhes:', error.message);
+      return [];
+    }
   };
 
   const loadUserSchools = async (userId) => {
-    // Mock data - Implementar busca real baseada no usuário
-    return [
-      {
-        id: 'escola1',
-        nome: 'Escola Municipal São João',
-        status: 'ativo',
-        plano: 'basico',
-        cidade: 'São Paulo',
-        logo: '🏫',
-        role: 'coordenador'
+    try {
+      console.log('🔍 [loadUserSchools] Iniciando busca...');
+      console.log('🔍 [loadUserSchools] User ID:', userId);
+      
+      // MÉTODO 1: Buscar em usuarios/{userId}/escolas (estrutura antiga)
+      console.log('📚 [loadUserSchools] MÉTODO 1: Tentando usuarios/{userId}/escolas');
+      const userRef = ref(managementDB, `usuarios/${userId}`);
+      const userSnapshot = await get(userRef);
+      
+      if (userSnapshot.exists()) {
+        const userData = userSnapshot.val();
+        console.log('✅ [loadUserSchools] Usuário encontrado em usuarios/');
+        
+        if (userData.escolas) {
+          const escolasIds = Object.keys(userData.escolas);
+          console.log('📋 [loadUserSchools] Escolas vinculadas:', escolasIds);
+          
+          // Buscar dados completos de cada escola
+          const escolasPromises = escolasIds.map(async (escolaId) => {
+            const escolaRef = ref(managementDB, `escolas/${escolaId}`);
+            const escolaSnapshot = await get(escolaRef);
+            
+            if (escolaSnapshot.exists()) {
+              const escolaData = escolaSnapshot.val();
+              const userRole = userData.escolas[escolaId]?.role || 
+                              userData.escolas[escolaId]?.permissoes?.role || 
+                              'usuário';
+              
+              console.log('✅ [loadUserSchools] Escola carregada:', escolaData.nome);
+              
+              return {
+                id: escolaId,
+                nome: escolaData.nome,
+                status: escolaData.status || 'ativa',
+                plano: escolaData.plano || 'basico',
+                cidade: escolaData.endereco?.cidade || 'N/A',
+                estado: escolaData.endereco?.estado || '',
+                logo: '🏫',
+                role: userRole,
+                databaseURL: escolaData.databaseURL,
+                storageBucket: escolaData.storageBucket,
+                projectId: escolaData.projectId
+              };
+            }
+            return null;
+          });
+          
+          const escolas = (await Promise.all(escolasPromises)).filter(e => e !== null);
+          
+          if (escolas.length > 0) {
+            console.log(`✅ [loadUserSchools] MÉTODO 1 bem-sucedido: ${escolas.length} escola(s) encontrada(s)`);
+            escolas.forEach(escola => {
+              console.log(`  - ${escola.nome} (${escola.role})`);
+            });
+            return escolas;
+          }
+        }
       }
-    ];
+      
+      // MÉTODO 2: Buscar em escolas/{escolaId}/usuarios (estrutura nova)
+      console.log('📚 [loadUserSchools] MÉTODO 2: Tentando escolas/{escolaId}/usuarios');
+      
+      const escolasRef = ref(managementDB, 'escolas');
+      const escolasSnapshot = await get(escolasRef);
+      
+      if (!escolasSnapshot.exists()) {
+        console.log('⚠️ [loadUserSchools] Nenhuma escola encontrada no managementDB');
+        return [];
+      }
+
+      const todasEscolas = escolasSnapshot.val();
+      const escolasDoUsuario = [];
+      
+      console.log('📊 [loadUserSchools] Total de escolas no sistema:', Object.keys(todasEscolas).length);
+
+      // Percorrer TODAS as escolas e verificar se o usuário está nela
+      for (const [escolaId, escolaData] of Object.entries(todasEscolas)) {
+        console.log(`🔎 [loadUserSchools] Verificando escola: ${escolaData.nome} (${escolaId})`);
+        
+        // Verificar se a escola tem o array de usuários
+        if (escolaData.usuarios && escolaData.usuarios[userId]) {
+          console.log(`✅ [loadUserSchools] Usuário ENCONTRADO na escola: ${escolaData.nome}`);
+          
+          const userRole = escolaData.usuarios[userId].role || 'usuário';
+          
+          escolasDoUsuario.push({
+            id: escolaId,
+            nome: escolaData.nome,
+            status: escolaData.status || 'ativa',
+            plano: escolaData.plano || 'basico',
+            cidade: escolaData.endereco?.cidade || 'N/A',
+            estado: escolaData.endereco?.estado || '',
+            logo: '🏫',
+            role: userRole,
+            databaseURL: escolaData.databaseURL,
+            storageBucket: escolaData.storageBucket,
+            projectId: escolaData.projectId
+          });
+          
+          console.log('📦 [loadUserSchools] Dados da escola salvos:', {
+            id: escolaId,
+            nome: escolaData.nome,
+            databaseURL: escolaData.databaseURL,
+            storageBucket: escolaData.storageBucket,
+            projectId: escolaData.projectId
+          });
+        } else {
+          console.log(`⏭️ [loadUserSchools] Usuário NÃO está na escola: ${escolaData.nome}`);
+        }
+      }
+
+      if (escolasDoUsuario.length === 0) {
+        console.log('⚠️ [loadUserSchools] Usuário não está vinculado a nenhuma escola');
+        console.log('💡 [loadUserSchools] Estruturas verificadas:');
+        console.log('   1. usuarios/{userId}/escolas');
+        console.log('   2. escolas/{escolaId}/usuarios');
+      } else {
+        console.log(`✅ [loadUserSchools] MÉTODO 2 bem-sucedido: ${escolasDoUsuario.length} escola(s) encontrada(s)`);
+        escolasDoUsuario.forEach(escola => {
+          console.log(`  - ${escola.nome} (${escola.role})`);
+        });
+      }
+      
+      return escolasDoUsuario;
+    } catch (error) {
+      console.error('❌ [loadUserSchools] Erro ao carregar escolas:', error);
+      console.error('❌ [loadUserSchools] Detalhes:', error.message);
+      return [];
+    }
   };
 
   const handleSchoolAccess = (school) => {
+    console.log('🎯 [AccessTypeSelector] handleSchoolAccess chamado');
+    console.log('📋 [AccessTypeSelector] Escola selecionada:', school);
+    console.log('🔑 [AccessTypeSelector] ID da escola:', school.id);
+    console.log('📊 [AccessTypeSelector] Database URL:', school.databaseURL);
+    
     // Salvar escola selecionada no contexto/localStorage
     localStorage.setItem('selectedSchool', JSON.stringify(school));
+    console.log('💾 [AccessTypeSelector] Escola salva no localStorage');
+    
+    // Verificar se salvou corretamente
+    const saved = localStorage.getItem('selectedSchool');
+    console.log('✅ [AccessTypeSelector] Verificação - Salvo:', saved ? 'Sim' : 'Não');
+    
     onSchoolSelect(school);
+    console.log('📞 [AccessTypeSelector] onSchoolSelect chamado');
+    
     router.push('/dashboard');
+    console.log('🔄 [AccessTypeSelector] Redirecionando para dashboard');
   };
 
   const handleManagementAccess = () => {
@@ -248,13 +393,29 @@ export default function AccessTypeSelector({ user, onSchoolSelect, onManagementS
           {/* Logout */}
           <div className="text-center">
             <button
-              onClick={() => {
-                // Implementar logout
-                localStorage.clear();
-                sessionStorage.clear();
-                router.push('/login');
+              onClick={async () => {
+                try {
+                  console.log('🚪 [Logout] Iniciando logout...');
+                  
+                  // 1. Limpar armazenamento local
+                  localStorage.clear();
+                  sessionStorage.clear();
+                  console.log('✅ [Logout] Cache limpo');
+                  
+                  // 2. Fazer logout do Firebase Auth
+                  await signOut(auth);
+                  console.log('✅ [Logout] Firebase Auth deslogado');
+                  
+                  // 3. Redirecionar para login
+                  console.log('🔄 [Logout] Redirecionando para login...');
+                  router.push('/login');
+                } catch (error) {
+                  console.error('❌ [Logout] Erro ao fazer logout:', error);
+                  // Mesmo com erro, redirecionar
+                  router.push('/login');
+                }
               }}
-              className="text-sm text-gray-500 hover:text-gray-700"
+              className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
             >
               Sair do sistema
             </button>

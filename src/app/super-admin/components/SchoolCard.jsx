@@ -111,17 +111,28 @@ export default function SchoolCard({ school, onEdit, onDelete }) {
           </div>
 
           {/* Configurações Técnicas */}
-          <div className="bg-blue-50 rounded-lg p-3">
-            <div className="text-xs text-gray-500 mb-2">Configuração Firebase</div>
-            <div className="space-y-1 text-xs">
-              <div className="text-gray-600">
-                <span className="font-medium">Project ID:</span> {school.projectId}
-              </div>
-              <div className="text-gray-600">
-                <span className="font-medium">Database:</span> {school.databaseURL.replace('https://', '').replace('.firebaseio.com/', '')}
+          {(school.projectId || school.databaseURL || school.storageBucket) && (
+            <div className="bg-blue-50 rounded-lg p-3">
+              <div className="text-xs text-gray-500 mb-2">Configuração Firebase</div>
+              <div className="space-y-1 text-xs">
+                {school.projectId && (
+                  <div className="text-gray-600">
+                    <span className="font-medium">Project ID:</span> {school.projectId}
+                  </div>
+                )}
+                {school.databaseURL && (
+                  <div className="text-gray-600 truncate">
+                    <span className="font-medium">Database:</span> {school.databaseURL.replace('https://', '').replace('.firebaseio.com', '')}
+                  </div>
+                )}
+                {school.storageBucket && (
+                  <div className="text-gray-600 truncate">
+                    <span className="font-medium">Storage:</span> {school.storageBucket}
+                  </div>
+                )}
               </div>
             </div>
-          </div>
+          )}
 
           {/* Módulos Ativos */}
           <div>

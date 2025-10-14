@@ -125,11 +125,24 @@ export default function SchoolManagement() {
       console.log('  - databaseURL:', escolaData.databaseURL);
       console.log('  - storageBucket:', escolaData.storageBucket);
 
-      // Salvar diretamente no banco de gerenciamento
+      // Salvar escola em escolas/{id}
       const escolasRef = ref(managementDB, 'escolas');
       const novaEscolaRef = await push(escolasRef, escolaData);
+      const novaEscolaId = novaEscolaRef.key;
 
-      console.log('✅ Escola criada com sucesso! ID:', novaEscolaRef.key);
+      console.log('✅ Escola criada em escolas/{id}:', novaEscolaId);
+      
+      // TAMBÉM vincular em usuarios/{uid}/escolas/{id}
+      const userEscolaRef = ref(managementDB, `usuarios/${user.uid}/escolas/${novaEscolaId}`);
+      await update(userEscolaRef, {
+        role: 'coordenadora',
+        ativo: true,
+        dataVinculo: new Date().toISOString(),
+        permissoes: ['*']
+      });
+      
+      console.log('✅ Escola vinculada em usuarios/{uid}/escolas/{id}');
+      console.log('✅ Estrutura DUPLA criada com sucesso!');
 
       // Recarregar lista de escolas
       await loadSchools();
@@ -146,14 +159,54 @@ export default function SchoolManagement() {
     }
   };
 
-  const handleUpdateSchool = (schoolData) => {
-    setSchools(schools.map(school => 
-      school.id === editingSchool.id 
-        ? { ...school, ...schoolData }
-        : school
-    ));
-    setEditingSchool(null);
-    setShowForm(false);
+  const handleUpdateSchool = async (schoolData) => {
+    try {
+      if (!editingSchool || !editingSchool.id) {
+        throw new Error('ID da escola não encontrado');
+      }
+      
+      setLoading(true);
+      console.log('📝 Atualizando escola:', editingSchool.id);
+      
+      // Atualizar escola em escolas/{id}
+      const escolaRef = ref(managementDB, `escolas/${editingSchool.id}`);
+      await update(escolaRef, {
+        nome: schoolData.nome,
+        cnpj: schoolData.cnpj,
+        responsavel: schoolData.responsavel,
+        email: schoolData.email,
+        telefone: schoolData.telefone || '',
+        plano: schoolData.plano || 'basico',
+        mensalidade: schoolData.mensalidade || 1200,
+        dataVencimento: schoolData.dataVencimento || 15,
+        endereco: schoolData.endereco || {},
+        configuracoes: schoolData.configuracoes || {},
+        projectId: schoolData.projectId || '',
+        databaseURL: schoolData.databaseURL || '',
+        storageBucket: schoolData.storageBucket || ''
+      });
+      
+      console.log('✅ Escola atualizada em escolas/{id}');
+      
+      // Atualizar lista local
+      setSchools(schools.map(school => 
+        school.id === editingSchool.id 
+          ? { ...school, ...schoolData, id: editingSchool.id }
+          : school
+      ));
+      
+      setEditingSchool(null);
+      setShowForm(false);
+      setLoading(false);
+      
+      setSuccessMessage('Escola atualizada com sucesso!');
+      setShowSuccessModal(true);
+    } catch (error) {
+      console.error('❌ Erro ao atualizar escola:', error);
+      setErrorMessage('Erro ao atualizar escola: ' + error.message);
+      setShowErrorModal(true);
+      setLoading(false);
+    }
   };
 
   const handleDeleteSchool = async (schoolId) => {
@@ -209,13 +262,16 @@ export default function SchoolManagement() {
         console.log('👥 Removendo escola de', linkedUsers.length, 'usuários...');
         
         for (const user of linkedUsers) {
+          // AMBAS estruturas: usuarios/{userId}/escolas E escolas/{escolaId}/usuarios
           const userEscolasRef = ref(managementDB, `usuarios/${user.uid}/escolas/${schoolToDelete}`);
           await remove(userEscolasRef);
-          console.log('✅ Escola removida do usuário:', user.email);
+          console.log('✅ Escola removida do usuário (usuarios/{uid}/escolas):', user.email);
+          
+          // Estrutura já é removida ao deletar a escola inteira em escolas/{escolaId}
         }
       }
       
-      // 2. Excluir a escola do banco
+      // 2. Excluir a escola do banco (remove TUDO, incluindo usuarios)
       console.log('🗑️ Excluindo escola do banco...');
       const escolaRef = ref(managementDB, `escolas/${schoolToDelete}`);
       await remove(escolaRef);

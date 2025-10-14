@@ -147,7 +147,7 @@ export default function UserManagement() {
     try {
       console.log('📝 Atualizando usuário:', userData.uid);
       
-      // Atualizar no banco de gerenciamento
+      // Atualizar no banco de gerenciamento (usuarios/{uid})
       const usuarioRef = ref(managementDB, `usuarios/${userData.uid}`);
       await update(usuarioRef, {
         nome: userData.nome,
@@ -157,7 +157,26 @@ export default function UserManagement() {
         status: userData.status || 'ativo'
       });
       
-      console.log('✅ Usuário atualizado com sucesso!');
+      console.log('✅ Usuário atualizado em usuarios/{uid}');
+      
+      // TAMBÉM atualizar em escolas/{escolaId}/usuarios/{uid}
+      if (userData.escolas && Object.keys(userData.escolas).length > 0) {
+        console.log('🔄 Sincronizando usuário nas escolas vinculadas...');
+        
+        for (const [escolaId, escolaData] of Object.entries(userData.escolas)) {
+          const escolaUsuarioRef = ref(managementDB, `escolas/${escolaId}/usuarios/${userData.uid}`);
+          await update(escolaUsuarioRef, {
+            email: userData.email,
+            role: escolaData.role || 'coordenadora',
+            ativo: escolaData.ativo !== false,
+            dataVinculo: escolaData.dataVinculo || new Date().toISOString(),
+            permissoes: escolaData.permissoes || ['*']
+          });
+          console.log(`✅ Usuário sincronizado na escola: ${escolaId}`);
+        }
+      }
+      
+      console.log('✅ Usuário atualizado com sucesso em ambas estruturas!');
       
       // Atualizar lista local
       setUsers(users.map(user => 

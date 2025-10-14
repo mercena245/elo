@@ -14,13 +14,14 @@ import {
   Button,
   Alert
 } from '@mui/material';
-import { db, ref, get, set, auth, onAuthStateChanged } from '../../firebase';
-import { storage } from '../../firebase-storage';
+import { auth, onAuthStateChanged } from '../../firebase';
+import { schoolStorage } from '../../firebase-schoolStorage';
 import { auditService, LOG_ACTIONS } from '../../services/auditService';
 import { financeiroService } from '../../services/financeiroService';
 
 // Importar os componentes criados
 import {
+import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
   AlunosHeader,
   AlunosFiltros,
   AlunosList,
@@ -50,6 +51,9 @@ const ConfirmDialog = ({ open, onClose, onConfirm, title, message }) => (
 );
 
 const Alunos = () => {
+  // Hook para acessar banco da escola
+  const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, storage: schoolStorage } = useSchoolDatabase();
+
   // Estados principais
   const [alunos, setAlunos] = useState([]);
   const [turmas, setTurmas] = useState({});
@@ -192,7 +196,7 @@ const Alunos = () => {
       }
     });
     return () => unsubscribe();
-  }, []);
+  }, [isReady]);
 
   // Verificação de permissões
   if (!roleChecked) {

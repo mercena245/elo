@@ -40,7 +40,8 @@ import {
   Assessment as AssessmentIcon
 } from '@mui/icons-material';
 import { ref, get, update } from 'firebase/database';
-import { db } from '../../../../firebase';
+import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
+;
 
 const EditorPlanoAula = ({
   open,
@@ -186,6 +187,8 @@ const EditorPlanoAula = ({
 
   // Buscar informações do período letivo quando turma é selecionada
   useEffect(() => {
+    if (!isReady) return;
+    
     const buscarPeriodoLetivo = async () => {
       if (formData.turmaId && turmas[formData.turmaId]) {
         const turma = turmas[formData.turmaId];
@@ -225,6 +228,9 @@ const EditorPlanoAula = ({
 
   // Funções para obter nomes para exibição
   const getNomeTurma = () => {
+  // Hook para acessar banco da escola
+  const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, storage: schoolStorage } = useSchoolDatabase();
+
     if (!formData.turmaId || !turmas) return '';
     const turma = turmas[formData.turmaId];
     if (!turma) return formData.turmaId;
@@ -390,7 +396,7 @@ const EditorPlanoAula = ({
       dataAprovacao: new Date().toISOString(),
       observacoesAprovacao: ''
     };
-    await update(ref(db, `planos-aula/${plano.id}`), updateData);
+    await updateData('planos-aula/${plano.id}', updateData);
     setFormData(prev => ({ ...prev, ...updateData }));
     if (onClose) onClose();
   };
@@ -403,7 +409,7 @@ const EditorPlanoAula = ({
       dataAprovacao: new Date().toISOString(),
       observacoesAprovacao: observacoes
     };
-    await update(ref(db, `planos-aula/${plano.id}`), updateData);
+    await updateData('planos-aula/${plano.id}', updateData);
     setFormData(prev => ({ ...prev, ...updateData }));
     if (onClose) onClose();
   };
@@ -425,8 +431,6 @@ const EditorPlanoAula = ({
       default: return 'Desconhecido';
     }
   };
-
-
 
   return (
     <Dialog 

@@ -33,13 +33,17 @@ import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs from 'dayjs';
-import { db, ref, get, set, auth, onAuthStateChanged } from '../../firebase';
-import { storage } from '../../firebase-storage';
-import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
+import { auth, onAuthStateChanged } from '../../firebase';
+import { schoolStorage } from '../../firebase-schoolStorage';
+import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from "firebase/schoolStorage";
 import { auditService, LOG_ACTIONS } from '../../services/auditService';
 import { financeiroService } from '../../services/financeiroService';
+import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
 
 const Alunos = () => {
+  // Hook para acessar banco da escola
+  const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, storage: schoolStorage } = useSchoolDatabase();
+
   // Marcar/desmarcar anexo para exclusão (por nome)
   const handleMarcarParaExcluir = (nome) => {
     setAnexosParaExcluir(prev =>
@@ -91,14 +95,14 @@ const Alunos = () => {
         ? `id_aluno_${editForm.nome.replace(/\s/g, '').toLowerCase()}_${editForm.matricula}`
         : editAluno.id;
   const matricula = editForm.matricula || (editAluno && editAluno.matricula) || '';
-  const fileRef = storageRef(storage, `anexos_alunos/${alunoId}_${matricula}/${anexo.name}`);
+  const fileRef = storageRef(schoolStorage, `anexos_alunos/${alunoId}_${matricula}/${anexo.name}`);
       await deleteObject(fileRef);
       // Remove do registro do aluno
       const novosAnexos = editForm.anexos.filter((_, i) => i !== idx);
       const dadosAtualizados = { ...editForm, anexos: novosAnexos };
       if (isNew) {
         const novoId = alunoId;
-        await set(ref(db, `alunos/${novoId}`), dadosAtualizados);
+        await setData('alunos/${novoId}', dadosAtualizados);
         // Log da remoção de anexo
         await auditService.logAction(
           LOG_ACTIONS.STUDENT_FILE_DELETE,
@@ -110,7 +114,7 @@ const Alunos = () => {
           }
         );
       } else if (editAluno && editAluno.id) {
-        await set(ref(db, `alunos/${editAluno.id}`), dadosAtualizados);
+        await setData('alunos/${editAluno.id}', dadosAtualizados);
         // Log da remoção de anexo
         await auditService.logAction(
           LOG_ACTIONS.STUDENT_FILE_DELETE,
@@ -170,7 +174,7 @@ const Alunos = () => {
                 }
               };
               
-              await set(ref(db, `alunos/${aluno.id}`), alunoAtualizado);
+              await setData('alunos/${aluno.id}', alunoAtualizado);
               alunosAtualizados++;
               
               // Log da atualização de status
@@ -405,7 +409,7 @@ const Alunos = () => {
       }
       
       if (editAluno && editAluno.id) {
-        await set(ref(db, `alunos/${editAluno.id}`), dadosInativacao);
+        await setData('alunos/${editAluno.id}', dadosInativacao);
         
         // Log da inativação do aluno
         await auditService.logAction(
@@ -451,13 +455,13 @@ const Alunos = () => {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [isReady]);
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const alunosSnap = await get(ref(db, 'alunos'));
-      const turmasSnap = await get(ref(db, 'turmas'));
+      const alunosSnap = await getData('alunos');
+      const turmasSnap = await getData('turmas');
       let alunosArr = [];
       let turmasObj = {};
       
@@ -484,7 +488,7 @@ const Alunos = () => {
           if (atualizados > 0) {
             console.log(`✅ ${atualizados} alunos tiveram status atualizado. Recarregando dados...`);
             // Recarregar dados apenas se houve atualizações
-            const alunosSnapNovo = await get(ref(db, 'alunos'));
+            const alunosSnapNovo = await getData('alunos');
             if (alunosSnapNovo.exists()) {
               const alunosDataNovo = alunosSnapNovo.val();
               const alunosArrNovo = Object.entries(alunosDataNovo).map(([id, aluno]) => ({ ...aluno, id }));
@@ -604,7 +608,7 @@ const Alunos = () => {
         })
       };
       
-      await set(ref(db, `alunos/${editAluno.id}`), alunoAtualizado);
+      await setData('alunos/${editAluno.id}', alunoAtualizado);
       
       // Log da ativação
       await auditService.logAction(
@@ -714,7 +718,6 @@ const Alunos = () => {
     }
   };
 
-
   // Validação por passo
   const isStep1Valid = () => (
     editForm.nome?.trim() &&
@@ -761,7 +764,7 @@ const Alunos = () => {
           const nomeAnexo = anexo.name.trim().toLowerCase();
           if (anexosParaExcluir.map(n => n.trim().toLowerCase()).includes(nomeAnexo)) {
             const matricula = editForm.matricula || (editAluno && editAluno.matricula) || '';
-            const fileRef = storageRef(storage, `anexos_alunos/${alunoId}_${matricula}/${anexo.name}`);
+            const fileRef = storageRef(schoolStorage, `anexos_alunos/${alunoId}_${matricula}/${anexo.name}`);
             try {
               await deleteObject(fileRef);
             } catch (err) {
@@ -779,7 +782,7 @@ const Alunos = () => {
       if (anexosSelecionados.length > 0) {
         for (const file of anexosSelecionados) {
           const matricula = editForm.matricula || (editAluno && editAluno.matricula) || '';
-          const fileRef = storageRef(storage, `anexos_alunos/${alunoId}_${matricula}/${file.name}`);
+          const fileRef = storageRef(schoolStorage, `anexos_alunos/${alunoId}_${matricula}/${file.name}`);
           await uploadBytes(fileRef, file);
           const url = await getDownloadURL(fileRef);
           anexosUrls.push({ name: file.name, url });
@@ -800,7 +803,7 @@ const Alunos = () => {
           status: statusInicial
         };
         
-        await set(ref(db, `alunos/${novoId}`), dadosComStatus);
+        await setData('alunos/${novoId}', dadosComStatus);
         
         // Gerar títulos financeiros automaticamente
         if (dadosParaSalvar.financeiro?.mensalidadeValor > 0) {
@@ -885,7 +888,7 @@ const Alunos = () => {
         if (editAluno.financeiro?.status !== dadosParaSalvar.financeiro?.status) mudancas.statusFinanceiro = { de: editAluno.financeiro?.status, para: dadosParaSalvar.financeiro?.status };
         if (editAluno.financeiro?.diaVencimento !== dadosParaSalvar.financeiro?.diaVencimento) mudancas.diaVencimento = { de: editAluno.financeiro?.diaVencimento, para: dadosParaSalvar.financeiro?.diaVencimento };
         
-        await set(ref(db, `alunos/${editAluno.id}`), dadosParaSalvar);
+        await setData('alunos/${editAluno.id}', dadosParaSalvar);
         
         // Log da atualização do aluno
         if (Object.keys(mudancas).length > 0) {

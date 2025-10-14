@@ -46,8 +46,9 @@ import {
   Medication,
   Person
 } from '@mui/icons-material';
-import { db, ref, get, push, set, remove } from '../../../firebase';
-import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
+;
+import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "firebase/schoolStorage";
+import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
 
 const AgendaMedicaSection = ({ userRole, userData }) => {
   const [medicamentos, setMedicamentos] = useState([]);
@@ -407,7 +408,7 @@ const AgendaMedicaSection = ({ userRole, userData }) => {
       setUploadingReceita(true);
       const storage = getStorage();
       const timestamp = new Date().getTime();
-      const receitaRef = storageRef(storage, `receitas/temp_${timestamp}_${file.name}`);
+      const receitaRef = storageRef(schoolStorage, `receitas/temp_${timestamp}_${file.name}`);
       
       await uploadBytes(receitaRef, file);
       const downloadURL = await getDownloadURL(receitaRef);
@@ -450,6 +451,9 @@ const AgendaMedicaSection = ({ userRole, userData }) => {
   };
 
   const fecharDetalhes = () => {
+  // Hook para acessar banco da escola
+  const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, storage: schoolStorage } = useSchoolDatabase();
+
     setModalDetalhes(false);
     setMedicamentoDetalhes(null);
   };

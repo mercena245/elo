@@ -28,6 +28,7 @@ import {
   Checkbox
 } from '@mui/material';
 import {
+import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
   Print,
   FilterList,
   Download,
@@ -41,9 +42,12 @@ import {
   Tune,
   Description
 } from '@mui/icons-material';
-import { db, ref, get } from '../../../firebase';
+;
 
 const Impressoes = () => {
+  // Hook para acessar banco da escola
+  const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, storage: schoolStorage } = useSchoolDatabase();
+
   const [loading, setLoading] = useState(true);
   const [tabValue, setTabValue] = useState(0);
   const [gerandoRelatorio, setGerandoRelatorio] = useState(false);
@@ -134,16 +138,16 @@ const Impressoes = () => {
 
   useEffect(() => {
     carregarDados();
-  }, []);
+  }, [isReady]);
 
   const carregarDados = async () => {
     setLoading(true);
     try {
       const [turmasSnap, disciplinasSnap, usuariosSnap, alunosSnap] = await Promise.all([
-        get(ref(db, 'turmas')),
-        get(ref(db, 'disciplinas')),
-        get(ref(db, 'usuarios')),
-        get(ref(db, 'alunos'))
+        getData('turmas'),
+        getData('disciplinas'),
+        getData('usuarios'),
+        getData('alunos')
       ]);
 
       // Carregar turmas
@@ -299,7 +303,7 @@ const Impressoes = () => {
     try {
       const dados = { alunos: [], notas: [], frequencia: [], comportamentos: [] };
 
-      const alunosSnap = await get(ref(db, 'alunos'));
+      const alunosSnap = await getData('alunos');
       if (alunosSnap.exists()) {
         Object.entries(alunosSnap.val()).forEach(([id, data]) => {
           const incluirAluno = filtrosPersonalizados.turmaIds.length === 0 || 
@@ -312,7 +316,7 @@ const Impressoes = () => {
       }
 
       if (filtrosPersonalizados.incluirNotas) {
-        const notasSnap = await get(ref(db, 'notas'));
+        const notasSnap = await getData('notas');
         if (notasSnap.exists()) {
           Object.entries(notasSnap.val()).forEach(([id, data]) => {
             const incluirNota = (filtrosPersonalizados.turmaIds.length === 0 || filtrosPersonalizados.turmaIds.includes(data.turmaId)) &&
@@ -339,7 +343,7 @@ const Impressoes = () => {
     try {
       const dados = { alunos: [], notas: [], frequencia: [], comportamentos: [] };
 
-      const alunosSnap = await get(ref(db, 'alunos'));
+      const alunosSnap = await getData('alunos');
       if (alunosSnap.exists()) {
         Object.entries(alunosSnap.val()).forEach(([id, data]) => {
           dados.alunos.push({ id, ...data });
@@ -347,7 +351,7 @@ const Impressoes = () => {
       }
 
       if (config.incluirNotas) {
-        const notasSnap = await get(ref(db, 'notas'));
+        const notasSnap = await getData('notas');
         if (notasSnap.exists()) {
           Object.entries(notasSnap.val()).forEach(([id, data]) => {
             dados.notas.push({ id, ...data });
@@ -356,7 +360,7 @@ const Impressoes = () => {
       }
 
       if (config.incluirFrequencia) {
-        const frequenciaSnap = await get(ref(db, 'frequencia'));
+        const frequenciaSnap = await getData('frequencia');
         if (frequenciaSnap.exists()) {
           Object.entries(frequenciaSnap.val()).forEach(([id, data]) => {
             dados.frequencia.push({ id, ...data });

@@ -45,8 +45,9 @@ import {
   TrendingUp,
   TrendingDown
 } from '@mui/icons-material';
-import { db, ref, get, push, set, remove } from '../../../firebase';
-import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
+;
+import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "firebase/schoolStorage";
+import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
 
 const ComportamentosSection = ({ userRole, userData }) => {
   const [comportamentos, setComportamentos] = useState([]);
@@ -231,6 +232,9 @@ const ComportamentosSection = ({ userRole, userData }) => {
   };
 
   const calcularEstatisticas = () => {
+  // Hook para acessar banco da escola
+  const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, storage: schoolStorage } = useSchoolDatabase();
+
     const stats = {};
     
     alunos.forEach(aluno => {

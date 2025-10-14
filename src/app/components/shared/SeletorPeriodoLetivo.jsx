@@ -12,7 +12,8 @@ import {
   CircularProgress
 } from '@mui/material';
 import { School as SchoolIcon } from '@mui/icons-material';
-import { db, ref, get } from '../../../firebase';
+import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
+;
 
 const SeletorPeriodoLetivo = ({ 
   value = '', 
@@ -30,13 +31,13 @@ const SeletorPeriodoLetivo = ({
 
   useEffect(() => {
     carregarPeriodos();
-  }, []);
+  }, [isReady]);
 
   const carregarPeriodos = async () => {
     setLoading(true);
     setError('');
     try {
-      const snap = await get(ref(db, "Escola/Periodo"));
+      const snap = await getData('Escola/Periodo');
       if (snap.exists()) {
         const data = snap.val();
         const lista = Object.entries(data)

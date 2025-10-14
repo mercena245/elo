@@ -16,7 +16,8 @@ import {
 } from '@mui/material';
 import { useAuthUser } from '../../../hooks/useAuthUser';
 import { get, ref } from 'firebase/database';
-import { db } from '../../../firebase';
+import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
+;
 
 export default function SeletorTurmaAluno({ 
   onTurmaChange = () => {}, 
@@ -36,6 +37,8 @@ export default function SeletorTurmaAluno({
   const [minhasTurmas, setMinhasTurmas] = useState([]); // Turmas vinculadas ao professor
 
   useEffect(() => {
+    if (!isReady) return;
+    
     const carregarDados = async () => {
       if (!user) return;
 

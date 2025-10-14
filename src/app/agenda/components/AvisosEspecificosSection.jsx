@@ -35,6 +35,7 @@ import {
   Fab
 } from '@mui/material';
 import {
+import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
   Announcement,
   Add,
   Person,
@@ -52,7 +53,7 @@ import {
   Delete,
   Send
 } from '@mui/icons-material';
-import { db, ref, get, push, set, remove } from '../../../firebase';
+;
 
 const AvisosEspecificosSection = ({ userRole, userData }) => {
   const [avisos, setAvisos] = useState([]);

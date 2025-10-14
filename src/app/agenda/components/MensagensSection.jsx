@@ -42,8 +42,9 @@ import {
   School,
   Circle
 } from '@mui/icons-material';
-import { db, ref, get, push, set, storage, storageRef, uploadBytes, getDownloadURL, auth } from '../../../firebase';
+import { storageRef, uploadBytes, getDownloadURL, auth } from '../../../firebase';
 import { auditService, LOG_ACTIONS } from '../../../services/auditService';
+import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
 
 const MensagensSection = ({ userRole, userData }) => {
   const [conversas, setConversas] = useState([]);
@@ -220,6 +221,9 @@ const MensagensSection = ({ userRole, userData }) => {
   };
 
   const fecharDialogNovaMensagem = () => {
+  // Hook para acessar banco da escola
+  const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, storage: schoolStorage } = useSchoolDatabase();
+
     // Log do cancelamento se havia conteúdo
     if (novaMensagem.destinatario || novaMensagem.assunto || novaMensagem.conteudo || (novaMensagem.anexos && novaMensagem.anexos.length > 0)) {
       auditService.logAction(
@@ -259,7 +263,7 @@ const MensagensSection = ({ userRole, userData }) => {
     }
 
     try {
-      console.log('Storage inicializado:', storage);
+      console.log('Storage inicializado:', schoolStorage);
       
       const anexosUpload = [];
 
@@ -275,7 +279,7 @@ const MensagensSection = ({ userRole, userData }) => {
           caminho: fileName
         });
         
-        const fileRef = storageRef(storage, fileName);
+        const fileRef = storageRef(schoolStorage, fileName);
         console.log('Referência do Storage criada:', fileRef);
 
         // Upload do arquivo

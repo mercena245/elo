@@ -62,12 +62,16 @@ import {
   AccessTime,
   Close
 } from '@mui/icons-material';
-import { db, ref, get, push, set, storage, storageRef, uploadBytes, getDownloadURL } from '../../../firebase';
+import { storageRef, uploadBytes, getDownloadURL } from '../../../firebase';
 import { auditService, LOG_ACTIONS } from '../../../services/auditService';
+import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
 
 const DiarioSection = ({ userRole, userData }) => {
   // Funções para detectar tipo de turma baseado no turnoId
   const isTurmaIntegral = () => {
+  // Hook para acessar banco da escola
+  const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, storage: schoolStorage } = useSchoolDatabase();
+
     if (!novaEntrada.turma || !turmas.length) return false;
     const turma = turmas.find(t => t.id === novaEntrada.turma);
     return turma?.turnoId === 'Integral';
@@ -447,8 +451,8 @@ const DiarioSection = ({ userRole, userData }) => {
       const timestamp = Date.now();
       const fileName = `homework_${timestamp}_${file.name}`;
       
-      // Criar referência do arquivo no storage
-      const fileRef = storageRef(storage, `homework/${fileName}`);
+      // Criar referência do arquivo no schoolStorage
+      const fileRef = storageRef(schoolStorage, `homework/${fileName}`);
       
       // Fazer upload do arquivo
       const uploadResult = await uploadBytes(fileRef, file);

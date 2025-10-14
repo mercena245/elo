@@ -37,8 +37,9 @@ import {
   MenuBook,
   Grade
 } from '@mui/icons-material';
-import { db, ref, get, set } from '../../../firebase';
+;
 import { logAction, LOG_ACTIONS } from '../../../services/auditService';
+import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
 
 const LancamentoNotas = ({ professorId = null }) => {
   const [loading, setLoading] = useState(true);
@@ -70,7 +71,7 @@ const LancamentoNotas = ({ professorId = null }) => {
 
   useEffect(() => {
     carregarDados();
-  }, []);
+  }, [isReady]);
 
   useEffect(() => {
     if (filtros.turmaId && turmas.length > 0) {
@@ -88,9 +89,9 @@ const LancamentoNotas = ({ professorId = null }) => {
     setLoading(true);
     try {
       const [turmasSnap, disciplinasSnap, usuariosSnap] = await Promise.all([
-        get(ref(db, 'turmas')),
-        get(ref(db, 'disciplinas')),
-        get(ref(db, 'usuarios'))
+        getData('turmas'),
+        getData('disciplinas'),
+        getData('usuarios')
       ]);
 
       // Carregar turmas - aplicar filtro para professoras
@@ -148,7 +149,7 @@ const LancamentoNotas = ({ professorId = null }) => {
 
   const carregarAlunos = async () => {
     try {
-      const alunosSnap = await get(ref(db, 'alunos'));
+      const alunosSnap = await getData('alunos');
       const alunosData = [];
       
       if (alunosSnap.exists()) {
@@ -186,7 +187,7 @@ const LancamentoNotas = ({ professorId = null }) => {
 
   const carregarNotas = async () => {
     try {
-      const notasSnap = await get(ref(db, 'notas'));
+      const notasSnap = await getData('notas');
       const notasData = [];
       
       if (notasSnap.exists()) {
@@ -258,7 +259,7 @@ const LancamentoNotas = ({ professorId = null }) => {
           updatedAt: new Date().toISOString()
         };
 
-        promises.push(set(ref(db, `notas/${notaId}`), notaData));
+        promises.push(setData('notas/${notaId}', notaData));
         
         // Preparar log para cada nota
         const logData = {
@@ -414,7 +415,6 @@ const LancamentoNotas = ({ professorId = null }) => {
                 </Select>
               </FormControl>
             </Grid>
-
 
           </Grid>
         </CardContent>

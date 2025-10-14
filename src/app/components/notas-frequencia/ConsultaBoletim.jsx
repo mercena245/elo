@@ -34,6 +34,7 @@ import {
   AccordionDetails
 } from '@mui/material';
 import { 
+import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
   Assessment,
   Print,
   Download,
@@ -48,7 +49,7 @@ import {
   EventBusy,
   CheckCircle
 } from '@mui/icons-material';
-import { db, ref, get } from '../../../firebase';
+;
 
 const ConsultaBoletim = ({ alunoId = null, turmaId = null, professorId = null }) => {
   const [loading, setLoading] = useState(true);
@@ -73,7 +74,7 @@ const ConsultaBoletim = ({ alunoId = null, turmaId = null, professorId = null })
 
   useEffect(() => {
     carregarDados();
-  }, []);
+  }, [isReady]);
 
   useEffect(() => {
     if (filtros.turmaId && turmas.length > 0) {
@@ -91,9 +92,9 @@ const ConsultaBoletim = ({ alunoId = null, turmaId = null, professorId = null })
     setLoading(true);
     try {
       const [turmasSnap, disciplinasSnap, usuariosSnap] = await Promise.all([
-        get(ref(db, 'turmas')),
-        get(ref(db, 'disciplinas')),
-        get(ref(db, 'usuarios'))
+        getData('turmas'),
+        getData('disciplinas'),
+        getData('usuarios')
       ]);
 
       // Carregar turmas - aplicar filtro para professoras
@@ -154,7 +155,7 @@ const ConsultaBoletim = ({ alunoId = null, turmaId = null, professorId = null })
 
   const carregarAlunos = async () => {
     try {
-      const alunosSnap = await get(ref(db, 'alunos'));
+      const alunosSnap = await getData('alunos');
       const alunosData = [];
       
       if (alunosSnap.exists()) {
@@ -193,8 +194,8 @@ const ConsultaBoletim = ({ alunoId = null, turmaId = null, professorId = null })
   const carregarBoletim = async () => {
     try {
       const [notasSnap, frequenciaSnap] = await Promise.all([
-        get(ref(db, 'notas')),
-        get(ref(db, 'frequencia'))
+        getData('notas'),
+        getData('frequencia')
       ]);
 
       // Carregar notas
@@ -343,6 +344,9 @@ const ConsultaBoletim = ({ alunoId = null, turmaId = null, professorId = null })
   };
 
   const handleImprimirBoletim = () => {
+  // Hook para acessar banco da escola
+  const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, storage: schoolStorage } = useSchoolDatabase();
+
     const printContent = `
       <html>
         <head>

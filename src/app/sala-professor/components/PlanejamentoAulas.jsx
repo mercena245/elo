@@ -43,7 +43,7 @@ import {
   Visibility as VisibilityIcon
 } from '@mui/icons-material';
 import { ref, onValue, push, update, remove, get } from 'firebase/database';
-import { db } from '../../../firebase';
+;
 import { useAuthUser } from '../../../hooks/useAuthUser';
 import { auditService } from '../../../services/auditService';
 
@@ -52,8 +52,12 @@ import EditorPlanoAula from './shared/EditorPlanoAula';
 import CalendarioGrade from '../../../app/sala-professor/components/shared/CalendarioGrade';
 import SeletorTurmaAluno from './SeletorTurmaAluno';
 import SeletorPeriodoLetivo from '../../components/shared/SeletorPeriodoLetivo';
+import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
 
 const PlanejamentoAulas = () => {
+  // Hook para acessar banco da escola
+  const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, storage: schoolStorage } = useSchoolDatabase();
+
   const [novoPlanoData, setNovoPlanoData] = useState(null);
   const { user, userRole } = useAuthUser();
   const [loading, setLoading] = useState(true);
@@ -338,7 +342,7 @@ const PlanejamentoAulas = () => {
       };
       if (planoId) {
         // Atualiza plano existente
-        await update(ref(db, `planos-aula/${planoId}`), planoData);
+        await updateData('planos-aula/${planoId}', planoData);
         await auditService.logAction(
           'plano_aula_update',
           user.uid,
@@ -351,7 +355,7 @@ const PlanejamentoAulas = () => {
         );
       } else {
         // Cria novo plano
-        await push(ref(db, 'planos-aula'), planoData);
+        await pushData('planos-aula', planoData);
         await auditService.logAction(
           'plano_aula_create',
           user.uid,
@@ -373,7 +377,7 @@ const PlanejamentoAulas = () => {
   const excluirPlano = (planoId, titulo) => {
     const handleConfirm = async () => {
       try {
-        await remove(ref(db, `planos-aula/${planoId}`));
+        await removeData('planos-aula/${planoId}');
         await auditService.logAction(
           'plano_aula_delete',
           user.uid,
@@ -522,7 +526,6 @@ const PlanejamentoAulas = () => {
             </CardContent>
           </Card>
         </Grid>
-
 
         {/* Quadro de Planos Pendentes */}
         <Grid item xs={12} md={8}>

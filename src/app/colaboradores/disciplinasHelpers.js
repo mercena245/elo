@@ -1,9 +1,12 @@
 // Funções auxiliares para disciplinas na tela de colaboradores
 
-import { ref, get, db } from '../../firebase';
+;
 
 export async function fetchDisciplinas() {
-  const snap = await get(ref(db, 'disciplinas'));
+  // Hook para acessar banco da escola
+  const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, storage: schoolStorage } = useSchoolDatabase();
+
+  const snap = await getData('disciplinas');
   if (snap.exists()) {
     const data = snap.val();
     return Object.entries(data).map(([id, val]) => ({ id, ...val }));

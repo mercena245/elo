@@ -14,8 +14,9 @@ import {
   Alert,
   Divider
 } from '@mui/material';
-import { db, ref, get, set, remove } from '../../../firebase';
+;
 import { logAction, LOG_ACTIONS } from '../../../services/auditService';
+import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
 
 const ModalHorario = ({ 
   open, 
@@ -62,7 +63,7 @@ const ModalHorario = ({
   const carregarDados = async () => {
     try {
       // Carregar disciplinas
-      const disciplinasSnap = await get(ref(db, 'disciplinas'));
+      const disciplinasSnap = await getData('disciplinas');
       if (disciplinasSnap.exists()) {
         const disciplinasData = disciplinasSnap.val();
         const disciplinasArray = Object.entries(disciplinasData).map(([id, disc]) => ({ id, ...disc }));
@@ -70,7 +71,7 @@ const ModalHorario = ({
       }
 
       // Carregar professores
-      const usuariosSnap = await get(ref(db, 'usuarios'));
+      const usuariosSnap = await getData('usuarios');
       if (usuariosSnap.exists()) {
         const usuariosData = usuariosSnap.val();
         const professoresArray = Object.entries(usuariosData)
@@ -174,7 +175,7 @@ const ModalHorario = ({
       };
 
       // Salvar no caminho específico do período letivo
-      await set(ref(db, `GradeHoraria/${periodoLetivoId}/${turmaId}/${horarioId}`), horarioData);
+      await setData('GradeHoraria/${periodoLetivoId}/${turmaId}/${horarioId}', horarioData);
       
       // Buscar nomes para o log
       const disciplinaNome = disciplinas.find(d => d.id === form.disciplinaId)?.nome || 'Disciplina não encontrada';
@@ -237,7 +238,7 @@ const ModalHorario = ({
       const professorNome = professores.find(p => p.id === horarioExistente.professorId)?.nome || 'Professor não encontrado';
       const diaNome = diasSemanaLabels[diaSemana] || `Dia ${diaSemana}`;
       
-      await remove(ref(db, `GradeHoraria/${periodoLetivoId}/${turmaId}/${horarioExistente.id}`));
+      await removeData('GradeHoraria/${periodoLetivoId}/${turmaId}/${horarioExistente.id}');
       
       // Log da exclusão
       await logAction({

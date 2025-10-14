@@ -56,8 +56,9 @@ import {
   Security,
   Download
 } from '@mui/icons-material';
-import { db, ref, get, query, orderByChild, limitToLast, startAt, endAt } from '../../firebase';
+import { query, orderByChild, limitToLast, startAt, endAt } from '../../firebase';
 import { logAction } from '../../services/auditService';
+import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
 
 const LogsViewer = ({ open, onClose }) => {
   const [logs, setLogs] = useState([]);
@@ -277,6 +278,9 @@ const LogsViewer = ({ open, onClose }) => {
   };
 
   const applyFilters = () => {
+  // Hook para acessar banco da escola
+  const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, storage: schoolStorage } = useSchoolDatabase();
+
     let filtered = logs;
 
     // Filtro por data

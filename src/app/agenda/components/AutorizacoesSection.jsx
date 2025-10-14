@@ -38,6 +38,7 @@ import {
   StepContent
 } from '@mui/material';
 import {
+import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
   Assignment,
   Add,
   Person,
@@ -58,7 +59,7 @@ import {
   Event,
   Restaurant
 } from '@mui/icons-material';
-import { db, ref, get, push, set, update } from '../../../firebase';
+;
 
 const AutorizacoesSection = ({ userRole, userData }) => {
   const [autorizacoes, setAutorizacoes] = useState([]);

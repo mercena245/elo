@@ -48,11 +48,15 @@ import {
   CalendarMonth as CalendarMonthIcon
 } from '@mui/icons-material';
 import { ref, onValue, push, update, remove } from 'firebase/database';
-import { db } from '../../../firebase';
+;
 import { useAuthUser } from '../../../hooks/useAuthUser';
 import { auditService } from '../../../services/auditService';
+import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
 
 const CronogramaAcademico = () => {
+  // Hook para acessar banco da escola
+  const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, storage: schoolStorage } = useSchoolDatabase();
+
   const { user, userRole } = useAuthUser();
   const [loading, setLoading] = useState(true);
   const [eventos, setEventos] = useState({});
@@ -240,7 +244,7 @@ const CronogramaAcademico = () => {
       };
 
       if (eventoEditando) {
-        await update(ref(db, `cronograma-academico/${eventoEditando.id}`), eventoData);
+        await updateData('cronograma-academico/${eventoEditando.id}', eventoData);
         await auditService.logAction(
           'cronograma_evento_update',
           user.uid,
@@ -250,7 +254,7 @@ const CronogramaAcademico = () => {
           }
         );
       } else {
-        await push(ref(db, 'cronograma-academico'), eventoData);
+        await pushData('cronograma-academico', eventoData);
         await auditService.logAction(
           'cronograma_evento_create',
           user.uid,
@@ -274,7 +278,7 @@ const CronogramaAcademico = () => {
     if (!confirm(`Deseja excluir o evento "${titulo}"?`)) return;
 
     try {
-      await remove(ref(db, `cronograma-academico/${eventoId}`));
+      await removeData('cronograma-academico/${eventoId}');
       await auditService.logAction(
         'cronograma_evento_delete',
         user.uid,

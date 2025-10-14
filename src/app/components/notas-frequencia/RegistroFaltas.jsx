@@ -39,8 +39,9 @@ import {
   Check,
   Close
 } from '@mui/icons-material';
-import { db, ref, get, set } from '../../../firebase';
+;
 import { logAction, LOG_ACTIONS } from '../../../services/auditService';
+import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
 
 const RegistroFaltas = ({ professorId = null }) => {
   const [loading, setLoading] = useState(true);
@@ -63,7 +64,7 @@ const RegistroFaltas = ({ professorId = null }) => {
 
   useEffect(() => {
     carregarDados();
-  }, []);
+  }, [isReady]);
 
   useEffect(() => {
     if (filtros.turmaId && turmas.length > 0) {
@@ -81,9 +82,9 @@ const RegistroFaltas = ({ professorId = null }) => {
     setLoading(true);
     try {
       const [turmasSnap, disciplinasSnap, usuariosSnap] = await Promise.all([
-        get(ref(db, 'turmas')),
-        get(ref(db, 'disciplinas')),
-        get(ref(db, 'usuarios'))
+        getData('turmas'),
+        getData('disciplinas'),
+        getData('usuarios')
       ]);
 
       // Carregar turmas - aplicar filtro para professoras
@@ -141,7 +142,7 @@ const RegistroFaltas = ({ professorId = null }) => {
 
   const carregarAlunos = async () => {
     try {
-      const alunosSnap = await get(ref(db, 'alunos'));
+      const alunosSnap = await getData('alunos');
       const alunosData = [];
       
       if (alunosSnap.exists()) {
@@ -179,7 +180,7 @@ const RegistroFaltas = ({ professorId = null }) => {
 
   const carregarFaltas = async () => {
     try {
-      const faltasSnap = await get(ref(db, 'frequencia'));
+      const faltasSnap = await getData('frequencia');
       const faltasData = [];
       const presencasIniciais = {};
       
@@ -219,6 +220,9 @@ const RegistroFaltas = ({ professorId = null }) => {
   };
 
   const handleMarcarTodosPresentes = () => {
+  // Hook para acessar banco da escola
+  const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, storage: schoolStorage } = useSchoolDatabase();
+
     const novasPresencas = {};
     alunos.forEach(aluno => {
       novasPresencas[aluno.id] = true;
@@ -264,7 +268,7 @@ const RegistroFaltas = ({ professorId = null }) => {
           updatedAt: new Date().toISOString()
         };
 
-        promises.push(set(ref(db, `frequencia/${frequenciaId}`), frequenciaData));
+        promises.push(setData('frequencia/${frequenciaId}', frequenciaData));
         
         // Log apenas se houve mudança no status de presença
         const presencaAnterior = faltaExistente ? faltaExistente.presente : null;

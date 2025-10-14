@@ -46,14 +46,17 @@ import {
   Send as SendIcon
 } from '@mui/icons-material';
 import { ref, onValue, push, update, remove } from 'firebase/database';
-import { db } from '../../../firebase';
+;
 import { useAuthUser } from '../../../hooks/useAuthUser';
 import { auditService } from '../../../services/auditService';
 import SeletorTurmaAluno from './SeletorTurmaAluno';
 import geminiService from '../../../services/geminiService';
-
+import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
 
 const RelatoriosPedagogicos = () => {
+  // Hook para acessar banco da escola
+  const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, storage: schoolStorage } = useSchoolDatabase();
+
   // SEMPRE declare todos os hooks no topo!
   const { user, userRole } = useAuthUser();
   const [loading, setLoading] = useState(true);
@@ -306,7 +309,7 @@ const RelatoriosPedagogicos = () => {
         atualizadoEm: new Date().toISOString()
       };
 
-      await push(ref(db, 'relatorios-pedagogicos'), relatorioData);
+      await pushData('relatorios-pedagogicos', relatorioData);
 
       // Log de auditoria
       await auditService.logAction(
@@ -342,7 +345,7 @@ const RelatoriosPedagogicos = () => {
   // Função para aprovar relatório
   const aprovarRelatorio = async (relatorio) => {
     try {
-      await update(ref(db, `relatorios-pedagogicos/${relatorio.id}`), {
+      await updateData('relatorios-pedagogicos/${relatorio.id}', {
         statusAprovacao: 'aprovado',
         atualizadoEm: new Date().toISOString(),
       });
@@ -385,7 +388,7 @@ const RelatoriosPedagogicos = () => {
   const salvarEdicao = async () => {
     if (!editandoRelatorio) return;
     try {
-      await update(ref(db, `relatorios-pedagogicos/${editandoRelatorio.id}`), {
+      await updateData('relatorios-pedagogicos/${editandoRelatorio.id}', {
         conteudo: conteudoEditado,
         atualizadoEm: new Date().toISOString(),
       });

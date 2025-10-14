@@ -20,12 +20,16 @@ import {
   Chip
 } from '@mui/material';
 import { Add, Print } from '@mui/icons-material';
-import { db, ref, get } from '../../../firebase';
+;
 import ModalHorario from './ModalHorario';
 import ImpressaoGradeNova from './ImpressaoGradeNova';
 import SeletorPeriodoLetivo from '../shared/SeletorPeriodoLetivo';
+import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
 
 const GradeVisualizador = () => {
+  // Hook para acessar banco da escola
+  const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, storage: schoolStorage } = useSchoolDatabase();
+
   const [turmas, setTurmas] = useState([]);
   const [periodosAula, setPeriodosAula] = useState([]);
   const [horariosAula, setHorariosAula] = useState([]);
@@ -49,7 +53,7 @@ const GradeVisualizador = () => {
 
   useEffect(() => {
     carregarDados();
-  }, []);
+  }, [isReady]);
 
   // Effect para carregar períodos de aula quando período letivo é selecionado
   useEffect(() => {
@@ -103,7 +107,7 @@ const GradeVisualizador = () => {
     
     try {
       // Carregar turmas
-      const turmasSnap = await get(ref(db, 'turmas'));
+      const turmasSnap = await getData('turmas');
       if (turmasSnap.exists()) {
         const turmasData = turmasSnap.val();
         const turmasArray = Object.entries(turmasData)
@@ -120,7 +124,7 @@ const GradeVisualizador = () => {
       }
 
       // Carregar disciplinas
-      const disciplinasSnap = await get(ref(db, 'disciplinas'));
+      const disciplinasSnap = await getData('disciplinas');
       if (disciplinasSnap.exists()) {
         const disciplinasData = disciplinasSnap.val();
         const disciplinasArray = Object.entries(disciplinasData).map(([id, disc]) => ({ id, ...disc }));
@@ -128,7 +132,7 @@ const GradeVisualizador = () => {
       }
 
       // Carregar professores (usuários com role professora)
-      const usuariosSnap = await get(ref(db, 'usuarios'));
+      const usuariosSnap = await getData('usuarios');
       if (usuariosSnap.exists()) {
         const usuariosData = usuariosSnap.val();
         const professoresArray = Object.entries(usuariosData)

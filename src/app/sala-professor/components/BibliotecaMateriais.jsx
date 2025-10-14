@@ -63,11 +63,15 @@ import {
   Archive as ArchiveIcon
 } from '@mui/icons-material';
 import { ref, onValue, push, update, remove } from 'firebase/database';
-import { db } from '../../../firebase';
+;
 import { useAuthUser } from '../../../hooks/useAuthUser';
 import { auditService } from '../../../services/auditService';
+import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
 
 const BibliotecaMateriais = () => {
+  // Hook para acessar banco da escola
+  const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, storage: schoolStorage } = useSchoolDatabase();
+
   const { user, userRole } = useAuthUser();
   const [loading, setLoading] = useState(true);
   const [materiais, setMateriais] = useState({});
@@ -274,7 +278,7 @@ const BibliotecaMateriais = () => {
       };
 
       if (materialEditando) {
-        await update(ref(db, `biblioteca-materiais/${materialEditando.id}`), materialData);
+        await updateData('biblioteca-materiais/${materialEditando.id}', materialData);
         await auditService.logAction(
           'material_update',
           user.uid,
@@ -284,7 +288,7 @@ const BibliotecaMateriais = () => {
           }
         );
       } else {
-        await push(ref(db, 'biblioteca-materiais'), materialData);
+        await pushData('biblioteca-materiais', materialData);
         await auditService.logAction(
           'material_create',
           user.uid,
@@ -307,7 +311,7 @@ const BibliotecaMateriais = () => {
   const aprovarMaterial = async (materialId, aprovar = true) => {
     try {
       const novoStatus = aprovar ? 'aprovado' : 'rejeitado';
-      await update(ref(db, `biblioteca-materiais/${materialId}`), {
+      await updateData('biblioteca-materiais/${materialId}', {
         statusAprovacao: novoStatus,
         revisadoPor: user.uid,
         revisadoPorNome: user.displayName || user.email,
@@ -335,7 +339,7 @@ const BibliotecaMateriais = () => {
     if (!confirm(`Deseja excluir o material "${titulo}"?`)) return;
 
     try {
-      await remove(ref(db, `biblioteca-materiais/${materialId}`));
+      await removeData('biblioteca-materiais/${materialId}');
       await auditService.logAction(
         'material_delete',
         user.uid,

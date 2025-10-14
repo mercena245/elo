@@ -38,12 +38,12 @@ import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs from 'dayjs';
-import { db, ref, get, set, auth, onAuthStateChanged } from '../../firebase';
-import { storage } from '../../firebase-storage';
+import { auth, onAuthStateChanged } from '../../firebase';
 import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { auditService, LOG_ACTIONS } from '../../services/auditService';
 import { financeiroService } from '../../services/financeiroService';
 import FichaMatricula from '../../components/FichaMatricula';
+import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
 
 // Componente para indicador de pré-matrícula
 const PreMatriculaIndicator = ({ aluno }) => {
@@ -266,6 +266,9 @@ const PreMatriculaDetalhes = ({ aluno }) => {
 };
 
 const Alunos = () => {
+  // Hook para acessar banco da escola
+  const { getData, setData, isReady, error: dbError, currentSchool, storage: schoolStorage } = useSchoolDatabase();
+  
   // Marcar/desmarcar anexo para exclusão (por nome)
   const handleMarcarParaExcluir = (nome) => {
     setAnexosParaExcluir(prev =>

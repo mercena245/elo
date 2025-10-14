@@ -33,10 +33,14 @@ import {
   BarChart,
   PieChart
 } from '@mui/icons-material';
-import { db, ref, get } from '../../../firebase';
+;
 import ImpressaoRelatorios from './ImpressaoRelatorios';
+import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
 
 const RelatoriosGrade = () => {
+  // Hook para acessar banco da escola
+  const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, storage: schoolStorage } = useSchoolDatabase();
+
   const [loading, setLoading] = useState(true);
   const [dadosRelatorio, setDadosRelatorio] = useState({
     turmas: [],
@@ -51,18 +55,18 @@ const RelatoriosGrade = () => {
 
   useEffect(() => {
     carregarDadosRelatorio();
-  }, []);
+  }, [isReady]);
 
   const carregarDadosRelatorio = async () => {
     setLoading(true);
     try {
       // Carregar todos os dados necessários
       const [turmasSnap, disciplinasSnap, usuariosSnap, periodosSnap, gradeSnap] = await Promise.all([
-        get(ref(db, 'turmas')),
-        get(ref(db, 'disciplinas')),
-        get(ref(db, 'usuarios')),
-        get(ref(db, 'Escola/PeriodosAula')),
-        get(ref(db, 'GradeHoraria'))
+        getData('turmas'),
+        getData('disciplinas'),
+        getData('usuarios'),
+        getData('Escola/PeriodosAula'),
+        getData('GradeHoraria')
       ]);
 
       const turmas = [];

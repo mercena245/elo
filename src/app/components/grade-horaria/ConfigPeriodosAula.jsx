@@ -21,10 +21,14 @@ import {
   Grid
 } from '@mui/material';
 import { Edit, Delete, Add } from '@mui/icons-material';
-import { db, ref, get, set, remove } from '../../../firebase';
+;
 import SeletorPeriodoLetivo from '../shared/SeletorPeriodoLetivo';
+import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
 
 const ConfigPeriodosAula = () => {
+  // Hook para acessar banco da escola
+  const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, storage: schoolStorage } = useSchoolDatabase();
+
   const [periodosAula, setPeriodosAula] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
@@ -103,7 +107,7 @@ const ConfigPeriodosAula = () => {
     try {
       const periodoId = editPeriodo ? editPeriodo.id : `periodo_${Date.now()}`;
       
-      await set(ref(db, `Escola/PeriodosAula/${periodoLetivoSelecionado.id}/${periodoId}`), {
+      await setData('Escola/PeriodosAula/${periodoLetivoSelecionado.id}/${periodoId}', {
         nome: form.nome,
         inicio: form.inicio,
         fim: form.fim,
@@ -148,7 +152,7 @@ const ConfigPeriodosAula = () => {
     }
     
     try {
-      await remove(ref(db, `Escola/PeriodosAula/${periodoLetivoSelecionado.id}/${periodo.id}`));
+      await removeData('Escola/PeriodosAula/${periodoLetivoSelecionado.id}/${periodo.id}');
       await carregarPeriodos();
       setMsg('Período excluído com sucesso!');
     } catch (err) {

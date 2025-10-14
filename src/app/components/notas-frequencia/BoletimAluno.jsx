@@ -25,6 +25,7 @@ import {
   Alert
 } from '@mui/material';
 import { 
+import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
   School,
   TrendingUp,
   TrendingDown,
@@ -39,7 +40,7 @@ import {
   Star,
   Warning
 } from '@mui/icons-material';
-import { db, ref, get } from '../../../firebase';
+;
 
 const BoletimAluno = ({ alunoId, responsavelId }) => {
   const [loading, setLoading] = useState(true);
@@ -64,7 +65,7 @@ const BoletimAluno = ({ alunoId, responsavelId }) => {
   const carregarDadosFilho = async () => {
     try {
       // Para responsáveis, buscar o aluno vinculado
-      const alunosSnap = await get(ref(db, 'alunos'));
+      const alunosSnap = await getData('alunos');
       let filhoId = null;
       
       if (alunosSnap.exists()) {
@@ -92,11 +93,11 @@ const BoletimAluno = ({ alunoId, responsavelId }) => {
     try {
       const [alunoSnap, turmasSnap, disciplinasSnap, usuariosSnap, notasSnap, frequenciaSnap] = await Promise.all([
         get(ref(db, `alunos/${idAluno}`)),
-        get(ref(db, 'turmas')),
-        get(ref(db, 'disciplinas')),
-        get(ref(db, 'usuarios')),
-        get(ref(db, 'notas')),
-        get(ref(db, 'frequencia'))
+        getData('turmas'),
+        getData('disciplinas'),
+        getData('usuarios'),
+        getData('notas'),
+        getData('frequencia')
       ]);
 
       // Dados do aluno
@@ -281,6 +282,9 @@ const BoletimAluno = ({ alunoId, responsavelId }) => {
   };
 
   const handleImprimirBoletim = () => {
+  // Hook para acessar banco da escola
+  const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, storage: schoolStorage } = useSchoolDatabase();
+
     const printContent = `
       <html>
         <head>

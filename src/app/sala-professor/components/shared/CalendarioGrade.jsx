@@ -27,7 +27,8 @@ import {
   School as SchoolIcon
 } from '@mui/icons-material';
 import { ref, get } from 'firebase/database';
-import { db } from '../../../../firebase';
+import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
+;
 
 const CalendarioGrade = ({
   gradeHoraria = {},
@@ -61,6 +62,8 @@ const CalendarioGrade = ({
 
   // Carregar períodos de aula para obter horários
   useEffect(() => {
+    if (!isReady) return;
+    
     const carregarPeriodosAula = async () => {
       try {
         const periodosRef = ref(db, 'Escola/PeriodosAula');
@@ -74,9 +77,12 @@ const CalendarioGrade = ({
     };
     
     carregarPeriodosAula();
-  }, []);
+  }, [isReady]);
 
   const processarGradeHoraria = () => {
+  // Hook para acessar banco da escola
+  const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, storage: schoolStorage } = useSchoolDatabase();
+
     console.log('🎯 CalendarioGrade - Processando grade horária:', {
       gradeHoraria,
       gradeHorariaType: typeof gradeHoraria,

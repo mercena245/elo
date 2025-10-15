@@ -173,10 +173,12 @@ export const schoolDatabaseOperations = (schoolData) => {
         
         return exists ? snapshot.val() : null;
       } catch (error) {
-        console.error(`❌ [schoolDatabaseOperations.get] Erro ao ler dados:`, {
+        console.error(`❌ [schoolDatabaseOperations.get] Erro ao ler dados:`, error);
+        console.error(`❌ [schoolDatabaseOperations.get] Detalhes:`, {
           path,
-          errorCode: error.code,
-          errorMessage: error.message,
+          errorCode: error?.code,
+          errorMessage: error?.message,
+          errorStack: error?.stack,
           databaseURL: schoolData.databaseURL,
           projectId: schoolData.projectId
         });

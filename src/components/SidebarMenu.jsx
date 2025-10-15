@@ -4,6 +4,8 @@ import { auth, onAuthStateChanged } from '../firebase';
 import { signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import { useSchoolDatabase } from '../hooks/useSchoolDatabase';
+import { useManagementDatabase } from '../hooks/useManagementDatabase';
+import { useAuth } from '../context/AuthContext';
 import { 
   Drawer, 
   IconButton, 
@@ -22,8 +24,17 @@ import {
 
 // Versão modernizada do SidebarMenu
 const SidebarMenu = () => {
-  // Hook para acessar banco da escola
-  const { getData, isReady } = useSchoolDatabase();
+  // Hook para verificar tipo de acesso
+  const { accessType } = useAuth();
+  
+  // Hook para acessar banco da escola (se accessType === 'school')
+  const schoolDB = useSchoolDatabase();
+  
+  // Hook para acessar banco de gerenciamento (se accessType === 'management')
+  const managementDB = useManagementDatabase();
+  
+  // Escolher qual banco usar baseado no accessType
+  const { getData, isReady } = accessType === 'management' ? managementDB : schoolDB;
   
   const [open, setOpen] = useState(false);
   const [hideIcon, setHideIcon] = useState(false);
@@ -55,7 +66,11 @@ const SidebarMenu = () => {
   useEffect(() => {
     async function fetchRole() {
       try {
-        if (!userId || !isReady) return;
+        // Não buscar se não tiver userId, se não estiver pronto, ou se getData não existir
+        if (!userId || !isReady || !getData) {
+          console.log('⏸️ [SidebarMenu] Aguardando inicialização:', { userId: !!userId, isReady, hasGetData: !!getData });
+          return;
+        }
         
         // Buscar do banco da escola usando getData
         const data = await getData(`usuarios/${userId}`);
@@ -86,7 +101,11 @@ const SidebarMenu = () => {
   useEffect(() => {
     async function fetchPendentes() {
       try {
-        if (!isReady) return;
+        // Não buscar se não estiver pronto ou se getData não existir
+        if (!isReady || !getData) {
+          console.log('⏸️ [SidebarMenu] Aguardando para buscar pendentes:', { isReady, hasGetData: !!getData });
+          return;
+        }
         
         // Buscar usuários do banco da escola
         const usuarios = await getData('usuarios');
@@ -97,7 +116,8 @@ const SidebarMenu = () => {
         } else {
           setPendentes(0);
         }
-      } catch {
+      } catch (error) {
+        console.log('⚠️ [SidebarMenu] Erro ao buscar pendentes (provavelmente sem escola):', error.message);
         setPendentes(0);
       }
     }

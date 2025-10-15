@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useManagementDatabase } from '../../../hooks/useManagementDatabase';
 import SchoolManagement from './SchoolManagement';
 import UserManagement from './UserManagement';
 import FinancialManagement from './FinancialManagement';
@@ -8,6 +9,7 @@ import SystemSettings from './SystemSettings';
 import DashboardOverview from './DashboardOverview';
 
 export default function SuperAdminDashboard({ user }) {
+  const { getAllSchools, getAllUsers } = useManagementDatabase();
   const [activeTab, setActiveTab] = useState('overview');
   const [stats, setStats] = useState({
     totalSchools: 0,
@@ -16,20 +18,56 @@ export default function SuperAdminDashboard({ user }) {
     monthlyRevenue: 0,
     pendingPayments: 0
   });
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     loadDashboardStats();
   }, []);
 
   const loadDashboardStats = async () => {
-    // TODO: Implementar carregamento real das estatísticas
-    setStats({
-      totalSchools: 15,
-      activeSchools: 13,
-      totalUsers: 247,
-      monthlyRevenue: 45780.50,
-      pendingPayments: 3450.00
-    });
+    try {
+      setLoading(true);
+      console.log('📊 [SuperAdminDashboard] Carregando estatísticas...');
+      
+      // Buscar escolas e usuários reais do managementDB
+      const [schools, users] = await Promise.all([
+        getAllSchools(),
+        getAllUsers()
+      ]);
+      
+      console.log('🏫 [SuperAdminDashboard] Escolas:', schools.length);
+      console.log('👥 [SuperAdminDashboard] Usuários:', users.length);
+      
+      // Contar escolas ativas
+      const activeSchools = schools.filter(s => s.status === 'ativa' || s.status === 'ativo').length;
+      
+      // Calcular receita (exemplo - você pode ajustar a lógica)
+      const monthlyRevenue = schools.reduce((total, school) => {
+        if (school.plano === 'basico') return total + 299.90;
+        if (school.plano === 'premium') return total + 599.90;
+        if (school.plano === 'empresarial') return total + 999.90;
+        return total;
+      }, 0);
+      
+      setStats({
+        totalSchools: schools.length,
+        activeSchools: activeSchools,
+        totalUsers: users.length,
+        monthlyRevenue: monthlyRevenue,
+        pendingPayments: 0 // TODO: Calcular do sistema financeiro
+      });
+      
+      console.log('✅ [SuperAdminDashboard] Estatísticas carregadas:', {
+        totalSchools: schools.length,
+        activeSchools,
+        totalUsers: users.length,
+        monthlyRevenue
+      });
+    } catch (error) {
+      console.error('❌ [SuperAdminDashboard] Erro ao carregar estatísticas:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleLogout = () => {
@@ -44,6 +82,18 @@ export default function SuperAdminDashboard({ user }) {
     { id: 'financial', name: 'Financeiro', icon: '💰' },
     { id: 'settings', name: 'Configurações', icon: '⚙️' }
   ];
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-indigo-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Carregando painel do Super Admin...</p>
+          <p className="mt-2 text-sm text-gray-500">Conectando ao Management Database</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">

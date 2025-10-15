@@ -94,41 +94,76 @@ export const useSchoolDatabase = () => {
    * Buscar dados de um caminho
    */
   const getData = useCallback(async (path) => {
-    if (!db) throw new Error('Database não inicializado');
+    if (!db) {
+      console.warn('⚠️ [useSchoolDatabase.getData] Database não inicializado - provavelmente sem escola selecionada');
+      throw new Error('Database não inicializado. Selecione uma escola primeiro.');
+    }
+    if (!isReady) {
+      console.warn('⚠️ [useSchoolDatabase.getData] Database não está pronto');
+      throw new Error('Database não está pronto. Aguarde a inicialização.');
+    }
     return await db.get(path);
-  }, [db]);
+  }, [db, isReady]);
 
   /**
    * Salvar dados em um caminho
    */
   const setData = useCallback(async (path, data) => {
-    if (!db) throw new Error('Database não inicializado');
+    if (!db) {
+      console.warn('⚠️ [useSchoolDatabase.setData] Database não inicializado');
+      throw new Error('Database não inicializado. Selecione uma escola primeiro.');
+    }
+    if (!isReady) {
+      console.warn('⚠️ [useSchoolDatabase.setData] Database não está pronto');
+      throw new Error('Database não está pronto. Aguarde a inicialização.');
+    }
     await db.set(path, data);
-  }, [db]);
+  }, [db, isReady]);
 
   /**
    * Adicionar novo item (push)
    */
   const pushData = useCallback(async (path, data) => {
-    if (!db) throw new Error('Database não inicializado');
+    if (!db) {
+      console.warn('⚠️ [useSchoolDatabase.pushData] Database não inicializado');
+      throw new Error('Database não inicializado. Selecione uma escola primeiro.');
+    }
+    if (!isReady) {
+      console.warn('⚠️ [useSchoolDatabase.pushData] Database não está pronto');
+      throw new Error('Database não está pronto. Aguarde a inicialização.');
+    }
     return await db.push(path, data);
-  }, [db]);
+  }, [db, isReady]);
 
   /**
    * Atualizar dados
    */
   const updateData = useCallback(async (path, updates) => {
-    if (!db) throw new Error('Database não inicializado');
+    if (!db) {
+      console.warn('⚠️ [useSchoolDatabase.updateData] Database não inicializado');
+      throw new Error('Database não inicializado. Selecione uma escola primeiro.');
+    }
+    if (!isReady) {
+      console.warn('⚠️ [useSchoolDatabase.updateData] Database não está pronto');
+      throw new Error('Database não está pronto. Aguarde a inicialização.');
+    }
     await db.update(path, updates);
-  }, [db]);
+  }, [db, isReady]);
 
   /**
    * Remover dados
    */
   const removeData = useCallback(async (path) => {
-    if (!db) throw new Error('Database não inicializado');
+    if (!db) {
+      console.warn('⚠️ [useSchoolDatabase.removeData] Database não inicializado');
+      throw new Error('Database não inicializado. Selecione uma escola primeiro.');
+    }
+    if (!isReady) {
+      console.warn('⚠️ [useSchoolDatabase.removeData] Database não está pronto');
+      throw new Error('Database não está pronto. Aguarde a inicialização.');
+    }
     await db.remove(path);
-  }, [db]);
+  }, [db, isReady]);
 
   /**
    * Listener em tempo real

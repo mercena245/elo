@@ -1,11 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { SchoolManagementService } from '../../../services/schoolManagementService';
-import { UserManagementService } from '../../../services/userManagementService';
-import { FinancialManagementService } from '../../../services/financialManagementService';
+import { useManagementDatabase } from '../../../hooks/useManagementDatabase';
 
 export default function DashboardOverview({ stats }) {
+  const { getAllSchools, getAllUsers, getData } = useManagementDatabase();
   const [realStats, setRealStats] = useState({
     totalSchools: 0,
     activeSchools: 0,
@@ -28,43 +27,51 @@ export default function DashboardOverview({ stats }) {
   const loadDashboardData = async () => {
     setLoading(true);
     try {
-      // Por enquanto usar dados mockados até popular o banco
+      console.log('📊 [DashboardOverview] Carregando dados reais do Management DB...');
+      
+      // Buscar dados reais do managementDB
+      const [schools, users] = await Promise.all([
+        getAllSchools(),
+        getAllUsers()
+      ]);
+      
+      console.log('🏫 [DashboardOverview] Escolas:', schools.length);
+      console.log('👥 [DashboardOverview] Usuários:', users.length);
+      
+      // Contar escolas ativas
+      const activeSchools = schools.filter(s => s.status === 'ativa' || s.status === 'ativo').length;
+      
+      // Calcular receita mensal baseada nos planos
+      const monthlyRevenue = schools.reduce((total, school) => {
+        if (school.status !== 'ativa' && school.status !== 'ativo') return total;
+        
+        if (school.plano === 'basico') return total + 299.90;
+        if (school.plano === 'premium') return total + 599.90;
+        if (school.plano === 'empresarial') return total + 999.90;
+        return total;
+      }, 0);
+      
+      // Contar contratos ativos
+      const activeContracts = activeSchools;
+      
       setRealStats({
-        totalSchools: 4,
-        activeSchools: 3,
-        totalUsers: 12,
-        monthlyRevenue: 2799.70,
-        pendingPayments: 1299.90,
-        totalRevenue: 5499.40,
-        activeContracts: 3
+        totalSchools: schools.length,
+        activeSchools: activeSchools,
+        totalUsers: users.length,
+        monthlyRevenue: monthlyRevenue,
+        pendingPayments: 0, // TODO: Calcular do sistema financeiro
+        totalRevenue: monthlyRevenue * 12, // Estimativa anual
+        activeContracts: activeContracts
       });
       
-      // Quando o banco estiver populado, usar isso:
-      /*
-      const [schoolStatsResult, userStatsResult, financialStatsResult] = await Promise.all([
-        SchoolManagementService.getSchoolStats(),
-        UserManagementService.getUserStats(),
-        FinancialManagementService.getFinancialStats()
-      ]);
-
-      if (schoolStatsResult.success && userStatsResult.success && financialStatsResult.success) {
-        const schoolStats = schoolStatsResult.data;
-        const userStats = userStatsResult.data;
-        const financialStats = financialStatsResult.data;
-
-        setRealStats({
-          totalSchools: schoolStats.total,
-          activeSchools: schoolStats.ativas,
-          totalUsers: userStats.total,
-          monthlyRevenue: financialStats.monthlyRevenue,
-          pendingPayments: financialStats.pendingPayments,
-          totalRevenue: financialStats.totalRevenue,
-          activeContracts: financialStats.activeContracts
-        });
-      }
-      */
+      console.log('✅ [DashboardOverview] Dados carregados:', {
+        totalSchools: schools.length,
+        activeSchools,
+        monthlyRevenue,
+        totalUsers: users.length
+      });
     } catch (error) {
-      console.error('Erro ao carregar dados do dashboard:', error);
+      console.error('❌ [DashboardOverview] Erro ao carregar dados:', error);
     } finally {
       setLoading(false);
     }

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { populateDatabase } from '../../utils/populateDatabase';
 import { SchoolManagementService } from '../../services/schoolManagementService';
-import { UserManagementService } from '../../services/userManagementService';
+import { userManagementService } from '../../services/userManagementService';
 import { FinancialManagementService } from '../../services/financialManagementService';
 
 export default function DatabaseSetupPage() {
@@ -44,7 +44,7 @@ export default function DatabaseSetupPage() {
       
       const [schoolStats, userStats, financialStats] = await Promise.all([
         SchoolManagementService.getSchoolStats(),
-        UserManagementService.getUserStats(),
+        userManagementService.getUserStats(),
         FinancialManagementService.getFinancialStats()
       ]);
 
@@ -76,9 +76,9 @@ export default function DatabaseSetupPage() {
       addLog(`Escolas encontradas: ${schoolsResult.success ? schoolsResult.data.length : 'Erro'}`, 
              schoolsResult.success ? 'success' : 'error');
 
-      // Testar UserManagementService  
-      addLog('Testando UserManagementService...', 'info');
-      const usersResult = await UserManagementService.getAllUsers();
+      // Testar userManagementService  
+      addLog('Testando userManagementService...', 'info');
+      const usersResult = await userManagementService.getAllUsers();
       addLog(`Usuários encontrados: ${usersResult.success ? usersResult.data.length : 'Erro'}`, 
              usersResult.success ? 'success' : 'error');
 

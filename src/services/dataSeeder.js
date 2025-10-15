@@ -1,6 +1,6 @@
 // Script para popular o banco de gerenciamento com dados fictícios
 import { SchoolManagementService } from './schoolManagementService.js';
-import { UserManagementService } from './userManagementService.js';
+import { userManagementService } from './userManagementService.js';
 import { FinancialManagementService } from './financialManagementService.js';
 
 export class DataSeeder {
@@ -279,7 +279,7 @@ export class DataSeeder {
     ];
     
     for (const user of users) {
-      const result = await UserManagementService.createUser(user);
+      const result = await userManagementService.createUser(user);
       if (result.success) {
         console.log(`✅ Usuário criado: ${user.nome}`);
       } else {

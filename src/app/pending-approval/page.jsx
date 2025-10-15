@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../context/AuthContext';
-import { managementDB, ref, get, onValue } from '../../firebase';
+import { managementDB, ref, get } from '../../firebase';
+import { onValue } from 'firebase/database';
 
 export default function PendingApprovalPage() {
   const { user } = useAuth();

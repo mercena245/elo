@@ -15,7 +15,6 @@ import {
   Autocomplete
 } from '@mui/material';
 import { useAuthUser } from '../../../hooks/useAuthUser';
-import { get, ref } from 'firebase/database';
 import { useSchoolDatabase } from '../../../hooks/useSchoolDatabase';
 
 export default function SeletorTurmaAluno({ 
@@ -28,6 +27,7 @@ export default function SeletorTurmaAluno({
   userRole = null // Role do usuário
 }) {
   const { user } = useAuthUser();
+  const { getData, isReady } = useSchoolDatabase();
   const [turmas, setTurmas] = useState({});
   const [alunos, setAlunos] = useState([]);
   const [selectedTurma, setSelectedTurma] = useState('');
@@ -36,7 +36,10 @@ export default function SeletorTurmaAluno({
   const [minhasTurmas, setMinhasTurmas] = useState([]); // Turmas vinculadas ao professor
 
   useEffect(() => {
-    if (!isReady) return;
+    if (!isReady) {
+      console.log('⏳ [SeletorTurmaAluno] Aguardando conexão com banco da escola...');
+      return;
+    }
     
     const carregarDados = async () => {
       if (!user) return;
@@ -44,20 +47,19 @@ export default function SeletorTurmaAluno({
       try {
         console.log('SeletorTurmaAluno - Carregando dados...');
         
-        // Carregar turmas
-        const turmasRef = ref(db, 'turmas');
-        const turmasSnapshot = await get(turmasRef);
-        const turmasData = turmasSnapshot.val() || {};
+        // Carregar turmas e alunos usando getData
+        const [turmasData, alunosData] = await Promise.all([
+          getData('turmas'),
+          getData('alunos')
+        ]);
         
         console.log('SeletorTurmaAluno - Turmas:', turmasData);
         
         // Se deve filtrar por professor, buscar dados do usuário
         if (filtrarTurmasPorProfessor && professorUid && userRole === 'professora') {
-          const userRef = ref(db, `usuarios/${professorUid}`);
-          const userSnapshot = await get(userRef);
+          const userData = await getData(`usuarios/${professorUid}`);
           
-          if (userSnapshot.exists()) {
-            const userData = userSnapshot.val();
+          if (userData) {
             const turmasVinculadas = userData.turmas || [];
             setMinhasTurmas(turmasVinculadas);
             console.log('SeletorTurmaAluno - Turmas vinculadas ao professor:', turmasVinculadas);
@@ -65,7 +67,7 @@ export default function SeletorTurmaAluno({
             // Filtrar apenas turmas vinculadas
             const turmasFiltradas = {};
             turmasVinculadas.forEach(turmaId => {
-              if (turmasData[turmaId]) {
+              if (turmasData && turmasData[turmaId]) {
                 turmasFiltradas[turmaId] = turmasData[turmaId];
               }
             });
@@ -75,17 +77,16 @@ export default function SeletorTurmaAluno({
           }
         } else {
           // Coordenadora ou sem filtro - mostrar todas
-          setTurmas(turmasData);
+          setTurmas(turmasData || {});
         }
 
-        // Carregar alunos
-        const alunosRef = ref(db, 'alunos');
-        const alunosSnapshot = await get(alunosRef);
-        const alunosData = alunosSnapshot.val() || {};
-        const alunosArray = Object.keys(alunosData).map(id => ({
-          id,
-          ...alunosData[id]
-        }));
+        // Processar alunos
+        const alunosArray = alunosData 
+          ? Object.keys(alunosData).map(id => ({
+              id,
+              ...alunosData[id]
+            }))
+          : [];
 
         console.log('SeletorTurmaAluno - Alunos:', alunosArray);
         setAlunos(alunosArray);
@@ -97,7 +98,7 @@ export default function SeletorTurmaAluno({
     };
 
     carregarDados();
-  }, [user, filtrarTurmasPorProfessor, professorUid, userRole]);
+  }, [user, isReady, filtrarTurmasPorProfessor, professorUid, userRole]);
 
   const handleTurmaChange = (event) => {
     const turmaId = event.target.value;

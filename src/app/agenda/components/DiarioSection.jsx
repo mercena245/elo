@@ -62,15 +62,33 @@ import {
   AccessTime,
   Close
 } from '@mui/icons-material';
-import { storageRef, uploadBytes, getDownloadURL } from '../../../firebase';
+import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import { auditService, LOG_ACTIONS } from '../../../services/auditService';
-import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
+import { useSchoolDatabase } from '../../../hooks/useSchoolDatabase';
 
 const DiarioSection = ({ userRole, userData }) => {
+  // 🔒 Hook para acessar banco da escola - DEVE estar no topo!
+  const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, storage: schoolStorage } = useSchoolDatabase();
+
+  // Estados
+  const [entradas, setEntradas] = useState([]);
+  const [dialogNovaEntrada, setDialogNovaEntrada] = useState(false);
+  const [dialogDetalhes, setDialogDetalhes] = useState(false);
+  const [entradaSelecionada, setEntradaSelecionada] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [alunos, setAlunos] = useState([]);
+  const [turmas, setTurmas] = useState([]);
+  const [filtroData, setFiltroData] = useState(new Date().toISOString().split('T')[0]);
+  const [filtroAluno, setFiltroAluno] = useState('');
+  const [estatisticas, setEstatisticas] = useState({});
+  const [expandedCards, setExpandedCards] = useState({});
+  const [showAllExpanded, setShowAllExpanded] = useState(false);
+  const [filePreviewDialog, setFilePreviewDialog] = useState(false);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [uploadingFile, setUploadingFile] = useState(false);
+  
   // Funções para detectar tipo de turma baseado no turnoId
   const isTurmaIntegral = () => {
-  // Hook para acessar banco da escola
-  const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, storage: schoolStorage } = useSchoolDatabase();
 
     if (!novaEntrada.turma || !turmas.length) return false;
     const turma = turmas.find(t => t.id === novaEntrada.turma);
@@ -95,21 +113,7 @@ const DiarioSection = ({ userRole, userData }) => {
     return turma?.turnoId === 'Manhã' || turma?.turnoId === 'Tarde';
   };
 
-  const [entradas, setEntradas] = useState([]);
-  const [dialogNovaEntrada, setDialogNovaEntrada] = useState(false);
-  const [dialogDetalhes, setDialogDetalhes] = useState(false);
-  const [entradaSelecionada, setEntradaSelecionada] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [alunos, setAlunos] = useState([]);
-  const [turmas, setTurmas] = useState([]);
-  const [filtroData, setFiltroData] = useState(new Date().toISOString().split('T')[0]);
-  const [filtroAluno, setFiltroAluno] = useState('');
-  const [estatisticas, setEstatisticas] = useState({});
-  const [expandedCards, setExpandedCards] = useState({});
-  const [showAllExpanded, setShowAllExpanded] = useState(false);
-  const [filePreviewDialog, setFilePreviewDialog] = useState(false);
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [uploadingFile, setUploadingFile] = useState(false);
+  // Estado da nova entrada
   const [novaEntrada, setNovaEntrada] = useState({
     turma: '',
     data: new Date().toISOString().split('T')[0],
@@ -183,7 +187,7 @@ const DiarioSection = ({ userRole, userData }) => {
     fetchEntradas();
     fetchAlunos();
     fetchTurmas();
-  }, [userData, filtroData, filtroAluno]);
+  }, [userData, filtroData, filtroAluno, isReady]);
 
   useEffect(() => {
     if (entradas.length > 0) {
@@ -192,12 +196,12 @@ const DiarioSection = ({ userRole, userData }) => {
   }, [entradas]);
 
   const fetchEntradas = async () => {
+    if (!isReady) return;
+    
     try {
-      const entradasRef = ref(db, 'diario');
-      const snap = await get(entradasRef);
+      const dados = await getData('diario');
       
-      if (snap.exists()) {
-        const dados = snap.val();
+      if (dados) {
         const entradasList = Object.entries(dados).map(([id, entrada]) => ({
           id,
           ...entrada
@@ -250,12 +254,12 @@ const DiarioSection = ({ userRole, userData }) => {
   };
 
   const fetchAlunos = async () => {
+    if (!isReady) return;
+    
     try {
-      const alunosRef = ref(db, 'alunos');
-      const snap = await get(alunosRef);
+      const dados = await getData('alunos');
       
-      if (snap.exists()) {
-        const dados = snap.val();
+      if (dados) {
         const alunosList = Object.entries(dados).map(([id, aluno]) => ({
           id,
           ...aluno
@@ -283,12 +287,12 @@ const DiarioSection = ({ userRole, userData }) => {
   };
 
   const fetchTurmas = async () => {
+    if (!isReady) return;
+    
     try {
-      const turmasRef = ref(db, 'turmas');
-      const snap = await get(turmasRef);
+      const dados = await getData('turmas');
       
-      if (snap.exists()) {
-        const dados = snap.val();
+      if (dados) {
         const turmasList = Object.entries(dados).map(([id, turma]) => ({
           id,
           ...turma
@@ -451,8 +455,8 @@ const DiarioSection = ({ userRole, userData }) => {
       const timestamp = Date.now();
       const fileName = `homework_${timestamp}_${file.name}`;
       
-      // Criar referência do arquivo no schoolStorage
-      const fileRef = storageRef(schoolStorage, `homework/${fileName}`);
+      // Criar referência do arquivo no schoolStorage (instância real)
+      const fileRef = storageRef(schoolStorage._storage, `homework/${fileName}`);
       
       // Fazer upload do arquivo
       const uploadResult = await uploadBytes(fileRef, file);

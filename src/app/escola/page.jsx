@@ -34,7 +34,8 @@ import { ExpandMore, ExpandLess, Edit, Delete, Add, Notifications, AttachFile, P
 import { FaTrash } from 'react-icons/fa';
 import { FaUsers, FaChalkboardTeacher } from 'react-icons/fa';
 import { db, ref, get, set, push, remove, storage, storageRef, uploadBytes, getDownloadURL, deleteObject } from '@/firebase';
-import { auth } from '@/firebase';
+import { auth, onAuthStateChanged } from '@/firebase';
+import { auditService } from '../../services/auditService';
 
 const { logAction, LOG_ACTIONS } = auditService;
 import DisciplinaCard from "../components/escola/DisciplinaCard";
@@ -44,6 +45,7 @@ import TurmaCard from "../components/escola/TurmaCard";
 import PeriodoCard from "../components/escola/PeriodoCard";
 import GradeHorariaCard from "../components/escola/GradeHorariaCard";
 import { useSchoolServices } from '../../hooks/useSchoolServices';
+import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
 
 // Helpers
 function formatDateBR(dateStr) {
@@ -57,6 +59,9 @@ function formatDateBR(dateStr) {
 const Escola = () => {
   // Services multi-tenant
   const { auditService, financeiroService, LOG_ACTIONS, isReady: servicesReady } = useSchoolServices();
+  
+  // Hook para acessar banco da escola
+  const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, storage: schoolStorage } = useSchoolDatabase();
 
   // TURMAS
   const [turmas, setTurmas] = useState([]);
@@ -104,9 +109,9 @@ const Escola = () => {
   const [isNewColab, setIsNewColab] = useState(false);
 
   // ROLE/LOGIN
+  const [userId, setUserId] = useState(null);
   const [userRole, setUserRole] = useState('');
   const [roleChecked, setRoleChecked] = useState(false);
-  const userId = auth.currentUser ? auth.currentUser.uid : null;
 
   // Função para verificar se um aviso está expirado
   const isAvisoExpirado = (aviso) => {
@@ -151,12 +156,16 @@ const Escola = () => {
 
   // Função para carregar dados iniciais (turmas e avisos)
   const fetchData = async () => {
+    if (!isReady) {
+      console.log('⏳ Aguardando conexão com banco da escola...');
+      return;
+    }
+    
     setLoading(true);
     try {
       // Carregar turmas
-      const turmasSnap = await get(ref(db, 'turmas'));
-      if (turmasSnap.exists()) {
-        const turmasData = turmasSnap.val();
+      const turmasData = await getData('turmas');
+      if (turmasData) {
         const turmasArray = Object.entries(turmasData).map(([id, turma]) => ({ ...turma, id }));
         setTurmas(turmasArray);
       } else {
@@ -164,9 +173,8 @@ const Escola = () => {
       }
 
       // Carregar avisos
-      const avisosSnap = await get(ref(db, 'avisos'));
-      if (avisosSnap.exists()) {
-        const avisosData = avisosSnap.val();
+      const avisosData = await getData('avisos');
+      if (avisosData) {
         const avisosArray = Object.entries(avisosData).map(([id, aviso]) => ({ ...aviso, id }));
         
         // Filtrar avisos não expirados e ativos
@@ -234,11 +242,15 @@ const Escola = () => {
 
   // Buscar períodos ativos para turmas
   const fetchPeriodosAtivos = async () => {
+    if (!isReady) {
+      console.log('⏳ Aguardando conexão com banco da escola...');
+      return;
+    }
+    
     setLoadingPeriodosAtivos(true);
     try {
-      const snap = await get(ref(db, "Escola/Periodo"));
-      if (snap.exists()) {
-        const data = snap.val();
+      const data = await getData("Escola/Periodo");
+      if (data) {
         const ativos = Object.entries(data)
           .filter(([, p]) => p.ativo)
           .map(([id, p]) => ({
@@ -330,6 +342,11 @@ const Escola = () => {
       alert("Selecione o período!");
       return;
     }
+    if (!isReady) {
+      console.log('⏳ Aguardando conexão com banco da escola...');
+      return;
+    }
+    
     setSavingTurma(true);
     try {
       const periodo = periodosAtivos.find(p => p.id === editTurmaForm.periodoId);
@@ -337,7 +354,7 @@ const Escola = () => {
       
       if (isNewTurma) {
         const novoId = `id_turma_${editTurmaForm.nome.replace(/\s/g, '').toLowerCase()}`;
-        await set(ref(db, `turmas/${novoId}`), editTurmaForm);
+        await setData(`turmas/${novoId}`, editTurmaForm);
         
         // Log da criação da turma
         const userData = {
@@ -366,7 +383,7 @@ const Escola = () => {
         if (editTurma.turnoId !== editTurmaForm.turnoId) mudancas.turno = { de: editTurma.turnoId, para: editTurmaForm.turnoId };
         if (editTurma.periodoId !== editTurmaForm.periodoId) mudancas.periodo = { de: editTurma.periodoId, para: editTurmaForm.periodoId };
         
-        await set(ref(db, `turmas/${editTurma.id}`), editTurmaForm);
+        await setData(`turmas/${editTurma.id}`, editTurmaForm);
         
         // Log da atualização da turma
         if (Object.keys(mudancas).length > 0) {
@@ -396,31 +413,33 @@ const Escola = () => {
 
   // Excluir turma
   const handleExcluirTurma = async turma => {
+    if (!isReady) {
+      console.log('⏳ Aguardando conexão com banco da escola...');
+      return;
+    }
+    
     setTurmaExcluir(turma);
     // Buscar vínculos
     const vinculos = [];
     // Alunos
-    const alunosSnap = await get(ref(db, `alunos`));
-    if (alunosSnap.exists()) {
-      const alunos = alunosSnap.val();
+    const alunos = await getData(`alunos`);
+    if (alunos) {
       const alunosTurma = Object.values(alunos).filter(a => a.turmaId === turma.id);
       if (alunosTurma.length > 0) {
         vinculos.push({ tipo: "Alunos", lista: alunosTurma.map(a => a.nome || a.id) });
       }
     }
     // Professores
-    const profsSnap = await get(ref(db, `professores`));
-    if (profsSnap.exists()) {
-      const profs = profsSnap.val();
+    const profs = await getData(`professores`);
+    if (profs) {
       const profsTurma = Object.values(profs).filter(p => p.turmaId === turma.id);
       if (profsTurma.length > 0) {
         vinculos.push({ tipo: "Professores", lista: profsTurma.map(p => p.nome || p.id) });
       }
     }
     // Usuários
-    const usuariosSnap = await get(ref(db, `usuarios`));
-    if (usuariosSnap.exists()) {
-      const usuarios = usuariosSnap.val();
+    const usuarios = await getData(`usuarios`);
+    if (usuarios) {
       const usuariosTurma = Object.values(usuarios).filter(u => u.turmaId === turma.id);
       if (usuariosTurma.length > 0) {
         vinculos.push({ tipo: "Usuários", lista: usuariosTurma.map(u => u.nome || u.id) });
@@ -436,9 +455,14 @@ const Escola = () => {
 
   const handleConfirmExcluirTurma = async () => {
     if (!turmaExcluir) return;
+    if (!isReady) {
+      console.log('⏳ Aguardando conexão com banco da escola...');
+      return;
+    }
+    
     setExcluindoTurma(true);
     try {
-      await remove(ref(db, `turmas/${turmaExcluir.id}`));
+      await removeData(`turmas/${turmaExcluir.id}`);
       
       // Log da exclusão da turma
       const userData = {
@@ -757,7 +781,8 @@ const Escola = () => {
     setSalvandoPeriodo(true);
     try {
       const periodoId = `${periodoForm.ano}_${periodoForm.periodo}_${Date.now()}`;
-      await set(ref(db, `Escola/Periodo/${periodoId}`), {
+      console.log('💾 [Escola] Salvando período:', periodoId);
+      await setData(`Escola/Periodo/${periodoId}`, {
         ...periodoForm
       });
       
@@ -776,6 +801,7 @@ const Escola = () => {
         }
       });
       
+      console.log('✅ [Escola] Período salvo com sucesso');
       setMsgPeriodo("Período salvo com sucesso!");
       setPeriodoForm({
         ano: "",
@@ -797,9 +823,9 @@ const Escola = () => {
     setLoadingConsulta(true);
     setPeriodosCadastrados([]);
     try {
-      const snap = await get(ref(db, "Escola/Periodo"));
-      if (snap.exists()) {
-        const data = snap.val();
+      console.log('📡 [Escola] Carregando períodos do banco da escola...');
+      const data = await getData("Escola/Periodo");
+      if (data) {
         const lista = Object.entries(data).map(([id, val]) => ({ id, ...val }))
           .sort((a, b) => {
             if (a.ano !== b.ano) return b.ano - a.ano;
@@ -807,10 +833,13 @@ const Escola = () => {
             return a.dataInicio.localeCompare(b.dataInicio);
           });
         setPeriodosCadastrados(lista);
+        console.log('✅ [Escola] Períodos carregados:', lista.length);
       } else {
+        console.log('⚠️ [Escola] Nenhum período encontrado');
         setPeriodosCadastrados([]);
       }
     } catch (err) {
+      console.error('❌ [Escola] Erro ao carregar períodos:', err);
       setPeriodosCadastrados([]);
     }
     setLoadingConsulta(false);
@@ -861,7 +890,8 @@ const Escola = () => {
       if (editPeriodo.dataInicio !== editPeriodoForm.dataInicio) mudancas.dataInicio = { de: editPeriodo.dataInicio, para: editPeriodoForm.dataInicio };
       if (editPeriodo.dataFim !== editPeriodoForm.dataFim) mudancas.dataFim = { de: editPeriodo.dataFim, para: editPeriodoForm.dataFim };
       
-      await set(ref(db, `Escola/Periodo/${editPeriodoForm.id}`), {
+      console.log('🔄 [Escola] Editando período:', editPeriodoForm.id);
+      await setData(`Escola/Periodo/${editPeriodoForm.id}`, {
         ano: editPeriodoForm.ano,
         periodo: editPeriodoForm.periodo,
         ativo: !!editPeriodoForm.ativo,
@@ -892,30 +922,31 @@ const Escola = () => {
   async function handleExcluirPeriodo(id) {
     if (!window.confirm('Confirma excluir este período?')) return;
     try {
+      console.log('🗑️ [Escola] Excluindo período:', id);
       // Buscar dados do período antes de excluir para o log
-      const periodoRef = ref(db, `Escola/Periodo/${id}`);
-      const periodoSnap = await get(periodoRef);
-      const periodoData = periodoSnap.exists() ? periodoSnap.val() : {};
+      const periodoData = await getData(`Escola/Periodo/${id}`);
       
-      await remove(periodoRef);
+      await removeData(`Escola/Periodo/${id}`);
       
       // Log da exclusão do período
       await auditService?.logAction({
         action: LOG_ACTIONS.PERIOD_DELETE,
         entity: 'period',
         entityId: id,
-        details: `Período excluído: Ano ${periodoData.ano || 'N/A'} - Período ${periodoData.periodo || 'N/A'}`,
+        details: `Período excluído: Ano ${periodoData?.ano || 'N/A'} - Período ${periodoData?.periodo || 'N/A'}`,
         changes: {
-          ano: periodoData.ano,
-          periodo: periodoData.periodo,
-          dataInicio: periodoData.dataInicio,
-          dataFim: periodoData.dataFim,
-          ativo: periodoData.ativo
+          ano: periodoData?.ano,
+          periodo: periodoData?.periodo,
+          dataInicio: periodoData?.dataInicio,
+          dataFim: periodoData?.dataFim,
+          ativo: periodoData?.ativo
         }
       });
       
+      console.log('✅ [Escola] Período excluído com sucesso');
       carregarPeriodosCadastrados();
     } catch (err) {
+      console.error('❌ [Escola] Erro ao excluir período:', err);
       alert('Erro ao excluir período!');
     }
   }
@@ -932,7 +963,8 @@ const Escola = () => {
     setLoadingDisciplinas(true);
     try {
       const disciplinaId = `disciplina_${Date.now()}`;
-      await set(ref(db, `disciplinas/${disciplinaId}`), { nome: novaDisciplina });
+      console.log('💾 [Escola] Salvando disciplina:', disciplinaId);
+      await setData(`disciplinas/${disciplinaId}`, { nome: novaDisciplina });
       
       // Log da criação da disciplina
       await auditService?.logAction({
@@ -945,9 +977,11 @@ const Escola = () => {
         }
       });
       
+      console.log('✅ [Escola] Disciplina salva com sucesso');
       setNovaDisciplina("");
       await fetchDataDisciplinas();
     } catch (err) {
+      console.error('❌ [Escola] Erro ao adicionar disciplina:', err);
       alert("Erro ao adicionar disciplina!");
     }
     setLoadingDisciplinas(false);
@@ -956,7 +990,8 @@ const Escola = () => {
   const handleExcluirDisciplina = async (disciplina) => {
     setLoadingDisciplinas(true);
     try {
-      await remove(ref(db, `disciplinas/${disciplina.id}`));
+      console.log('🗑️ [Escola] Excluindo disciplina:', disciplina.id);
+      await removeData(`disciplinas/${disciplina.id}`);
       
       // Log da exclusão da disciplina
       await auditService?.logAction({
@@ -979,15 +1014,18 @@ const Escola = () => {
   const fetchDataDisciplinas = async () => {
     setLoadingDisciplinas(true);
     try {
-      const snap = await get(ref(db, 'disciplinas'));
-      if (snap.exists()) {
-        const data = snap.val();
+      console.log('📡 [Escola] Carregando disciplinas do banco da escola...');
+      const data = await getData('disciplinas');
+      if (data) {
         const listaDisciplinas = Object.entries(data).map(([id, val]) => ({ id, ...val }));
         setDisciplinas(listaDisciplinas);
+        console.log('✅ [Escola] Disciplinas carregadas:', listaDisciplinas.length);
       } else {
+        console.log('⚠️ [Escola] Nenhuma disciplina encontrada');
         setDisciplinas([]);
       }
     } catch (err) {
+      console.error('❌ [Escola] Erro ao carregar disciplinas:', err);
       setDisciplinas([]);
     }
     setLoadingDisciplinas(false);
@@ -1010,25 +1048,62 @@ const Escola = () => {
     return () => clearInterval(interval);
   }, []);
 
+  // Listener de autenticação - DEVE rodar imediatamente
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        console.log('✅ [Escola] Usuário autenticado:', user.uid);
+        setUserId(user.uid);
+      } else {
+        console.log('❌ [Escola] Nenhum usuário autenticado');
+        setUserId(null);
+        setUserRole(null);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // Verificar role do usuário
   useEffect(() => {
     async function fetchRole() {
+      console.log('🔍 [Escola] Verificando role - userId:', userId, 'isReady:', isReady);
+      
       if (!userId) {
+        console.log('⚠️ [Escola] Sem userId - marcando roleChecked como true');
         setUserRole(null);
         setRoleChecked(true);
         return;
       }
-      const userRef = ref(db, `usuarios/${userId}`);
-      const snap = await get(userRef);
-      if (snap.exists()) {
-        const userData = snap.val();
-        setUserRole((userData.role || '').trim().toLowerCase());
-      } else {
-        setUserRole(null);
+
+      if (!isReady) {
+        console.log('⏳ [Escola] Aguardando conexão com banco da escola...');
+        return;
       }
-      setRoleChecked(true);
+      
+      try {
+        console.log('📡 [Escola] Buscando dados do usuário:', `usuarios/${userId}`);
+        const userData = await getData(`usuarios/${userId}`);
+        console.log('📦 [Escola] Dados recebidos:', userData);
+        
+        if (userData) {
+          // ✅ Não converter para lowercase - manter o valor original
+          setUserRole(userData.role || '');
+          console.log('✅ [Escola] Role carregada:', userData.role);
+        } else {
+          console.log('⚠️ [Escola] Nenhum dado encontrado para o usuário');
+          setUserRole(null);
+        }
+      } catch (error) {
+        console.error('❌ [Escola] Erro ao buscar dados do usuário:', error);
+        setUserRole(null);
+      } finally {
+        setRoleChecked(true);
+        console.log('✔️ [Escola] roleChecked marcado como true');
+      }
     }
     fetchRole();
-  }, [userId]);
+  }, [userId, isReady, getData]);
 
   if (!roleChecked) {
     return (
@@ -1037,14 +1112,19 @@ const Escola = () => {
       </Box>
     );
   }
-  if (userRole !== 'coordenadora') {
+  
+  // Verificar se é coordenadora ou coordenador
+  if (!userRole || (userRole !== 'coordenadora' && userRole !== 'coordenador')) {
     return (
       <Box sx={{ mt: 8, textAlign: 'center' }}>
         <Typography variant="h5" color="error" gutterBottom>
           Acesso negado
         </Typography>
         <Typography variant="body1">
-          Esta página é restrita para coordenadoras.
+          Esta página é restrita para coordenadoras/coordenadores.
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+          Role detectada: "{userRole || 'não definida'}"
         </Typography>
       </Box>
     );

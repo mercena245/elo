@@ -58,10 +58,12 @@ import secretariaDigitalService from '../../services/secretariaDigitalService';
 
 import { useSecretariaAccess } from '../../hooks/useSecretariaAccess';
 import { useSchoolServices } from '../../hooks/useSchoolServices';
+import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
 
 const SecretariaDigital = () => {
-  // Services multi-tenant
+  // Hooks multi-tenant
   const { auditService, financeiroService, LOG_ACTIONS, isReady: servicesReady } = useSchoolServices();
+  const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, storage: schoolStorage } = useSchoolDatabase();
 
   const [loading, setLoading] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -92,6 +94,11 @@ const SecretariaDigital = () => {
   }, [accessLoading, userRole]);
 
   const carregarDados = async () => {
+    if (!isReady) {
+      console.log('⏳ Aguardando conexão com banco da escola...');
+      return;
+    }
+
     setLoading(true);
     try {
       // Carregar alunos
@@ -101,12 +108,10 @@ const SecretariaDigital = () => {
         const alunosData = await alunosResponse.json();
         todosAlunos = alunosData;
       } else {
-        // Fallback para buscar do Firebase
-        const { db, ref, get } = await import('../../firebase');
-        const alunosRef = ref(db, 'alunos');
-        const snapshot = await get(alunosRef);
-        if (snapshot.exists()) {
-          todosAlunos = Object.entries(snapshot.val())
+        // Fallback para buscar usando useSchoolDatabase
+        const alunosData = await getData('alunos');
+        if (alunosData) {
+          todosAlunos = Object.entries(alunosData)
             .map(([id, aluno]) => ({ id, ...aluno }));
         }
       }

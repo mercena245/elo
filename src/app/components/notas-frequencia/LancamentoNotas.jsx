@@ -39,9 +39,10 @@ import {
 } from '@mui/icons-material';
 ;
 import { logAction, LOG_ACTIONS } from '../../../services/auditService';
-import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
+import { useSchoolDatabase } from '../../../hooks/useSchoolDatabase';
 
 const LancamentoNotas = ({ professorId = null }) => {
+  const { getData, setData, updateData, isReady } = useSchoolDatabase();
   const [loading, setLoading] = useState(true);
   const [turmas, setTurmas] = useState([]);
   const [disciplinas, setDisciplinas] = useState([]);
@@ -86,59 +87,51 @@ const LancamentoNotas = ({ professorId = null }) => {
   }, [filtros.turmaId, filtros.disciplinaId, filtros.professorIdSelecionado, filtros.bimestre]);
 
   const carregarDados = async () => {
+    if (!isReady) return;
+    
     setLoading(true);
     try {
-      const [turmasSnap, disciplinasSnap, usuariosSnap] = await Promise.all([
+      const [turmasData, disciplinasData, usuariosData] = await Promise.all([
         getData('turmas'),
         getData('disciplinas'),
         getData('usuarios')
       ]);
 
       // Carregar turmas - aplicar filtro para professoras
-      let turmasData = [];
-      if (turmasSnap.exists()) {
-        const todasTurmas = [];
-        Object.entries(turmasSnap.val()).forEach(([id, data]) => {
-          todasTurmas.push({ id, ...data });
-        });
+      let turmasArray = [];
+      if (turmasData) {
+        const todasTurmas = Object.entries(turmasData).map(([id, data]) => ({
+          id,
+          ...data
+        }));
 
         // Se é professora, filtrar apenas suas turmas usando ID
         if (professorId) {
-          const professoraSnap = await get(ref(db, `usuarios/${professorId}`));
-          if (professoraSnap.exists()) {
-            const professoraData = professoraSnap.val();
+          const professoraData = await getData(`usuarios/${professorId}`);
+          if (professoraData) {
             const minhasTurmas = professoraData.turmas || [];
-            
-            turmasData = todasTurmas.filter(turma => 
-              minhasTurmas.includes(turma.id)
-            );
+            turmasArray = todasTurmas.filter(turma => minhasTurmas.includes(turma.id));
           }
         } else {
           // Se é coordenadora, mostrar todas as turmas
-          turmasData = todasTurmas;
+          turmasArray = todasTurmas;
         }
       }
-      setTurmas(turmasData);
+      setTurmas(turmasArray);
 
       // Carregar disciplinas
-      const disciplinasData = [];
-      if (disciplinasSnap.exists()) {
-        Object.entries(disciplinasSnap.val()).forEach(([id, data]) => {
-          disciplinasData.push({ id, ...data });
-        });
-      }
-      setDisciplinas(disciplinasData);
+      const disciplinasArray = disciplinasData
+        ? Object.entries(disciplinasData).map(([id, data]) => ({ id, ...data }))
+        : [];
+      setDisciplinas(disciplinasArray);
 
       // Carregar professores - corrigir filtro
-      const professoresData = [];
-      if (usuariosSnap.exists()) {
-        Object.entries(usuariosSnap.val()).forEach(([id, data]) => {
-          if (data.role === 'professora' && data.nome) {
-            professoresData.push({ id, ...data });
-          }
-        });
-      }
-      setProfessores(professoresData);
+      const professoresArray = usuariosData
+        ? Object.entries(usuariosData)
+            .filter(([id, data]) => data.role === 'professora' && data.nome)
+            .map(([id, data]) => ({ id, ...data }))
+        : [];
+      setProfessores(professoresArray);
 
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
@@ -148,17 +141,18 @@ const LancamentoNotas = ({ professorId = null }) => {
   };
 
   const carregarAlunos = async () => {
+    if (!isReady) return;
+    
     try {
-      const alunosSnap = await getData('alunos');
-      const alunosData = [];
+      const alunosData = await getData('alunos');
+      let alunosArray = [];
       
-      if (alunosSnap.exists()) {
+      if (alunosData) {
         // Se é professora, verificar se tem permissão para ver esta turma
         if (professorId) {
-          const professoraSnap = await get(ref(db, `usuarios/${professorId}`));
+          const professoraData = await getData(`usuarios/${professorId}`);
           
-          if (professoraSnap.exists()) {
-            const professoraData = professoraSnap.val();
+          if (professoraData) {
             const minhasTurmas = professoraData.turmas || [];
             
             // Verificar se a turma selecionada está nas turmas da professora usando ID
@@ -170,40 +164,38 @@ const LancamentoNotas = ({ professorId = null }) => {
           }
         }
         
-        Object.entries(alunosSnap.val()).forEach(([id, data]) => {
-          if (data.turmaId === filtros.turmaId) {
-            alunosData.push({ id, ...data });
-          }
-        });
+        alunosArray = Object.entries(alunosData)
+          .filter(([id, data]) => data.turmaId === filtros.turmaId)
+          .map(([id, data]) => ({ id, ...data }));
       }
       
       // Ordenar por nome
-      alunosData.sort((a, b) => a.nome?.localeCompare(b.nome) || 0);
-      setAlunos(alunosData);
+      alunosArray.sort((a, b) => a.nome?.localeCompare(b.nome) || 0);
+      setAlunos(alunosArray);
     } catch (error) {
       console.error('Erro ao carregar alunos:', error);
     }
   };
 
   const carregarNotas = async () => {
+    if (!isReady) return;
+    
     try {
-      const notasSnap = await getData('notas');
-      const notasData = [];
+      const notasData = await getData('notas');
+      let notasArray = [];
       
-      if (notasSnap.exists()) {
-        Object.entries(notasSnap.val()).forEach(([id, data]) => {
-          if (
+      if (notasData) {
+        notasArray = Object.entries(notasData)
+          .filter(([id, data]) => 
             data.turmaId === filtros.turmaId &&
             data.disciplinaId === filtros.disciplinaId &&
             data.professorId === filtros.professorIdSelecionado &&
             data.bimestre === filtros.bimestre
-          ) {
-            notasData.push({ id, ...data });
-          }
-        });
+          )
+          .map(([id, data]) => ({ id, ...data }));
       }
       
-      setNotas(notasData);
+      setNotas(notasArray);
     } catch (error) {
       console.error('Erro ao carregar notas:', error);
     }
@@ -259,7 +251,7 @@ const LancamentoNotas = ({ professorId = null }) => {
           updatedAt: new Date().toISOString()
         };
 
-        promises.push(setData('notas/${notaId}', notaData));
+        promises.push(setData(`notas/${notaId}`, notaData));
         
         // Preparar log para cada nota
         const logData = {

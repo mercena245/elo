@@ -3,7 +3,7 @@ import SidebarMenu from '../../components/SidebarMenu';
 import AdminClaimChecker from '../../components/AdminClaimChecker';
 import DevClaimsAccordion from '../../components/DevClaimsAccordion';
 import LogsViewer from '../components/LogsViewer';
-import { Box, Typography, Card, CardContent, List, ListItem, ListItemText, CircularProgress, Button, FormControl, InputLabel, Select, MenuItem, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Autocomplete, Chip } from '@mui/material';
+import { Box, Typography, Card, CardContent, List, ListItem, ListItemButton, ListItemText, CircularProgress, Button, FormControl, InputLabel, Select, MenuItem, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Autocomplete, Chip } from '@mui/material';
 import { useEffect, useState } from 'react';
 import { auth, deleteUserFunction } from '../../firebase';
 
@@ -19,18 +19,24 @@ export default function Configuracoes() {
   // Hook para acessar banco da escola
   const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, storage: schoolStorage } = useSchoolDatabase();
 
+  // Services multi-tenant
+  const { auditService, financeiroService, LOG_ACTIONS, isReady: servicesReady } = useSchoolServices();
+
   const { user } = useAuth();
   const superAdminId = 'qD6UucWtcgPC9GHA41OB8rSaghZ2';
   const isSuperAdmin = user?.uid === superAdminId;
   // Função para recusar usuário (excluir do banco e do Auth)
   async function rejectUser(uid) {
+    if (!isReady) {
+      console.log('⏳ Aguardando conexão com banco da escola...');
+      return;
+    }
+    
     // Buscar dados do usuário para o log antes de excluir
-    const userRef = ref(db, `usuarios/${uid}`);
-    const userSnap = await get(userRef);
-    const userData = userSnap.exists() ? userSnap.val() : {};
+    const userData = await getData(`usuarios/${uid}`) || {};
     
     // Remove do banco
-    await set(userRef, null);
+    await removeData(`usuarios/${uid}`);
     
     // Log da rejeição do usuário
     await auditService?.logAction({
@@ -76,12 +82,15 @@ export default function Configuracoes() {
   const [alunosSelecionados, setAlunosSelecionados] = useState([]);
   // Função para atualizar lista de usuários e pendentes
   const fetchUsuarios = async () => {
+    if (!isReady) {
+      console.log('⏳ Aguardando conexão com banco da escola...');
+      return;
+    }
+    
     setLoading(true);
     setLoadingUsuarios(true);
-    const usuariosRef = ref(db, 'usuarios');
-    const snap = await get(usuariosRef);
-    if (snap.exists()) {
-      const all = snap.val();
+    const all = await getData('usuarios');
+    if (all) {
       const listaPendentes = Object.entries(all)
         .filter(([_, u]) => !u.role)
         .map(([uid, u]) => ({ ...u, uid }));
@@ -100,11 +109,14 @@ export default function Configuracoes() {
 
   // Função para buscar alunos
   const fetchAlunos = async () => {
+    if (!isReady) {
+      console.log('⏳ Aguardando conexão com banco da escola...');
+      return;
+    }
+    
     try {
-      const alunosRef = ref(db, 'alunos');
-      const snap = await get(alunosRef);
-      if (snap.exists()) {
-        const all = snap.val();
+      const all = await getData('alunos');
+      if (all) {
         const listaAlunos = Object.entries(all)
           .map(([id, aluno]) => ({ 
             id, 
@@ -126,11 +138,14 @@ export default function Configuracoes() {
   // Atualiza role do usuário e vincula com aluno se aplicável
   const handleEditRole = async () => {
     if (!editUser) return;
+    if (!isReady) {
+      console.log('⏳ Aguardando conexão com banco da escola...');
+      return;
+    }
+    
     try {
-      const userRef = ref(db, `usuarios/${editUser.uid}`);
-      const snap = await get(userRef);
-      if (snap.exists()) {
-        const userData = snap.val();
+      const userData = await getData(`usuarios/${editUser.uid}`);
+      if (userData) {
         const dadosAnteriores = { ...userData };
         
         // Remover vinculações antigas se necessário
@@ -139,12 +154,10 @@ export default function Configuracoes() {
         const alunosParaRemover = alunosAntigos.filter(id => !novosIds.includes(id));
         
         for (const alunoId of alunosParaRemover) {
-          const alunoAntigoRef = ref(db, `alunos/${alunoId}`);
-          const alunoAntigoSnap = await get(alunoAntigoRef);
-          if (alunoAntigoSnap.exists()) {
-            const alunoAntigoData = alunoAntigoSnap.val();
+          const alunoAntigoData = await getData(`alunos/${alunoId}`);
+          if (alunoAntigoData) {
             const { responsavelUsuario, ...alunoSemResponsavel } = alunoAntigoData;
-            await set(alunoAntigoRef, alunoSemResponsavel);
+            await setData(`alunos/${alunoId}`, alunoSemResponsavel);
           }
         }
         
@@ -156,7 +169,7 @@ export default function Configuracoes() {
           alunosVinculados: (editRole === 'pai' && alunosSelecionados.length > 0) ? alunosSelecionados.map(a => a.id) : []
         };
         
-        await set(userRef, updatedUserData);
+        await setData(`usuarios/${editUser.uid}`, updatedUserData);
         
         // Identificar mudanças para o log
         const mudancas = {};
@@ -193,11 +206,9 @@ export default function Configuracoes() {
         // Vincular novos alunos se o role é "pai"
         if (editRole === 'pai' && alunosSelecionados.length > 0) {
           for (const aluno of alunosSelecionados) {
-            const alunoRef = ref(db, `alunos/${aluno.id}`);
-            const alunoSnap = await get(alunoRef);
-            if (alunoSnap.exists()) {
-              const alunoData = alunoSnap.val();
-              await set(alunoRef, {
+            const alunoData = await getData(`alunos/${aluno.id}`);
+            if (alunoData) {
+              await setData(`alunos/${aluno.id}`, {
                 ...alunoData,
                 responsavelUsuario: {
                   uid: editUser.uid,
@@ -236,11 +247,13 @@ export default function Configuracoes() {
   // Inativa usuário
   const handleInativar = async () => {
     if (!editUser) return;
-    const userRef = ref(db, `usuarios/${editUser.uid}`);
-    const snap = await get(userRef);
-    if (snap.exists()) {
-      const userData = snap.val();
-      
+    if (!isReady) {
+      console.log('⏳ Aguardando conexão com banco da escola...');
+      return;
+    }
+    
+    const userData = await getData(`usuarios/${editUser.uid}`);
+    if (userData) {
       // Se havia alunos vinculados, remover as vinculações
       const alunosVinculados = userData.alunosVinculados || (userData.alunoVinculado ? [userData.alunoVinculado] : []);
       const nomesAlunosVinculados = alunosVinculados.map(id => {
@@ -249,16 +262,14 @@ export default function Configuracoes() {
       });
       
       for (const alunoId of alunosVinculados) {
-        const alunoRef = ref(db, `alunos/${alunoId}`);
-        const alunoSnap = await get(alunoRef);
-        if (alunoSnap.exists()) {
-          const alunoData = alunoSnap.val();
+        const alunoData = await getData(`alunos/${alunoId}`);
+        if (alunoData) {
           const { responsavelUsuario, ...alunoSemResponsavel } = alunoData;
-          await set(alunoRef, alunoSemResponsavel);
+          await setData(`alunos/${alunoId}`, alunoSemResponsavel);
         }
       }
       
-      await set(userRef, { ...userData, role: 'inativo', alunosVinculados: [] });
+      await setData(`usuarios/${editUser.uid}`, { ...userData, role: 'inativo', alunosVinculados: [] });
       
       // Log da inativação do usuário
       await auditService?.logAction({
@@ -283,6 +294,11 @@ export default function Configuracoes() {
   // Exclui usuário do banco e do Auth via Cloud Function
   const handleDeleteUser = async () => {
     if (!editUser) return;
+    if (!isReady) {
+      console.log('⏳ Aguardando conexão com banco da escola...');
+      return;
+    }
+    
     try {
       // Se havia alunos vinculados, remover as vinculações primeiro
       const alunosVinculados = editUser.alunosVinculados || (editUser.alunoVinculado ? [editUser.alunoVinculado] : []);
@@ -292,12 +308,10 @@ export default function Configuracoes() {
       });
       
       for (const alunoId of alunosVinculados) {
-        const alunoRef = ref(db, `alunos/${alunoId}`);
-        const alunoSnap = await get(alunoRef);
-        if (alunoSnap.exists()) {
-          const alunoData = alunoSnap.val();
+        const alunoData = await getData(`alunos/${alunoId}`);
+        if (alunoData) {
           const { responsavelUsuario, ...alunoSemResponsavel } = alunoData;
-          await set(alunoRef, alunoSemResponsavel);
+          await setData(`alunos/${alunoId}`, alunoSemResponsavel);
         }
       }
       
@@ -353,10 +367,13 @@ export default function Configuracoes() {
     fetchAlunos();
     // Buscar turmas do banco
     const fetchTurmas = async () => {
-      const turmasRef = ref(db, 'turmas');
-      const snap = await get(turmasRef);
-      if (snap.exists()) {
-        const all = snap.val();
+      if (!isReady) {
+        console.log('⏳ Aguardando conexão com banco da escola...');
+        return;
+      }
+      
+      const all = await getData('turmas');
+      if (all) {
         // Transformar em array de objetos com ID e nome para usar no Select
         const listaTurmas = Object.entries(all).map(([id, turma]) => ({
           id,
@@ -368,7 +385,7 @@ export default function Configuracoes() {
       }
     };
     fetchTurmas();
-  }, []);
+  }, [isReady, getData]);
 
   useEffect(() => {
     async function fetchRole() {
@@ -377,10 +394,13 @@ export default function Configuracoes() {
         setRoleChecked(true);
         return;
       }
-      const userRef = ref(db, `usuarios/${userId}`);
-      const snap = await get(userRef);
-      if (snap.exists()) {
-        const userData = snap.val();
+      if (!isReady) {
+        console.log('⏳ Aguardando conexão com banco da escola...');
+        return;
+      }
+      
+      const userData = await getData(`usuarios/${userId}`);
+      if (userData) {
         setUserRole((userData.role || '').trim().toLowerCase());
       } else {
         setUserRole(null);
@@ -388,7 +408,7 @@ export default function Configuracoes() {
       setRoleChecked(true);
     }
     fetchRole();
-  }, [userId]);
+  }, [userId, isReady, getData]);
 
   if (!roleChecked) {
     return (
@@ -411,12 +431,15 @@ export default function Configuracoes() {
   }
 
   const handleApprove = async (uid, role) => {
-    const userRef = ref(db, `usuarios/${uid}`);
+    if (!isReady) {
+      console.log('⏳ Aguardando conexão com banco da escola...');
+      return;
+    }
+    
     // Busca os dados atuais do usuário
-    const snap = await get(userRef);
-    if (snap.exists()) {
-      const userData = snap.val();
-      await set(userRef, { ...userData, role });
+    const userData = await getData(`usuarios/${uid}`);
+    if (userData) {
+      await setData(`usuarios/${uid}`, { ...userData, role });
       
       // Log da aprovação do usuário
       await auditService?.logAction({
@@ -587,9 +610,11 @@ export default function Configuracoes() {
               ) : (
                 <List>
                   {pendentes.map(user => (
-                    <ListItem key={user.uid} divider button onClick={() => { setSelectedUser(user); setDialogOpen(true); }}>
-                      <ListItemText primary={user.nome || user.email} secondary={user.email} />
-                      <Button variant="outlined" color="primary" onClick={() => { setSelectedUser(user); setDialogOpen(true); }}>Validar acesso</Button>
+                    <ListItem key={user.uid} divider disablePadding>
+                      <ListItemButton onClick={() => { setSelectedUser(user); setDialogOpen(true); }}>
+                        <ListItemText primary={user.nome || user.email} secondary={user.email} />
+                        <Button variant="outlined" color="primary" onClick={(e) => { e.stopPropagation(); setSelectedUser(user); setDialogOpen(true); }}>Validar acesso</Button>
+                      </ListItemButton>
                     </ListItem>
                   ))}
                 </List>
@@ -649,23 +674,24 @@ export default function Configuracoes() {
                       (u.email && u.email.toLowerCase().includes(filtroNomeUsuario.toLowerCase()))
                     )
                     .map(user => (
-                      <ListItem key={user.uid} divider button onClick={() => {
-                        setEditUser(user);
-                        setEditRole(user.role || '');
-                        
-                        // Carregar alunos vinculados existentes se houver
-                        const alunosVinculados = user.alunosVinculados || (user.alunoVinculado ? [user.alunoVinculado] : []);
-                        if (alunosVinculados.length > 0) {
-                          const alunosCarregados = alunosVinculados.map(id => 
-                            alunos.find(aluno => aluno.id === id)
-                          ).filter(Boolean); // Remove valores undefined
-                          setAlunosSelecionados(alunosCarregados);
-                        } else {
-                          setAlunosSelecionados([]);
-                        }
-                        
-                        setEditDialogOpen(true);
-                      }}>
+                      <ListItem key={user.uid} divider disablePadding>
+                        <ListItemButton onClick={() => {
+                          setEditUser(user);
+                          setEditRole(user.role || '');
+                          
+                          // Carregar alunos vinculados existentes se houver
+                          const alunosVinculados = user.alunosVinculados || (user.alunoVinculado ? [user.alunoVinculado] : []);
+                          if (alunosVinculados.length > 0) {
+                            const alunosCarregados = alunosVinculados.map(id => 
+                              alunos.find(aluno => aluno.id === id)
+                            ).filter(Boolean); // Remove valores undefined
+                            setAlunosSelecionados(alunosCarregados);
+                          } else {
+                            setAlunosSelecionados([]);
+                          }
+                          
+                          setEditDialogOpen(true);
+                        }}>
                         <ListItemText
                           primary={user.nome || user.email}
                           secondary={
@@ -683,6 +709,7 @@ export default function Configuracoes() {
                             })() : '')
                           }
                         />
+                        </ListItemButton>
                       </ListItem>
                     ))}
           {/* Modal de edição de usuário */}

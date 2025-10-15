@@ -1,6 +1,6 @@
 "use client";
 import React, { useState } from 'react';
-import { auth } from '../firebase';
+import { auth, db, ref, get, set } from '../firebase';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { 
   Button, 
@@ -33,8 +33,6 @@ const RegisterForm = ({ onRegisterStart }) => {
   const [showForm, setShowForm] = useState(true);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
-
-  const { db, ref, get, set } = require('../firebase');
 
   const handleSubmit = async (e) => {
     e.preventDefault();

@@ -47,9 +47,12 @@ import {
   Person
 } from '@mui/icons-material';
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
-import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
+import { useSchoolDatabase } from '../../../hooks/useSchoolDatabase';
 
 const AgendaMedicaSection = ({ userRole, userData }) => {
+  // Hook para acessar banco da escola
+  const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, storage: schoolStorage } = useSchoolDatabase();
+
   const [medicamentos, setMedicamentos] = useState([]);
   const [dialogNovoMedicamento, setDialogNovoMedicamento] = useState(false);
   const [dialogReceita, setDialogReceita] = useState(false);
@@ -86,15 +89,15 @@ const AgendaMedicaSection = ({ userRole, userData }) => {
     if (userRole === 'coordenadora') {
       fetchSolicitacoesPendentes();
     }
-  }, [userData]);
+  }, [userData, isReady]);
 
   const fetchMedicamentos = async () => {
+    if (!isReady) return;
+    
     try {
-      const medicamentosRef = ref(db, 'medicamentos');
-      const snap = await get(medicamentosRef);
+      const dados = await getData('medicamentos');
       
-      if (snap.exists()) {
-        const dados = snap.val();
+      if (dados) {
         const medicamentosList = Object.entries(dados).map(([id, med]) => ({
           id,
           ...med
@@ -129,12 +132,12 @@ const AgendaMedicaSection = ({ userRole, userData }) => {
   };
 
   const fetchAlunos = async () => {
+    if (!isReady) return;
+    
     try {
-      const alunosRef = ref(db, 'alunos');
-      const snap = await get(alunosRef);
+      const dados = await getData('alunos');
       
-      if (snap.exists()) {
-        const dados = snap.val();
+      if (dados) {
         const alunosList = Object.entries(dados).map(([id, aluno]) => ({
           id,
           ...aluno
@@ -163,12 +166,12 @@ const AgendaMedicaSection = ({ userRole, userData }) => {
   };
 
   const fetchHistorico = async () => {
+    if (!isReady) return;
+    
     try {
-      const historicoRef = ref(db, 'historicoMedicacao');
-      const snap = await get(historicoRef);
+      const dados = await getData('historicoMedicacao');
       
-      if (snap.exists()) {
-        const dados = snap.val();
+      if (dados) {
         const historicoList = Object.entries(dados).map(([id, hist]) => ({
           id,
           ...hist
@@ -199,12 +202,12 @@ const AgendaMedicaSection = ({ userRole, userData }) => {
   };
 
   const fetchSolicitacoesPendentes = async () => {
+    if (!isReady) return;
+    
     try {
-      const medicamentosRef = ref(db, 'medicamentos');
-      const snap = await get(medicamentosRef);
+      const dados = await getData('medicamentos');
       
-      if (snap.exists()) {
-        const dados = snap.val();
+      if (dados) {
         const medicamentosList = Object.entries(dados).map(([id, med]) => ({
           id,
           ...med
@@ -405,9 +408,9 @@ const AgendaMedicaSection = ({ userRole, userData }) => {
   const uploadReceita = async (file) => {
     try {
       setUploadingReceita(true);
-      const storage = getStorage();
       const timestamp = new Date().getTime();
-      const receitaRef = storageRef(schoolStorage, `receitas/temp_${timestamp}_${file.name}`);
+      // Usar _storage (instância real do Firebase Storage)
+      const receitaRef = storageRef(schoolStorage._storage, `receitas/temp_${timestamp}_${file.name}`);
       
       await uploadBytes(receitaRef, file);
       const downloadURL = await getDownloadURL(receitaRef);
@@ -450,9 +453,6 @@ const AgendaMedicaSection = ({ userRole, userData }) => {
   };
 
   const fecharDetalhes = () => {
-  // Hook para acessar banco da escola
-  const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, storage: schoolStorage } = useSchoolDatabase();
-
     setModalDetalhes(false);
     setMedicamentoDetalhes(null);
   };

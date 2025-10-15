@@ -83,15 +83,13 @@ const Agenda = () => {
 
   useEffect(() => {
     const fetchUserData = async () => {
-      if (!userId) return;
+      if (!userId || !isReady) return;
       
       try {
-        const userRef = ref(db, `usuarios/${userId}`);
-        const userSnap = await get(userRef);
+        // Usar getData do hook useSchoolDatabase
+        const data = await getData(`usuarios/${userId}`);
         
-        if (userSnap.exists()) {
-          const data = userSnap.val();
-          
+        if (data) {
           // Para pais, buscar dados dos alunos vinculados
           if (data.role === 'pai') {
             const alunosVinculados = data.alunosVinculados || (data.alunoVinculado ? [data.alunoVinculado] : []);
@@ -109,7 +107,7 @@ const Agenda = () => {
     };
 
     fetchUserData();
-  }, [userId]);
+  }, [userId, isReady, getData]);
 
   const tabsConfig = [
     {

@@ -42,11 +42,15 @@ import {
   School,
   Circle
 } from '@mui/icons-material';
-import { storageRef, uploadBytes, getDownloadURL, auth } from '../../../firebase';
+import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
+import { auth } from '../../../firebase';
 import { auditService, LOG_ACTIONS } from '../../../services/auditService';
-import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
+import { useSchoolDatabase } from '../../../hooks/useSchoolDatabase';
 
 const MensagensSection = ({ userRole, userData }) => {
+  // Hook para acessar banco da escola
+  const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, storage: schoolStorage } = useSchoolDatabase();
+
   const [conversas, setConversas] = useState([]);
   const [conversaSelecionada, setConversaSelecionada] = useState(null);
   const [dialogNovaMensagem, setDialogNovaMensagem] = useState(false);
@@ -63,15 +67,15 @@ const MensagensSection = ({ userRole, userData }) => {
   useEffect(() => {
     fetchConversas();
     fetchUsuarios();
-  }, [userData]);
+  }, [userData, isReady]);
 
   const fetchConversas = async () => {
+    if (!isReady) return;
+    
     try {
-      const mensagensRef = ref(db, 'mensagens');
-      const snap = await get(mensagensRef);
+      const dados = await getData('mensagens');
       
-      if (snap.exists()) {
-        const dados = snap.val();
+      if (dados) {
         const conversasList = Object.entries(dados).map(([id, conversa]) => ({
           id,
           ...conversa
@@ -93,12 +97,12 @@ const MensagensSection = ({ userRole, userData }) => {
   };
 
   const fetchUsuarios = async () => {
+    if (!isReady) return;
+    
     try {
-      const usuariosRef = ref(db, 'usuarios');
-      const snap = await get(usuariosRef);
+      const dados = await getData('usuarios');
       
-      if (snap.exists()) {
-        const dados = snap.val();
+      if (dados) {
         const usuariosList = Object.entries(dados).map(([id, usuario]) => ({
           id,
           ...usuario
@@ -221,9 +225,6 @@ const MensagensSection = ({ userRole, userData }) => {
   };
 
   const fecharDialogNovaMensagem = () => {
-  // Hook para acessar banco da escola
-  const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, storage: schoolStorage } = useSchoolDatabase();
-
     // Log do cancelamento se havia conteúdo
     if (novaMensagem.destinatario || novaMensagem.assunto || novaMensagem.conteudo || (novaMensagem.anexos && novaMensagem.anexos.length > 0)) {
       auditService.logAction(
@@ -279,7 +280,8 @@ const MensagensSection = ({ userRole, userData }) => {
           caminho: fileName
         });
         
-        const fileRef = storageRef(schoolStorage, fileName);
+        // Usar _storage (instância real do Firebase Storage)
+        const fileRef = storageRef(schoolStorage._storage, fileName);
         console.log('Referência do Storage criada:', fileRef);
 
         // Upload do arquivo

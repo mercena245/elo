@@ -12,6 +12,8 @@ import TwoFactorVerification from '../components/TwoFactorVerification'
 const inter = Inter({ subsets: ['latin'] })
 
 function AppContent({ children }) {
+  const [mounted, setMounted] = useState(false);
+  
   const { 
     user, 
     loading, 
@@ -26,6 +28,29 @@ function AppContent({ children }) {
     handleTwoFactorVerificationSuccess,
     handleTwoFactorCancel
   } = useAuth();
+
+  // Evitar erro de hidratação
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Durante hidratação inicial, sempre renderiza children
+  if (!mounted) {
+    return children;
+  }
+
+  // Verificar se está em uma rota pública (login, register, etc)
+  const isPublicRoute = typeof window !== 'undefined' && 
+    (window.location.pathname === '/login' || 
+     window.location.pathname === '/register' ||
+     window.location.pathname === '/school-selection' ||
+     window.location.pathname === '/aguardando-aprovacao' ||
+     window.location.pathname === '/');
+
+  // Se está em rota pública, renderiza imediatamente sem esperar autenticação
+  if (isPublicRoute && loading) {
+    return children;
+  }
 
   if (loading) {
     return (

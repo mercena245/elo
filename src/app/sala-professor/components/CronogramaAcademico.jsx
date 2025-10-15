@@ -47,8 +47,6 @@ import {
   Schedule as ScheduleIcon,
   CalendarMonth as CalendarMonthIcon
 } from '@mui/icons-material';
-import { ref, onValue, push, update, remove } from 'firebase/database';
-;
 import { useAuthUser } from '../../../hooks/useAuthUser';
 import { auditService } from '../../../services/auditService';
 import { useSchoolDatabase } from '../../../hooks/useSchoolDatabase';
@@ -100,47 +98,34 @@ const CronogramaAcademico = () => {
   };
 
   useEffect(() => {
-    if (user?.uid) {
+    if (user?.uid && isReady) {
       carregarDados();
     }
-  }, [user]);
+  }, [user, isReady]);
 
   useEffect(() => {
     organizarEventos();
   }, [eventos, mesAtual]);
 
   const carregarDados = async () => {
+    if (!isReady) {
+      console.log('⏳ [CronogramaAcademico] Aguardando conexão com banco da escola...');
+      return;
+    }
+
     try {
       setLoading(true);
       
-      const refs = {
-        eventos: ref(db, 'cronograma-academico'),
-        turmas: ref(db, 'turmas'),
-        disciplinas: ref(db, 'disciplinas')
-      };
+      // Buscar dados usando getData
+      const [eventosData, turmasData, disciplinasData] = await Promise.all([
+        getData('cronograma-academico'),
+        getData('turmas'),
+        getData('disciplinas')
+      ]);
 
-      // Listeners
-      const unsubscribes = [];
-
-      unsubscribes.push(
-        onValue(refs.eventos, (snapshot) => {
-          setEventos(snapshot.val() || {});
-        })
-      );
-
-      unsubscribes.push(
-        onValue(refs.turmas, (snapshot) => {
-          setTurmas(snapshot.val() || {});
-        })
-      );
-
-      unsubscribes.push(
-        onValue(refs.disciplinas, (snapshot) => {
-          setDisciplinas(snapshot.val() || {});
-        })
-      );
-
-      return () => unsubscribes.forEach(unsub => unsub());
+      setEventos(eventosData || {});
+      setTurmas(turmasData || {});
+      setDisciplinas(disciplinasData || {});
       
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
@@ -244,7 +229,7 @@ const CronogramaAcademico = () => {
       };
 
       if (eventoEditando) {
-        await updateData('cronograma-academico/${eventoEditando.id}', eventoData);
+        await updateData(`cronograma-academico/${eventoEditando.id}`, eventoData);
         await auditService.logAction(
           'cronograma_evento_update',
           user.uid,
@@ -278,7 +263,7 @@ const CronogramaAcademico = () => {
     if (!confirm(`Deseja excluir o evento "${titulo}"?`)) return;
 
     try {
-      await removeData('cronograma-academico/${eventoId}');
+      await removeData(`cronograma-academico/${eventoId}`);
       await auditService.logAction(
         'cronograma_evento_delete',
         user.uid,
@@ -429,7 +414,7 @@ const CronogramaAcademico = () => {
                 {/* Dias do mês */}
                 {getDiasDoMes().map((dia, index) => {
                   if (!dia) {
-                    return <Grid item xs key={index} sx={{ width: '14.28%', height: 80 }} />;
+                    return <Grid item xs key={`empty-${index}`} sx={{ width: '14.28%', height: 80 }} />;
                   }
 
                   const dateKey = dia.toISOString().split('T')[0];
@@ -437,7 +422,7 @@ const CronogramaAcademico = () => {
                   const isHoje = dia.toDateString() === new Date().toDateString();
 
                   return (
-                    <Grid item xs key={dia.getDate()} sx={{ width: '14.28%' }}>
+                    <Grid item xs key={dateKey} sx={{ width: '14.28%' }}>
                       <Paper
                         variant="outlined"
                         sx={{

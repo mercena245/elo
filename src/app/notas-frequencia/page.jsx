@@ -13,7 +13,7 @@ import {
   Tab,
   Alert
 } from '@mui/material';
-import { auth } from '../../firebase';
+import { auth, onAuthStateChanged } from '../../firebase';
 import { useRouter } from 'next/navigation';
 import LancamentoNotas from '../components/notas-frequencia/LancamentoNotas';
 import RegistroFaltas from '../components/notas-frequencia/RegistroFaltas';
@@ -28,46 +28,70 @@ const NotasFrequencia = () => {
 
   const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState('');
-  const [userId, setUserId] = useState('');
+  const [userId, setUserId] = useState(null);
   const [roleChecked, setRoleChecked] = useState(false);
   const [tabValue, setTabValue] = useState(0);
   const router = useRouter();
-  const currentUser = auth.currentUser;
 
+  // Listener de autenticação - DEVE rodar imediatamente
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged(async (user) => {
-      console.log('NotasFrequencia - Estado da autenticação mudou:', user);
-      
-      if (!user) {
-        console.log('Usuário não autenticado, redirecionando para login...');
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        console.log('✅ [Notas] Usuário autenticado:', user.uid);
+        setUserId(user.uid);
+      } else {
+        console.log('❌ [Notas] Nenhum usuário autenticado');
+        setUserId(null);
+        setUserRole(null);
         router.push('/login');
-        return;
-      }
-      
-      setUserId(user.uid);
-      console.log('UserId definido:', user.uid);
-      
-      try {
-        const userRef = ref(db, `usuarios/${user.uid}`);
-        const snap = await get(userRef);
-        if (snap.exists()) {
-          const userData = snap.val();
-          console.log('Dados do usuário:', userData);
-          setUserRole((userData.role || '').trim().toLowerCase());
-        } else {
-          console.log('Usuário não encontrado no banco de dados');
-          setUserRole(null);
-        }
-      } catch (error) {
-        console.error('Erro ao buscar dados do usuário:', error);
-      } finally {
-        setRoleChecked(true);
-        setLoading(false);
       }
     });
 
     return () => unsubscribe();
   }, [router]);
+
+  // Verificar role do usuário
+  useEffect(() => {
+    async function fetchRole() {
+      console.log('🔍 [Notas] Verificando role - userId:', userId, 'isReady:', isReady);
+      
+      if (!userId) {
+        console.log('⚠️ [Notas] Sem userId - marcando roleChecked como true');
+        setUserRole(null);
+        setRoleChecked(true);
+        setLoading(false);
+        return;
+      }
+
+      if (!isReady) {
+        console.log('⏳ [Notas] Aguardando conexão com banco da escola...');
+        return;
+      }
+      
+      try {
+        console.log('📡 [Notas] Buscando dados do usuário:', `usuarios/${userId}`);
+        const userData = await getData(`usuarios/${userId}`);
+        console.log('📦 [Notas] Dados recebidos:', userData);
+        
+        if (userData) {
+          // ✅ Não converter para lowercase - manter o valor original
+          setUserRole(userData.role || '');
+          console.log('✅ [Notas] Role carregada:', userData.role);
+        } else {
+          console.log('⚠️ [Notas] Nenhum dado encontrado para o usuário');
+          setUserRole(null);
+        }
+      } catch (error) {
+        console.error('❌ [Notas] Erro ao buscar dados do usuário:', error);
+        setUserRole(null);
+      } finally {
+        setRoleChecked(true);
+        setLoading(false);
+        console.log('✔️ [Notas] roleChecked marcado como true');
+      }
+    }
+    fetchRole();
+  }, [userId, isReady, getData]);
 
   // Definir abas baseadas no papel do usuário
   const getTabsForRole = () => {

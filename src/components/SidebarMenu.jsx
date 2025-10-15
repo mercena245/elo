@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { FaBars, FaHome, FaUserFriends, FaSchool, FaSignOutAlt, FaStore, FaUsers, FaCalendarAlt, FaCashRegister, FaEnvelope, FaPrint, FaImages, FaUserCircle, FaCog, FaGraduationCap, FaCertificate, FaChalkboardTeacher } from 'react-icons/fa';
-import { db, ref, get, auth, onAuthStateChanged } from '../firebase';
+import { auth, onAuthStateChanged } from '../firebase';
 import { signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
+import { useSchoolDatabase } from '../hooks/useSchoolDatabase';
 import { 
   Drawer, 
   IconButton, 
@@ -21,6 +22,9 @@ import {
 
 // Versão modernizada do SidebarMenu
 const SidebarMenu = () => {
+  // Hook para acessar banco da escola
+  const { getData, isReady } = useSchoolDatabase();
+  
   const [open, setOpen] = useState(false);
   const [hideIcon, setHideIcon] = useState(false);
   const [pendentes, setPendentes] = useState(0);
@@ -51,36 +55,44 @@ const SidebarMenu = () => {
   useEffect(() => {
     async function fetchRole() {
       try {
-        if (!userId) return;
-        const userRef = ref(db, `usuarios/${userId}`);
-        const snap = await get(userRef);
-        if (snap.exists()) {
-          const data = snap.val();
+        if (!userId || !isReady) return;
+        
+        // Buscar do banco da escola usando getData
+        const data = await getData(`usuarios/${userId}`);
+        
+        if (data) {
+          console.log('📋 [SidebarMenu] Dados do usuário:', data);
+          console.log('👤 [SidebarMenu] Role do usuário:', data.role);
+          
           setUserRole(data.role || '');
           setUserName(data.nome || data.displayName || 'Usuário');
           setUserEmail(data.email || '');
         } else {
+          console.log('⚠️ [SidebarMenu] Usuário não encontrado no banco da escola');
           setUserRole('');
           setUserName('Usuário');
           setUserEmail('');
         }
-      } catch {
+      } catch (error) {
+        console.error('❌ [SidebarMenu] Erro ao buscar role:', error);
         setUserRole('');
         setUserName('Usuário');
         setUserEmail('');
       }
     }
     fetchRole();
-  }, [userId]);
+  }, [userId, isReady, getData]);
 
   useEffect(() => {
     async function fetchPendentes() {
       try {
-        const usuariosRef = ref(db, 'usuarios');
-        const snap = await get(usuariosRef);
-        if (snap.exists()) {
-          const all = snap.val();
-          const lista = Object.values(all).filter(u => !u.role);
+        if (!isReady) return;
+        
+        // Buscar usuários do banco da escola
+        const usuarios = await getData('usuarios');
+        
+        if (usuarios) {
+          const lista = Object.values(usuarios).filter(u => !u.role);
           setPendentes(lista.length);
         } else {
           setPendentes(0);
@@ -90,7 +102,7 @@ const SidebarMenu = () => {
       }
     }
     fetchPendentes();
-  }, []);
+  }, [isReady, getData]);
 
   const handleLogout = async () => {
     await signOut(auth);
@@ -119,10 +131,8 @@ const SidebarMenu = () => {
 
   const getRoleLabel = (role) => {
     switch (role) {
-      case 'coordenadora': 
-      case 'coordenador': return 'Coordenador(a)';
-      case 'professora': 
-      case 'professor': return 'Professor(a)';
+      case 'coordenadora': return 'Coordenador(a)';
+      case 'professora': return 'Professor(a)';
       case 'pai': return 'Responsável';
       case 'admin': return 'Administrador';
       default: return 'Usuário';
@@ -132,32 +142,32 @@ const SidebarMenu = () => {
   const menuItems = [
     { icon: FaHome, label: 'Início', path: '/dashboard', color: '#10B981' },
     // { icon: FaUserCircle, label: 'Perfil', path: '/profile', color: '#3B82F6' }, // Desativado temporariamente
-    ...(['coordenadora', 'coordenador', 'professora', 'professor'].includes(userRole) ? [
+    ...(['coordenadora', 'professora'].includes(userRole) ? [
       { icon: FaUserFriends, label: 'Alunos', path: '/alunos', color: '#F59E0B' }
     ] : []),
-    ...(['professora', 'professor', 'coordenadora', 'coordenador'].includes(userRole) ? [
+    ...(['professora', 'coordenadora'].includes(userRole) ? [
       { icon: FaChalkboardTeacher, label: 'Sala do Professor', path: '/sala-professor', color: '#8B5CF6' }
     ] : []),
-    ...(['professora', 'professor'].includes(userRole) ? [
+    ...(userRole === 'professora' ? [
       { icon: FaGraduationCap, label: 'Notas & Frequência', path: '/notas-frequencia', color: '#8B5CF6' }
     ] : []),
-    ...(['coordenadora', 'coordenador'].includes(userRole) ? [
+    ...(userRole === 'coordenadora' ? [
       { icon: FaSchool, label: 'Escola', path: '/escola', color: '#EF4444' }
     ] : []),
     ...(userRole === 'pai' ? [
       { icon: FaGraduationCap, label: 'Turma do Filho', path: '/turma-filho', color: '#2563EB' }
     ] : []),
     { icon: FaStore, label: 'Loja', path: '/loja', color: '#06B6D4' },
-    ...(['coordenadora', 'coordenador'].includes(userRole) ? [
+    ...(userRole === 'coordenadora' ? [
       { icon: FaUsers, label: 'Colaboradores', path: '/colaboradores', color: '#84CC16' }
     ] : []),
     { icon: FaCalendarAlt, label: 'Agenda', path: '/agenda', color: '#F97316' },
     { icon: FaCashRegister, label: 'Caixa (Financeiro)', path: '/financeiro', color: '#10B981' },
-    ...(['coordenadora', 'coordenador'].includes(userRole) || userRole === 'pai' ? [
+    ...(['coordenadora', 'pai'].includes(userRole) ? [
       { icon: FaCertificate, label: 'Secretaria Digital', path: '/secretaria-digital', color: '#7C3AED' }
     ] : []),
     { icon: FaEnvelope, label: 'Avisos', path: '/avisos', color: '#8B5CF6' },
-    ...(['coordenadora', 'coordenador'].includes(userRole) ? [
+    ...(userRole === 'coordenadora' ? [
       { icon: FaPrint, label: 'Impressões', path: '/impressoes', color: '#6B7280' }
     ] : []),
     { icon: FaImages, label: 'Galeria de Fotos', path: '/galeriafotos', color: '#EC4899' }

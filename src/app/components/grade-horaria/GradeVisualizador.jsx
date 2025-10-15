@@ -24,7 +24,7 @@ import { Add, Print } from '@mui/icons-material';
 import ModalHorario from './ModalHorario';
 import ImpressaoGradeNova from './ImpressaoGradeNova';
 import SeletorPeriodoLetivo from '../shared/SeletorPeriodoLetivo';
-import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
+import { useSchoolDatabase } from '../../../hooks/useSchoolDatabase';
 
 const GradeVisualizador = () => {
   // Hook para acessar banco da escola
@@ -103,19 +103,25 @@ const GradeVisualizador = () => {
   };
 
   const carregarDados = async () => {
+    if (!isReady) return;
+    
     setLoading(true);
     
     try {
-      // Carregar turmas
-      const turmasSnap = await getData('turmas');
-      if (turmasSnap.exists()) {
-        const turmasData = turmasSnap.val();
+      // Carregar turmas, disciplinas e usuários
+      const [turmasData, disciplinasData, usuariosData] = await Promise.all([
+        getData('turmas'),
+        getData('disciplinas'),
+        getData('usuarios')
+      ]);
+      
+      // Processar turmas
+      if (turmasData) {
         const turmasArray = Object.entries(turmasData)
           .map(([id, turma]) => ({ id, ...turma }))
-          .filter(turma => turma.nome && turma.nome.trim() !== ''); // Filtrar turmas sem nome
+          .filter(turma => turma.nome && turma.nome.trim() !== '');
         setTurmas(turmasArray);
         
-        // Selecionar primeira turma automaticamente se não houver seleção
         if (turmasArray.length > 0 && !turmaSelected) {
           setTurmaSelected(turmasArray[0].id);
         }
@@ -123,27 +129,22 @@ const GradeVisualizador = () => {
         setTurmas([]);
       }
 
-      // Carregar disciplinas
-      const disciplinasSnap = await getData('disciplinas');
-      if (disciplinasSnap.exists()) {
-        const disciplinasData = disciplinasSnap.val();
-        const disciplinasArray = Object.entries(disciplinasData).map(([id, disc]) => ({ id, ...disc }));
-        setDisciplinas(disciplinasArray);
-      }
+      // Processar disciplinas
+      const disciplinasArray = disciplinasData
+        ? Object.entries(disciplinasData).map(([id, disc]) => ({ id, ...disc }))
+        : [];
+      setDisciplinas(disciplinasArray);
 
-      // Carregar professores (usuários com role professora)
-      const usuariosSnap = await getData('usuarios');
-      if (usuariosSnap.exists()) {
-        const usuariosData = usuariosSnap.val();
-        const professoresArray = Object.entries(usuariosData)
-          .filter(([_, user]) => user.role === 'professora')
-          .map(([id, prof]) => ({ id, ...prof }));
-        setProfessores(professoresArray);
-      }
+      // Processar professores
+      const professoresArray = usuariosData
+        ? Object.entries(usuariosData)
+            .filter(([_, user]) => user.role === 'professora')
+            .map(([id, prof]) => ({ id, ...prof }))
+        : [];
+      setProfessores(professoresArray);
 
     } catch (err) {
       console.error('Erro ao carregar dados:', err);
-      // Manter arrays vazios em caso de erro
       setTurmas([]);
       setDisciplinas([]);
       setProfessores([]);
@@ -152,15 +153,14 @@ const GradeVisualizador = () => {
   };
 
   const carregarPeriodosAula = async () => {
-    if (!periodoLetivoSelecionado) {
+    if (!isReady || !periodoLetivoSelecionado) {
       setPeriodosAula([]);
       return;
     }
 
     try {
-      const periodosSnap = await get(ref(db, `Escola/PeriodosAula/${periodoLetivoSelecionado.id}`));
-      if (periodosSnap.exists()) {
-        const periodosData = periodosSnap.val();
+      const periodosData = await getData(`Escola/PeriodosAula/${periodoLetivoSelecionado.id}`);
+      if (periodosData) {
         const periodosArray = Object.entries(periodosData)
           .map(([id, periodo]) => ({ 
             id, 
@@ -179,16 +179,15 @@ const GradeVisualizador = () => {
   };
 
   const carregarHorarios = async () => {
-    if (!turmaSelected || !periodoLetivoSelecionado) {
+    if (!isReady || !turmaSelected || !periodoLetivoSelecionado) {
       setHorariosAula([]);
       return;
     }
 
     try {
-      const horariosSnap = await get(ref(db, `GradeHoraria/${periodoLetivoSelecionado.id}/${turmaSelected}`));
+      const horariosData = await getData(`GradeHoraria/${periodoLetivoSelecionado.id}/${turmaSelected}`);
       
-      if (horariosSnap.exists()) {
-        const horariosData = horariosSnap.val();
+      if (horariosData) {
         const horariosArray = Object.entries(horariosData).map(([id, horario]) => ({ id, ...horario }));
         setHorariosAula(horariosArray);
       } else {

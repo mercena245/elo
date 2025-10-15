@@ -35,6 +35,26 @@ yarn-error.log*
 
 # Firebase service account (NUNCA versionar)
 elo-school-firebase-adminsdk-*.json
+config/firebase/*.json
+!config/firebase/*.example.json
+
+# Backups locais (não versionar dados grandes)
+backups/database/*.json
+!backups/database/estrutura-base-escola-vazia.json
+backups/pages/*
+!backups/pages/.gitkeep
+
+# Arquivos temporários
+temp_*.txt
+*.tmp
+*.bak
+
+# Relatórios pessoais
+relatorio
+relatório.pdf
+
+# Git temporário
+temp_git/
 
 # vercel
 .vercel

@@ -1,0 +1,98 @@
+{
+  "Escola": {
+    "Periodo": {},
+    "PeriodosAula": {
+      "exemplo": {
+        "nome": "Manhã",
+        "horaInicio": "08:00",
+        "horaFim": "12:00",
+        "ativo": true
+      }
+    }
+  },
+  "GradeHoraria": {},
+  "alunos": {},
+  "audit_logs": {},
+  "autorizacoes": {},
+  "avisos": {},
+  "avisosEspecificos": {},
+  "colaboradores": {
+    "exemplo": {
+      "ativo": true,
+      "nome": "Professor(a) Exemplo"
+    }
+  },
+  "comportamentos": {},
+  "config": {
+    "devPassword": "984984"
+  },
+  "configuracoes": {
+    "escola": {
+      "nome": "Escola Teste",
+      "cnpj": "",
+      "telefone": "",
+      "email": "",
+      "endereco": ""
+    }
+  },
+  "contas_pagar": {},
+  "contas_pagas": {},
+  "diario": {},
+  "disciplinas": {
+    "exemplo_matematica": {
+      "nome": "Matemática",
+      "ativo": true
+    },
+    "exemplo_portugues": {
+      "nome": "Português",
+      "ativo": true
+    }
+  },
+  "fotos": {},
+  "frequencia": {},
+  "historicoMedicacao": {},
+  "historico_creditos": [],
+  "loja_produtos": {},
+  "medicamentos": {},
+  "mensagens": {},
+  "notas": {},
+  "periodos": {
+    "exemplo_2025": {
+      "nome": "Ano Letivo 2025",
+      "ativo": true,
+      "dataInicio": "2025-02-01",
+      "dataFim": "2025-12-20"
+    }
+  },
+  "planos-aula": {},
+  "relatorios-pedagogicos": {},
+  "titulos_financeiros": {},
+  "turmas": {
+    "exemplo_turma": {
+      "nome": "Turma Exemplo",
+      "ano": "1º Ano",
+      "turno": "Manhã",
+      "ativo": true,
+      "professorId": "",
+      "sala": ""
+    }
+  },
+  "turnos": {
+    "manha": {
+      "nome": "Manhã",
+      "horaInicio": "08:00",
+      "horaFim": "12:00"
+    },
+    "tarde": {
+      "nome": "Tarde",
+      "horaInicio": "13:00",
+      "horaFim": "17:00"
+    },
+    "integral": {
+      "nome": "Integral",
+      "horaInicio": "08:00",
+      "horaFim": "17:00"
+    }
+  },
+  "usuarios": {}
+}

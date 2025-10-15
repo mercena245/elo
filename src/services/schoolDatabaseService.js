@@ -144,6 +144,9 @@ export const schoolDatabaseOperations = (schoolData) => {
   const db = getSchoolDatabase(schoolData);
 
   return {
+    // 🔥 Expor o database real para services que precisam dele
+    _database: db,
+    
     /**
      * Cria uma referência para um caminho no database
      */
@@ -249,6 +252,9 @@ export const schoolStorageOperations = (schoolData) => {
   const storage = getSchoolStorage(schoolData);
 
   return {
+    // 🔥 Expor o storage real para services que precisam dele
+    _storage: storage,
+    
     /**
      * Cria uma referência para um arquivo no storage
      */

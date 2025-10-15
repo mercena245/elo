@@ -8,7 +8,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useSchoolDatabase } from '../../../hooks/useSchoolDatabase';
+import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
 
 export default function ExemploAlunosComponent() {
   const [alunos, setAlunos] = useState([]);

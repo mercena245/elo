@@ -109,18 +109,116 @@ export function AuthProvider({ children }) {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setUser(firebaseUser);
       if (firebaseUser) {
-        // Busca o role do usuário no banco
-        const userRef = ref(db, `usuarios/${firebaseUser.uid}`);
-        const snap = await get(userRef);
-        if (snap.exists()) {
-          const userData = snap.val();
-          setRole(userData.role);
+        let userData = null;
+        
+        // Primeiro, verificar se há escola selecionada no localStorage
+        let savedSchool = localStorage.getItem('selectedSchool');
+        let schoolToCheck = null;
+        
+        if (savedSchool) {
+          try {
+            schoolToCheck = JSON.parse(savedSchool);
+          } catch (error) {
+            console.error('❌ [AuthContext] Erro ao parsear escola do localStorage:', error);
+          }
+        }
+        
+        // Se não houver escola no localStorage, buscar do managementDB
+        if (!schoolToCheck) {
+          console.log('🔍 [AuthContext] Sem escola no localStorage, buscando do managementDB...');
+          
+          try {
+            const userRef = ref(managementDB, `usuarios/${firebaseUser.uid}`);
+            const userSnap = await get(userRef);
+            
+            if (userSnap.exists()) {
+              const userMgmtData = userSnap.val();
+              
+              // Verificar se usuário tem escolas vinculadas
+              if (userMgmtData.escolas && Object.keys(userMgmtData.escolas).length > 0) {
+                // Pegar a primeira escola vinculada
+                const primeiraEscolaId = Object.keys(userMgmtData.escolas)[0];
+                console.log('✅ [AuthContext] Primeira escola encontrada:', primeiraEscolaId);
+                
+                // Buscar dados completos da escola
+                const escolaRef = ref(managementDB, `escolas/${primeiraEscolaId}`);
+                const escolaSnap = await get(escolaRef);
+                
+                if (escolaSnap.exists()) {
+                  schoolToCheck = {
+                    id: primeiraEscolaId,
+                    ...escolaSnap.val()
+                  };
+                  
+                  // Salvar no localStorage para próximas vezes
+                  localStorage.setItem('selectedSchool', JSON.stringify(schoolToCheck));
+                  localStorage.setItem('accessType', 'school');
+                  setSelectedSchool(schoolToCheck);
+                  setAccessType('school');
+                  
+                  console.log('💾 [AuthContext] Escola salva no localStorage:', schoolToCheck.nome);
+                }
+              }
+            }
+          } catch (error) {
+            console.error('❌ [AuthContext] Erro ao buscar escolas do usuário:', error);
+          }
+        }
+        
+        // Agora buscar role do banco da escola (se houver escola)
+        if (schoolToCheck && schoolToCheck.id) {
+          try {
+            console.log('🔍 [AuthContext] Buscando role do usuário na escola:', schoolToCheck.id);
+            
+            // Buscar dados completos da escola se necessário
+            if (!schoolToCheck.databaseURL) {
+              const escolaRef = ref(managementDB, `escolas/${schoolToCheck.id}`);
+              const escolaSnap = await get(escolaRef);
+              
+              if (escolaSnap.exists()) {
+                schoolToCheck = {
+                  id: schoolToCheck.id,
+                  ...escolaSnap.val()
+                };
+              }
+            }
+            
+            // Importar schoolDatabaseService e conectar ao banco da escola
+            const { getSchoolDatabase } = await import('../services/schoolDatabaseService');
+            const schoolDB = getSchoolDatabase(schoolToCheck);
+            
+            // Buscar usuário no banco DA ESCOLA
+            const userRef = ref(schoolDB, `usuarios/${firebaseUser.uid}`);
+            const snap = await get(userRef);
+            
+            if (snap.exists()) {
+              userData = snap.val();
+              console.log('✅ [AuthContext] Role encontrada no banco da escola:', userData.role);
+              setRole(userData.role);
+            } else {
+              console.log('⚠️ [AuthContext] Usuário não encontrado no banco da escola');
+              setRole(null);
+            }
+          } catch (error) {
+            console.error('❌ [AuthContext] Erro ao buscar role do banco da escola:', error);
+            setRole(null);
+          }
         } else {
-          setRole(null);
+          // Sem escola vinculada, buscar do managementDB (pode ser usuário novo)
+          console.log('🔍 [AuthContext] Sem escola vinculada, buscando do managementDB');
+          const userRef = ref(managementDB, `usuarios/${firebaseUser.uid}`);
+          const snap = await get(userRef);
+          
+          if (snap.exists()) {
+            userData = snap.val();
+            setRole(userData.role);
+          } else {
+            setRole(null);
+          }
         }
 
-        // Verificar se precisa mostrar seletor de acesso
-        checkAccessSelector(firebaseUser);
+        // Verificar se precisa mostrar seletor de acesso (apenas se tiver role)
+        checkAccessSelector(firebaseUser, userData);
         
         // Verificar se precisa 2FA
         checkTwoFactorRequired(firebaseUser);
@@ -195,12 +293,22 @@ export function AuthProvider({ children }) {
     auth.signOut();
   };
 
-  const checkAccessSelector = (firebaseUser) => {
+  const checkAccessSelector = (firebaseUser, userData) => {
     const superAdminId = 'qD6UucWtcgPC9GHA41OB8rSaghZ2';
     const isSuperAdmin = firebaseUser?.uid === superAdminId;
     
     console.log('🔍 [checkAccessSelector] Verificando acesso...');
     console.log('👤 [checkAccessSelector] É super admin?', isSuperAdmin);
+    console.log('👤 [checkAccessSelector] User Data:', userData);
+    console.log('👤 [checkAccessSelector] Tem role?', userData?.role ? 'Sim: ' + userData.role : 'Não');
+    
+    // Se usuário não tem role, não mostra AccessTypeSelector
+    // LoginForm vai redirecionar para /school-selection
+    if (!userData?.role && !isSuperAdmin) {
+      console.log('⚠️ [checkAccessSelector] Usuário SEM role - não mostra seletor');
+      setShowAccessSelector(false);
+      return;
+    }
     
     // Verificar se há escola já selecionada
     const savedSchool = localStorage.getItem('selectedSchool');
@@ -218,8 +326,8 @@ export function AuthProvider({ children }) {
       console.log('🔐 [checkAccessSelector] Super Admin SEM escola - Mostrando seletor');
       setShowAccessSelector(true);
     } else {
-      // Usuário normal SEM escola selecionada - DEVE MOSTRAR SELETOR
-      console.log('👤 [checkAccessSelector] Usuário normal SEM escola - Mostrando seletor');
+      // Usuário normal COM role mas SEM escola selecionada - DEVE MOSTRAR SELETOR
+      console.log('👤 [checkAccessSelector] Usuário normal COM role SEM escola - Mostrando seletor');
       setShowAccessSelector(true);
       
       // Se não houver accessType salvo, definir como 'school' por padrão

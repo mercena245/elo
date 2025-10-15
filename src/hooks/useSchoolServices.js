@@ -15,7 +15,7 @@ import { createFinanceiroService } from '../services/financeiroServiceMultiTenan
 export const useSchoolServices = () => {
   // Obter database e storage da escola
   const { 
-    database,
+    db,              // ✅ Corrigido: era 'database'
     storage,
     isReady, 
     error, 
@@ -29,14 +29,27 @@ export const useSchoolServices = () => {
 
   // Criar instâncias dos services usando useMemo para evitar recriação
   const auditService = useMemo(() => {
-    if (!database || !isReady) return null;
-    return createAuditService(database);
-  }, [database, isReady]);
+    if (!db || !isReady) {
+      console.log('⏳ [useSchoolServices] Aguardando db para criar auditService...', { hasDb: !!db, isReady });
+      return null;
+    }
+    console.log('✅ [useSchoolServices] Criando auditService');
+    // Passar o database real do Firebase (não o wrapper)
+    return createAuditService(db._database || db);
+  }, [db, isReady]);
 
   const financeiroService = useMemo(() => {
-    if (!database || !isReady) return null;
-    return createFinanceiroService(database, storage);
-  }, [database, storage, isReady]);
+    if (!db || !isReady) {
+      console.log('⏳ [useSchoolServices] Aguardando db para criar financeiroService...', { hasDb: !!db, isReady });
+      return null;
+    }
+    console.log('✅ [useSchoolServices] Criando financeiroService');
+    console.log('🔍 [useSchoolServices] Passando wrapper completo do db');
+    
+    // Passar o wrapper completo que tem os métodos get, set, etc
+    const realStorage = storage?._storage || storage;
+    return createFinanceiroService(db, realStorage);
+  }, [db, storage, isReady]);
 
   return {
     // Services
@@ -57,7 +70,7 @@ export const useSchoolServices = () => {
     updateData,
     
     // Informações da escola
-    database,
+    database: db,  // ✅ Exportar como 'database' para compatibilidade
     storage,
     isReady,
     error,

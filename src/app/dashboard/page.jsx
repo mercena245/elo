@@ -6,7 +6,7 @@ import ProtectedRoute from '../../components/ProtectedRoute';
 import SimpleCarousel from '../../components/SimpleCarousel';
 import SchoolSelector from '../../components/SchoolSelector';
 import { useAuth } from '../../context/AuthContext';
-import useSchoolDatabase from '../../hooks/useSchoolDatabase';
+import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
 // Importações do Swiper
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Navigation, Pagination, Autoplay, EffectCoverflow } from 'swiper/modules';

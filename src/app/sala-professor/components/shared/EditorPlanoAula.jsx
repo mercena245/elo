@@ -39,7 +39,6 @@ import {
   Psychology as PsychologyIcon,
   Assessment as AssessmentIcon
 } from '@mui/icons-material';
-import { ref, get, update } from 'firebase/database';
 import { useSchoolDatabase } from '../../../../hooks/useSchoolDatabase';
 
 const EditorPlanoAula = ({
@@ -55,6 +54,8 @@ const EditorPlanoAula = ({
   isEditing = false
 }) => {
   const { user, role: userRole } = useAuth();
+  // Hook para acessar banco da escola
+  const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, storage: schoolStorage } = useSchoolDatabase();
   
   const [formData, setFormData] = useState({
     titulo: '',
@@ -196,11 +197,9 @@ const EditorPlanoAula = ({
         if (periodoId) {
           try {
             console.log('🔍 Buscando período letivo:', periodoId);
-            const periodoRef = ref(db, `Escola/Periodo/${periodoId}`);
-            const periodoSnapshot = await get(periodoRef);
+            const periodo = await getData(`Escola/Periodo/${periodoId}`);
             
-            if (periodoSnapshot.exists()) {
-              const periodo = periodoSnapshot.val();
+            if (periodo) {
               console.log('📅 Período letivo encontrado:', periodo);
               
               setPeriodoLetivo(periodo);
@@ -223,13 +222,10 @@ const EditorPlanoAula = ({
     };
 
     buscarPeriodoLetivo();
-  }, [formData.turmaId, turmas]);
+  }, [formData.turmaId, turmas, isReady, getData]);
 
   // Funções para obter nomes para exibição
   const getNomeTurma = () => {
-  // Hook para acessar banco da escola
-  const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, storage: schoolStorage } = useSchoolDatabase();
-
     if (!formData.turmaId || !turmas) return '';
     const turma = turmas[formData.turmaId];
     if (!turma) return formData.turmaId;

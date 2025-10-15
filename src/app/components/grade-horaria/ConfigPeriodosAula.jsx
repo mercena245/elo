@@ -23,7 +23,7 @@ import {
 import { Edit, Delete, Add } from '@mui/icons-material';
 ;
 import SeletorPeriodoLetivo from '../shared/SeletorPeriodoLetivo';
-import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
+import { useSchoolDatabase } from '../../../hooks/useSchoolDatabase';
 
 const ConfigPeriodosAula = () => {
   // Hook para acessar banco da escola
@@ -48,12 +48,14 @@ const ConfigPeriodosAula = () => {
   const [msg, setMsg] = useState('');
 
   useEffect(() => {
-    if (periodoLetivoSelecionado) {
+    if (periodoLetivoSelecionado && isReady) {
       carregarPeriodos();
     }
-  }, [periodoLetivoSelecionado]);
+  }, [periodoLetivoSelecionado, isReady]);
 
   const carregarPeriodos = async () => {
+    if (!isReady) return;
+    
     setLoading(true);
     
     if (!periodoLetivoSelecionado) {
@@ -63,9 +65,8 @@ const ConfigPeriodosAula = () => {
     }
 
     try {
-      const snap = await get(ref(db, `Escola/PeriodosAula/${periodoLetivoSelecionado.id}`));
-      if (snap.exists()) {
-        const data = snap.val();
+      const data = await getData(`Escola/PeriodosAula/${periodoLetivoSelecionado.id}`);
+      if (data) {
         const lista = Object.entries(data)
           .map(([id, periodo]) => ({ 
             id, 
@@ -107,7 +108,7 @@ const ConfigPeriodosAula = () => {
     try {
       const periodoId = editPeriodo ? editPeriodo.id : `periodo_${Date.now()}`;
       
-      await setData('Escola/PeriodosAula/${periodoLetivoSelecionado.id}/${periodoId}', {
+      await setData(`Escola/PeriodosAula/${periodoLetivoSelecionado.id}/${periodoId}`, {
         nome: form.nome,
         inicio: form.inicio,
         fim: form.fim,
@@ -152,7 +153,7 @@ const ConfigPeriodosAula = () => {
     }
     
     try {
-      await removeData('Escola/PeriodosAula/${periodoLetivoSelecionado.id}/${periodo.id}');
+      await removeData(`Escola/PeriodosAula/${periodoLetivoSelecionado.id}/${periodo.id}`);
       await carregarPeriodos();
       setMsg('Período excluído com sucesso!');
     } catch (err) {

@@ -35,7 +35,7 @@ import {
 } from '@mui/icons-material';
 ;
 import ImpressaoRelatorios from './ImpressaoRelatorios';
-import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
+import { useSchoolDatabase } from '../../../hooks/useSchoolDatabase';
 
 const RelatoriosGrade = () => {
   // Hook para acessar banco da escola
@@ -58,10 +58,12 @@ const RelatoriosGrade = () => {
   }, [isReady]);
 
   const carregarDadosRelatorio = async () => {
+    if (!isReady) return;
+    
     setLoading(true);
     try {
       // Carregar todos os dados necessários
-      const [turmasSnap, disciplinasSnap, usuariosSnap, periodosSnap, gradeSnap] = await Promise.all([
+      const [turmasData, disciplinasData, usuariosData, periodosData, gradeData] = await Promise.all([
         getData('turmas'),
         getData('disciplinas'),
         getData('usuarios'),
@@ -70,22 +72,22 @@ const RelatoriosGrade = () => {
       ]);
 
       const turmas = [];
-      if (turmasSnap.exists()) {
-        Object.entries(turmasSnap.val()).forEach(([id, data]) => {
+      if (turmasData) {
+        Object.entries(turmasData).forEach(([id, data]) => {
           turmas.push({ id, ...data });
         });
       }
 
       const disciplinas = [];
-      if (disciplinasSnap.exists()) {
-        Object.entries(disciplinasSnap.val()).forEach(([id, data]) => {
+      if (disciplinasData) {
+        Object.entries(disciplinasData).forEach(([id, data]) => {
           disciplinas.push({ id, ...data });
         });
       }
 
       const professores = [];
-      if (usuariosSnap.exists()) {
-        Object.entries(usuariosSnap.val()).forEach(([id, data]) => {
+      if (usuariosData) {
+        Object.entries(usuariosData).forEach(([id, data]) => {
           if (data.role === 'professor' && data.nome) {
             professores.push({ id, ...data });
           }
@@ -93,8 +95,8 @@ const RelatoriosGrade = () => {
       }
 
       const periodosAula = [];
-      if (periodosSnap.exists()) {
-        Object.entries(periodosSnap.val()).forEach(([id, data]) => {
+      if (periodosData) {
+        Object.entries(periodosData).forEach(([id, data]) => {
           if (data.tipo === 'aula') {
             periodosAula.push({ id, ...data });
           }
@@ -102,7 +104,7 @@ const RelatoriosGrade = () => {
         periodosAula.sort((a, b) => a.ordem - b.ordem);
       }
 
-      const gradeHoraria = gradeSnap.exists() ? gradeSnap.val() : {};
+      const gradeHoraria = gradeData ? gradeData : {};
       
       console.log('📊 Debug Relatórios - Dados carregados:', {
         turmas: turmas.length,

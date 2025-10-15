@@ -68,6 +68,8 @@ const TurmaFilho = () => {
   }, [user, role, secretariaLoading, alunosVinculados]);
 
   const carregarDadosFilho = async () => {
+    if (!isReady) return;
+    
     try {
       setLoading(true);
       console.log('Alunos vinculados recebidos:', alunosVinculados);
@@ -83,11 +85,9 @@ const TurmaFilho = () => {
       console.log('Primeiro filho selecionado:', alunosVinculados[0]);
 
       // Carregar turmas para ter informações completas
-      const turmasRef = ref(db, 'turmas');
-      const turmasSnapshot = await get(turmasRef);
+      const turmasData = await getData('turmas');
       
-      if (turmasSnapshot.exists()) {
-        const turmasData = turmasSnapshot.val();
+      if (turmasData) {
         setTurmas(turmasData);
         console.log('Turmas carregadas:', Object.keys(turmasData));
         
@@ -125,14 +125,14 @@ const TurmaFilho = () => {
   };
 
   const carregarAvisosTurma = async (turmaId) => {
+    if (!isReady) return;
+    
     try {
       console.log('Carregando avisos específicos para turma:', turmaId);
       
-      const avisosRef = ref(db, 'avisosEspecificos');
-      const avisosSnapshot = await get(avisosRef);
+      const dados = await getData('avisosEspecificos');
       
-      if (avisosSnapshot.exists()) {
-        const dados = avisosSnapshot.val();
+      if (dados) {
         const avisosList = Object.entries(dados).map(([id, aviso]) => ({
           id,
           ...aviso
@@ -185,12 +185,13 @@ const TurmaFilho = () => {
 
   // Função para buscar professor responsável pela turma
   const buscarProfessorTurma = async (turmaId) => {
+    if (!isReady) return 'Carregando...';
+    
     try {
-      const usuariosRef = ref(db, 'usuarios');
-      const snapshot = await get(usuariosRef);
+      const usuariosData = await getData('usuarios');
       
-      if (snapshot.exists()) {
-        const usuarios = Object.entries(snapshot.val());
+      if (usuariosData) {
+        const usuarios = Object.entries(usuariosData);
         const professores = usuarios.filter(([id, usuario]) => usuario.role === 'professora');
         
         // Encontrar professor que tem esta turma vinculada
@@ -212,12 +213,13 @@ const TurmaFilho = () => {
 
   // Função para contar alunos da turma
   const contarAlunosTurma = async (turmaId) => {
+    if (!isReady) return 0;
+    
     try {
-      const alunosRef = ref(db, 'alunos');
-      const snapshot = await get(alunosRef);
+      const alunosData = await getData('alunos');
       
-      if (snapshot.exists()) {
-        const alunos = Object.values(snapshot.val());
+      if (alunosData) {
+        const alunos = Object.values(alunosData);
         const alunosNaTurma = alunos.filter(aluno => aluno.turmaId === turmaId);
         return alunosNaTurma.length;
       }
@@ -231,21 +233,21 @@ const TurmaFilho = () => {
 
   // Função para buscar nome de disciplina
   const buscarNomeDisciplina = async (disciplinaId) => {
+    if (!isReady) return disciplinaId;
+    
     try {
       // Tentar primeiro em 'disciplinas'
-      let disciplinaRef = ref(db, `disciplinas/${disciplinaId}`);
-      let snapshot = await get(disciplinaRef);
+      let disciplinaData = await getData(`disciplinas/${disciplinaId}`);
       
-      if (snapshot.exists()) {
-        return snapshot.val().nome || snapshot.val().nomeDisciplina || disciplinaId;
+      if (disciplinaData) {
+        return disciplinaData.nome || disciplinaData.nomeDisciplina || disciplinaId;
       }
       
       // Se não encontrar, tentar em 'Escola/Disciplinas'
-      disciplinaRef = ref(db, `Escola/Disciplinas/${disciplinaId}`);
-      snapshot = await get(disciplinaRef);
+      disciplinaData = await getData(`Escola/Disciplinas/${disciplinaId}`);
       
-      if (snapshot.exists()) {
-        return snapshot.val().nome || snapshot.val().nomeDisciplina || disciplinaId;
+      if (disciplinaData) {
+        return disciplinaData.nome || disciplinaData.nomeDisciplina || disciplinaId;
       }
       
       console.log('⚠️ Disciplina não encontrada:', disciplinaId);
@@ -258,12 +260,13 @@ const TurmaFilho = () => {
 
   // Função para buscar nome de professor por ID
   const buscarNomeProfessor = async (professorId) => {
+    if (!isReady) return 'Carregando...';
+    
     try {
-      const professorRef = ref(db, `usuarios/${professorId}`);
-      const snapshot = await get(professorRef);
+      const professorData = await getData(`usuarios/${professorId}`);
       
-      if (snapshot.exists()) {
-        return snapshot.val().name || snapshot.val().nome || snapshot.val().displayName || 'Professor não informado';
+      if (professorData) {
+        return professorData.name || professorData.nome || professorData.displayName || 'Professor não informado';
       }
       return 'Professor não encontrado';
     } catch (error) {
@@ -307,18 +310,19 @@ const TurmaFilho = () => {
 
   // Função para carregar grade horária
   const carregarGradeHoraria = async (turmaId) => {
+    if (!isReady) return;
+    
     try {
       // Primeiro, buscar o período letivo da turma específica
-      const turmaSnapshot = await getData('turmas/${turmaId}');
+      const dadosTurma = await getData(`turmas/${turmaId}`);
       
-      if (!turmaSnapshot.exists()) {
+      if (!dadosTurma) {
         console.log('❌ Turma não encontrada');
         setGradeHoraria([]);
         setPeriodosAula([]);
         return;
       }
       
-      const dadosTurma = turmaSnapshot.val();
       const periodoLetivoId = dadosTurma.periodoId;
       
       if (!periodoLetivoId) {
@@ -332,22 +336,21 @@ const TurmaFilho = () => {
       console.log('📅 Dados da turma:', dadosTurma);
       
       // Carregar períodos de aula da estrutura correta com período letivo
-      const periodosAulaRef = ref(db, `Escola/PeriodosAula/${periodoLetivoId}`);
-      const periodosAulaSnapshot = await get(periodosAulaRef);
+      const periodosData = await getData(`Escola/PeriodosAula/${periodoLetivoId}`);
       
-      if (periodosAulaSnapshot.exists()) {
-        const periodosData = Object.entries(periodosAulaSnapshot.val()).map(([id, periodo]) => ({
+      if (periodosData) {
+        const periodosArray = Object.entries(periodosData).map(([id, periodo]) => ({
           id,
           ...periodo
         }));
         
         // Filtrar períodos pelo turno da turma
-        let periodosFiltrados = periodosData;
+        let periodosFiltrados = periodosArray;
         const turnoTurma = dadosTurma.turnoId;
         
         // Filtrar apenas períodos do turno da turma
         if (turnoTurma && turnoTurma !== 'Integral') {
-          periodosFiltrados = periodosData.filter(periodo => 
+          periodosFiltrados = periodosArray.filter(periodo => 
             periodo.turno === turnoTurma
           );
         }
@@ -360,14 +363,11 @@ const TurmaFilho = () => {
       }
       
       // Carregar horários da grade usando a nova estrutura hierárquica
-      const horariosRef = ref(db, `GradeHoraria/${periodoLetivoId}/${turmaId}`);
-      const horariosSnapshot = await get(horariosRef);
+      const horariosData = await getData(`GradeHoraria/${periodoLetivoId}/${turmaId}`);
       
       console.log('📚 Carregando grade horária do caminho:', `GradeHoraria/${periodoLetivoId}/${turmaId}`);
       
-      if (horariosSnapshot.exists()) {
-        const horariosData = horariosSnapshot.val();
-        
+      if (horariosData) {
         // Converter objeto para array
         const todosHorarios = Object.entries(horariosData).map(([id, horario]) => ({
           id,

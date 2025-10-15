@@ -16,7 +16,7 @@ import {
 } from '@mui/material';
 ;
 import { logAction, LOG_ACTIONS } from '../../../services/auditService';
-import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
+import { useSchoolDatabase } from '../../../hooks/useSchoolDatabase';
 
 const ModalHorario = ({ 
   open, 
@@ -28,6 +28,9 @@ const ModalHorario = ({
   onSalvar,
   periodoLetivoId
 }) => {
+  // Hook para acessar banco da escola
+  const { getData, setData, removeData, isReady } = useSchoolDatabase();
+  
   const [form, setForm] = useState({
     disciplinaId: '',
     professorId: ''
@@ -58,27 +61,31 @@ const ModalHorario = ({
       }
       setMsg('');
     }
-  }, [open, horarioExistente]);
+  }, [open, horarioExistente, isReady]);
 
   const carregarDados = async () => {
+    if (!isReady) return;
+    
     try {
-      // Carregar disciplinas
-      const disciplinasSnap = await getData('disciplinas');
-      if (disciplinasSnap.exists()) {
-        const disciplinasData = disciplinasSnap.val();
-        const disciplinasArray = Object.entries(disciplinasData).map(([id, disc]) => ({ id, ...disc }));
-        setDisciplinas(disciplinasArray);
-      }
+      // Carregar disciplinas e professores
+      const [disciplinasData, usuariosData] = await Promise.all([
+        getData('disciplinas'),
+        getData('usuarios')
+      ]);
+      
+      // Processar disciplinas
+      const disciplinasArray = disciplinasData
+        ? Object.entries(disciplinasData).map(([id, disc]) => ({ id, ...disc }))
+        : [];
+      setDisciplinas(disciplinasArray);
 
-      // Carregar professores
-      const usuariosSnap = await getData('usuarios');
-      if (usuariosSnap.exists()) {
-        const usuariosData = usuariosSnap.val();
-        const professoresArray = Object.entries(usuariosData)
-          .filter(([_, user]) => user.role === 'professora')
-          .map(([id, prof]) => ({ id, ...prof }));
-        setProfessores(professoresArray);
-      }
+      // Processar professores
+      const professoresArray = usuariosData
+        ? Object.entries(usuariosData)
+            .filter(([_, user]) => user.role === 'professora')
+            .map(([id, prof]) => ({ id, ...prof }))
+        : [];
+      setProfessores(professoresArray);
     } catch (err) {
       console.error('Erro ao carregar dados:', err);
     }
@@ -90,13 +97,13 @@ const ModalHorario = ({
   };
 
   const validarConflitos = async () => {
+    if (!isReady) return 'Aguarde, carregando dados...';
+    
     try {
       // Verificar se professor já tem aula neste horário no mesmo período letivo
-      const horariosSnap = await get(ref(db, `GradeHoraria/${periodoLetivoId}`));
+      const turmasData = await getData(`GradeHoraria/${periodoLetivoId}`);
       
-      if (horariosSnap.exists()) {
-        const turmasData = horariosSnap.val();
-        
+      if (turmasData) {
         // Buscar em todas as turmas deste período letivo
         const todosHorarios = [];
         Object.keys(turmasData).forEach(turmaKey => {

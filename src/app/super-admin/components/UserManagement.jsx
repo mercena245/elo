@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import UserForm from './UserForm';
 import { managementDB, ref, get, update, auth } from '../../../firebase';
 import ConfirmDialog from './ConfirmDialog';
+import { userManagementService } from '../../../services/userManagementService';
 
 export default function UserManagement() {
   const [users, setUsers] = useState([]);
@@ -159,11 +160,13 @@ export default function UserManagement() {
       
       console.log('✅ Usuário atualizado em usuarios/{uid}');
       
-      // TAMBÉM atualizar em escolas/{escolaId}/usuarios/{uid}
+      // TAMBÉM atualizar em escolas/{escolaId}/usuarios/{uid} no management
+      // E no banco específico de cada escola
       if (userData.escolas && Object.keys(userData.escolas).length > 0) {
         console.log('🔄 Sincronizando usuário nas escolas vinculadas...');
         
         for (const [escolaId, escolaData] of Object.entries(userData.escolas)) {
+          // 1. Atualizar no management DB
           const escolaUsuarioRef = ref(managementDB, `escolas/${escolaId}/usuarios/${userData.uid}`);
           await update(escolaUsuarioRef, {
             email: userData.email,
@@ -172,7 +175,28 @@ export default function UserManagement() {
             dataVinculo: escolaData.dataVinculo || new Date().toISOString(),
             permissoes: escolaData.permissoes || ['*']
           });
-          console.log(`✅ Usuário sincronizado na escola: ${escolaId}`);
+          console.log(`✅ Usuário sincronizado no managementDB escola: ${escolaId}`);
+          
+          // 2. Salvar no banco específico da escola
+          console.log(`📝 Salvando no banco da escola: ${escolaId}`);
+          const saved = await userManagementService.addUserToSchoolDatabase(
+            userData.uid,
+            escolaId,
+            {
+              email: userData.email,
+              nome: userData.nome,
+              role: escolaData.role || 'coordenadora',
+              ativo: escolaData.ativo !== false,
+              turmas: [],
+              createdAt: escolaData.dataVinculo || new Date().toISOString()
+            }
+          );
+          
+          if (saved) {
+            console.log(`✅ Usuário salvo no banco da escola: ${escolaId}`);
+          } else {
+            console.error(`❌ Erro ao salvar no banco da escola: ${escolaId}`);
+          }
         }
       }
       

@@ -317,8 +317,8 @@ export default function UserForm({ user, schools, onSubmit, onClose }) {
                             >
                               <option value="coordenadora">Coordenadora</option>
                               <option value="secretaria">Secretária</option>
-                              <option value="professor">Professor(a)</option>
-                              <option value="responsavel">Responsável</option>
+                              <option value="professora">Professora</option>
+                              <option value="pai">Pai</option>
                             </select>
                           </div>
 

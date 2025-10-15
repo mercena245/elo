@@ -45,8 +45,6 @@ import {
   Add as AddIcon,
   Send as SendIcon
 } from '@mui/icons-material';
-import { ref, onValue, push, update, remove } from 'firebase/database';
-;
 import { useAuthUser } from '../../../hooks/useAuthUser';
 import { auditService } from '../../../services/auditService';
 import SeletorTurmaAluno from './SeletorTurmaAluno';
@@ -107,65 +105,49 @@ const RelatoriosPedagogicos = () => {
   };
 
   useEffect(() => {
+    if (!isReady) {
+      console.log('⏳ [RelatoriosPedagogicos] Aguardando conexão com banco da escola...');
+      return;
+    }
+    
     if (user?.uid) {
       carregarDados();
     }
-  }, [user]);
+  }, [user, isReady]);
 
   useEffect(() => {
     organizarRelatorios();
   }, [relatorios, selectedTurmas, selectedAlunos]);
 
   const carregarDados = async () => {
+    if (!isReady) return;
+    
     try {
       setLoading(true);
       
-      const refs = {
-        relatorios: ref(db, 'relatorios-pedagogicos'),
-        turmas: ref(db, 'turmas'),
-        disciplinas: ref(db, 'disciplinas'),
-        alunos: ref(db, 'alunos')
-      };
+      // Buscar dados usando getData
+      const [relatoriosData, turmasData, disciplinasData, alunosData] = await Promise.all([
+        getData('relatorios-pedagogicos'),
+        getData('turmas'),
+        getData('disciplinas'),
+        getData('alunos')
+      ]);
 
-      // Listeners
-      const unsubscribes = [];
-
-      unsubscribes.push(
-        onValue(refs.relatorios, (snapshot) => {
-          setRelatorios(snapshot.val() || {});
-        })
-      );
-
-      unsubscribes.push(
-        onValue(refs.turmas, (snapshot) => {
-          const turmasData = snapshot.val() || {};
-          setTurmas(turmasData);
-          
-          // Se é professor, filtrar só suas turmas
-          if (userRole === 'professor' || userRole === 'professora') {
-            const minhasTurmasIds = Object.keys(turmasData).filter(turmaId => {
-              // Aqui você pode implementar a lógica para verificar se o professor leciona nesta turma
-              // Por enquanto, retorna todas (pode ser refinado conforme a estrutura de dados)
-              return true;
-            });
-            setMinhasTurmas(minhasTurmasIds);
-          }
-        })
-      );
-
-      unsubscribes.push(
-        onValue(refs.disciplinas, (snapshot) => {
-          setDisciplinas(snapshot.val() || {});
-        })
-      );
-
-      unsubscribes.push(
-        onValue(refs.alunos, (snapshot) => {
-          setAlunos(snapshot.val() || {});
-        })
-      );
-
-      return () => unsubscribes.forEach(unsub => unsub());
+      setRelatorios(relatoriosData || {});
+      setTurmas(turmasData || {});
+      
+      // Se é professor, filtrar só suas turmas
+      if (userRole === 'professor' || userRole === 'professora') {
+        const minhasTurmasIds = Object.keys(turmasData || {}).filter(turmaId => {
+          // Aqui você pode implementar a lógica para verificar se o professor leciona nesta turma
+          // Por enquanto, retorna todas (pode ser refinado conforme a estrutura de dados)
+          return true;
+        });
+        setMinhasTurmas(minhasTurmasIds);
+      }
+      
+      setDisciplinas(disciplinasData || {});
+      setAlunos(alunosData || {});
       
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
@@ -388,7 +370,7 @@ const RelatoriosPedagogicos = () => {
   const salvarEdicao = async () => {
     if (!editandoRelatorio) return;
     try {
-      await updateData('relatorios-pedagogicos/${editandoRelatorio.id}', {
+      await updateData(`relatorios-pedagogicos/${editandoRelatorio.id}`, {
         conteudo: conteudoEditado,
         atualizadoEm: new Date().toISOString(),
       });

@@ -73,6 +73,7 @@ import {
   CancelOutlined
 } from '@mui/icons-material';
 import { auth, onAuthStateChanged } from '../../firebase';
+import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 
 import GeradorMensalidadesDialog from '../../components/GeradorMensalidadesDialog';
@@ -83,11 +84,23 @@ import { useSchoolServices } from '../../hooks/useSchoolServices';
 
 const FinanceiroPage = () => {
   // Services multi-tenant
-  const { auditService, financeiroService, LOG_ACTIONS, isReady: servicesReady } = useSchoolServices();
-
+  const { auditService, financeiroService, LOG_ACTIONS, isReady: servicesReady, currentSchool: serviceSchool } = useSchoolServices();
 
   // Hook para acessar banco da escola
   const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, storage: schoolStorage } = useSchoolDatabase();
+
+  // 🔍 Debug inicial
+  useEffect(() => {
+    console.log('🔍 [FinanceiroPage] Estado Inicial:', {
+      servicesReady,
+      isReady,
+      hasFinanceiroService: !!financeiroService,
+      hasAuditService: !!auditService,
+      currentSchool: currentSchool?.nome,
+      serviceSchool: serviceSchool?.nome,
+      dbError
+    });
+  }, [servicesReady, isReady, financeiroService, auditService, currentSchool, serviceSchool, dbError]);
 
   const router = useRouter();
   const [userRole, setUserRole] = useState(null);
@@ -333,11 +346,14 @@ const FinanceiroPage = () => {
         return;
       }
       
+      if (!isReady) {
+        console.log('⏳ Aguardando conexão com banco da escola...');
+        return;
+      }
+      
       try {
-        const userRef = ref(db, `usuarios/${userId}`);
-        const snap = await get(userRef);
-        if (snap.exists()) {
-          const userData = snap.val();
+        const userData = await getData(`usuarios/${userId}`);
+        if (userData) {
           setUserRole((userData.role || '').trim().toLowerCase());
         } else {
           setUserRole(null);
@@ -349,11 +365,13 @@ const FinanceiroPage = () => {
       setRoleChecked(true);
     }
     fetchRole();
-  }, [userId]);
+  }, [userId, isReady, getData]);
 
   // Carregar dados conforme a role
   useEffect(() => {
-    if (roleChecked && userRole) {
+    // 🔒 Verificar se tudo está pronto antes de buscar dados
+    if (roleChecked && userRole && isReady && servicesReady) {
+      console.log('✅ Sistema pronto, carregando dados financeiros...');
       fetchData();
       // Definir tab inicial baseada no perfil
       if (isPai()) {
@@ -361,8 +379,15 @@ const FinanceiroPage = () => {
       } else {
         setTabValue(0); // Tab de dashboard para coordenadores/professores
       }
+    } else {
+      console.log('⏳ Aguardando sistema estar pronto:', {
+        roleChecked,
+        userRole,
+        isReady,
+        servicesReady
+      });
     }
-  }, [roleChecked, userRole, userId]);
+  }, [roleChecked, userRole, userId, isReady, servicesReady]);
 
   // Recalcular métricas quando os dados mudarem
   useEffect(() => {
@@ -377,31 +402,38 @@ const FinanceiroPage = () => {
 
   // useEffect para carregar dados do mês atual
   useEffect(() => {
-    if (userId) {
+    if (userId && financeiroService) {
       carregarDadosMesAtual();
       // Configurar filtro padrão para contas pagas do mês atual
       const inicio = `${mesAtual.ano}-${mesAtual.mes.toString().padStart(2, '0')}-01`;
       const fim = new Date(mesAtual.ano, mesAtual.mes, 0).toISOString().split('T')[0];
       setFiltrosContasPagas(prev => ({ ...prev, dataInicio: inicio, dataFim: fim }));
     }
-  }, [userId, mesAtual.mes, mesAtual.ano]);
+  }, [userId, mesAtual.mes, mesAtual.ano, financeiroService]);
 
   // useEffect para recarregar contas quando período selecionado mudar
   useEffect(() => {
-    if (userId && exibirPorPeriodo) {
+    if (userId && exibirPorPeriodo && isReady) {
       fetchContasPagar();
     }
-  }, [exibirPorPeriodo, periodoSelecionado, userId]);
+  }, [exibirPorPeriodo, periodoSelecionado, userId, isReady]);
 
   // Função para carregar dados do mês atual
   const carregarDadosMesAtual = async () => {
+    // 🔒 Verificar se serviço está disponível
+    if (!financeiroService) {
+      console.log('⏳ [carregarDadosMesAtual] Aguardando financeiroService...');
+      return;
+    }
+
     try {
       const result = await financeiroService.verificarMesFechado(mesAtual.mes, mesAtual.ano);
       if (result.success) {
         setMesAtual(prev => ({ ...prev, fechado: result.fechado }));
+        console.log('✅ Status do mês carregado:', result.fechado);
       }
     } catch (error) {
-      console.error('Erro ao verificar status do mês:', error);
+      console.error('❌ Erro ao verificar status do mês:', error);
     }
   };
 
@@ -438,11 +470,15 @@ const FinanceiroPage = () => {
   };
 
   const fetchAlunos = async () => {
+    if (!isReady) {
+      console.log('⏳ Aguardando conexão com banco da escola...');
+      return;
+    }
+    
     try {
-      const alunosRef = ref(db, 'alunos');
-      const snapshot = await get(alunosRef);
-      if (snapshot.exists()) {
-        const alunosData = Object.entries(snapshot.val()).map(([id, aluno]) => ({
+      const alunosDataRaw = await getData('alunos');
+      if (alunosDataRaw) {
+        const alunosData = Object.entries(alunosDataRaw).map(([id, aluno]) => ({
           id,
           ...aluno
         }));
@@ -459,11 +495,15 @@ const FinanceiroPage = () => {
 
   const fetchAlunosBasico = async () => {
     // Para professora, apenas dados não sensíveis
+    if (!isReady) {
+      console.log('⏳ Aguardando conexão com banco da escola...');
+      return;
+    }
+    
     try {
-      const alunosRef = ref(db, 'alunos');
-      const snapshot = await get(alunosRef);
-      if (snapshot.exists()) {
-        const alunosData = Object.entries(snapshot.val()).map(([id, aluno]) => ({
+      const alunosDataRaw = await getData('alunos');
+      if (alunosDataRaw) {
+        const alunosData = Object.entries(alunosDataRaw).map(([id, aluno]) => ({
           id,
           nome: aluno.nome,
           matricula: aluno.matricula,
@@ -481,11 +521,15 @@ const FinanceiroPage = () => {
   };
 
   const fetchTitulos = async () => {
+    if (!isReady) {
+      console.log('⏳ Aguardando conexão com banco da escola...');
+      return;
+    }
+    
     try {
-      const titulosRef = ref(db, 'titulos_financeiros');
-      const snapshot = await get(titulosRef);
-      if (snapshot.exists()) {
-        const titulosData = Object.entries(snapshot.val()).map(([id, titulo]) => ({
+      const titulosDataRaw = await getData('titulos_financeiros');
+      if (titulosDataRaw) {
+        const titulosData = Object.entries(titulosDataRaw).map(([id, titulo]) => ({
           id,
           ...titulo
         }));
@@ -501,12 +545,16 @@ const FinanceiroPage = () => {
   };
 
   const fetchTurmas = async () => {
+    if (!isReady) {
+      console.log('⏳ Aguardando conexão com banco da escola...');
+      return;
+    }
+    
     try {
-      const turmasRef = ref(db, 'turmas');
-      const snapshot = await get(turmasRef);
-      if (snapshot.exists()) {
-        setTurmas(snapshot.val());
-        console.log('🏫 Turmas carregadas:', Object.keys(snapshot.val()).length);
+      const turmasDataRaw = await getData('turmas');
+      if (turmasDataRaw) {
+        setTurmas(turmasDataRaw);
+        console.log('🏫 Turmas carregadas:', Object.keys(turmasDataRaw).length);
       } else {
         setTurmas({});
         console.log('🏫 Nenhuma turma encontrada');
@@ -517,22 +565,24 @@ const FinanceiroPage = () => {
   };
 
   const fetchTitulosPai = async () => {
+    if (!isReady) {
+      console.log('⏳ Aguardando conexão com banco da escola...');
+      return;
+    }
+    
     try {
       // Buscar filhos do pai logado
-      const usuarioRef = ref(db, `usuarios/${userId}`);
-      const usuarioSnap = await get(usuarioRef);
+      const userData = await getData(`usuarios/${userId}`);
       
-      if (usuarioSnap.exists()) {
-        const userData = usuarioSnap.val();
+      if (userData) {
         const alunosIds = userData.alunosVinculados || [];
         
         if (alunosIds.length > 0) {
           // Buscar dados dos alunos vinculados
-          const alunosRef = ref(db, 'alunos');
-          const alunosSnapshot = await get(alunosRef);
+          const todosAlunosRaw = await getData('alunos');
           
-          if (alunosSnapshot.exists()) {
-            const todosAlunos = Object.entries(alunosSnapshot.val())
+          if (todosAlunosRaw) {
+            const todosAlunos = Object.entries(todosAlunosRaw)
               .map(([id, aluno]) => ({ id, ...aluno }));
             
             // Filtrar apenas os alunos vinculados ao pai
@@ -541,11 +591,10 @@ const FinanceiroPage = () => {
           }
           
           // Buscar títulos dos alunos vinculados
-          const titulosRef = ref(db, 'titulos_financeiros');
-          const snapshot = await get(titulosRef);
+          const titulosDataRaw = await getData('titulos_financeiros');
           
-          if (snapshot.exists()) {
-            const titulosData = Object.entries(snapshot.val())
+          if (titulosDataRaw) {
+            const titulosData = Object.entries(titulosDataRaw)
               .filter(([id, titulo]) => alunosIds.includes(titulo.alunoId))
               .map(([id, titulo]) => ({
                 id,
@@ -771,6 +820,11 @@ const FinanceiroPage = () => {
   };
 
   const handleGerarTitulo = async () => {
+    if (!isReady) {
+      console.log('⏳ Aguardando conexão com banco da escola...');
+      return;
+    }
+    
     try {
       const tituloData = {
         ...novoTitulo,
@@ -782,12 +836,11 @@ const FinanceiroPage = () => {
         updatedAt: new Date().toISOString()
       };
 
-      const titulosRef = ref(db, 'titulos_financeiros');
-      const novoTituloRef = await push(titulosRef, tituloData);
+      const novoTituloId = await pushData('titulos_financeiros', tituloData);
 
       // Log da ação
       await auditService.auditService?.logAction('titulo_create', userId, {
-        entityId: novoTituloRef.key,
+        entityId: novoTituloId,
         description: `Título gerado: ${novoTitulo.tipo} - ${novoTitulo.descricao}`,
         changes: { valor: novoTitulo.valor, vencimento: novoTitulo.vencimento }
       });
@@ -857,7 +910,7 @@ const FinanceiroPage = () => {
       // Upload real do comprovante para Firebase Storage
       const timestamp = Date.now();
       const fileName = `${timestamp}_${pagamento.comprovante.name}`;
-      const comprovanteRef = storageRef(schoolStorage, `comprovantes_pagamento/${fileName}`);
+      const comprovanteRef = storageRef(schoolStorage._storage, `comprovantes_pagamento/${fileName}`);
       
       // Fazer upload do arquivo
       console.log('📤 Iniciando upload do comprovante...');
@@ -868,7 +921,6 @@ const FinanceiroPage = () => {
       console.log('✅ Upload concluído. URL:', comprovanteUrl);
 
       // Atualizar título para "em análise"
-      const tituloRef = ref(db, `titulos_financeiros/${tituloSelecionado.id}`);
       const atualizacao = {
         ...tituloSelecionado,
         status: 'em_analise',
@@ -884,7 +936,7 @@ const FinanceiroPage = () => {
         updatedAt: new Date().toISOString()
       };
 
-      await set(tituloRef, atualizacao);
+      await setData(`titulos_financeiros/${tituloSelecionado.id}`, atualizacao);
 
       // Log da ação
       await auditService.auditService?.logAction('pagamento_enviado', userId, {
@@ -906,8 +958,12 @@ const FinanceiroPage = () => {
   };
 
   const aprovarPagamento = async (titulo) => {
+    if (!isReady) {
+      console.log('⏳ Aguardando conexão com banco da escola...');
+      return;
+    }
+    
     try {
-      const tituloRef = ref(db, `titulos_financeiros/${titulo.id}`);
       const atualizacao = {
         ...titulo,
         status: 'pago',
@@ -920,7 +976,7 @@ const FinanceiroPage = () => {
         updatedAt: new Date().toISOString()
       };
 
-      await set(tituloRef, atualizacao);
+      await setData(`titulos_financeiros/${titulo.id}`, atualizacao);
 
       // Log da ação
       await auditService.auditService?.logAction('pagamento_aprovado', userId, {
@@ -938,8 +994,12 @@ const FinanceiroPage = () => {
   };
 
   const rejeitarPagamento = async (titulo) => {
+    if (!isReady) {
+      console.log('⏳ Aguardando conexão com banco da escola...');
+      return;
+    }
+    
     try {
-      const tituloRef = ref(db, `titulos_financeiros/${titulo.id}`);
       const atualizacao = {
         ...titulo,
         status: 'pendente',
@@ -951,7 +1011,7 @@ const FinanceiroPage = () => {
         updatedAt: new Date().toISOString()
       };
 
-      await set(tituloRef, atualizacao);
+      await setData(`titulos_financeiros/${titulo.id}`, atualizacao);
 
       // Log da ação
       await auditService.auditService?.logAction('pagamento_rejeitado', userId, {
@@ -1064,11 +1124,16 @@ const FinanceiroPage = () => {
         ano: periodoSelecionado.getFullYear()
       } : mesAtual;
       
-      // Buscar contas pendentes
-      const contasRef = ref(db, 'contas_pagar');
-      const snapshot = await get(contasRef);
-      if (snapshot.exists()) {
-        Object.entries(snapshot.val()).forEach(([id, conta]) => {
+      // Aguardar banco estar pronto
+      if (!isReady) {
+        console.log('⏳ [Financeiro] Aguardando banco estar pronto...');
+        return;
+      }
+      
+      // Buscar contas pendentes do banco da escola
+      const contasPagarData = await getData('contas_pagar');
+      if (contasPagarData) {
+        Object.entries(contasPagarData).forEach(([id, conta]) => {
           const vencimento = new Date(conta.vencimento);
           if (vencimento.getMonth() + 1 === mesParaBuscar.mes && 
               vencimento.getFullYear() === mesParaBuscar.ano) {
@@ -1077,11 +1142,10 @@ const FinanceiroPage = () => {
         });
       }
       
-      // Buscar contas pagas do mês para exibir na lista
-      const contasPagasRef = ref(db, 'contas_pagas');
-      const snapshotPagas = await get(contasPagasRef);
-      if (snapshotPagas.exists()) {
-        Object.entries(snapshotPagas.val()).forEach(([id, conta]) => {
+      // Buscar contas pagas do mês do banco da escola
+      const contasPagasData = await getData('contas_pagas');
+      if (contasPagasData) {
+        Object.entries(contasPagasData).forEach(([id, conta]) => {
           if (conta.dataPagamento) {
             const dataPagamento = new Date(conta.dataPagamento);
             if (dataPagamento.getMonth() + 1 === mesParaBuscar.mes && 
@@ -1211,24 +1275,27 @@ const FinanceiroPage = () => {
 
   const fetchContasPagas = async () => {
     try {
+      if (!isReady) {
+        console.log('⏳ [Financeiro] Aguardando banco estar pronto...');
+        return;
+      }
+      
       const contasPagas = [];
       
-      // Buscar de contas_pagar com status 'paga'
-      const contasPagarRef = ref(db, 'contas_pagar');
-      const snapshotPagar = await get(contasPagarRef);
-      if (snapshotPagar.exists()) {
-        Object.entries(snapshotPagar.val()).forEach(([id, conta]) => {
+      // Buscar de contas_pagar com status 'paga' do banco da escola
+      const contasPagarData = await getData('contas_pagar');
+      if (contasPagarData) {
+        Object.entries(contasPagarData).forEach(([id, conta]) => {
           if (conta.status === 'paga') {
             contasPagas.push({ id, ...conta });
           }
         });
       }
       
-      // Buscar de contas_pagas
-      const contasPagasRef = ref(db, 'contas_pagas');
-      const snapshotPagas = await get(contasPagasRef);
-      if (snapshotPagas.exists()) {
-        Object.entries(snapshotPagas.val()).forEach(([id, conta]) => {
+      // Buscar de contas_pagas do banco da escola
+      const contasPagasData = await getData('contas_pagas');
+      if (contasPagasData) {
+        Object.entries(contasPagasData).forEach(([id, conta]) => {
           contasPagas.push({ id, ...conta });
         });
       }
@@ -1240,16 +1307,22 @@ const FinanceiroPage = () => {
   };
 
   const fetchSaldoEscola = async () => {
+    // 🔒 Verificar se serviço está disponível
+    if (!financeiroService) {
+      console.log('⏳ [fetchSaldoEscola] Aguardando financeiroService...');
+      return;
+    }
+
     try {
       const result = await financeiroService.obterSaldoEscola();
       if (result.success) {
         setSaldoEscola(result.saldo);
         console.log('🏦 Saldo da escola atualizado:', result.saldo);
       } else {
-        console.error('Erro ao obter saldo:', result.error);
+        console.error('❌ Erro ao obter saldo:', result.error);
       }
     } catch (error) {
-      console.error('Erro ao buscar saldo da escola:', error);
+      console.error('❌ Erro ao buscar saldo da escola:', error);
     }
   };
 
@@ -1264,7 +1337,7 @@ const FinanceiroPage = () => {
         criadoPor: userId
       };
 
-      let novaContaRef;
+      let novaContaId;
       // Se a conta já foi paga, adicionar informações de pagamento
       if (novaConta.jaFoiPaga) {
         contaData.dataPagamento = novaConta.dataPagamento;
@@ -1272,23 +1345,23 @@ const FinanceiroPage = () => {
         contaData.pagoPor = userId;
         contaData.pagoEm = new Date().toISOString();
         
-        // Conta já paga vai apenas para contas_pagas
-        const contasPagasRef = ref(db, 'contas_pagas');
-        novaContaRef = await push(contasPagasRef, contaData);
+        // Conta já paga vai apenas para contas_pagas no banco da escola
+        novaContaId = await pushData('contas_pagas', contaData);
       } else {
-        // Conta pendente vai para contas_pagar
-        const contasRef = ref(db, 'contas_pagar');
-        novaContaRef = await push(contasRef, contaData);
+        // Conta pendente vai para contas_pagar no banco da escola
+        novaContaId = await pushData('contas_pagar', contaData);
         
         // Se for recorrente, criar próximas parcelas
         if (novaConta.recorrente) {
-          await criarContasRecorrentes(novaContaRef.key, contaData);
+          await criarContasRecorrentes(novaContaId, contaData);
         }
       }
 
       // Log da ação
-      await auditService.auditService?.logAction('conta_criada', userId, {
-        entityId: novaContaRef.key,
+      await auditService?.logAction({
+        action: LOG_ACTIONS.FINANCE_CREATE,
+        entity: 'conta',
+        entityId: novaContaId,
         description: `Conta criada: ${novaConta.descricao}`,
         changes: { valor: novaConta.valor, vencimento: novaConta.vencimento }
       });
@@ -1320,7 +1393,14 @@ const FinanceiroPage = () => {
 
   const criarContasRecorrentes = async (contaId, contaData) => {
     try {
-      const contasRef = ref(db, 'contas_pagar');
+      // 🔒 Verificar se banco está pronto
+      if (!isReady) {
+        console.log('⏳ Aguardando banco estar pronto para criar contas recorrentes...');
+        return;
+      }
+
+      console.log('📋 Criando contas recorrentes no banco da escola:', currentSchool?.name);
+      
       const proximoVencimento = new Date(contaData.vencimento);
       
       // Criar próximas 12 parcelas
@@ -1344,14 +1424,22 @@ const FinanceiroPage = () => {
           parcela: i + 1
         };
 
-        await push(contasRef, contaRecorrente);
+        // 🔒 Usar pushData para salvar no banco da escola
+        await pushData('contas_pagar', contaRecorrente);
+        console.log(`✅ Conta recorrente ${i}/12 criada no banco da escola`);
       }
     } catch (error) {
-      console.error('Erro ao criar contas recorrentes:', error);
+      console.error('❌ Erro ao criar contas recorrentes:', error);
     }
   };
 
   const pagarConta = async (conta) => {
+    // 🔒 Verificar se serviço está disponível
+    if (!financeiroService) {
+      showFeedback('error', 'Erro', 'Serviço financeiro não está disponível. Tente novamente.');
+      return;
+    }
+
     setProcessingOperation(true);
     try {
       // Usar o serviço para pagar a conta
@@ -1767,6 +1855,17 @@ const FinanceiroPage = () => {
     }, [alunoId]);
 
     const buscarDadosCredito = async () => {
+      // 🔒 Verificar se serviço está disponível
+      if (!financeiroService) {
+        console.log('⏳ [buscarDadosCredito] Aguardando financeiroService...');
+        setCreditoInfo({
+          saldo: 0,
+          historico: [],
+          carregando: false
+        });
+        return;
+      }
+
       setCreditoInfo(prev => ({ ...prev, carregando: true }));
       
       try {
@@ -4841,6 +4940,12 @@ const FinanceiroPage = () => {
             <Button onClick={() => setDialogFecharMes(false)}>Cancelar</Button>
             <Button 
               onClick={async () => {
+                // 🔒 Verificar se serviço está disponível
+                if (!financeiroService) {
+                  showFeedback('error', 'Erro', 'Serviço financeiro não está disponível.');
+                  return;
+                }
+
                 const result = await financeiroService.fecharMes(mesAtual, userId);
                 if (result.success) {
                   showFeedback('success', 'Mês Fechado', `Mês fechado com sucesso! ${result.contasMigradas} contas migradas para o próximo mês.`);

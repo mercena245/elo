@@ -35,7 +35,6 @@ import {
   Fab
 } from '@mui/material';
 import {
-import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
   Announcement,
   Add,
   Person,
@@ -53,9 +52,12 @@ import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
   Delete,
   Send
 } from '@mui/icons-material';
-;
+import { useSchoolDatabase } from '../../../hooks/useSchoolDatabase';
 
 const AvisosEspecificosSection = ({ userRole, userData }) => {
+  // Hook para acessar banco da escola
+  const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, storage: schoolStorage } = useSchoolDatabase();
+
   const [avisos, setAvisos] = useState([]);
   const [dialogNovoAviso, setDialogNovoAviso] = useState(false);
   const [dialogDetalhes, setDialogDetalhes] = useState(false);
@@ -95,15 +97,15 @@ const AvisosEspecificosSection = ({ userRole, userData }) => {
     fetchAvisos();
     fetchAlunos();
     fetchTurmas();
-  }, [userData]);
+  }, [userData, isReady]);
 
   const fetchAvisos = async () => {
+    if (!isReady) return;
+    
     try {
-      const avisosRef = ref(db, 'avisosEspecificos');
-      const snap = await get(avisosRef);
+      const dados = await getData('avisosEspecificos');
       
-      if (snap.exists()) {
-        const dados = snap.val();
+      if (dados) {
         const avisosList = Object.entries(dados).map(([id, aviso]) => ({
           id,
           ...aviso
@@ -159,12 +161,12 @@ const AvisosEspecificosSection = ({ userRole, userData }) => {
   };
 
   const fetchAlunos = async () => {
+    if (!isReady) return;
+    
     try {
-      const alunosRef = ref(db, 'alunos');
-      const snap = await get(alunosRef);
+      const dados = await getData('alunos');
       
-      if (snap.exists()) {
-        const dados = snap.val();
+      if (dados) {
         const alunosList = Object.entries(dados).map(([id, aluno]) => ({
           id,
           ...aluno
@@ -192,12 +194,12 @@ const AvisosEspecificosSection = ({ userRole, userData }) => {
   };
 
   const fetchTurmas = async () => {
+    if (!isReady) return;
+    
     try {
-      const turmasRef = ref(db, 'turmas');
-      const snap = await get(turmasRef);
+      const dados = await getData('turmas');
       
-      if (snap.exists()) {
-        const dados = snap.val();
+      if (dados) {
         const turmasList = Object.entries(dados).map(([id, turma]) => ({
           id,
           ...turma

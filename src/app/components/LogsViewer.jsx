@@ -62,6 +62,12 @@ import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
 import { useSchoolServices } from '../../hooks/useSchoolServices';
 
 const LogsViewer = ({ open, onClose }) => {
+  // Services multi-tenant (deve estar no topo do componente)
+  const { auditService, financeiroService, LOG_ACTIONS, isReady: servicesReady } = useSchoolServices();
+
+  // Hook para acessar banco da escola (deve estar no topo do componente)
+  const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, storage: schoolStorage } = useSchoolDatabase();
+
   const [logs, setLogs] = useState([]);
   const [filteredLogs, setFilteredLogs] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -84,79 +90,7 @@ const LogsViewer = ({ open, onClose }) => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(50);
 
-  // Constantes para filtros
-  const LOG_ACTIONS = {
-    // Usuários
-    USER_CREATE: 'user_create',
-    USER_UPDATE: 'user_update', 
-    USER_DELETE: 'user_delete',
-    USER_APPROVE: 'user_approve',
-    USER_REJECT: 'user_reject',
-    USER_ROLE_CHANGE: 'user_role_change',
-    USER_STUDENT_LINK: 'user_student_link',
-    USER_STUDENT_UNLINK: 'user_student_unlink',
-    USER_ACTIVATE: 'user_activate',
-    USER_DEACTIVATE: 'user_deactivate',
-    
-    // Alunos
-    STUDENT_CREATE: 'student_create',
-    STUDENT_UPDATE: 'student_update',
-    STUDENT_DELETE: 'student_delete',
-    STUDENT_ACTIVATE: 'student_activate',
-    STUDENT_DEACTIVATE: 'student_deactivate',
-    STUDENT_FILE_UPLOAD: 'student_file_upload',
-    STUDENT_FILE_DELETE: 'student_file_delete',
-    STUDENT_VIEWED: 'student_viewed',
-    
-    // Escola
-    CLASS_CREATE: 'class_create',
-    CLASS_UPDATE: 'class_update',
-    CLASS_DELETE: 'class_delete',
-    PERIOD_CREATE: 'period_create',
-    PERIOD_UPDATE: 'period_update',
-    PERIOD_DELETE: 'period_delete',
-    PERIOD_ACTIVATE: 'period_activate',
-    SUBJECT_CREATE: 'subject_create',
-    SUBJECT_UPDATE: 'subject_update',
-    SUBJECT_DELETE: 'subject_delete',
-    NOTICE_CREATE: 'notice_create',
-    NOTICE_UPDATE: 'notice_update',
-    NOTICE_DELETE: 'notice_delete',
-    
-    // Grade e Notas
-    SCHEDULE_CREATE: 'schedule_create',
-    SCHEDULE_UPDATE: 'schedule_update',
-    SCHEDULE_DELETE: 'schedule_delete',
-    GRADE_CREATE: 'grade_create',
-    GRADE_UPDATE: 'grade_update',
-    GRADE_DELETE: 'grade_delete',
-    ATTENDANCE_CREATE: 'attendance_create',
-    ATTENDANCE_UPDATE: 'attendance_update',
-    ATTENDANCE_DELETE: 'attendance_delete',
-    
-    // Mensagens e Diário
-    MESSAGE_SENT: 'message_sent',
-    MESSAGE_READ: 'message_read',
-    MESSAGE_VIEWED: 'message_viewed',
-    MESSAGE_SEND_ERROR: 'message_send_error',
-    MESSAGE_COMPOSE_STARTED: 'message_compose_started',
-    MESSAGE_COMPOSE_CANCELLED: 'message_compose_cancelled',
-    MESSAGE_FILTER_CHANGED: 'message_filter_changed',
-    
-    DIARY_ENTRY_CREATED: 'diary_entry_created',
-    DIARY_ENTRY_VIEWED: 'diary_entry_viewed',
-    DIARY_ENTRY_ERROR: 'diary_entry_error',
-    DIARY_FILTER_CHANGED: 'diary_filter_changed',
-    DIARY_COMPOSE_STARTED: 'diary_compose_started',
-    DIARY_COMPOSE_CANCELLED: 'diary_compose_cancelled',
-    
-    // Anexos
-    ATTACHMENT_UPLOADED: 'attachment_uploaded',
-    ATTACHMENT_DOWNLOADED: 'attachment_downloaded',
-    ATTACHMENT_VIEWED: 'attachment_viewed',
-    ATTACHMENT_REMOVED: 'attachment_removed',
-    ATTACHMENT_UPLOAD_ERROR: 'attachment_upload_error'
-  };
+  // LOG_ACTIONS vem do hook useSchoolServices, removida definição duplicada
 
   const LOG_LEVELS = {
     INFO: 'info',
@@ -279,11 +213,7 @@ const LogsViewer = ({ open, onClose }) => {
   };
 
   const applyFilters = () => {
-  // Services multi-tenant
-  const { auditService, financeiroService, LOG_ACTIONS, isReady: servicesReady } = useSchoolServices();
-
-  // Hook para acessar banco da escola
-  const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, storage: schoolStorage } = useSchoolDatabase();
+    // Hooks já estão no topo do componente, não devem ser chamados aqui
 
     let filtered = logs;
 

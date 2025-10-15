@@ -41,7 +41,7 @@ import {
   Tune,
   Description
 } from '@mui/icons-material';
-import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
+import { useSchoolDatabase } from '../../../hooks/useSchoolDatabase';
 
 const Impressoes = () => {
   // Hook para acessar banco da escola

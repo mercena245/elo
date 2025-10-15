@@ -26,7 +26,6 @@ import {
   ChevronRight,
   School as SchoolIcon
 } from '@mui/icons-material';
-import { ref, get } from 'firebase/database';
 import { useSchoolDatabase } from '../../../../hooks/useSchoolDatabase';
 
 const CalendarioGrade = ({
@@ -38,6 +37,9 @@ const CalendarioGrade = ({
   professorUid,
   userRole
 }) => {
+  // Hook para acessar banco da escola - DEVE estar no nível superior do componente
+  const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, storage: schoolStorage } = useSchoolDatabase();
+
   const [semanaAtual, setSemanaAtual] = useState(new Date());
   const [aulasOrganizadas, setAulasOrganizadas] = useState({});
   const [periodosAula, setPeriodosAula] = useState({}); // Para buscar horários dos períodos
@@ -65,10 +67,9 @@ const CalendarioGrade = ({
     
     const carregarPeriodosAula = async () => {
       try {
-        const periodosRef = ref(db, 'Escola/PeriodosAula');
-        const snapshot = await get(periodosRef);
-        if (snapshot.exists()) {
-          setPeriodosAula(snapshot.val());
+        const periodosData = await getData('Escola/PeriodosAula');
+        if (periodosData) {
+          setPeriodosAula(periodosData);
         }
       } catch (error) {
         console.error('Erro ao carregar períodos de aula:', error);
@@ -76,12 +77,9 @@ const CalendarioGrade = ({
     };
     
     carregarPeriodosAula();
-  }, [isReady]);
+  }, [isReady, getData]);
 
   const processarGradeHoraria = () => {
-  // Hook para acessar banco da escola
-  const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, storage: schoolStorage } = useSchoolDatabase();
-
     console.log('🎯 CalendarioGrade - Processando grade horária:', {
       gradeHoraria,
       gradeHorariaType: typeof gradeHoraria,

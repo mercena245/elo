@@ -1,0 +1,28 @@
+{
+  "rules": {
+    "management": {
+      ".read": "auth != null",
+      "escolas": {
+        "$escolaId": {
+          ".write": "root.child('management/superAdmins/' + auth.uid).exists()"
+        }
+      },
+      "userSchools": {
+        "$userId": {
+          ".read": "auth.uid === $userId",
+          ".write": "auth.uid === $userId || root.child('management/superAdmins/' + auth.uid).exists()"
+        }
+      },
+      "superAdmins": {
+        ".read": "root.child('management/superAdmins/' + auth.uid).exists()",
+        ".write": false
+      }
+    },
+    "escolasData": {
+      "$escolaId": {
+        ".read": "root.child('management/userSchools/' + auth.uid).val() === $escolaId || root.child('management/superAdmins/' + auth.uid).exists()",
+        ".write": "root.child('management/userSchools/' + auth.uid).val() === $escolaId || root.child('management/superAdmins/' + auth.uid).exists()"
+      }
+    }
+  }
+}

@@ -34,7 +34,6 @@ import {
   AccordionDetails
 } from '@mui/material';
 import { 
-import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
   Assessment,
   Print,
   Download,
@@ -49,9 +48,12 @@ import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
   EventBusy,
   CheckCircle
 } from '@mui/icons-material';
-;
+import { useSchoolDatabase } from '../../../hooks/useSchoolDatabase';
 
 const ConsultaBoletim = ({ alunoId = null, turmaId = null, professorId = null }) => {
+  // Hook para acessar banco da escola
+  const { getData, isReady } = useSchoolDatabase();
+  
   const [loading, setLoading] = useState(true);
   const [turmas, setTurmas] = useState([]);
   const [disciplinas, setDisciplinas] = useState([]);
@@ -89,62 +91,54 @@ const ConsultaBoletim = ({ alunoId = null, turmaId = null, professorId = null })
   }, [filtros.turmaId, filtros.alunoId, filtros.bimestre, filtros.disciplinaId, filtros.professorId]);
 
   const carregarDados = async () => {
+    if (!isReady) return;
+    
     setLoading(true);
     try {
-      const [turmasSnap, disciplinasSnap, usuariosSnap] = await Promise.all([
+      const [turmasData, disciplinasData, usuariosData] = await Promise.all([
         getData('turmas'),
         getData('disciplinas'),
         getData('usuarios')
       ]);
 
       // Carregar turmas - aplicar filtro para professoras
-      let turmasData = [];
-      if (turmasSnap.exists()) {
-        const todasTurmas = [];
-        Object.entries(turmasSnap.val()).forEach(([id, data]) => {
-          todasTurmas.push({ id, ...data });
-        });
+      let turmasArray = [];
+      if (turmasData) {
+        const todasTurmas = Object.entries(turmasData).map(([id, data]) => ({ id, ...data }));
 
         // Se é professora, filtrar apenas suas turmas usando ID
         if (professorId) {
-          const professoraSnap = await get(ref(db, `usuarios/${professorId}`));
-          if (professoraSnap.exists()) {
-            const professoraData = professoraSnap.val();
+          const professoraData = await getData(`usuarios/${professorId}`);
+          if (professoraData) {
             const minhasTurmas = professoraData.turmas || [];
-            
-            turmasData = todasTurmas.filter(turma => 
-              minhasTurmas.includes(turma.id)
-            );
+            turmasArray = todasTurmas.filter(turma => minhasTurmas.includes(turma.id));
           }
         } else {
           // Se é coordenadora, mostrar todas as turmas
-          turmasData = todasTurmas;
+          turmasArray = todasTurmas;
         }
       }
-      setTurmas(turmasData);
+      setTurmas(turmasArray);
 
       // Carregar disciplinas
-      const disciplinasData = [];
-      if (disciplinasSnap.exists()) {
-        Object.entries(disciplinasSnap.val()).forEach(([id, data]) => {
-          disciplinasData.push({ id, ...data });
-        });
-      }
-      setDisciplinas(disciplinasData);
+      const disciplinasArray = disciplinasData
+        ? Object.entries(disciplinasData).map(([id, data]) => ({ id, ...data }))
+        : [];
+      setDisciplinas(disciplinasArray);
 
       // Carregar usuários para nomes de professores
-      const usuariosData = {};
-      const professoresData = [];
-      if (usuariosSnap.exists()) {
-        Object.entries(usuariosSnap.val()).forEach(([id, data]) => {
+      const usuariosObj = {};
+      const professoresArray = [];
+      if (usuariosData) {
+        Object.entries(usuariosData).forEach(([id, data]) => {
           if (data.role === 'professora' && data.nome) {
-            usuariosData[id] = data;
-            professoresData.push({ id, ...data });
+            usuariosObj[id] = data;
+            professoresArray.push({ id, ...data });
           }
         });
       }
-      setUsuarios(usuariosData);
-      setProfessores(professoresData);
+      setUsuarios(usuariosObj);
+      setProfessores(professoresArray);
 
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
@@ -154,17 +148,18 @@ const ConsultaBoletim = ({ alunoId = null, turmaId = null, professorId = null })
   };
 
   const carregarAlunos = async () => {
+    if (!isReady) return;
+    
     try {
-      const alunosSnap = await getData('alunos');
-      const alunosData = [];
+      const alunosData = await getData('alunos');
+      let alunosArray = [];
       
-      if (alunosSnap.exists()) {
+      if (alunosData) {
         // Se é professora, verificar se tem permissão para ver esta turma
         if (professorId) {
-          const professoraSnap = await get(ref(db, `usuarios/${professorId}`));
+          const professoraData = await getData(`usuarios/${professorId}`);
           
-          if (professoraSnap.exists()) {
-            const professoraData = professoraSnap.val();
+          if (professoraData) {
             const minhasTurmas = professoraData.turmas || [];
             
             // Verificar se a turma selecionada está nas turmas da professora usando ID
@@ -176,69 +171,69 @@ const ConsultaBoletim = ({ alunoId = null, turmaId = null, professorId = null })
           }
         }
         
-        Object.entries(alunosSnap.val()).forEach(([id, data]) => {
-          if (data.turmaId === filtros.turmaId) {
-            alunosData.push({ id, ...data });
-          }
-        });
+        alunosArray = Object.entries(alunosData)
+          .filter(([id, data]) => data.turmaId === filtros.turmaId)
+          .map(([id, data]) => ({ id, ...data }));
       }
       
       // Ordenar por nome
-      alunosData.sort((a, b) => a.nome?.localeCompare(b.nome) || 0);
-      setAlunos(alunosData);
+      alunosArray.sort((a, b) => a.nome?.localeCompare(b.nome) || 0);
+      setAlunos(alunosArray);
     } catch (error) {
       console.error('Erro ao carregar alunos:', error);
     }
   };
 
   const carregarBoletim = async () => {
+    if (!isReady) return;
+    
     try {
-      const [notasSnap, frequenciaSnap] = await Promise.all([
+      const [notasData, frequenciaData] = await Promise.all([
         getData('notas'),
         getData('frequencia')
       ]);
 
       // Carregar notas
-      const notasData = [];
-      if (notasSnap.exists()) {
-        Object.entries(notasSnap.val()).forEach(([id, data]) => {
-          let incluir = false;
-          
-          if (filtros.alunoId && data.alunoId === filtros.alunoId) incluir = true;
-          else if (filtros.turmaId && data.turmaId === filtros.turmaId) incluir = true;
-          
-          if (incluir && filtros.bimestre && data.bimestre !== filtros.bimestre) incluir = false;
-          if (incluir && filtros.disciplinaId && data.disciplinaId !== filtros.disciplinaId) incluir = false;
-          if (incluir && filtros.professorId && data.professorId !== filtros.professorId) incluir = false;
-          
-          if (incluir) {
-            notasData.push({ id, ...data });
-          }
-        });
+      let notasArray = [];
+      if (notasData) {
+        notasArray = Object.entries(notasData)
+          .filter(([id, data]) => {
+            let incluir = false;
+            
+            if (filtros.alunoId && data.alunoId === filtros.alunoId) incluir = true;
+            else if (filtros.turmaId && data.turmaId === filtros.turmaId) incluir = true;
+            
+            if (incluir && filtros.bimestre && data.bimestre !== filtros.bimestre) incluir = false;
+            if (incluir && filtros.disciplinaId && data.disciplinaId !== filtros.disciplinaId) incluir = false;
+            if (incluir && filtros.professorId && data.professorId !== filtros.professorId) incluir = false;
+            
+            return incluir;
+          })
+          .map(([id, data]) => ({ id, ...data }));
       }
-      setNotas(notasData);
+      setNotas(notasArray);
 
       // Carregar frequência
-      const frequenciaData = [];
-      if (frequenciaSnap.exists()) {
-        Object.entries(frequenciaSnap.val()).forEach(([id, data]) => {
-          let incluir = false;
-          
-          if (filtros.alunoId && data.alunoId === filtros.alunoId) incluir = true;
-          else if (filtros.turmaId && data.turmaId === filtros.turmaId) incluir = true;
-          
-          if (incluir && filtros.disciplinaId && data.disciplinaId !== filtros.disciplinaId) incluir = false;
-          if (incluir && filtros.professorId && data.professorId !== filtros.professorId) incluir = false;
-          
-          if (incluir) {
-            frequenciaData.push({ id, ...data });
-          }
-        });
+      let frequenciaArray = [];
+      if (frequenciaData) {
+        frequenciaArray = Object.entries(frequenciaData)
+          .filter(([id, data]) => {
+            let incluir = false;
+            
+            if (filtros.alunoId && data.alunoId === filtros.alunoId) incluir = true;
+            else if (filtros.turmaId && data.turmaId === filtros.turmaId) incluir = true;
+            
+            if (incluir && filtros.disciplinaId && data.disciplinaId !== filtros.disciplinaId) incluir = false;
+            if (incluir && filtros.professorId && data.professorId !== filtros.professorId) incluir = false;
+            
+            return incluir;
+          })
+          .map(([id, data]) => ({ id, ...data }));
       }
-      setFrequencia(frequenciaData);
+      setFrequencia(frequenciaArray);
 
       // Processar dados para boletim completo
-      processarBoletimCompleto(notasData, frequenciaData);
+      processarBoletimCompleto(notasArray, frequenciaArray);
 
     } catch (error) {
       console.error('Erro ao carregar boletim:', error);

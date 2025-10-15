@@ -347,7 +347,8 @@ export default function GaleriaFotos() {
         // Excluir do Storage se houver URL
         if (fotoData.url) {
           try {
-            const imageRef = storageRef(schoolStorage, fotoData.url);
+            // Usar _storage (instância real do Firebase Storage)
+            const imageRef = storageRef(schoolStorage._storage, fotoData.url);
             await deleteObject(imageRef);
             console.log('Foto excluída do Storage');
           } catch (storageError) {
@@ -414,7 +415,8 @@ export default function GaleriaFotos() {
         // Upload de múltiplas imagens
         const uploadPromises = novaFoto.files.map(async (file, index) => {
           const filePath = `fotos/${Date.now()}_${index}_${file.name}`;
-          const fileRef = storageRef(schoolStorage, filePath);
+          // Usar _storage (instância real do Firebase Storage)
+          const fileRef = storageRef(schoolStorage._storage, filePath);
           await uploadBytes(fileRef, file);
           return await getDownloadURL(fileRef);
         });

@@ -46,10 +46,14 @@ import {
   School,
   CalendarToday
 } from '@mui/icons-material';
-import { financeiroService } from '../services/financeiroService';
+import { useSchoolServices } from '../hooks/useSchoolServices';
 
 const DashboardFinanceiro = ({ userRole }) => {
+  // 🔒 Hook multi-tenant para serviços da escola
+  const { financeiroService, isReady: servicesReady, currentSchool, error: serviceError } = useSchoolServices();
+  
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [periodo, setPeriodo] = useState('mensal'); // mensal, anual
   const [dados, setDados] = useState({
     metricas: {},
@@ -61,13 +65,39 @@ const DashboardFinanceiro = ({ userRole }) => {
     comparativoMensal: []
   });
 
+  // Log para debug
   useEffect(() => {
-    carregarDadosDashboard();
-  }, [periodo]);
+    console.log('🔍 [DashboardFinanceiro] Estado:', {
+      servicesReady,
+      hasFinanceiroService: !!financeiroService,
+      currentSchool: currentSchool?.name,
+      serviceError
+    });
+  }, [servicesReady, financeiroService, currentSchool, serviceError]);
+
+  useEffect(() => {
+    if (financeiroService && servicesReady) {
+      console.log('✅ [DashboardFinanceiro] Serviço pronto, carregando dados...');
+      carregarDadosDashboard();
+    } else {
+      console.log('⏳ [DashboardFinanceiro] Aguardando serviço...', {
+        hasService: !!financeiroService,
+        isReady: servicesReady
+      });
+    }
+  }, [periodo, financeiroService, servicesReady]);
 
   const carregarDadosDashboard = async () => {
+    // 🔒 Verificar se o serviço está disponível
+    if (!financeiroService) {
+      console.log('⏳ Aguardando financeiroService estar pronto...');
+      return;
+    }
+
     setLoading(true);
     try {
+      console.log('📊 Carregando dados do dashboard financeiro...');
+      
       // Carregar métricas gerais
       const metricas = await financeiroService.calcularMetricas();
       
@@ -80,6 +110,13 @@ const DashboardFinanceiro = ({ userRole }) => {
       // Carregar relatório de inadimplência
       const relatorioInadimplencia = await financeiroService.relatorioInadimplencia();
 
+      console.log('✅ Dados do dashboard carregados:', {
+        metricas: metricas.success,
+        proximosVencimentos: proximosVencimentos.success,
+        titulosVencidos: titulosVencidos.success,
+        relatorioInadimplencia: relatorioInadimplencia.success
+      });
+
       setDados({
         metricas: metricas.success ? metricas.metricas : {},
         proximosVencimentos: proximosVencimentos.success ? proximosVencimentos.titulos : [],
@@ -87,7 +124,7 @@ const DashboardFinanceiro = ({ userRole }) => {
         inadimplenciaPorTurma: relatorioInadimplencia.success ? relatorioInadimplencia.relatorio : []
       });
     } catch (error) {
-      console.error('Erro ao carregar dados do dashboard:', error);
+      console.error('❌ Erro ao carregar dados do dashboard:', error);
     } finally {
       setLoading(false);
     }
@@ -120,13 +157,50 @@ const DashboardFinanceiro = ({ userRole }) => {
     return diff;
   };
 
-  if (loading) {
+  // Estado de erro
+  if (error) {
     return (
       <Box sx={{ p: 3 }}>
-        <Typography variant="h6" gutterBottom>
-          Carregando dashboard...
-        </Typography>
-        <LinearProgress />
+        <Card sx={{ bgcolor: '#fee', border: '1px solid #fcc' }}>
+          <CardContent>
+            <Typography variant="h6" color="error" gutterBottom>
+              ❌ Erro ao Carregar Dashboard
+            </Typography>
+            <Typography variant="body2">{error}</Typography>
+            <Button 
+              variant="outlined" 
+              sx={{ mt: 2 }}
+              onClick={() => {
+                setError(null);
+                setLoading(true);
+                if (financeiroService) carregarDadosDashboard();
+              }}
+            >
+              Tentar Novamente
+            </Button>
+          </CardContent>
+        </Card>
+      </Box>
+    );
+  }
+
+  // Estado de loading
+  if (loading || !financeiroService) {
+    return (
+      <Box sx={{ p: 3 }}>
+        <Card>
+          <CardContent sx={{ textAlign: 'center', py: 4 }}>
+            <Typography variant="h6" gutterBottom>
+              {!financeiroService ? '⏳ Conectando aos serviços...' : 'Carregando dashboard...'}
+            </Typography>
+            <LinearProgress sx={{ mt: 2 }} />
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+              {!financeiroService 
+                ? 'Aguardando conexão com o banco de dados da escola...' 
+                : 'Buscando dados financeiros...'}
+            </Typography>
+          </CardContent>
+        </Card>
       </Box>
     );
   }

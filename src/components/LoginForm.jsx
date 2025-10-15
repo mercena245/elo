@@ -2,7 +2,7 @@
 "use client";
 import React, { useState } from 'react';
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth, provider, signInWithPopup } from '../firebase';
+import { auth, provider, signInWithPopup, db, ref, get, set } from '../firebase';
 import { 
   Button, 
   TextField, 
@@ -22,6 +22,7 @@ import {
   FaUserPlus 
 } from 'react-icons/fa';
 import { useRouter } from 'next/navigation';
+import Modal from './Modal';
 
 const LoginForm = ({ onLoginStart }) => {
   const router = useRouter();
@@ -30,8 +31,14 @@ const LoginForm = ({ onLoginStart }) => {
   const [senha, setSenha] = useState("");
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(true);
-
-  const { db, ref, get, set } = require('../firebase');
+  
+  // Estados do modal
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalConfig, setModalConfig] = useState({
+    type: 'info',
+    title: '',
+    message: ''
+  });
 
   const handleGoogleLogin = async () => {
     setLoading(true);
@@ -46,28 +53,34 @@ const LoginForm = ({ onLoginStart }) => {
       if (snap.exists()) {
         const userData = snap.val();
         if (userData.role) {
-          // Pequeno delay para mostrar o loading
+          // Usuário com role definida - redireciona para dashboard
           setTimeout(() => {
             router.push('/dashboard');
           }, 1500);
         } else {
+          // Usuário sem role - redireciona para seleção de escola
           setLoading(false);
-          alert('Aguardando liberação para acesso.');
+          router.push('/school-selection');
         }
       } else {
-        // Cria o usuário no banco sem role
+        // Usuário novo - cria no banco e redireciona para seleção de escola
         await set(userRef, {
           email: user.email,
           nome: user.displayName || '',
           role: null
         });
         setLoading(false);
-        alert('Aguardando liberação para acesso.');
+        router.push('/school-selection');
       }
     } catch (error) {
       console.error(error);
       setLoading(false);
-      alert('Erro ao fazer login com Google');
+      setModalConfig({
+        type: 'error',
+        title: '❌ Erro no Login',
+        message: 'Não foi possível fazer login com o Google. Tente novamente.'
+      });
+      setModalOpen(true);
     }
   };
 
@@ -85,27 +98,47 @@ const LoginForm = ({ onLoginStart }) => {
       if (snap.exists()) {
         const userData = snap.val();
         if (userData.role) {
-          // Pequeno delay para mostrar o loading
+          // Usuário com role definida - redireciona para dashboard
           setTimeout(() => {
             router.push('/dashboard');
           }, 1500);
         } else {
+          // Usuário sem role - redireciona para seleção de escola
           setLoading(false);
-          alert('Aguardando liberação para acesso.');
+          router.push('/school-selection');
         }
       } else {
-        // Cria o usuário no banco sem role
+        // Usuário novo - cria no banco e redireciona para seleção de escola
         await set(userRef, {
           email: user.email,
-          nome: user.displayName || '',
+          nome: user.displayName || email.split('@')[0],
           role: null
         });
         setLoading(false);
-        alert('Aguardando liberação para acesso.');
+        router.push('/school-selection');
       }
     } catch (error) {
       setLoading(false);
-      alert('Erro ao fazer login: ' + error.message);
+      
+      // Mensagem de erro mais amigável baseada no tipo de erro
+      let errorMessage = 'Não foi possível fazer login. Tente novamente.';
+      
+      if (error.code === 'auth/user-not-found') {
+        errorMessage = 'Usuário não encontrado. Verifique seu e-mail ou crie uma conta.';
+      } else if (error.code === 'auth/wrong-password') {
+        errorMessage = 'Senha incorreta. Tente novamente.';
+      } else if (error.code === 'auth/invalid-email') {
+        errorMessage = 'E-mail inválido. Verifique o formato do e-mail.';
+      } else if (error.code === 'auth/user-disabled') {
+        errorMessage = 'Esta conta foi desativada. Entre em contato com o administrador.';
+      }
+      
+      setModalConfig({
+        type: 'error',
+        title: '❌ Erro no Login',
+        message: errorMessage
+      });
+      setModalOpen(true);
     }
   };
 
@@ -453,6 +486,16 @@ const LoginForm = ({ onLoginStart }) => {
           />
         </Paper>
       </Slide>
+
+      {/* Modal de feedback */}
+      <Modal
+        isOpen={modalOpen}
+        onClose={() => setModalOpen(false)}
+        type={modalConfig.type}
+        title={modalConfig.title}
+        message={modalConfig.message}
+        confirmText="OK"
+      />
     </Box>
   );
 };

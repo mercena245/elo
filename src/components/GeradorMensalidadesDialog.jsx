@@ -41,10 +41,14 @@ import {
   Warning,
   Info
 } from '@mui/icons-material';
-import { financeiroService } from '../services/financeiroService';
-import { db, ref, get } from '../firebase';
+import { useSchoolDatabase } from '../hooks/useSchoolDatabase';
+import { useSchoolServices } from '../hooks/useSchoolServices';
 
 const GeradorMensalidadesDialog = ({ open, onClose, onSuccess }) => {
+  // 🔒 Hooks multi-tenant
+  const { getData, isReady } = useSchoolDatabase();
+  const { financeiroService } = useSchoolServices();
+  
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [alunos, setAlunos] = useState([]);
@@ -100,21 +104,28 @@ const GeradorMensalidadesDialog = ({ open, onClose, onSuccess }) => {
 
   const fetchAlunos = async () => {
     try {
-      const alunosRef = ref(db, 'alunos');
-      const snapshot = await get(alunosRef);
+      // 🔒 Verificar se banco está pronto
+      if (!isReady) {
+        console.log('⏳ Aguardando banco estar pronto...');
+        return;
+      }
+
+      // 🔒 Buscar alunos do banco da escola
+      const alunosData = await getData('alunos');
       
-      if (snapshot.exists()) {
-        const alunosData = Object.entries(snapshot.val())
+      if (alunosData) {
+        const alunosArray = Object.entries(alunosData)
           .map(([id, aluno]) => ({
             id,
             ...aluno
           }))
           .filter(aluno => aluno.status === 'ativo' && aluno.financeiro?.mensalidadeValor);
         
-        setAlunos(alunosData);
+        setAlunos(alunosArray);
+        console.log(`✅ Carregados ${alunosArray.length} alunos ativos com mensalidade`);
       }
     } catch (error) {
-      console.error('Erro ao buscar alunos:', error);
+      console.error('❌ Erro ao buscar alunos:', error);
     }
   };
 

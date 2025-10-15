@@ -25,7 +25,6 @@ import {
   Alert
 } from '@mui/material';
 import { 
-import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
   School,
   TrendingUp,
   TrendingDown,
@@ -40,9 +39,12 @@ import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
   Star,
   Warning
 } from '@mui/icons-material';
-;
+import { useSchoolDatabase } from '../../../hooks/useSchoolDatabase';
 
 const BoletimAluno = ({ alunoId, responsavelId }) => {
+  // Hook para acessar banco da escola
+  const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, storage: schoolStorage } = useSchoolDatabase();
+  
   const [loading, setLoading] = useState(true);
   const [dadosAluno, setDadosAluno] = useState(null);
   const [turma, setTurma] = useState(null);
@@ -63,13 +65,15 @@ const BoletimAluno = ({ alunoId, responsavelId }) => {
   }, [alunoId, responsavelId]);
 
   const carregarDadosFilho = async () => {
+    if (!isReady) return;
+    
     try {
       // Para responsáveis, buscar o aluno vinculado
-      const alunosSnap = await getData('alunos');
+      const alunosData = await getData('alunos');
       let filhoId = null;
       
-      if (alunosSnap.exists()) {
-        Object.entries(alunosSnap.val()).forEach(([id, data]) => {
+      if (alunosData) {
+        Object.entries(alunosData).forEach(([id, data]) => {
           if (data.responsavelId === responsavelId || data.paiId === responsavelId) {
             filhoId = id;
           }
@@ -89,10 +93,12 @@ const BoletimAluno = ({ alunoId, responsavelId }) => {
   };
 
   const carregarDadosAluno = async (idAluno = alunoId) => {
+    if (!isReady) return;
+    
     setLoading(true);
     try {
-      const [alunoSnap, turmasSnap, disciplinasSnap, usuariosSnap, notasSnap, frequenciaSnap] = await Promise.all([
-        get(ref(db, `alunos/${idAluno}`)),
+      const [alunoData, turmasData, disciplinasData, usuariosData, notasData, frequenciaData] = await Promise.all([
+        getData(`alunos/${idAluno}`),
         getData('turmas'),
         getData('disciplinas'),
         getData('usuarios'),
@@ -101,43 +107,35 @@ const BoletimAluno = ({ alunoId, responsavelId }) => {
       ]);
 
       // Dados do aluno
-      if (alunoSnap.exists()) {
-        setDadosAluno({ id: idAluno, ...alunoSnap.val() });
+      if (alunoData) {
+        setDadosAluno({ id: idAluno, ...alunoData });
       }
 
       // Turmas
-      const turmasData = {};
-      if (turmasSnap.exists()) {
-        Object.entries(turmasSnap.val()).forEach(([id, data]) => {
-          turmasData[id] = data;
+      const turmasObj = {};
+      if (turmasData) {
+        Object.entries(turmasData).forEach(([id, data]) => {
+          turmasObj[id] = data;
         });
-        if (alunoSnap.exists() && alunoSnap.val().turmaId) {
-          setTurma(turmasData[alunoSnap.val().turmaId]);
+        if (alunoData && alunoData.turmaId) {
+          setTurma(turmasObj[alunoData.turmaId]);
         }
       }
 
       // Disciplinas
-      const disciplinasData = [];
-      if (disciplinasSnap.exists()) {
-        Object.entries(disciplinasSnap.val()).forEach(([id, data]) => {
-          disciplinasData.push({ id, ...data });
-        });
-      }
-      setDisciplinas(disciplinasData);
+      const disciplinasArray = disciplinasData
+        ? Object.entries(disciplinasData).map(([id, data]) => ({ id, ...data }))
+        : [];
+      setDisciplinas(disciplinasArray);
 
       // Usuários (professores)
-      const usuariosData = {};
-      if (usuariosSnap.exists()) {
-        Object.entries(usuariosSnap.val()).forEach(([id, data]) => {
-          usuariosData[id] = data;
-        });
-      }
-      setUsuarios(usuariosData);
+      const usuariosObj = usuariosData || {};
+      setUsuarios(usuariosObj);
 
       // Processar boletim
       const boletimData = {};
       const estatisticasData = {
-        totalDisciplinas: disciplinasData.length,
+        totalDisciplinas: disciplinasArray.length,
         aprovado: 0,
         recuperacao: 0,
         reprovado: 0,
@@ -147,7 +145,7 @@ const BoletimAluno = ({ alunoId, responsavelId }) => {
         totalAulas: 0
       };
 
-      disciplinasData.forEach(disciplina => {
+      disciplinasArray.forEach(disciplina => {
         boletimData[disciplina.id] = {
           nome: disciplina.nome,
           professor: '',
@@ -167,8 +165,8 @@ const BoletimAluno = ({ alunoId, responsavelId }) => {
       });
 
       // Processar notas
-      if (notasSnap.exists()) {
-        Object.entries(notasSnap.val()).forEach(([id, nota]) => {
+      if (notasData) {
+        Object.entries(notasData).forEach(([id, nota]) => {
           if (nota.alunoId === idAluno && boletimData[nota.disciplinaId]) {
             boletimData[nota.disciplinaId].notas[nota.bimestre] = parseFloat(nota.nota);
             if (nota.professorId && usuarios[nota.professorId]) {
@@ -179,8 +177,9 @@ const BoletimAluno = ({ alunoId, responsavelId }) => {
       }
 
       // Processar frequência
-      if (frequenciaSnap.exists()) {
-        Object.entries(frequenciaSnap.val()).forEach(([id, freq]) => {
+      // Processar frequência
+      if (frequenciaData) {
+        Object.entries(frequenciaData).forEach(([id, freq]) => {
           if (freq.alunoId === idAluno && boletimData[freq.disciplinaId]) {
             boletimData[freq.disciplinaId].totalAulas++;
             if (!freq.presente) {
@@ -282,9 +281,6 @@ const BoletimAluno = ({ alunoId, responsavelId }) => {
   };
 
   const handleImprimirBoletim = () => {
-  // Hook para acessar banco da escola
-  const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, storage: schoolStorage } = useSchoolDatabase();
-
     const printContent = `
       <html>
         <head>

@@ -46,9 +46,12 @@ import {
   TrendingDown
 } from '@mui/icons-material';
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
-import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
+import { useSchoolDatabase } from '../../../hooks/useSchoolDatabase';
 
 const ComportamentosSection = ({ userRole, userData }) => {
+  // Hook para acessar banco da escola
+  const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, storage: schoolStorage } = useSchoolDatabase();
+
   const [comportamentos, setComportamentos] = useState([]);
   const [dialogNovoComportamento, setDialogNovoComportamento] = useState(false);
   const [dialogDetalhes, setDialogDetalhes] = useState(false);
@@ -101,7 +104,7 @@ const ComportamentosSection = ({ userRole, userData }) => {
       fetchAlunos();
       fetchUsuarios();
     }
-  }, [userData]);
+  }, [userData, isReady]);
 
   useEffect(() => {
     if (comportamentos.length > 0) {
@@ -121,12 +124,12 @@ const ComportamentosSection = ({ userRole, userData }) => {
   }, [usuarios]);
 
   const fetchComportamentos = async () => {
+    if (!isReady) return;
+    
     try {
-      const comportamentosRef = ref(db, 'comportamentos');
-      const snap = await get(comportamentosRef);
+      const dados = await getData('comportamentos');
       
-      if (snap.exists()) {
-        const dados = snap.val();
+      if (dados) {
         const comportamentosList = Object.entries(dados).map(([id, comp]) => ({
           id,
           ...comp
@@ -159,12 +162,12 @@ const ComportamentosSection = ({ userRole, userData }) => {
   };
 
   const fetchAlunos = async () => {
+    if (!isReady) return;
+    
     try {
-      const alunosRef = ref(db, 'alunos');
-      const snap = await get(alunosRef);
+      const dados = await getData('alunos');
       
-      if (snap.exists()) {
-        const dados = snap.val();
+      if (dados) {
         const alunosList = Object.entries(dados).map(([id, aluno]) => ({
           id,
           ...aluno
@@ -212,12 +215,12 @@ const ComportamentosSection = ({ userRole, userData }) => {
   };
 
   const fetchUsuarios = async () => {
+    if (!isReady) return;
+    
     try {
-      const usuariosRef = ref(db, 'users');
-      const snap = await get(usuariosRef);
+      const dados = await getData('users');
       
-      if (snap.exists()) {
-        const dados = snap.val();
+      if (dados) {
         const usuariosList = Object.entries(dados).map(([id, user]) => ({
           id,
           ...user
@@ -231,9 +234,6 @@ const ComportamentosSection = ({ userRole, userData }) => {
   };
 
   const calcularEstatisticas = () => {
-  // Hook para acessar banco da escola
-  const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, storage: schoolStorage } = useSchoolDatabase();
-
     const stats = {};
     
     alunos.forEach(aluno => {

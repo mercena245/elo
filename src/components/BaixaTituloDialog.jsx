@@ -46,10 +46,12 @@ import {
   Print,
   Email
 } from '@mui/icons-material';
-import financeiroService from '../services/financeiroService';
-import { auditService } from '../services/auditService';
+import { useSchoolServices } from '../hooks/useSchoolServices';
 
 const BaixaTituloDialog = ({ open, onClose, titulo, onSuccess, userId }) => {
+  // 🔒 Hooks multi-tenant
+  const { financeiroService, auditService } = useSchoolServices();
+  
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
   
@@ -97,17 +99,24 @@ const BaixaTituloDialog = ({ open, onClose, titulo, onSuccess, userId }) => {
   const buscarCreditoAluno = async () => {
     if (!titulo?.alunoId) return;
     
+    // 🔒 Verificar se serviço está disponível
+    if (!financeiroService) {
+      console.log('⏳ Aguardando financeiroService estar pronto...');
+      return;
+    }
+    
     setCarregandoCredito(true);
     try {
       const resultado = await financeiroService.obterSaldoCredito(titulo.alunoId);
       if (resultado.success) {
         setCreditoDisponivel(resultado.saldo);
+        console.log('✅ Crédito do aluno carregado:', resultado.saldo);
       } else {
-        console.error('Erro ao buscar crédito:', resultado.error);
+        console.error('❌ Erro ao buscar crédito:', resultado.error);
         setCreditoDisponivel(0);
       }
     } catch (error) {
-      console.error('Erro ao buscar crédito:', error);
+      console.error('❌ Erro ao buscar crédito:', error);
       setCreditoDisponivel(0);
     } finally {
       setCarregandoCredito(false);
@@ -209,6 +218,13 @@ const BaixaTituloDialog = ({ open, onClose, titulo, onSuccess, userId }) => {
   };
 
   const executarBaixa = async () => {
+    // 🔒 Verificar se serviços estão disponíveis
+    if (!financeiroService || !auditService) {
+      console.error('❌ Serviços não disponíveis');
+      alert('Erro: Serviços financeiros não estão prontos. Tente novamente.');
+      return;
+    }
+
     setLoading(true);
     try {
       // Utilizar crédito se houver

@@ -38,7 +38,6 @@ import {
   StepContent
 } from '@mui/material';
 import {
-import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
   Assignment,
   Add,
   Person,
@@ -59,9 +58,12 @@ import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
   Event,
   Restaurant
 } from '@mui/icons-material';
-;
+import { useSchoolDatabase } from '../../../hooks/useSchoolDatabase';
 
 const AutorizacoesSection = ({ userRole, userData }) => {
+  // Hook para acessar banco da escola
+  const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, storage: schoolStorage } = useSchoolDatabase();
+
   const [autorizacoes, setAutorizacoes] = useState([]);
   const [dialogNovaAutorizacao, setDialogNovaAutorizacao] = useState(false);
   const [dialogDetalhes, setDialogDetalhes] = useState(false);
@@ -134,15 +136,15 @@ const AutorizacoesSection = ({ userRole, userData }) => {
   useEffect(() => {
     fetchAutorizacoes();
     fetchAlunos();
-  }, [userData]);
+  }, [userData, isReady]);
 
   const fetchAutorizacoes = async () => {
+    if (!isReady) return;
+    
     try {
-      const autorizacoesRef = ref(db, 'autorizacoes');
-      const snap = await get(autorizacoesRef);
+      const dados = await getData('autorizacoes');
       
-      if (snap.exists()) {
-        const dados = snap.val();
+      if (dados) {
         const autorizacoesList = Object.entries(dados).map(([id, auth]) => ({
           id,
           ...auth
@@ -173,12 +175,12 @@ const AutorizacoesSection = ({ userRole, userData }) => {
   };
 
   const fetchAlunos = async () => {
+    if (!isReady) return;
+    
     try {
-      const alunosRef = ref(db, 'alunos');
-      const snap = await get(alunosRef);
+      const dados = await getData('alunos');
       
-      if (snap.exists()) {
-        const dados = snap.val();
+      if (dados) {
         const alunosList = Object.entries(dados).map(([id, aluno]) => ({
           id,
           ...aluno

@@ -62,6 +62,7 @@ import {
   Check
 } from '@mui/icons-material';
 import { auth, onAuthStateChanged } from '../../firebase';
+import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import ProtectedRoute from '../../components/ProtectedRoute';
 import SidebarMenu from '../../components/SidebarMenu';
 import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
@@ -73,6 +74,7 @@ const LojaPage = () => {
 
   const router = useRouter();
   const [userRole, setUserRole] = useState(null);
+  const [roleChecked, setRoleChecked] = useState(false);
   const [loading, setLoading] = useState(true);
   const [tabValue, setTabValue] = useState(0);
   const [userId, setUserId] = useState(null);
@@ -114,13 +116,14 @@ const LojaPage = () => {
   const [imageUpload, setImageUpload] = useState(null);
   const [imagePreview, setImagePreview] = useState('');
   
-  // Listener de autenticação
+  // Listener de autenticação - DEVE rodar imediatamente, sem depender de isReady
   useEffect(() => {
-    if (!isReady) return;
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
+        console.log('✅ [Loja] Usuário autenticado:', user.uid);
         setUserId(user.uid);
       } else {
+        console.log('❌ [Loja] Nenhum usuário autenticado');
         setUserId(null);
         setUserRole(null);
         // Evitar redirecionamento se já estamos na página de login
@@ -145,25 +148,43 @@ const LojaPage = () => {
   // Verificar role do usuário
   useEffect(() => {
     async function fetchRole() {
+      console.log('🔍 [Loja] Verificando role - userId:', userId, 'isReady:', isReady);
+      
       if (!userId) {
+        console.log('⚠️ [Loja] Sem userId - marcando roleChecked como true');
         setUserRole(null);
+        setRoleChecked(true);
+        return;
+      }
+
+      if (!isReady) {
+        console.log('⏳ [Loja] Aguardando conexão com banco da escola...');
         return;
       }
       
       try {
-        const userRef = ref(db, `usuarios/${userId}`);
-        const snap = await get(userRef);
-        if (snap.exists()) {
-          const userData = snap.val();
-          setUserRole((userData.role || '').trim().toLowerCase());
+        console.log('📡 [Loja] Buscando dados do usuário:', `usuarios/${userId}`);
+        const userData = await getData(`usuarios/${userId}`);
+        console.log('📦 [Loja] Dados recebidos:', userData);
+        
+        if (userData) {
+          // ✅ Não converter para lowercase - manter o valor original
+          setUserRole(userData.role || '');
+          console.log('✅ [Loja] Role carregada:', userData.role);
+        } else {
+          console.log('⚠️ [Loja] Nenhum dado encontrado para o usuário');
+          setUserRole(null);
         }
       } catch (error) {
-        console.error('Erro ao buscar dados do usuário:', error);
+        console.error('❌ [Loja] Erro ao buscar dados do usuário:', error);
         setUserRole(null);
+      } finally {
+        setRoleChecked(true);
+        console.log('✔️ [Loja] roleChecked marcado como true');
       }
     }
     fetchRole();
-  }, [userId]);
+  }, [userId, isReady, getData]);
 
   // Carregar dados
   useEffect(() => {
@@ -194,14 +215,18 @@ const LojaPage = () => {
   };
 
   const fetchProdutos = async () => {
+    if (!isReady) {
+      console.log('⏳ Aguardando conexão com banco da escola...');
+      return;
+    }
+
     try {
-      const produtosRef = ref(db, 'loja_produtos');
-      const snapshot = await get(produtosRef);
-      if (snapshot.exists()) {
-        const produtosData = Object.entries(snapshot.val())
+      const produtosData = await getData('loja_produtos');
+      if (produtosData) {
+        const produtosArray = Object.entries(produtosData)
           .map(([id, produto]) => ({ id, ...produto }))
           .filter(produto => produto.ativo !== false);
-        setProdutos(produtosData);
+        setProdutos(produtosArray);
       }
     } catch (error) {
       console.error('Erro ao buscar produtos:', error);
@@ -209,22 +234,24 @@ const LojaPage = () => {
   };
 
   const fetchAlunos = async () => {
+    if (!isReady) {
+      console.log('⏳ Aguardando conexão com banco da escola...');
+      return;
+    }
+
     try {
       if (isPai()) {
         // Pai/Mãe vê apenas seus alunos vinculados
-        const usuarioRef = ref(db, `usuarios/${userId}`);
-        const usuarioSnap = await get(usuarioRef);
+        const userData = await getData(`usuarios/${userId}`);
         
-        if (usuarioSnap.exists()) {
-          const userData = usuarioSnap.val();
+        if (userData) {
           const alunosIds = userData.alunosVinculados || [];
           
           if (alunosIds.length > 0) {
-            const alunosRef = ref(db, 'alunos');
-            const alunosSnapshot = await get(alunosRef);
+            const todosAlunosData = await getData('alunos');
             
-            if (alunosSnapshot.exists()) {
-              const todosAlunos = Object.entries(alunosSnapshot.val())
+            if (todosAlunosData) {
+              const todosAlunos = Object.entries(todosAlunosData)
                 .map(([id, aluno]) => ({ id, ...aluno }));
               
               const alunosVinculados = todosAlunos.filter(aluno => alunosIds.includes(aluno.id));
@@ -234,14 +261,13 @@ const LojaPage = () => {
         }
       } else {
         // Coordenador vê todos os alunos
-        const alunosRef = ref(db, 'alunos');
-        const snapshot = await get(alunosRef);
-        if (snapshot.exists()) {
-          const alunosData = Object.entries(snapshot.val()).map(([id, aluno]) => ({
+        const alunosData = await getData('alunos');
+        if (alunosData) {
+          const alunosArray = Object.entries(alunosData).map(([id, aluno]) => ({
             id,
             ...aluno
           }));
-          setAlunos(alunosData);
+          setAlunos(alunosArray);
         }
       }
     } catch (error) {
@@ -251,20 +277,24 @@ const LojaPage = () => {
 
   // Função para carregar vendas (títulos financeiros do tipo loja)
   const fetchVendas = async (dataInicio = null, dataFim = null) => {
+    if (!isReady) {
+      console.log('⏳ Aguardando conexão com banco da escola...');
+      return;
+    }
+
     try {
       setLoadingVendas(true);
-      const titulosRef = ref(db, 'titulos_financeiros');
-      const snapshot = await get(titulosRef);
+      const titulosData = await getData('titulos_financeiros');
       
-      if (snapshot.exists()) {
-        const titulosData = Object.entries(snapshot.val())
+      if (titulosData) {
+        const titulosArray = Object.entries(titulosData)
           .map(([id, titulo]) => ({ id, ...titulo }))
           .filter(titulo => titulo.tipo === 'loja'); // Apenas vendas da loja
         
         // Aplicar filtros de data se fornecidos
-        let vendasFiltradas = titulosData;
+        let vendasFiltradas = titulosArray;
         if (dataInicio || dataFim) {
-          vendasFiltradas = titulosData.filter(venda => {
+          vendasFiltradas = titulosArray.filter(venda => {
             const dataVenda = new Date(venda.dataCriacao);
             const inicio = dataInicio ? new Date(dataInicio) : null;
             const fim = dataFim ? new Date(dataFim + 'T23:59:59') : null;
@@ -367,6 +397,27 @@ const LojaPage = () => {
 
   const salvarProduto = async () => {
     if (salvandoProduto) return; // Evita cliques duplos
+
+    console.log('💾 [Loja] Iniciando salvamento de produto...');
+    console.log('📊 [Loja] Estado:', { 
+      isReady, 
+      hasStorage: !!schoolStorage,
+      hasStorageInstance: !!schoolStorage?._storage,
+      hasImageUpload: !!imageUpload 
+    });
+
+    if (!isReady) {
+      console.log('⏳ [Loja] Aguardando conexão com banco da escola...');
+      alert('Aguarde a conexão com o banco de dados da escola...');
+      return;
+    }
+
+    if (!schoolStorage || !schoolStorage._storage) {
+      console.error('❌ [Loja] schoolStorage não está disponível!');
+      console.error('schoolStorage:', schoolStorage);
+      alert('Erro: Storage da escola não disponível. Tente recarregar a página.');
+      return;
+    }
     
     setSalvandoProduto(true);
     try {
@@ -374,9 +425,16 @@ const LojaPage = () => {
       
       // Upload da imagem se houver
       if (imageUpload) {
-        const imageRef = storageRef(schoolStorage, `loja/${Date.now()}_${imageUpload.name}`);
+        console.log('📤 [Loja] Fazendo upload da imagem...');
+        const filePath = `loja/${Date.now()}_${imageUpload.name}`;
+        console.log('📁 [Loja] Caminho do arquivo:', filePath);
+        
+        // Usar _storage (instância real do Firebase Storage)
+        const imageRef = storageRef(schoolStorage._storage, filePath);
         await uploadBytes(imageRef, imageUpload);
         fotoUrl = await getDownloadURL(imageRef);
+        
+        console.log('✅ [Loja] Upload concluído. URL:', fotoUrl);
       }
 
       const produtoData = {
@@ -388,20 +446,22 @@ const LojaPage = () => {
 
       if (produtoEditando.id) {
         // Atualizar produto existente
-        const produtoRef = ref(db, `loja_produtos/${produtoEditando.id}`);
-        await set(produtoRef, produtoData);
+        console.log('🔄 [Loja] Atualizando produto:', produtoEditando.id);
+        await setData(`loja_produtos/${produtoEditando.id}`, produtoData);
       } else {
         // Criar novo produto
+        console.log('➕ [Loja] Criando novo produto');
         produtoData.dataCriacao = new Date().toISOString();
-        const novoProdutoRef = pushData('loja_produtos');
-        await set(novoProdutoRef, produtoData);
+        produtoData.ativo = true;
+        await pushData('loja_produtos', produtoData);
       }
 
+      console.log('✅ [Loja] Produto salvo com sucesso!');
       await fetchProdutos();
       setProdutoDialog(false);
       
     } catch (error) {
-      console.error('Erro ao salvar produto:', error);
+      console.error('❌ [Loja] Erro ao salvar produto:', error);
       alert('Erro ao salvar produto. Tente novamente.');
     } finally {
       setSalvandoProduto(false);
@@ -409,10 +469,15 @@ const LojaPage = () => {
   };
 
   const excluirProduto = async (produtoId) => {
+    if (!isReady) {
+      console.log('⏳ Aguardando conexão com banco da escola...');
+      return;
+    }
+
     if (confirm('Tem certeza que deseja excluir este produto?')) {
       try {
-        const produtoRef = ref(db, `loja_produtos/${produtoId}`);
-        await set(produtoRef, { ...produtos.find(p => p.id === produtoId), ativo: false });
+        const produtoAtual = produtos.find(p => p.id === produtoId);
+        await setData(`loja_produtos/${produtoId}`, { ...produtoAtual, ativo: false });
         await fetchProdutos();
       } catch (error) {
         console.error('Erro ao excluir produto:', error);
@@ -474,6 +539,11 @@ const LojaPage = () => {
       return;
     }
 
+    if (!isReady) {
+      console.log('⏳ Aguardando conexão com banco da escola...');
+      return;
+    }
+
     try {
       const total = calcularTotal();
       const itensDescricao = carrinho.map(item => 
@@ -499,8 +569,7 @@ const LojaPage = () => {
         }))
       };
 
-      const novoTituloRef = pushData('titulos_financeiros');
-      await set(novoTituloRef, tituloData);
+      await pushData('titulos_financeiros', tituloData);
 
       // Limpar carrinho e fechar dialogs
       limparCarrinho();
@@ -517,11 +586,24 @@ const LojaPage = () => {
     }
   };
 
+  // Mostrar loading enquanto verifica a role
+  if (!roleChecked) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  // Verificar acesso após role ser carregada
   if (!userRole || !['coordenadora', 'coordenador', 'pai', 'mae'].includes(userRole)) {
     return (
       <Container>
         <Typography variant="h6" align="center" sx={{ mt: 4 }}>
           Acesso não autorizado.
+        </Typography>
+        <Typography variant="body2" align="center" sx={{ mt: 2, color: 'text.secondary' }}>
+          Role detectada: "{userRole || 'não definida'}"
         </Typography>
       </Container>
     );

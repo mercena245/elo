@@ -3,14 +3,20 @@ import { ref, get, set, push, update, remove } from 'firebase/database';
 /**
  * Serviço Financeiro - Multi-Tenant
  * Factory function que cria uma instância do serviço para um banco específico
- * @param {Database} database - Instância do Firebase Database da escola
+ * @param {Object} databaseWrapper - Wrapper com métodos get, set, push, etc da escola
  * @param {Storage} storage - Instância do Firebase Storage da escola (opcional)
  */
-export const createFinanceiroService = (database, storage = null) => {
-  if (!database) {
-    console.error('Database não fornecido para financeiroService');
+export const createFinanceiroService = (databaseWrapper, storage = null) => {
+  if (!databaseWrapper) {
+    console.error('❌ [financeiroService] Database wrapper não fornecido');
     return null;
   }
+
+  // Extrair métodos e instância real do wrapper
+  const { get: dbGet, set: dbSet, push: dbPush, update: dbUpdate, remove: dbRemove, _database } = databaseWrapper;
+  
+  // Para compatibilidade com código legado que usa ref() diretamente
+  const database = _database;
 
   return {
   // Gerar título financeiro
@@ -1190,13 +1196,20 @@ export const createFinanceiroService = (database, storage = null) => {
 
   async verificarMesFechado(mes, ano) {
     try {
-      const mesId = `${ano}-${mes.toString().padStart(2, '0')}`;
-      const fechamentoRef = ref(database, `fechamentos_mensais/${mesId}`);
-      const snapshot = await get(fechamentoRef);
+      console.log('🔍 [verificarMesFechado] Verificando mês:', { mes, ano });
       
-      return { success: true, fechado: snapshot.exists(), dados: snapshot.val() };
+      const mesId = `${ano}-${mes.toString().padStart(2, '0')}`;
+      const path = `fechamentos_mensais/${mesId}`;
+      
+      // Usar o método wrapper em vez de ref() diretamente
+      const dados = await dbGet(path);
+      const fechado = dados !== null;
+      
+      console.log('✅ [verificarMesFechado] Resultado:', { fechado, temDados: !!dados });
+      
+      return { success: true, fechado, dados };
     } catch (error) {
-      console.error('Erro ao verificar fechamento do mês:', error);
+      console.error('❌ [verificarMesFechado] Erro ao verificar fechamento do mês:', error);
       return { success: false, error: error.message };
     }
   }

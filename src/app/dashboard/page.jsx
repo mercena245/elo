@@ -5,6 +5,8 @@ import SidebarMenu from '../../components/SidebarMenu';
 import ProtectedRoute from '../../components/ProtectedRoute';
 import SimpleCarousel from '../../components/SimpleCarousel';
 import SchoolSelector from '../../components/SchoolSelector';
+import SchoolHeader from '../../components/SchoolHeader';
+import HeaderSettingsDialog from '../../components/HeaderSettingsDialog';
 import { useAuth } from '../../context/AuthContext';
 import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
 // Importações do Swiper
@@ -86,6 +88,8 @@ const Dashboard = () => {
   });
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [headerConfig, setHeaderConfig] = useState(null);
   const router = useRouter();
 
   // Verificar autenticação
@@ -314,6 +318,67 @@ const Dashboard = () => {
     fetchAllData();
   }, [isReady, isLoading, error, schoolData, userId, getData]);
 
+  // Carregar configurações do header
+  useEffect(() => {
+    const loadHeaderConfig = async () => {
+      if (!isReady || !getData) {
+        console.log('⏳ [Dashboard] Aguardando banco para carregar config do header...');
+        return;
+      }
+
+      try {
+        console.log('📋 [Dashboard] Carregando configurações do header...');
+        
+        // Carregar configurações do header
+        const headerData = await getData('configuracoes/header');
+        
+        // Carregar informações da escola
+        const schoolInfo = await getData('configuracoes/escola');
+        
+        console.log('📋 [Dashboard] Header data:', headerData);
+        console.log('📋 [Dashboard] School info:', schoolInfo);
+
+        // Montar configuração completa
+        const fullConfig = {
+          primaryColor: headerData?.primaryColor || '#667eea',
+          secondaryColor: headerData?.secondaryColor || '#764ba2',
+          backgroundImage: headerData?.backgroundImage || null,
+          backgroundOverlay: headerData?.backgroundOverlay ?? 0.3,
+          logoUrl: headerData?.logoUrl || null,
+          schoolName: schoolInfo?.nome || currentSchool?.nome || '',
+          motto: schoolInfo?.motto || '',
+          showLogo: headerData?.showLogo ?? true,
+          showSchoolName: headerData?.showSchoolName ?? true,
+          showMotto: headerData?.showMotto ?? true,
+          textColor: headerData?.textColor || '#ffffff',
+          style: headerData?.style || 'gradient'
+        };
+
+        console.log('✅ [Dashboard] Config completa montada:', fullConfig);
+        setHeaderConfig(fullConfig);
+      } catch (error) {
+        console.error('❌ [Dashboard] Erro ao carregar config do header:', error);
+        // Configuração padrão em caso de erro
+        setHeaderConfig({
+          primaryColor: '#667eea',
+          secondaryColor: '#764ba2',
+          backgroundImage: null,
+          backgroundOverlay: 0.3,
+          logoUrl: null,
+          schoolName: currentSchool?.nome || '',
+          motto: '',
+          showLogo: true,
+          showSchoolName: true,
+          showMotto: true,
+          textColor: '#ffffff',
+          style: 'gradient'
+        });
+      }
+    };
+
+    loadHeaderConfig();
+  }, [isReady, getData, currentSchool]);
+
   // Filtra as fotos conforme role/turmas
   const fotosVisiveis = fotos.filter(foto => {
     if (userRole === 'coordenadora') return true;
@@ -403,70 +468,45 @@ const Dashboard = () => {
     );
   }
 
+  // Debug do userRole
+  console.log('🎯 [Dashboard] userRole:', userRole);
+  console.log('🎯 [Dashboard] userName:', userName);
+  console.log('🎯 [Dashboard] currentSchool:', currentSchool?.nome);
+
   return (
     <ProtectedRoute>
       <div className="dashboard-container">
         <SidebarMenu />
         <main className="dashboard-main">
           <Box sx={{ p: { xs: 2, sm: 3 }, bgcolor: '#f8fafc', minHeight: '100vh' }}>
-            {/* Header de Boas-vindas */}
-            <Fade in timeout={800}>
-              <Paper 
-                elevation={0} 
-                sx={{ 
-                  p: { xs: 1, sm: 1.5, md: 2 }, 
-                  mb: { xs: 1, sm: 1.5 }, 
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                  color: 'white',
-                  borderRadius: { xs: 2, md: 3 }
-                }}
-              >
-                <Box sx={{ 
-                  display: 'flex', 
-                  flexDirection: { xs: 'column', sm: 'row' },
-                  justifyContent: 'space-between', 
-                  alignItems: { xs: 'center', sm: 'center' },
-                  textAlign: { xs: 'center', sm: 'left' }
-                }}>
-                  <Box sx={{ mb: { xs: 2, sm: 0 } }}>
-                    <Typography variant="h4" fontWeight={700} gutterBottom sx={{ fontSize: { xs: '1.5rem', sm: '2rem', md: '2.125rem' } }}>
-                      {getSaudacao()}, {userName}! 👋
-                    </Typography>
-                    <Typography variant="h6" sx={{ opacity: 0.9, fontWeight: 400, fontSize: { xs: '0.9rem', sm: '1rem', md: '1.25rem' } }}>
-                      Sistema Educacional ELO - {roleLabels[userRole] || 'Usuário'}
-                    </Typography>
-                    <Box sx={{ mt: 2, display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
-                      <Chip 
-                        icon={<Lightbulb />}
-                        label="Dashboard Inteligente" 
-                        size="medium"
-                        sx={{ 
-                          bgcolor: 'rgba(255,255,255,0.2)', 
-                          color: 'white',
-                          '& .MuiChip-icon': { color: 'white' },
-                          '& .MuiChip-label': { 
-                            fontSize: { xs: '0.75rem', sm: '0.8125rem' }
-                          }
-                        }}
-                      />
-                      <Box sx={{ bgcolor: 'rgba(255,255,255,0.1)', borderRadius: 2, p: 1 }}>
-                        <SchoolSelector />
-                      </Box>
-                    </Box>
-                  </Box>
-                  <Avatar 
-                    sx={{ 
-                      width: { xs: 60, sm: 70, md: 80 }, 
-                      height: { xs: 60, sm: 70, md: 80 }, 
-                      bgcolor: 'rgba(255,255,255,0.2)',
-                      fontSize: { xs: '1.5rem', md: '2rem' }
-                    }}
-                  >
-                    <DashboardIcon sx={{ fontSize: { xs: '2rem', md: '2.5rem' } }} />
-                  </Avatar>
-                </Box>
+            {/* Header Personalizável da Escola */}
+            {currentSchool && userName && userRole ? (
+              <>
+                <SchoolHeader 
+                  userName={userName}
+                  userRole={userRole}
+                  onOpenSettings={() => {
+                    console.log('🔧 [Dashboard] Abrindo settings modal...');
+                    console.log('🔧 [Dashboard] userRole no momento:', userRole);
+                    setSettingsOpen(true);
+                  }}
+                />
+                
+                {/* Modal de Configurações do Header */}
+                <HeaderSettingsDialog 
+                  open={settingsOpen}
+                  onClose={() => setSettingsOpen(false)}
+                  currentConfig={headerConfig}
+                />
+              </>
+            ) : (
+              <Paper elevation={0} sx={{ p: 3, mb: 2, background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white', borderRadius: 3 }}>
+                <Typography variant="h5">Carregando header...</Typography>
+                <Typography variant="body2">userName: {userName || 'aguardando...'}</Typography>
+                <Typography variant="body2">userRole: {userRole || 'aguardando...'}</Typography>
+                <Typography variant="body2">school: {currentSchool?.nome || 'aguardando...'}</Typography>
               </Paper>
-            </Fade>
+            )}
 
             {/* Ações Rápidas - Logo abaixo do header */}
             <Fade in timeout={1000}>

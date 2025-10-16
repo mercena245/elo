@@ -56,7 +56,6 @@ import {
   Security,
   Download
 } from '@mui/icons-material';
-import { query, orderByChild, limitToLast, startAt, endAt } from '../../firebase';
 
 import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
 import { useSchoolServices } from '../../hooks/useSchoolServices';
@@ -127,20 +126,26 @@ const LogsViewer = ({ open, onClose }) => {
   const fetchLogs = async () => {
     setLoading(true);
     try {
-      console.log('🔍 Iniciando busca por logs...');
+      console.log('🔍 [LogsViewer] Iniciando busca por logs...');
+      console.log('🔍 [LogsViewer] isReady:', isReady);
+      console.log('🔍 [LogsViewer] currentSchool:', currentSchool?.nome);
+
+      if (!isReady) {
+        console.log('⏳ [LogsViewer] Aguardando banco estar pronto...');
+        setLogs([]);
+        setLoading(false);
+        return;
+      }
       
-      const logsRef = ref(db, 'audit_logs');
+      // Buscar logs usando useSchoolDatabase
+      console.log('🔍 [LogsViewer] Buscando logs de audit_logs...');
+      const rawData = await getData('audit_logs');
       
-      // Primeiro, tentar buscar todos os logs sem filtro
-      console.log('🔍 Tentando buscar todos os logs...');
-      const snapshot = await get(logsRef);
+      console.log('🔍 [LogsViewer] Dados recebidos:', rawData ? 'SIM' : 'NÃO');
       
-      console.log('🔍 Debug logs - snapshot exists:', snapshot.exists());
-      
-      if (snapshot.exists()) {
-        const rawData = snapshot.val();
-        console.log('🔍 Debug logs - raw data keys:', Object.keys(rawData));
-        console.log('🔍 Debug logs - sample data:', Object.entries(rawData).slice(0, 3));
+      if (rawData) {
+        console.log('🔍 [LogsViewer] Número de chaves:', Object.keys(rawData).length);
+        console.log('🔍 [LogsViewer] Primeiras 3 chaves:', Object.keys(rawData).slice(0, 3));
         
         const logsData = Object.entries(rawData).map(([id, log]) => ({
           id,
@@ -149,23 +154,23 @@ const LogsViewer = ({ open, onClose }) => {
           metadata: log.metadata ? (typeof log.metadata === 'string' ? JSON.parse(log.metadata) : log.metadata) : {}
         }));
         
-        console.log('🔍 Debug logs - processed data length:', logsData.length);
-        console.log('🔍 Debug logs - sample processed:', logsData.slice(0, 2));
+        console.log('🔍 [LogsViewer] Logs processados:', logsData.length);
+        console.log('🔍 [LogsViewer] Amostra de log:', logsData.slice(0, 2));
         
         // Ordenar por timestamp (mais recentes primeiro)
         const sortedLogs = logsData.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
         
-        console.log('✅ Logs carregados com sucesso:', sortedLogs.length);
+        console.log('✅ [LogsViewer] Logs carregados com sucesso:', sortedLogs.length);
         setLogs(sortedLogs);
         calculateStats(sortedLogs);
       } else {
-        console.log('📋 Nenhum log encontrado no Firebase - collection vazia');
+        console.log('📋 [LogsViewer] Nenhum log encontrado no banco - collection vazia');
         setLogs([]);
         setStats({});
       }
     } catch (error) {
-      console.error('❌ Erro ao buscar logs:', error);
-      console.error('❌ Stack trace:', error.stack);
+      console.error('❌ [LogsViewer] Erro ao buscar logs:', error);
+      console.error('❌ [LogsViewer] Stack trace:', error.stack);
       setLogs([]);
     } finally {
       setLoading(false);
@@ -458,7 +463,7 @@ const LogsViewer = ({ open, onClose }) => {
               ${filteredLogs.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map(log => `
                 <tr>
                   <td>${formatDate(log.timestamp)}</td>
-                  <td>${log.userEmail || log.userName || log.userId}</td>
+                  <td>${log.userName || log.userEmail || log.userId || 'Desconhecido'}</td>
                   <td>${getActionDescription(log.action)}</td>
                   <td>${log.entity}</td>
                   <td class="level-${log.level}">${(log.level || 'info').toUpperCase()}</td>
@@ -791,10 +796,10 @@ const LogsViewer = ({ open, onClose }) => {
                           <TableCell>
                             <Box>
                               <Typography variant="body2" fontWeight={600}>
-                                {log.userEmail || log.userName || log.userId}
+                                {log.userName || log.userEmail || log.userId || 'Usuário desconhecido'}
                               </Typography>
                               <Typography variant="caption" color="text.secondary">
-                                {log.userRole || 'N/A'}
+                                {log.userEmail || log.userRole || 'N/A'}
                               </Typography>
                             </Box>
                           </TableCell>
@@ -883,9 +888,21 @@ const LogsViewer = ({ open, onClose }) => {
                   <Typography variant="body2" gutterBottom>{selectedLog.id}</Typography>
                 </Grid>
                 <Grid item xs={12} md={6}>
-                  <Typography variant="subtitle2" color="primary">Usuário:</Typography>
+                  <Typography variant="subtitle2" color="primary">Nome do Usuário:</Typography>
                   <Typography variant="body2" gutterBottom>
-                    {selectedLog.userEmail || selectedLog.userName || selectedLog.userId}
+                    {selectedLog.userName || 'Não informado'}
+                  </Typography>
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <Typography variant="subtitle2" color="primary">Email:</Typography>
+                  <Typography variant="body2" gutterBottom>
+                    {selectedLog.userEmail || 'Não informado'}
+                  </Typography>
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <Typography variant="subtitle2" color="primary">ID do Usuário:</Typography>
+                  <Typography variant="body2" gutterBottom>
+                    {selectedLog.userId || 'N/A'}
                   </Typography>
                 </Grid>
                 <Grid item xs={12} md={6}>

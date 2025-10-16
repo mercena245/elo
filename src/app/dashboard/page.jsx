@@ -478,19 +478,27 @@ const Dashboard = () => {
       <div className="dashboard-container">
         <SidebarMenu />
         <main className="dashboard-main">
-          <Box sx={{ p: { xs: 2, sm: 3 }, bgcolor: '#f8fafc', minHeight: '100vh' }}>
+          <Box sx={{ 
+            p: { xs: 2, sm: 3, md: 4 }, 
+            bgcolor: '#f8fafc', 
+            minHeight: '100vh',
+            maxWidth: '1600px',
+            mx: 'auto'
+          }}>
             {/* Header Personalizável da Escola */}
             {currentSchool && userName && userRole ? (
               <>
-                <SchoolHeader 
-                  userName={userName}
-                  userRole={userRole}
-                  onOpenSettings={() => {
-                    console.log('🔧 [Dashboard] Abrindo settings modal...');
-                    console.log('🔧 [Dashboard] userRole no momento:', userRole);
-                    setSettingsOpen(true);
-                  }}
-                />
+                <Box sx={{ mb: { xs: 3, md: 4 } }}>
+                  <SchoolHeader 
+                    userName={userName}
+                    userRole={userRole}
+                    onOpenSettings={() => {
+                      console.log('🔧 [Dashboard] Abrindo settings modal...');
+                      console.log('🔧 [Dashboard] userRole no momento:', userRole);
+                      setSettingsOpen(true);
+                    }}
+                  />
+                </Box>
                 
                 {/* Modal de Configurações do Header */}
                 <HeaderSettingsDialog 

@@ -141,6 +141,7 @@ export const createAuditService = (database) => {
   const logAction = async (actionOrData, userId, details = {}, level = LOG_LEVELS.INFO) => {
     try {
       let action, entityId, description, changes;
+      let userData = null; // Declarar userData aqui para evitar sobrescrever
       
       // Compatibilidade: se o primeiro parâmetro é um objeto (formato antigo)
       if (typeof actionOrData === 'object' && actionOrData !== null) {
@@ -152,7 +153,7 @@ export const createAuditService = (database) => {
         level = logData.level || LOG_LEVELS.INFO;
         
         // Tentar obter userData do objeto ou do localStorage
-        let userData = logData.userData;
+        userData = logData.userData;
         if (!userData && typeof window !== 'undefined') {
           try {
             const storedData = localStorage.getItem('userData');
@@ -160,9 +161,41 @@ export const createAuditService = (database) => {
               userData = JSON.parse(storedData);
             }
           } catch (error) {
-            console.error('Erro ao obter dados do usuário do localStorage:', error);
+            console.error('[AuditService] Erro ao obter userData do localStorage:', error);
           }
         }
+        
+        // Se ainda não tiver userData, tentar obter do Firebase Auth atual
+        if (!userData || !userData.id) {
+          try {
+            const currentUser = auth?.currentUser;
+            if (currentUser) {
+              console.log('🔍 [AuditService] Buscando dados do usuário autenticado:', currentUser.uid);
+              // Buscar dados completos do banco
+              const userRef = ref(database, `usuarios/${currentUser.uid}`);
+              const userSnapshot = await get(userRef);
+              
+              if (userSnapshot.exists()) {
+                const userFromDB = userSnapshot.val();
+                userData = {
+                  id: currentUser.uid,
+                  uid: currentUser.uid,
+                  email: currentUser.email || userFromDB.email,
+                  nome: userFromDB.nome,
+                  role: userFromDB.role
+                };
+                console.log('✅ [AuditService] Dados do usuário obtidos:', {
+                  nome: userData.nome,
+                  email: userData.email,
+                  role: userData.role
+                });
+              }
+            }
+          } catch (error) {
+            console.error('❌ [AuditService] Erro ao buscar usuário autenticado:', error);
+          }
+        }
+        
         userId = userData?.id || userData?.uid || 'unknown';
       } else {
         // Formato novo
@@ -170,6 +203,39 @@ export const createAuditService = (database) => {
         entityId = details.entityId;
         description = details.description;
         changes = details.changes;
+        
+        // Se userId não foi passado ou é inválido, buscar do Firebase Auth
+        if (!userId || userId === 'unknown') {
+          try {
+            const currentUser = auth?.currentUser;
+            if (currentUser) {
+              console.log('🔍 [AuditService] Buscando dados do usuário autenticado (formato novo):', currentUser.uid);
+              userId = currentUser.uid;
+              
+              // Buscar dados completos do banco
+              const userRef = ref(database, `usuarios/${userId}`);
+              const userSnapshot = await get(userRef);
+              
+              if (userSnapshot.exists()) {
+                const userFromDB = userSnapshot.val();
+                userData = {
+                  id: userId,
+                  uid: userId,
+                  email: currentUser.email || userFromDB.email,
+                  nome: userFromDB.nome,
+                  role: userFromDB.role
+                };
+                console.log('✅ [AuditService] Dados do usuário obtidos (formato novo):', {
+                  nome: userData.nome,
+                  email: userData.email,
+                  role: userData.role
+                });
+              }
+            }
+          } catch (error) {
+            console.error('❌ [AuditService] Erro ao buscar usuário autenticado (formato novo):', error);
+          }
+        }
       }
 
       // Validação básica
@@ -178,16 +244,52 @@ export const createAuditService = (database) => {
         return;
       }
 
-      // Tentar obter dados do usuário do localStorage se não fornecido
-      let userData = null;
-      if (typeof window !== 'undefined') {
+      // Tentar obter dados do usuário do localStorage se ainda não tem
+      if (!userData && typeof window !== 'undefined') {
         try {
           const storedData = localStorage.getItem('userData');
           if (storedData) {
             userData = JSON.parse(storedData);
+            console.log('📋 [AuditService] Dados do usuário do localStorage:', {
+              nome: userData?.nome,
+              email: userData?.email,
+              role: userData?.role
+            });
           }
         } catch (error) {
-          console.error('Erro ao obter dados do usuário do localStorage:', error);
+          console.error('[AuditService] Erro ao obter dados do usuário do localStorage:', error);
+        }
+      }
+
+      // Se não tiver userData ou não tiver nome, buscar do banco
+      if (!userData || !userData.nome) {
+        console.log('⚠️ [AuditService] userData incompleto, buscando do banco...');
+        try {
+          const userRef = ref(database, `usuarios/${userId}`);
+          const userSnapshot = await get(userRef);
+          
+          if (userSnapshot.exists()) {
+            const userFromDB = userSnapshot.val();
+            console.log('✅ [AuditService] Dados do usuário do banco:', {
+              nome: userFromDB?.nome,
+              email: userFromDB?.email,
+              role: userFromDB?.role
+            });
+            
+            // Mesclar com userData existente ou criar novo
+            userData = {
+              ...(userData || {}),
+              nome: userFromDB.nome || userData?.nome,
+              email: userFromDB.email || userData?.email,
+              role: userFromDB.role || userData?.role,
+              id: userId,
+              uid: userId
+            };
+          } else {
+            console.log('⚠️ [AuditService] Usuário não encontrado no banco:', userId);
+          }
+        } catch (error) {
+          console.error('❌ [AuditService] Erro ao buscar usuário do banco:', error);
         }
       }
 
@@ -205,6 +307,24 @@ export const createAuditService = (database) => {
       else if (action.startsWith('message_')) entity = 'message';
       else if (action.startsWith('diary_')) entity = 'diary';
       else if (action.startsWith('attachment_')) entity = 'attachment';
+
+      // Log de debug para verificar dados antes de salvar
+      console.log('📋 [AuditService] Preparando log:', {
+        action,
+        userId,
+        userName: userData?.nome || userData?.name || userData?.displayName || null,
+        userEmail: userData?.email || null,
+        hasUserData: !!userData
+      });
+
+      // Se userId é "unknown", logar erro detalhado
+      if (userId === 'unknown') {
+        console.error('⚠️ [AuditService] userId é "unknown"! Verificar:', {
+          actionOrData: typeof actionOrData === 'object' ? actionOrData : actionOrData,
+          userData: userData,
+          localStorage: typeof window !== 'undefined' ? localStorage.getItem('userData') : 'N/A'
+        });
+      }
 
       // Estrutura do log
       const logEntry = {

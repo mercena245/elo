@@ -1032,21 +1032,26 @@ const Escola = () => {
   };
 
   useEffect(() => {
-    fetchDataDisciplinas();
-    carregarPeriodosCadastrados();
-    fetchData();
-    fetchPeriodosAtivos();
-    
-    // Executar limpeza de avisos expirados na inicialização
-    limparAvisosExpirados();
+    if (isReady) {
+      fetchDataDisciplinas();
+      carregarPeriodosCadastrados();
+      fetchData();
+      fetchPeriodosAtivos();
+      
+      // Executar limpeza de avisos expirados na inicialização
+      limparAvisosExpirados();
+    }
     
     // Executar limpeza periódica a cada 6 horas (opcional)
     const interval = setInterval(() => {
-      limparAvisosExpirados();
+      if (isReady) {
+        limparAvisosExpirados();
+      }
     }, 6 * 60 * 60 * 1000); // 6 horas em milissegundos
     
     return () => clearInterval(interval);
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isReady]);
 
   // Listener de autenticação - DEVE rodar imediatamente
   useEffect(() => {

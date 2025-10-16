@@ -80,6 +80,19 @@ export default function Configuracoes() {
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [alunos, setAlunos] = useState([]);
   const [alunosSelecionados, setAlunosSelecionados] = useState([]);
+  
+  // Estados para configurações da escola
+  const [dadosEscola, setDadosEscola] = useState({
+    nomeEscola: '',
+    endereco: '',
+    telefone: '',
+    email: '',
+    cnpj: '',
+    diretor: ''
+  });
+  const [loadingEscola, setLoadingEscola] = useState(true);
+  const [salvandoEscola, setSalvandoEscola] = useState(false);
+
   // Função para atualizar lista de usuários e pendentes
   const fetchUsuarios = async () => {
     if (!isReady) {
@@ -132,6 +145,78 @@ export default function Configuracoes() {
     } catch (error) {
       console.error('Erro ao buscar alunos:', error);
       setAlunos([]);
+    }
+  };
+
+  // Função para buscar dados da escola
+  const fetchDadosEscola = async () => {
+    if (!isReady) {
+      console.log('⏳ Aguardando conexão com banco da escola...');
+      return;
+    }
+    
+    setLoadingEscola(true);
+    try {
+      const configEscola = await getData('configuracoes/escola');
+      console.log('📋 [Configuracoes] Dados da escola:', configEscola);
+      
+      if (configEscola) {
+        setDadosEscola({
+          nomeEscola: configEscola.nomeEscola || '',
+          endereco: configEscola.endereco || '',
+          telefone: configEscola.telefone || '',
+          email: configEscola.email || '',
+          cnpj: configEscola.cnpj || '',
+          diretor: configEscola.diretor || ''
+        });
+      }
+    } catch (error) {
+      console.error('❌ Erro ao buscar dados da escola:', error);
+    } finally {
+      setLoadingEscola(false);
+    }
+  };
+
+  // Função para salvar dados da escola
+  const handleSalvarDadosEscola = async () => {
+    if (!isReady) {
+      console.log('⏳ Aguardando conexão com banco da escola...');
+      return;
+    }
+    
+    setSalvandoEscola(true);
+    try {
+      await setData('configuracoes/escola', dadosEscola);
+      
+      // Log da atualização
+      const currentUserData = {
+        id: user?.uid,
+        uid: user?.uid,
+        email: user?.email,
+        nome: user?.displayName || user?.email,
+        role: user?.role
+      };
+      
+      await auditService?.logAction({
+        action: 'school_update',
+        entity: 'school',
+        entityId: 'configuracoes',
+        details: 'Dados da escola atualizados',
+        changes: {
+          nomeEscola: dadosEscola.nomeEscola,
+          endereco: dadosEscola.endereco,
+          telefone: dadosEscola.telefone
+        },
+        userData: currentUserData
+      });
+      
+      alert('✅ Dados da escola salvos com sucesso!');
+      console.log('✅ Dados da escola salvos:', dadosEscola);
+    } catch (error) {
+      console.error('❌ Erro ao salvar dados da escola:', error);
+      alert('❌ Erro ao salvar dados da escola');
+    } finally {
+      setSalvandoEscola(false);
     }
   };
 
@@ -194,13 +279,23 @@ export default function Configuracoes() {
           mudancas.alunosVinculados = { de: nomesAlunosAntigos, para: nomesAlunosNovos };
         }
         
+        // Obter dados do usuário logado para o log
+        const currentUserData = {
+          id: user?.uid,
+          uid: user?.uid,
+          email: user?.email,
+          nome: user?.displayName || user?.email,
+          role: user?.role
+        };
+        
         // Log da atualização do usuário
         await auditService?.logAction({
           action: LOG_ACTIONS.USER_UPDATE,
           entity: 'user',
           entityId: editUser.uid,
           details: `Dados atualizados para usuário: ${editUser.nome || editUser.email}`,
-          changes: mudancas
+          changes: mudancas,
+          userData: currentUserData // ← Passar userData explicitamente
         });
         
         // Vincular novos alunos se o role é "pai"
@@ -228,7 +323,8 @@ export default function Configuracoes() {
               details: `${alunosSelecionados.length} aluno(s) vinculado(s) ao responsável ${editUser.nome || editUser.email}`,
               changes: {
                 alunosVinculados: alunosSelecionados.map(a => `${a.nome} (${a.matricula})`)
-              }
+              },
+              userData: currentUserData // ← Passar userData explicitamente
             });
           }
         }
@@ -251,6 +347,15 @@ export default function Configuracoes() {
       console.log('⏳ Aguardando conexão com banco da escola...');
       return;
     }
+
+    // Criar userData do usuário atual (quem está inativando)
+    const currentUserData = {
+      id: user?.uid,
+      uid: user?.uid,
+      email: user?.email,
+      nome: user?.displayName || user?.email,
+      role: user?.role
+    };
     
     const userData = await getData(`usuarios/${editUser.uid}`);
     if (userData) {
@@ -281,7 +386,8 @@ export default function Configuracoes() {
           statusAnterior: userData.role,
           statusNovo: 'inativo',
           alunosDesvinculados: nomesAlunosVinculados
-        }
+        },
+        userData: currentUserData // ← Passar userData explicitamente
       });
       
       setEditDialogOpen(false);
@@ -410,6 +516,14 @@ export default function Configuracoes() {
     fetchRole();
   }, [userId, isReady, getData]);
 
+  // useEffect para carregar dados da escola
+  useEffect(() => {
+    if (isReady) {
+      fetchDadosEscola();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isReady]);
+
   if (!roleChecked) {
     return (
       <Box sx={{ mt: 8, textAlign: 'center' }}>
@@ -461,9 +575,6 @@ export default function Configuracoes() {
 
   // Função para contar cliques no Card do título
   const handleDevCardClick = () => {
-  // Services multi-tenant
-  const { auditService, financeiroService, LOG_ACTIONS, isReady: servicesReady } = useSchoolServices();
-
     setDevClickCount(prev => {
       if (prev + 1 >= 5) {
         setDevModalOpen(true);
@@ -493,27 +604,47 @@ export default function Configuracoes() {
 
   // Função para backup do banco
   const handleBackupBanco = async () => {
+    if (!isReady) {
+      alert('⏳ Aguardando conexão com banco da escola...');
+      return;
+    }
+
     try {
-      const rootRef = ref(db, '/');
-      const snap = await get(rootRef);
-      if (snap.exists()) {
-        const data = snap.val();
+      console.log('📦 [Backup] Iniciando backup do banco...');
+      console.log('📦 [Backup] Escola:', currentSchool?.nome);
+
+      // Buscar todos os dados do banco da escola atual
+      const data = await getData('/');
+      
+      if (data) {
+        console.log('📦 [Backup] Dados carregados, gerando JSON...');
         const json = JSON.stringify(data, null, 2);
-        // Cria arquivo para download
+        
+        // Criar arquivo para download
         const blob = new Blob([json], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `backup_banco_${new Date().toISOString().slice(0,19).replace(/[:T]/g,'_')}.json`;
+        
+        // Nome do arquivo com escola e data
+        const escolaNome = (currentSchool?.nome || 'escola').replace(/[^a-z0-9]/gi, '_');
+        const dataHora = new Date().toISOString().slice(0,19).replace(/[:T]/g,'_');
+        a.download = `backup_${escolaNome}_${dataHora}.json`;
+        
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
+        
+        console.log('✅ [Backup] Backup criado com sucesso!');
+        alert('✅ Backup do banco criado com sucesso!');
       } else {
-        alert('Banco de dados vazio ou inacessível.');
+        console.log('⚠️ [Backup] Banco de dados vazio ou inacessível');
+        alert('⚠️ Banco de dados vazio ou inacessível.');
       }
     } catch (err) {
-      alert('Erro ao gerar backup: ' + err.message);
+      console.error('❌ [Backup] Erro ao gerar backup:', err);
+      alert('❌ Erro ao gerar backup: ' + err.message);
     }
   };
 
@@ -595,6 +726,92 @@ export default function Configuracoes() {
               </CardContent>
             </Card>
           )}
+          
+          {/* Card de Configurações da Escola para Relatórios */}
+          <Card sx={{ mb: 3 }}>
+            <CardContent>
+              <Typography variant="h6" color="primary" gutterBottom align="center">
+                📄 Configurações da Escola (Relatórios)
+              </Typography>
+              <Typography variant="body2" color="text.secondary" align="center" sx={{ mb: 3 }}>
+                Estas informações serão exibidas nas fichas de matrícula e outros documentos impressos
+              </Typography>
+              
+              {loadingEscola ? (
+                <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                  <CircularProgress />
+                </Box>
+              ) : (
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <TextField
+                    label="Nome da Escola"
+                    value={dadosEscola.nomeEscola}
+                    onChange={(e) => setDadosEscola({ ...dadosEscola, nomeEscola: e.target.value })}
+                    fullWidth
+                    required
+                    helperText="Nome completo da escola (aparece no cabeçalho dos relatórios)"
+                  />
+                  
+                  <TextField
+                    label="Endereço Completo"
+                    value={dadosEscola.endereco}
+                    onChange={(e) => setDadosEscola({ ...dadosEscola, endereco: e.target.value })}
+                    fullWidth
+                    multiline
+                    rows={2}
+                    helperText="Endereço completo da escola"
+                  />
+                  
+                  <Box sx={{ display: 'flex', gap: 2 }}>
+                    <TextField
+                      label="Telefone"
+                      value={dadosEscola.telefone}
+                      onChange={(e) => setDadosEscola({ ...dadosEscola, telefone: e.target.value })}
+                      fullWidth
+                      placeholder="(00) 00000-0000"
+                    />
+                    
+                    <TextField
+                      label="E-mail"
+                      value={dadosEscola.email}
+                      onChange={(e) => setDadosEscola({ ...dadosEscola, email: e.target.value })}
+                      fullWidth
+                      type="email"
+                      placeholder="contato@escola.com.br"
+                    />
+                  </Box>
+                  
+                  <Box sx={{ display: 'flex', gap: 2 }}>
+                    <TextField
+                      label="CNPJ"
+                      value={dadosEscola.cnpj}
+                      onChange={(e) => setDadosEscola({ ...dadosEscola, cnpj: e.target.value })}
+                      fullWidth
+                      placeholder="00.000.000/0000-00"
+                    />
+                    
+                    <TextField
+                      label="Diretor(a)"
+                      value={dadosEscola.diretor}
+                      onChange={(e) => setDadosEscola({ ...dadosEscola, diretor: e.target.value })}
+                      fullWidth
+                      placeholder="Nome do(a) diretor(a)"
+                    />
+                  </Box>
+                  
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    onClick={handleSalvarDadosEscola}
+                    disabled={salvandoEscola || !dadosEscola.nomeEscola}
+                    sx={{ mt: 2 }}
+                  >
+                    {salvandoEscola ? 'Salvando...' : '💾 Salvar Configurações'}
+                  </Button>
+                </Box>
+              )}
+            </CardContent>
+          </Card>
           
           <Card sx={{ mb: 3 }}>
             <CardContent>

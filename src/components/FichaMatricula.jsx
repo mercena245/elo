@@ -1,10 +1,46 @@
-import React from 'react';
+'use client';
+
+import React, { useState, useEffect } from 'react';
 import { 
   Box, 
   Typography
 } from '@mui/material';
+import { useSchoolDatabase } from '../hooks/useSchoolDatabase';
 
 const FichaMatricula = ({ aluno, turmas, onClose }) => {
+  const { getData, isReady } = useSchoolDatabase();
+  const [nomeEscola, setNomeEscola] = useState('ESCOLA ELO');
+
+  useEffect(() => {
+    const buscarNomeEscola = async () => {
+      console.log('🔍 [FichaMatricula] Iniciando busca do nome da escola...');
+      console.log('🔍 [FichaMatricula] isReady:', isReady);
+      console.log('🔍 [FichaMatricula] getData:', typeof getData);
+
+      if (!isReady) {
+        console.log('⏳ [FichaMatricula] Aguardando conexão com banco...');
+        return;
+      }
+
+      try {
+        console.log('🔍 [FichaMatricula] Buscando configuracoes/escola...');
+        const configEscola = await getData('configuracoes/escola');
+        console.log('📋 [FichaMatricula] Resultado:', configEscola);
+        
+        if (configEscola?.nomeEscola) {
+          setNomeEscola(configEscola.nomeEscola);
+          console.log('✅ Nome da escola carregado:', configEscola.nomeEscola);
+        } else {
+          console.log('⚠️ [FichaMatricula] nomeEscola não encontrado em configuracoes/escola');
+        }
+      } catch (error) {
+        console.error('❌ [FichaMatricula] Erro ao buscar nome da escola:', error);
+      }
+    };
+
+    buscarNomeEscola();
+  }, [getData, isReady]);
+
   const dataAtual = new Date().toLocaleDateString('pt-BR', {
     day: '2-digit',
     month: '2-digit',
@@ -269,7 +305,7 @@ const FichaMatricula = ({ aluno, turmas, onClose }) => {
         {/* Conteúdo da ficha para impressão */}
         <div id="ficha-matricula-content">
           <div className="header">
-            <h1>ESCOLA ELO</h1>
+            <h1>{nomeEscola}</h1>
             <h2>FICHA DE MATRÍCULA COMPLETA</h2>
           </div>
 
@@ -662,7 +698,7 @@ const FichaMatricula = ({ aluno, turmas, onClose }) => {
 
           <div className="footer">
             <p>Documento gerado automaticamente em {dataAtual}</p>
-            <p>ESCOLA ELO - Sistema de Gestão Escolar</p>
+            <p>{nomeEscola} - Sistema ELO-School</p>
           </div>
         </div>
       </Box>

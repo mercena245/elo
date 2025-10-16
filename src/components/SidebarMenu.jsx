@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useSchoolDatabase } from '../hooks/useSchoolDatabase';
 import { useManagementDatabase } from '../hooks/useManagementDatabase';
 import { useAuth } from '../context/AuthContext';
+import { SUPER_ADMIN_UID, ROLES, isSuperAdmin } from '../config/constants';
 import { 
   Drawer, 
   IconButton, 
@@ -66,8 +67,23 @@ const SidebarMenu = () => {
   useEffect(() => {
     async function fetchRole() {
       try {
-        // Não buscar se não tiver userId, se não estiver pronto, ou se getData não existir
-        if (!userId || !isReady || !getData) {
+        if (!userId) {
+          console.log('⏸️ [SidebarMenu] Aguardando userId');
+          return;
+        }
+        
+        // 👑 Se for Super Admin, tratá-lo como COORDENADOR direto
+        if (isSuperAdmin(userId)) {
+          console.log('👑 [SidebarMenu] Super Admin detectado - tratando como COORDENADORA');
+          setUserRole(ROLES.COORDENADORA); // ← Usar 'coordenadora' que é o padrão do sistema
+          setUserName('Super Admin');
+          setUserEmail(auth.currentUser?.email || '');
+          return;
+        }
+        
+        // Para usuários normais, buscar do banco da escola
+        // Não buscar se não tiver getData ou não estiver pronto
+        if (!isReady || !getData) {
           console.log('⏸️ [SidebarMenu] Aguardando inicialização:', { userId: !!userId, isReady, hasGetData: !!getData });
           return;
         }
@@ -101,28 +117,48 @@ const SidebarMenu = () => {
   useEffect(() => {
     async function fetchPendentes() {
       try {
-        // Não buscar se não estiver pronto ou se getData não existir
-        if (!isReady || !getData) {
-          console.log('⏸️ [SidebarMenu] Aguardando para buscar pendentes:', { isReady, hasGetData: !!getData });
+        // Não buscar pendentes se não estiver pronto
+        if (!isReady) {
+          console.log('⏸️ [SidebarMenu] Aguardando para buscar pendentes:', { isReady });
           return;
         }
         
-        // Buscar usuários do banco da escola
-        const usuarios = await getData('usuarios');
-        
-        if (usuarios) {
-          const lista = Object.values(usuarios).filter(u => !u.role);
-          setPendentes(lista.length);
+        // Se accessType === 'management', buscar do Management DB
+        if (accessType === 'management') {
+          console.log('🔍 [SidebarMenu] Buscando pendentes do Management DB');
+          const usuarios = await managementDB.getData('usuarios');
+          
+          if (usuarios) {
+            const lista = Object.values(usuarios).filter(u => !u.role);
+            setPendentes(lista.length);
+            console.log(`📊 [SidebarMenu] ${lista.length} usuários pendentes encontrados`);
+          } else {
+            setPendentes(0);
+          }
+        } 
+        // Se accessType === 'school', buscar do School DB
+        else if (accessType === 'school') {
+          console.log('🔍 [SidebarMenu] Buscando pendentes do School DB');
+          const usuarios = await schoolDB.getData('usuarios');
+          
+          if (usuarios) {
+            const lista = Object.values(usuarios).filter(u => !u.role);
+            setPendentes(lista.length);
+            console.log(`📊 [SidebarMenu] ${lista.length} usuários pendentes encontrados`);
+          } else {
+            setPendentes(0);
+          }
         } else {
+          console.log('⏸️ [SidebarMenu] Nenhum accessType definido ainda');
           setPendentes(0);
         }
       } catch (error) {
-        console.log('⚠️ [SidebarMenu] Erro ao buscar pendentes (provavelmente sem escola):', error.message);
+        console.log('⚠️ [SidebarMenu] Erro ao buscar pendentes:', error.message);
         setPendentes(0);
       }
     }
     fetchPendentes();
-  }, [isReady, getData]);
+  }, [isReady, accessType, schoolDB, managementDB]);
 
   const handleLogout = async () => {
     await signOut(auth);

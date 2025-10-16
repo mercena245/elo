@@ -97,5 +97,8 @@
   },
   "database": {
     "rules": "config/rules/database.rules.json"
+  },
+  "storage": {
+    "rules": "config/rules/storage.rules"
   }
 }

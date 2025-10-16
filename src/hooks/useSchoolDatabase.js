@@ -12,6 +12,8 @@ import {
   schoolStorageOperations,
   clearSchoolCache 
 } from '../services/schoolDatabaseService';
+import { SUPER_ADMIN_UID, ROLES, isSuperAdmin } from '../config/constants';
+import { auth } from '../firebase';
 
 export const useSchoolDatabase = () => {
   const { user, currentSchool, isLoadingSchool } = useAuth();
@@ -84,8 +86,8 @@ export const useSchoolDatabase = () => {
 
     // Cleanup ao desmontar ou trocar de escola
     return () => {
-      if (currentSchool?.projectId) {
-        clearSchoolCache(currentSchool.projectId);
+      if (currentSchool?.id) {
+        clearSchoolCache(currentSchool.id);
       }
     };
   }, [currentSchool, isLoadingSchool]);
@@ -94,6 +96,24 @@ export const useSchoolDatabase = () => {
    * Buscar dados de um caminho
    */
   const getData = useCallback(async (path) => {
+    // 👑 Se for Super Admin buscando seus próprios dados, retornar mock
+    const currentUser = auth.currentUser;
+    if (currentUser && isSuperAdmin(currentUser.uid) && path === `usuarios/${currentUser.uid}`) {
+      console.log('👑 [useSchoolDatabase.getData] Super Admin buscando seus dados - retornando mock');
+      return {
+        uid: currentUser.uid,
+        nome: 'Super Admin',
+        displayName: 'Super Admin',
+        email: currentUser.email,
+        role: ROLES.COORDENADORA, // ← Usar 'coordenadora' que é o padrão do sistema
+        turmas: ['todas'],
+        permissoes: {
+          verTudo: true,
+          editarTudo: true
+        }
+      };
+    }
+    
     if (!db) {
       console.warn('⚠️ [useSchoolDatabase.getData] Database não inicializado - provavelmente sem escola selecionada');
       throw new Error('Database não inicializado. Selecione uma escola primeiro.');

@@ -1,20 +1,6 @@
 {
   "rules": {
-    "escolas": {
-      ".read": "auth != null",
-      ".write": "auth != null",
-      "$escolaId": {
-        ".read": "auth != null",
-        ".write": "auth != null"
-      }
-    },
-    "usuarios": {
-      ".read": "auth != null",
-      ".write": "auth != null"
-    },
-    "configuracoes": {
-      ".read": "auth != null",
-      ".write": "auth != null"
-    }
+    ".read": "true",
+    ".write": "true"
   }
 }

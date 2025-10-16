@@ -1,8 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-
-const SUPER_ADMIN_PASSWORD = '984984'; // Temporário - será substituído por 2FA
+import { SUPER_ADMIN_PASSWORD } from '../../../config/constants';
 
 export default function SuperAdminAuth({ onAuthenticated, user }) {
   const [password, setPassword] = useState('');

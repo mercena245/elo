@@ -21,20 +21,40 @@ const schoolAuths = new Map();
 
 // Configuração mínima do Firebase (apenas para client-side)
 const getFirebaseConfig = (schoolData) => {
+  // Se a escola tem credenciais próprias completas, usar elas
+  if (schoolData.firebaseConfig?.apiKey) {
+    console.log('🔑 [getFirebaseConfig] Usando credenciais específicas da escola');
+    return {
+      apiKey: schoolData.firebaseConfig.apiKey,
+      authDomain: schoolData.firebaseConfig.authDomain || `${schoolData.projectId}.firebaseapp.com`,
+      databaseURL: schoolData.databaseURL,
+      projectId: schoolData.projectId,
+      storageBucket: schoolData.storageBucket,
+      messagingSenderId: schoolData.firebaseConfig.messagingSenderId,
+      appId: schoolData.firebaseConfig.appId
+    };
+  }
+  
+  // Caso contrário, usar credenciais do projeto principal (multi-tenant no mesmo projeto)
+  // Isso funciona quando todas as escolas estão no MESMO projeto Firebase
+  // mas com diferentes Realtime Databases e Storage Buckets
+  console.log('🔑 [getFirebaseConfig] Usando credenciais do projeto principal (multi-tenant)');
+  
   const config = {
     apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || 'AIzaSyBoY8kGVTZjRnneyxPRfyLaq_ePjgFNNrY',
-    authDomain: `${schoolData.projectId}.firebaseapp.com`,
-    databaseURL: schoolData.databaseURL,
-    projectId: schoolData.projectId,
-    storageBucket: schoolData.storageBucket,
+    authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || 'gerenciamento-elo-school.firebaseapp.com',
+    databaseURL: schoolData.databaseURL, // ← URL específica da escola
+    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'gerenciamento-elo-school',
+    storageBucket: schoolData.storageBucket, // ← Bucket específico da escola
     messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || '403961922767',
     appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || '1:403961922767:web:89ffe1a7ebe6be3e9a23ba'
   };
   
   console.log('🔧 [getFirebaseConfig] Configuração gerada:', {
-    projectId: config.projectId,
     databaseURL: config.databaseURL,
-    storageBucket: config.storageBucket
+    storageBucket: config.storageBucket,
+    projectId: config.projectId,
+    usingSchoolSpecificResources: true
   });
   
   return config;
@@ -42,34 +62,43 @@ const getFirebaseConfig = (schoolData) => {
 
 /**
  * Inicializa ou recupera a instância do Firebase App para uma escola específica
- * @param {Object} schoolData - Dados da escola contendo databaseURL, storageBucket, projectId
+ * @param {Object} schoolData - Dados da escola contendo databaseURL, storageBucket, projectId, id
  * @returns {Object} Firebase App instance
  */
 export const getSchoolApp = (schoolData) => {
-  if (!schoolData || !schoolData.projectId) {
-    throw new Error('Dados da escola inválidos ou projectId não fornecido');
+  if (!schoolData || !schoolData.id) {
+    throw new Error('Dados da escola inválidos ou ID não fornecido');
   }
 
-  const { projectId } = schoolData;
+  // Usar o ID da escola como identificador único (não o projectId que pode ser compartilhado)
+  const appName = `school-${schoolData.id}`;
 
   // Retorna do cache se já existe
-  if (schoolApps.has(projectId)) {
-    return schoolApps.get(projectId);
+  if (schoolApps.has(appName)) {
+    console.log(`♻️ [getSchoolApp] Usando cache para: ${schoolData.nome || schoolData.id}`);
+    return schoolApps.get(appName);
   }
 
   // Verifica se já existe uma app com esse nome
-  const existingApp = getApps().find(app => app.name === projectId);
+  const existingApp = getApps().find(app => app.name === appName);
   if (existingApp) {
-    schoolApps.set(projectId, existingApp);
+    console.log(`♻️ [getSchoolApp] App já existe: ${schoolData.nome || schoolData.id}`);
+    schoolApps.set(appName, existingApp);
     return existingApp;
   }
 
   // Cria nova instância
   const config = getFirebaseConfig(schoolData);
-  const app = initializeApp(config, projectId);
   
-  schoolApps.set(projectId, app);
-  console.log(`✅ Firebase App inicializado para escola: ${schoolData.nome} (${projectId})`);
+  console.log(`🔧 [getSchoolApp] Criando nova app para: ${schoolData.nome || schoolData.id}`);
+  console.log(`🔧 [getSchoolApp] App name: ${appName}`);
+  console.log(`🔧 [getSchoolApp] Database URL: ${config.databaseURL}`);
+  console.log(`🔧 [getSchoolApp] Storage Bucket: ${config.storageBucket}`);
+  
+  const app = initializeApp(config, appName);
+  
+  schoolApps.set(appName, app);
+  console.log(`✅ Firebase App inicializado para escola: ${schoolData.nome || schoolData.id} (${appName})`);
   
   return app;
 };
@@ -80,33 +109,36 @@ export const getSchoolApp = (schoolData) => {
  * @returns {Object} Firebase Database instance
  */
 export const getSchoolDatabase = (schoolData) => {
-  if (!schoolData || !schoolData.projectId) {
-    throw new Error('Dados da escola inválidos');
+  if (!schoolData || !schoolData.id) {
+    throw new Error('Dados da escola inválidos ou ID não fornecido');
   }
 
-  const { projectId, databaseURL } = schoolData;
+  const { id, databaseURL } = schoolData;
+  const cacheKey = `db-${id}`;
 
   // Retorna do cache se já existe
-  if (schoolDatabases.has(projectId)) {
-    console.log(`♻️ [getSchoolDatabase] Usando cache para: ${schoolData.nome}`);
-    return schoolDatabases.get(projectId);
+  if (schoolDatabases.has(cacheKey)) {
+    console.log(`♻️ [getSchoolDatabase] Usando cache para: ${schoolData.nome || id}`);
+    return schoolDatabases.get(cacheKey);
   }
 
   try {
+    console.log(`🔌 [getSchoolDatabase] Conectando ao banco da escola: ${schoolData.nome || id}`);
+    console.log(`🔌 [getSchoolDatabase] Database URL: ${databaseURL}`);
+    
     // Inicializa app e database
     const app = getSchoolApp(schoolData);
     
     // Usa a URL específica do banco da escola
     const database = getDatabase(app, databaseURL);
     
-    schoolDatabases.set(projectId, database);
-    console.log(`✅ [getSchoolDatabase] Database conectado para: ${schoolData.nome}`);
-    console.log(`📍 [getSchoolDatabase] Database URL: ${databaseURL}`);
+    schoolDatabases.set(cacheKey, database);
+    console.log(`✅ [getSchoolDatabase] Database conectado: ${schoolData.nome || id}`);
     
     return database;
   } catch (error) {
     console.error(`❌ [getSchoolDatabase] Erro ao conectar database:`, error);
-    throw new Error(`Falha ao conectar ao banco da escola: ${error.message}`);
+    throw error;
   }
 };
 
@@ -116,23 +148,25 @@ export const getSchoolDatabase = (schoolData) => {
  * @returns {Object} Firebase Storage instance
  */
 export const getSchoolStorage = (schoolData) => {
-  if (!schoolData || !schoolData.projectId) {
-    throw new Error('Dados da escola inválidos');
+  if (!schoolData || !schoolData.id) {
+    throw new Error('Dados da escola inválidos ou ID não fornecido');
   }
 
-  const { projectId } = schoolData;
+  const { id } = schoolData;
+  const cacheKey = `storage-${id}`;
 
   // Retorna do cache se já existe
-  if (schoolStorages.has(projectId)) {
-    return schoolStorages.get(projectId);
+  if (schoolStorages.has(cacheKey)) {
+    console.log(`♻️ [getSchoolStorage] Usando cache para: ${schoolData.nome || id}`);
+    return schoolStorages.get(cacheKey);
   }
 
   // Inicializa app e storage
   const app = getSchoolApp(schoolData);
   const storage = getStorage(app);
   
-  schoolStorages.set(projectId, storage);
-  console.log(`✅ Storage conectado para: ${schoolData.nome}`);
+  schoolStorages.set(cacheKey, storage);
+  console.log(`✅ [getSchoolStorage] Storage conectado: ${schoolData.nome || id}`);
   
   return storage;
 };
@@ -290,13 +324,19 @@ export const schoolStorageOperations = (schoolData) => {
 
 /**
  * Limpa o cache de uma escola específica (útil para logout ou troca de escola)
+ * @param {string} schoolId - ID da escola (não o projectId)
  */
-export const clearSchoolCache = (projectId) => {
-  if (projectId) {
-    schoolApps.delete(projectId);
-    schoolDatabases.delete(projectId);
-    schoolStorages.delete(projectId);
-    console.log(`🗑️ Cache limpo para escola: ${projectId}`);
+export const clearSchoolCache = (schoolId) => {
+  if (schoolId) {
+    const appName = `school-${schoolId}`;
+    const dbKey = `db-${schoolId}`;
+    const storageKey = `storage-${schoolId}`;
+    
+    schoolApps.delete(appName);
+    schoolDatabases.delete(dbKey);
+    schoolStorages.delete(storageKey);
+    
+    console.log(`🗑️ [clearSchoolCache] Cache limpo para escola: ${schoolId}`);
   }
 };
 

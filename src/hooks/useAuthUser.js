@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { auth } from '../firebase';
 import { useSchoolDatabase } from './useSchoolDatabase';
+import { SUPER_ADMIN_UID, ROLES, isSuperAdmin } from '../config/constants';
 
 export function useAuthUser() {
   const [user, setUser] = useState(null);
@@ -26,7 +27,16 @@ export function useAuthUser() {
       if (user && isReady) {
         try {
           console.log('🔐 [useAuthUser] Buscando role do usuário:', user.uid);
-          // Buscar dados do usuário no banco da escola
+          
+          // Se for Super Admin, tratá-lo como COORDENADOR dentro das escolas
+          if (isSuperAdmin(user.uid)) {
+            console.log('👑 [useAuthUser] Super Admin detectado - tratando como COORDENADORA');
+            setUserRole(ROLES.COORDENADORA); // ← Usar 'coordenadora' que é o padrão do sistema
+            setLoading(false);
+            return;
+          }
+          
+          // Para usuários normais, buscar do banco da escola
           const userData = await getData(`usuarios/${user.uid}`);
           
           if (userData && userData.role) {

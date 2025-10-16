@@ -4,8 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '../context/AuthContext';
 import { managementDB, ref, get } from '../firebase';
-
-const SUPER_ADMIN_UID = 'qD6UucWtcgPC9GHA41OB8rSaghZ2';
+import { SUPER_ADMIN_UID, isSuperAdmin } from '../config/constants';
 
 export default function AccessControl({ children }) {
   const { user, loading } = useAuth();
@@ -32,8 +31,8 @@ export default function AccessControl({ children }) {
         return;
       }
 
-      // SuperAdmin sempre tem acesso
-      if (user.uid === SUPER_ADMIN_UID) {
+      // SuperAdmin sempre tem acesso (mas tratado como coordenador nas escolas)
+      if (isSuperAdmin(user.uid)) {
         setHasAccess(true);
         setChecking(false);
         return;

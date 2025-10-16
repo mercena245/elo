@@ -3,6 +3,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth, db, ref, get, managementDB } from '../firebase';
 import { TwoFactorAuthService } from '../services/twoFactorAuthService';
+import { SUPER_ADMIN_UID, ROLES, isSuperAdmin } from '../config/constants';
 
 const AuthContext = createContext();
 
@@ -15,10 +16,12 @@ export function AuthProvider({ children }) {
   const [isLoadingSchool, setIsLoadingSchool] = useState(false);
   const [accessType, setAccessType] = useState(null); // 'school' ou 'management'
   const [showAccessSelector, setShowAccessSelector] = useState(false);
-  const [showTwoFactorSetup, setShowTwoFactorSetup] = useState(false);
-  const [showTwoFactorVerification, setShowTwoFactorVerification] = useState(false);
-  const [twoFactorRequired, setTwoFactorRequired] = useState(false);
-  const [twoFactorAuthenticated, setTwoFactorAuthenticated] = useState(false);
+  
+  // ⚠️ 2FA TEMPORARIAMENTE DESABILITADO
+  // const [showTwoFactorSetup, setShowTwoFactorSetup] = useState(false);
+  // const [showTwoFactorVerification, setShowTwoFactorVerification] = useState(false);
+  // const [twoFactorRequired, setTwoFactorRequired] = useState(false);
+  // const [twoFactorAuthenticated, setTwoFactorAuthenticated] = useState(false);
 
   // Definir loadSchoolData ANTES dos useEffects
   const loadSchoolData = async (schoolId) => {
@@ -170,34 +173,42 @@ export function AuthProvider({ children }) {
           try {
             console.log('🔍 [AuthContext] Buscando role do usuário na escola:', schoolToCheck.id);
             
-            // Buscar dados completos da escola se necessário
-            if (!schoolToCheck.databaseURL) {
-              const escolaRef = ref(managementDB, `escolas/${schoolToCheck.id}`);
-              const escolaSnap = await get(escolaRef);
-              
-              if (escolaSnap.exists()) {
-                schoolToCheck = {
-                  id: schoolToCheck.id,
-                  ...escolaSnap.val()
-                };
-              }
-            }
-            
-            // Importar schoolDatabaseService e conectar ao banco da escola
-            const { getSchoolDatabase } = await import('../services/schoolDatabaseService');
-            const schoolDB = getSchoolDatabase(schoolToCheck);
-            
-            // Buscar usuário no banco DA ESCOLA
-            const userRef = ref(schoolDB, `usuarios/${firebaseUser.uid}`);
-            const snap = await get(userRef);
-            
-            if (snap.exists()) {
-              userData = snap.val();
-              console.log('✅ [AuthContext] Role encontrada no banco da escola:', userData.role);
-              setRole(userData.role);
+            // ⭐ SE FOR SUPER ADMIN, TRATAR COMO COORDENADOR
+            if (isSuperAdmin(firebaseUser.uid)) {
+              console.log('👑 [AuthContext] Super Admin detectado - setando como COORDENADORA');
+              setRole(ROLES.COORDENADORA); // ← Usar 'coordenadora' que é o padrão do sistema
             } else {
-              console.log('⚠️ [AuthContext] Usuário não encontrado no banco da escola');
-              setRole(null);
+              // Para usuários normais, buscar do banco da escola
+              
+              // Buscar dados completos da escola se necessário
+              if (!schoolToCheck.databaseURL) {
+                const escolaRef = ref(managementDB, `escolas/${schoolToCheck.id}`);
+                const escolaSnap = await get(escolaRef);
+                
+                if (escolaSnap.exists()) {
+                  schoolToCheck = {
+                    id: schoolToCheck.id,
+                    ...escolaSnap.val()
+                  };
+                }
+              }
+              
+              // Importar schoolDatabaseService e conectar ao banco da escola
+              const { getSchoolDatabase } = await import('../services/schoolDatabaseService');
+              const schoolDB = getSchoolDatabase(schoolToCheck);
+              
+              // Buscar usuário no banco DA ESCOLA
+              const userRef = ref(schoolDB, `usuarios/${firebaseUser.uid}`);
+              const snap = await get(userRef);
+              
+              if (snap.exists()) {
+                userData = snap.val();
+                console.log('✅ [AuthContext] Role encontrada no banco da escola:', userData.role);
+                setRole(userData.role);
+              } else {
+                console.log('⚠️ [AuthContext] Usuário não encontrado no banco da escola');
+                setRole(null);
+              }
             }
           } catch (error) {
             console.error('❌ [AuthContext] Erro ao buscar role do banco da escola:', error);
@@ -220,31 +231,34 @@ export function AuthProvider({ children }) {
         // Verificar se precisa mostrar seletor de acesso (apenas se tiver role)
         checkAccessSelector(firebaseUser, userData);
         
-        // Verificar se precisa 2FA
-        checkTwoFactorRequired(firebaseUser);
+        // ⚠️ 2FA TEMPORARIAMENTE DESABILITADO
+        // checkTwoFactorRequired(firebaseUser);
       } else {
         setRole(null);
         setSelectedSchool(null);
         setAccessType(null);
         setShowAccessSelector(false);
-        setShowTwoFactorSetup(false);
-        setShowTwoFactorVerification(false);
-        setTwoFactorRequired(false);
-        setTwoFactorAuthenticated(false);
+        
+        // ⚠️ 2FA TEMPORARIAMENTE DESABILITADO
+        // setShowTwoFactorSetup(false);
+        // setShowTwoFactorVerification(false);
+        // setTwoFactorRequired(false);
+        // setTwoFactorAuthenticated(false);
         // Limpar sessão 2FA
-        const sessionKeys = Object.keys(sessionStorage).filter(key => key.startsWith('2fa_authenticated_'));
-        sessionKeys.forEach(key => sessionStorage.removeItem(key));
+        // const sessionKeys = Object.keys(sessionStorage).filter(key => key.startsWith('2fa_authenticated_'));
+        // sessionKeys.forEach(key => sessionStorage.removeItem(key));
       }
       setLoading(false);
     });
     return () => unsubscribe();
   }, []);
 
+  // ⚠️ 2FA TEMPORARIAMENTE DESABILITADO
+  /*
   const checkTwoFactorRequired = (firebaseUser) => {
-    const superAdminId = 'qD6UucWtcgPC9GHA41OB8rSaghZ2';
-    const isSuperAdmin = firebaseUser?.uid === superAdminId;
+    const isSuperAdminUser = isSuperAdmin(firebaseUser?.uid);
     
-    if (isSuperAdmin) {
+    if (isSuperAdminUser) {
       setTwoFactorRequired(true);
       
       // Verificar se 2FA está configurado
@@ -292,19 +306,19 @@ export function AuthProvider({ children }) {
     // Fazer logout se cancelar 2FA
     auth.signOut();
   };
+  */
 
   const checkAccessSelector = (firebaseUser, userData) => {
-    const superAdminId = 'qD6UucWtcgPC9GHA41OB8rSaghZ2';
-    const isSuperAdmin = firebaseUser?.uid === superAdminId;
+    const isSuperAdminUser = isSuperAdmin(firebaseUser?.uid);
     
     console.log('🔍 [checkAccessSelector] Verificando acesso...');
-    console.log('👤 [checkAccessSelector] É super admin?', isSuperAdmin);
+    console.log('👤 [checkAccessSelector] É super admin?', isSuperAdminUser);
     console.log('👤 [checkAccessSelector] User Data:', userData);
     console.log('👤 [checkAccessSelector] Tem role?', userData?.role ? 'Sim: ' + userData.role : 'Não');
     
     // Se usuário não tem role, não mostra AccessTypeSelector
     // LoginForm vai redirecionar para /school-selection
-    if (!userData?.role && !isSuperAdmin) {
+    if (!userData?.role && !isSuperAdminUser) {
       console.log('⚠️ [checkAccessSelector] Usuário SEM role - não mostra seletor');
       setShowAccessSelector(false);
       return;
@@ -321,7 +335,7 @@ export function AuthProvider({ children }) {
       // Dados já carregados no useEffect inicial, apenas controlar exibição
       console.log('✅ [checkAccessSelector] Escola JÁ selecionada - Ocultando seletor');
       setShowAccessSelector(false);
-    } else if (isSuperAdmin) {
+    } else if (isSuperAdminUser) {
       // Super admin sempre deve escolher tipo de acesso se não houver dados salvos
       console.log('🔐 [checkAccessSelector] Super Admin SEM escola - Mostrando seletor');
       setShowAccessSelector(true);
@@ -378,15 +392,16 @@ export function AuthProvider({ children }) {
       isLoadingSchool,
       accessType,
       showAccessSelector,
-      showTwoFactorSetup,
-      showTwoFactorVerification,
-      twoFactorRequired,
-      twoFactorAuthenticated,
+      // ⚠️ 2FA TEMPORARIAMENTE DESABILITADO
+      // showTwoFactorSetup,
+      // showTwoFactorVerification,
+      // twoFactorRequired,
+      // twoFactorAuthenticated,
       handleSchoolSelect,
       handleManagementSelect,
-      handleTwoFactorSetupComplete,
-      handleTwoFactorVerificationSuccess,
-      handleTwoFactorCancel,
+      // handleTwoFactorSetupComplete,
+      // handleTwoFactorVerificationSuccess,
+      // handleTwoFactorCancel,
       resetAccessType,
       loadSchoolData
     }}>

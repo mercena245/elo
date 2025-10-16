@@ -3,10 +3,9 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../context/AuthContext';
+import { SUPER_ADMIN_UID, isSuperAdmin } from '../../config/constants';
 import SuperAdminAuth from './components/SuperAdminAuth';
 import SuperAdminDashboard from './components/SuperAdminDashboard';
-
-const SUPER_ADMIN_UID = 'qD6UucWtcgPC9GHA41OB8rSaghZ2';
 
 export default function SuperAdminPage() {
   const { user, loading, accessType } = useAuth();
@@ -23,7 +22,7 @@ export default function SuperAdminPage() {
     }
 
     // Verificar se é o usuário autorizado
-    if (user.uid === SUPER_ADMIN_UID) {
+    if (isSuperAdmin(user.uid)) {
       setIsAuthorized(true);
       
       // Se não há accessType definido, verificar localStorage ou forçar seleção

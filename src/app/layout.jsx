@@ -6,8 +6,9 @@ import { LoadingProvider, useLoading } from '../context/LoadingContext'
 import { useState, useEffect } from 'react'
 import SplashScreen from '../components/SplashScreen'
 import AccessTypeSelector from '../components/AccessTypeSelector'
-import TwoFactorSetup from '../components/TwoFactorSetup'
-import TwoFactorVerification from '../components/TwoFactorVerification'
+// ⚠️ 2FA TEMPORARIAMENTE DESABILITADO
+// import TwoFactorSetup from '../components/TwoFactorSetup'
+// import TwoFactorVerification from '../components/TwoFactorVerification'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -18,15 +19,16 @@ function AppContent({ children }) {
     user, 
     loading, 
     showAccessSelector, 
-    showTwoFactorSetup,
-    showTwoFactorVerification,
-    twoFactorRequired,
-    twoFactorAuthenticated,
+    // ⚠️ 2FA TEMPORARIAMENTE DESABILITADO
+    // showTwoFactorSetup,
+    // showTwoFactorVerification,
+    // twoFactorRequired,
+    // twoFactorAuthenticated,
     handleSchoolSelect, 
     handleManagementSelect,
-    handleTwoFactorSetupComplete,
-    handleTwoFactorVerificationSuccess,
-    handleTwoFactorCancel
+    // handleTwoFactorSetupComplete,
+    // handleTwoFactorVerificationSuccess,
+    // handleTwoFactorCancel
   } = useAuth();
 
   // Evitar erro de hidratação
@@ -63,6 +65,8 @@ function AppContent({ children }) {
     );
   }
 
+  // ⚠️ 2FA TEMPORARIAMENTE DESABILITADO
+  /*
   // Se usuário logado e precisa configurar 2FA
   if (user && showTwoFactorSetup) {
     return (
@@ -100,6 +104,7 @@ function AppContent({ children }) {
       </div>
     );
   }
+  */
 
   // Se usuário logado e precisa selecionar tipo de acesso
   if (user && showAccessSelector) {

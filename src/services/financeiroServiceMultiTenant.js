@@ -55,7 +55,9 @@ export const createFinanceiroService = (databaseWrapper, storage = null) => {
         diaVencimento = 10,
         descontoPercentual = 0,
         valorMatricula = 0,
-        valorMateriais = 0
+        valorMateriais = 0,
+        dataInicioCompetencia = '',
+        dataFimCompetencia = ''
       } = financeiro;
 
       // Converter para números para garantir cálculos corretos
@@ -120,16 +122,43 @@ export const createFinanceiroService = (databaseWrapper, storage = null) => {
         titulosGerados.push({ id: novoTituloRef.key, tipo: 'materiais', valor: valorMateriaisNum });
       }
 
-      // 3. Gerar mensalidades do mês atual até dezembro
+      // 3. Gerar mensalidades baseadas na competência definida
       const valorMensalidadeComDesconto = mensalidadeNum * (1 - descontoNum / 100);
-      const mesAtual = hoje.getMonth(); // 0-11 (Janeiro=0, Dezembro=11)
-      const anoAtual = hoje.getFullYear();
-      const mesesRestantes = 12 - mesAtual; // Quantos meses restam até dezembro
       
-      for (let i = 0; i < mesesRestantes; i++) {
-        const mesVencimento = mesAtual + i;
-        const anoVencimento = anoAtual;
-        const vencimento = new Date(anoVencimento, mesVencimento, diaVencNum);
+      // Validar e processar datas de competência
+      if (!dataInicioCompetencia || !dataFimCompetencia) {
+        return { 
+          success: false, 
+          error: 'Data de início e fim da competência são obrigatórias para geração de mensalidades' 
+        };
+      }
+
+      // Parse das datas sem problema de timezone
+      const [anoInicioStr, mesInicioStr, diaInicioStr] = dataInicioCompetencia.split('-');
+      const [anoFimStr, mesFimStr, diaFimStr] = dataFimCompetencia.split('-');
+      
+      const anoInicio = parseInt(anoInicioStr);
+      const mesInicio = parseInt(mesInicioStr) - 1; // 0-11 para Date
+      const anoFim = parseInt(anoFimStr);
+      const mesFim = parseInt(mesFimStr) - 1; // 0-11 para Date
+      
+      const dataInicio = new Date(anoInicio, mesInicio, 1);
+      const dataFim = new Date(anoFim, mesFim, 1);
+      
+      // Validar se a data fim é posterior à data início
+      if (dataFim < dataInicio) {
+        return { 
+          success: false, 
+          error: 'Data fim da competência deve ser posterior à data início' 
+        };
+      }
+      
+      // Gerar mensalidades do mês início até o mês fim
+      let mesAtual = mesInicio;
+      let anoAtual = anoInicio;
+      
+      while (anoAtual < anoFim || (anoAtual === anoFim && mesAtual <= mesFim)) {
+        const vencimento = new Date(anoAtual, mesAtual, diaVencNum);
 
         const mensalidade = {
           alunoId,
@@ -140,7 +169,7 @@ export const createFinanceiroService = (databaseWrapper, storage = null) => {
           desconto: descontoNum,
           vencimento: vencimento.toISOString().split('T')[0],
           status: 'pendente',
-          observacoes: `Turma: ${turmaId || 'Não definida'}`,
+          observacoes: `Turma: ${turmaId || 'Não definida'} | Competência: ${dataInicio.toLocaleDateString('pt-BR')} a ${dataFim.toLocaleDateString('pt-BR')}`,
           dataGeracao: new Date().toISOString(),
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
@@ -149,6 +178,13 @@ export const createFinanceiroService = (databaseWrapper, storage = null) => {
         const titulosRef = ref(database, 'titulos_financeiros');
         const novoTituloRef = await push(titulosRef, mensalidade);
         titulosGerados.push({ id: novoTituloRef.key, tipo: 'mensalidade', valor: valorMensalidadeComDesconto });
+        
+        // Avançar para o próximo mês
+        mesAtual++;
+        if (mesAtual > 11) {
+          mesAtual = 0;
+          anoAtual++;
+        }
       }
 
       return { 

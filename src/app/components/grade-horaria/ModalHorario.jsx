@@ -182,7 +182,7 @@ const ModalHorario = ({
       };
 
       // Salvar no caminho específico do período letivo
-      await setData('GradeHoraria/${periodoLetivoId}/${turmaId}/${horarioId}', horarioData);
+      await setData(`GradeHoraria/${periodoLetivoId}/${turmaId}/${horarioId}`, horarioData);
       
       // Buscar nomes para o log
       const disciplinaNome = disciplinas.find(d => d.id === form.disciplinaId)?.nome || 'Disciplina não encontrada';
@@ -245,7 +245,7 @@ const ModalHorario = ({
       const professorNome = professores.find(p => p.id === horarioExistente.professorId)?.nome || 'Professor não encontrado';
       const diaNome = diasSemanaLabels[diaSemana] || `Dia ${diaSemana}`;
       
-      await removeData('GradeHoraria/${periodoLetivoId}/${turmaId}/${horarioExistente.id}');
+      await removeData(`GradeHoraria/${periodoLetivoId}/${turmaId}/${horarioExistente.id}`);
       
       // Log da exclusão
       await logAction({

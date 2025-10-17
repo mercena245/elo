@@ -35,6 +35,8 @@ import {
 import DeleteIcon from '@mui/icons-material/Delete';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import ContentCopy from '@mui/icons-material/ContentCopy';
+import InfoOutlined from '@mui/icons-material/InfoOutlined';
 import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs from 'dayjs';
@@ -43,6 +45,7 @@ import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from "fi
 
 
 import FichaMatricula from '../../components/FichaMatricula';
+import ContratoAluno from '../../components/ContratoAluno';
 import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
 import { useSchoolServices } from '../../hooks/useSchoolServices';
 
@@ -324,8 +327,10 @@ const Alunos = () => {
   const [validacaoCpf, setValidacaoCpf] = useState({});
   const [fotoAluno, setFotoAluno] = useState(null);
   const inputFotoRef = useRef(null);
-  // Estado para ficha de matrícula
+  // Estado para ficha de matrícula e contrato
   const [fichaMatriculaOpen, setFichaMatriculaOpen] = useState(false);
+  const [contratoOpen, setContratoOpen] = useState(false);
+  const [dialogSelecaoOpen, setDialogSelecaoOpen] = useState(false);
   const [alunoSelecionadoFicha, setAlunoSelecionadoFicha] = useState(null);
   // Estados para confirmação de fechamento do modal
   const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
@@ -469,6 +474,32 @@ const Alunos = () => {
       console.error('Erro ao buscar CEP:', error);
     }
     setBuscandoCep(false);
+  };
+
+  // Função para copiar endereço do aluno para mãe ou pai
+  const copiarEnderecoAluno = (destino) => {
+    const enderecoAluno = editForm.endereco;
+    
+    if (!enderecoAluno || !enderecoAluno.cep) {
+      alert('⚠️ Preencha o endereço do aluno primeiro!');
+      return;
+    }
+
+    setEditForm(prev => ({
+      ...prev,
+      [destino]: {
+        ...(prev[destino] || {}),
+        endereco: {
+          cep: enderecoAluno.cep || '',
+          rua: enderecoAluno.rua || '',
+          bairro: enderecoAluno.bairro || '',
+          cidade: enderecoAluno.cidade || '',
+          uf: enderecoAluno.uf || ''
+        }
+      }
+    }));
+
+    console.log(`✅ Endereço do aluno copiado para ${destino === 'mae' ? 'mãe' : 'pai'}`);
   };
 
   // Função para buscar dados da turma
@@ -1099,6 +1130,8 @@ const Alunos = () => {
         mensalidadeValor: aluno.financeiro?.mensalidadeValor || '',
         descontoPercentual: aluno.financeiro?.descontoPercentual || '',
         diaVencimento: aluno.financeiro?.diaVencimento || '10',
+        dataInicioCompetencia: aluno.financeiro?.dataInicioCompetencia || '',
+        dataFimCompetencia: aluno.financeiro?.dataFimCompetencia || '',
         status: aluno.financeiro?.status || 'ativo',
         valorMatricula: aluno.financeiro?.valorMatricula || '',
         valorMateriais: aluno.financeiro?.valorMateriais || '',
@@ -1285,6 +1318,8 @@ const Alunos = () => {
         diaVencimento: '',
         valorMatricula: '',
         valorMateriais: '',
+        dataInicioCompetencia: '',
+        dataFimCompetencia: '',
         status: 'ativo',
         observacoes: ''
       },
@@ -1303,14 +1338,37 @@ const Alunos = () => {
     setValidacaoCpf({});
   };
 
-  // Função para abrir ficha de matrícula
-  const handleAbrirFichaMatricula = (aluno) => {
+  // Função para abrir dialog de seleção (Ficha ou Contrato)
+  const handleAbrirSelecaoImpressao = (aluno) => {
     setAlunoSelecionadoFicha(aluno);
+    setDialogSelecaoOpen(true);
+  };
+
+  // Função para abrir ficha de matrícula
+  const handleAbrirFichaMatricula = () => {
+    setDialogSelecaoOpen(false);
     setFichaMatriculaOpen(true);
   };
 
   const handleFecharFichaMatricula = () => {
     setFichaMatriculaOpen(false);
+    setAlunoSelecionadoFicha(null);
+  };
+
+  // Função para abrir contrato
+  const handleAbrirContrato = () => {
+    setDialogSelecaoOpen(false);
+    setContratoOpen(true);
+  };
+
+  const handleFecharContrato = () => {
+    setContratoOpen(false);
+    setAlunoSelecionadoFicha(null);
+  };
+
+  // Fechar dialog de seleção
+  const handleFecharDialogSelecao = () => {
+    setDialogSelecaoOpen(false);
     setAlunoSelecionadoFicha(null);
   };
 
@@ -1562,6 +1620,8 @@ const Alunos = () => {
     // Campos financeiros básicos; pode expandir futuramente
     editForm.financeiro?.mensalidadeValor?.toString().trim() &&
     editForm.financeiro?.diaVencimento?.toString().trim() &&
+    editForm.financeiro?.dataInicioCompetencia?.trim() &&
+    editForm.financeiro?.dataFimCompetencia?.trim() &&
     editForm.financeiro?.status?.trim() &&
     !financeiroError
   );
@@ -2082,7 +2142,7 @@ const Alunos = () => {
                                     <Button
                                       variant="outlined"
                                       size="small"
-                                      onClick={() => handleAbrirFichaMatricula(aluno)}
+                                      onClick={() => handleAbrirSelecaoImpressao(aluno)}
                                       sx={{
                                         minWidth: 'auto',
                                         px: 1.5,
@@ -2093,7 +2153,7 @@ const Alunos = () => {
                                           borderColor: '#047857'
                                         }
                                       }}
-                                      title="Imprimir Ficha de Matrícula"
+                                      title="Imprimir Documentos"
                                     >
                                       🖨️
                                     </Button>
@@ -2566,9 +2626,31 @@ const Alunos = () => {
                             />
                           </Box>
                           
-                          <Typography variant="subtitle2" sx={{ color: '#374151', mt: 2 }}>
-                            🏠 Endereço da Mãe
-                          </Typography>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2, mb: 1 }}>
+                            <Typography variant="subtitle2" sx={{ color: '#374151' }}>
+                              🏠 Endereço da Mãe
+                            </Typography>
+                            <Button
+                              variant="outlined"
+                              size="small"
+                              onClick={() => copiarEnderecoAluno('mae')}
+                              startIcon={<ContentCopy />}
+                              sx={{ 
+                                textTransform: 'none',
+                                fontSize: '0.75rem',
+                                py: 0.5,
+                                px: 1.5,
+                                borderColor: '#6366f1',
+                                color: '#6366f1',
+                                '&:hover': {
+                                  borderColor: '#4f46e5',
+                                  bgcolor: '#f0f4ff'
+                                }
+                              }}
+                            >
+                              Copiar endereço do aluno
+                            </Button>
+                          </Box>
                           
                           <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 120px', gap: 2 }}>
                             <TextField
@@ -2728,9 +2810,31 @@ const Alunos = () => {
                             />
                           </Box>
                           
-                          <Typography variant="subtitle2" sx={{ color: '#374151', mt: 2 }}>
-                            🏠 Endereço do Pai
-                          </Typography>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2, mb: 1 }}>
+                            <Typography variant="subtitle2" sx={{ color: '#374151' }}>
+                              🏠 Endereço do Pai
+                            </Typography>
+                            <Button
+                              variant="outlined"
+                              size="small"
+                              onClick={() => copiarEnderecoAluno('pai')}
+                              startIcon={<ContentCopy />}
+                              sx={{ 
+                                textTransform: 'none',
+                                fontSize: '0.75rem',
+                                py: 0.5,
+                                px: 1.5,
+                                borderColor: '#6366f1',
+                                color: '#6366f1',
+                                '&:hover': {
+                                  borderColor: '#4f46e5',
+                                  bgcolor: '#f0f4ff'
+                                }
+                              }}
+                            >
+                              Copiar endereço do aluno
+                            </Button>
+                          </Box>
                           
                           <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 120px', gap: 2 }}>
                             <TextField
@@ -2976,6 +3080,44 @@ const Alunos = () => {
                             error={!!financeiroError}
                             helperText={financeiroError || 'Entre 1 e 31 (dia do mês para vencimento das mensalidades)'}
                           />
+                          
+                          <Alert severity="info" icon={<InfoOutlined />} sx={{ mt: 2, mb: 2 }}>
+                            <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                              📅 Competência das Mensalidades
+                            </Typography>
+                            <Typography variant="caption" sx={{ display: 'block', color: '#64748b' }}>
+                              Defina o período de geração das mensalidades. Por exemplo:<br />
+                              • <strong>Início: 01/02/2025</strong> e <strong>Fim: 31/12/2025</strong> = gera mensalidades de fevereiro a dezembro<br />
+                              • As mensalidades serão geradas automaticamente dentro deste período<br />
+                              • <strong>Importante:</strong> Taxa de matrícula e materiais são geradas sempre no mês de cadastro com vencimento em 7 dias
+                            </Typography>
+                          </Alert>
+                          
+                          <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+                            <TextField
+                              label="Data Início Competência"
+                              name="financeiro.dataInicioCompetencia"
+                              type="date"
+                              value={editForm.financeiro?.dataInicioCompetencia || ''}
+                              onChange={handleFormChange}
+                              fullWidth
+                              required
+                              InputLabelProps={{ shrink: true }}
+                              helperText="Primeiro mês das mensalidades"
+                            />
+                            
+                            <TextField
+                              label="Data Fim Competência"
+                              name="financeiro.dataFimCompetencia"
+                              type="date"
+                              value={editForm.financeiro?.dataFimCompetencia || ''}
+                              onChange={handleFormChange}
+                              fullWidth
+                              required
+                              InputLabelProps={{ shrink: true }}
+                              helperText="Último mês das mensalidades"
+                            />
+                          </Box>
                           
                           <FormControl fullWidth required>
                             <InputLabel id="status-financeiro-label">Status Financeiro Inicial</InputLabel>
@@ -3442,6 +3584,75 @@ const Alunos = () => {
                     </DialogActions>
                   </Dialog>
 
+                  {/* Dialog Seleção de Impressão */}
+                  <Dialog 
+                    open={dialogSelecaoOpen} 
+                    onClose={handleFecharDialogSelecao}
+                    maxWidth="sm"
+                    fullWidth
+                  >
+                    <DialogTitle sx={{ 
+                      bgcolor: '#4f46e5', 
+                      color: 'white',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 1
+                    }}>
+                      <span>🖨️</span>
+                      Selecione o documento para imprimir
+                    </DialogTitle>
+                    <DialogContent sx={{ pt: 3 }}>
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        <Button
+                          variant="outlined"
+                          fullWidth
+                          onClick={handleAbrirFichaMatricula}
+                          sx={{
+                            py: 2,
+                            borderColor: '#059669',
+                            color: '#059669',
+                            fontSize: '1rem',
+                            fontWeight: 600,
+                            '&:hover': {
+                              bgcolor: '#f0fdf4',
+                              borderColor: '#047857',
+                              transform: 'scale(1.02)'
+                            },
+                            transition: 'all 0.2s'
+                          }}
+                        >
+                          📋 Ficha de Matrícula
+                        </Button>
+                        
+                        <Button
+                          variant="outlined"
+                          fullWidth
+                          onClick={handleAbrirContrato}
+                          sx={{
+                            py: 2,
+                            borderColor: '#6366f1',
+                            color: '#6366f1',
+                            fontSize: '1rem',
+                            fontWeight: 600,
+                            '&:hover': {
+                              bgcolor: '#f0f4ff',
+                              borderColor: '#4f46e5',
+                              transform: 'scale(1.02)'
+                            },
+                            transition: 'all 0.2s'
+                          }}
+                        >
+                          📄 Contrato de Prestação de Serviços
+                        </Button>
+                      </Box>
+                    </DialogContent>
+                    <DialogActions>
+                      <Button onClick={handleFecharDialogSelecao} color="inherit">
+                        Cancelar
+                      </Button>
+                    </DialogActions>
+                  </Dialog>
+
                   {/* Dialog Ficha de Matrícula */}
                   <Dialog 
                     open={fichaMatriculaOpen} 
@@ -3465,6 +3676,30 @@ const Alunos = () => {
                           aluno={alunoSelecionadoFicha}
                           turmas={turmas}
                           onClose={handleFecharFichaMatricula}
+                        />
+                      )}
+                    </DialogContent>
+                  </Dialog>
+
+                  {/* Dialog Contrato */}
+                  <Dialog 
+                    open={contratoOpen} 
+                    onClose={handleFecharContrato}
+                    maxWidth="lg"
+                    fullWidth
+                    PaperProps={{
+                      sx: { 
+                        width: '95vw', 
+                        height: '95vh',
+                        maxWidth: 'none'
+                      }
+                    }}
+                  >
+                    <DialogContent sx={{ p: 0, overflow: 'auto' }}>
+                      {alunoSelecionadoFicha && (
+                        <ContratoAluno 
+                          aluno={alunoSelecionadoFicha}
+                          onClose={handleFecharContrato}
                         />
                       )}
                     </DialogContent>

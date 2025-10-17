@@ -25,7 +25,11 @@ import {
   ListItem,
   ListItemText,
   ListItemSecondaryAction,
-  Autocomplete
+  Autocomplete,
+  MenuItem,
+  Select,
+  FormControl,
+  InputLabel
 } from '@mui/material';
 import {
   Close as CloseIcon,
@@ -40,6 +44,7 @@ import {
   Assessment as AssessmentIcon
 } from '@mui/icons-material';
 import { useSchoolDatabase } from '../../../../hooks/useSchoolDatabase';
+import { FAIXAS_ETARIAS, obterCompetenciasFlat } from './competenciasBNCC';
 
 const EditorPlanoAula = ({
   open,
@@ -64,6 +69,7 @@ const EditorPlanoAula = ({
     data: '',
     horaInicio: '',
     horaFim: '',
+    faixaEtaria: '', // NOVO: Seletor de faixa etária
     bncc: [],
     objetivos: [],
     conteudoProgramatico: '',
@@ -92,30 +98,18 @@ const EditorPlanoAula = ({
   const [periodoLetivo, setPeriodoLetivo] = useState(null);
   const [dataMinima, setDataMinima] = useState('');
   const [dataMaxima, setDataMaxima] = useState('');
+  const [competenciasDisponiveis, setCompetenciasDisponiveis] = useState([]); // NOVO: Competências filtradas por faixa etária
 
-  // Competências BNCC simplificadas (principais áreas)
-  const competenciasBNCC = [
-    { codigo: 'EF01LP01', descricao: 'Reconhecer que textos são lidos e escritos da esquerda para a direita e de cima para baixo da página.' },
-    { codigo: 'EF01LP02', descricao: 'Escrever, espontaneamente ou por ditado, palavras e frases de forma alfabética.' },
-    { codigo: 'EF01MA01', descricao: 'Utilizar números naturais como indicador de quantidade ou de ordem em diferentes situações cotidianas.' },
-    { codigo: 'EF01MA02', descricao: 'Contar de maneira exata ou aproximada, utilizando diferentes estratégias.' },
-    { codigo: 'EF02LP01', descricao: 'Utilizar, ao produzir o texto, grafia correta de palavras conhecidas.' },
-    { codigo: 'EF02MA01', descricao: 'Comparar e ordenar números naturais (até a ordem de centenas).' },
-    { codigo: 'EF03LP01', descricao: 'Ler e escrever palavras com correspondências regulares diretas entre letras e fonemas.' },
-    { codigo: 'EF03MA01', descricao: 'Ler, escrever e comparar números naturais de até a ordem de unidade de milhar.' },
-    { codigo: 'EF04LP01', descricao: 'Grafar palavras utilizando regras de correspondência fonema-grafema regulares.' },
-    { codigo: 'EF04MA01', descricao: 'Ler, escrever e ordenar números naturais até a ordem de dezenas de milhar.' },
-    { codigo: 'EF05LP01', descricao: 'Grafar palavras utilizando regras de correspondência fonema-grafema regulares, contextuais e morfológicas.' },
-    { codigo: 'EF05MA01', descricao: 'Ler, escrever e ordenar números naturais até a ordem de centenas de milhar.' },
-    { codigo: 'EF06LP01', descricao: 'Reconhecer a impossibilidade de uma neutralidade absoluta no relato de fatos.' },
-    { codigo: 'EF06MA01', descricao: 'Comparar, ordenar, ler e escrever números naturais e números racionais.' },
-    { codigo: 'EF07LP01', descricao: 'Distinguir diferentes propostas editoriais.' },
-    { codigo: 'EF07MA01', descricao: 'Resolver e elaborar problemas com números inteiros e racionais.' },
-    { codigo: 'EF08LP01', descricao: 'Identificar e comparar as várias editorias de jornais impressos e digitais.' },
-    { codigo: 'EF08MA01', descricao: 'Efetuar cálculos com potências de expoentes inteiros e aplicar esse conhecimento.' },
-    { codigo: 'EF09LP01', descricao: 'Analisar o fenômeno da disseminação de informações e opiniões nos meios digitais.' },
-    { codigo: 'EF09MA01', descricao: 'Reconhecer que, uma vez fixada uma unidade de comprimento, existem segmentos de reta cujo comprimento não é expresso por número racional.' }
-  ];
+  // NOVO: Atualizar competências quando faixa etária mudar
+  useEffect(() => {
+    if (formData.faixaEtaria) {
+      const competencias = obterCompetenciasFlat(formData.faixaEtaria);
+      setCompetenciasDisponiveis(competencias);
+      console.log(`📚 Competências carregadas para ${formData.faixaEtaria}:`, competencias.length);
+    } else {
+      setCompetenciasDisponiveis([]);
+    }
+  }, [formData.faixaEtaria]);
 
   useEffect(() => {
     if (open) {
@@ -129,6 +123,8 @@ const EditorPlanoAula = ({
           horaInicio: plano.horaInicio || '',
           horaFim: plano.horaFim || '',
           periodoAula: plano.periodoAula || '',
+          faixaEtaria: plano.faixaEtaria || '', // NOVO
+          bncc: plano.bncc || [],
           objetivos: plano.objetivos || [],
           conteudoProgramatico: plano.conteudoProgramatico || '',
           metodologia: plano.metodologia || '',
@@ -151,6 +147,8 @@ const EditorPlanoAula = ({
           horaInicio: '',
           horaFim: '',
           periodoAula: '',
+          faixaEtaria: '', // NOVO
+          bncc: [], // NOVO
           objetivos: [],
           conteudoProgramatico: '',
           metodologia: '',
@@ -324,6 +322,10 @@ const EditorPlanoAula = ({
       newErrors.data = 'Data é obrigatória';
     }
 
+    if (!formData.faixaEtaria) {
+      newErrors.faixaEtaria = 'Faixa etária é obrigatória';
+    }
+
     if (!formData.conteudoProgramatico.trim()) {
       newErrors.conteudoProgramatico = 'Conteúdo programático é obrigatório';
     }
@@ -385,27 +387,27 @@ const EditorPlanoAula = ({
   // Aprovação/rejeição: atualiza apenas status e campos de aprovação no Firebase
   const handleApprovar = async () => {
     if (!plano?.id) return;
-    const updateData = {
+    const dadosAtualizacao = {
       statusAprovacao: 'aprovado',
       aprovadoPor: user?.uid || '',
       dataAprovacao: new Date().toISOString(),
       observacoesAprovacao: ''
     };
-    await updateData('planos-aula/${plano.id}', updateData);
-    setFormData(prev => ({ ...prev, ...updateData }));
+    await updateData(`planos-aula/${plano.id}`, dadosAtualizacao);
+    setFormData(prev => ({ ...prev, ...dadosAtualizacao }));
     if (onClose) onClose();
   };
 
   const handleRejeitar = async (observacoes = '') => {
     if (!plano?.id) return;
-    const updateData = {
+    const dadosAtualizacao = {
       statusAprovacao: 'rejeitado',
       aprovadoPor: user?.uid || '',
       dataAprovacao: new Date().toISOString(),
       observacoesAprovacao: observacoes
     };
-    await updateData('planos-aula/${plano.id}', updateData);
-    setFormData(prev => ({ ...prev, ...updateData }));
+    await updateData(`planos-aula/${plano.id}`, dadosAtualizacao);
+    setFormData(prev => ({ ...prev, ...dadosAtualizacao }));
     if (onClose) onClose();
   };
 
@@ -574,53 +576,101 @@ const EditorPlanoAula = ({
                   Competências BNCC
                 </Typography>
                 
-                <Autocomplete
-                  multiple
-                  options={competenciasBNCC}
-                  value={formData.bncc || []}
-                  onChange={(event, newValue) => {
-                    handleInputChange('bncc', newValue);
-                  }}
-                  getOptionLabel={(option) => `${option.codigo} - ${option.descricao}`}
-                  filterOptions={(options, { inputValue }) => {
-                    return options.filter(option =>
-                      option.codigo.toLowerCase().includes(inputValue.toLowerCase()) ||
-                      option.descricao.toLowerCase().includes(inputValue.toLowerCase())
-                    );
-                  }}
-                  renderInput={(params) => (
-                    <TextField
-                      {...params}
-                      label="Selecione as competências BNCC"
-                      placeholder="Digite para buscar (ex: EF01LP01)"
-                      variant="outlined"
-                      size="small"
+                {/* NOVO: Seletor de Faixa Etária */}
+                <FormControl fullWidth sx={{ mb: 3 }}>
+                  <InputLabel id="faixa-etaria-label">Faixa Etária / Nível de Ensino *</InputLabel>
+                  <Select
+                    labelId="faixa-etaria-label"
+                    value={formData.faixaEtaria}
+                    label="Faixa Etária / Nível de Ensino *"
+                    onChange={(e) => {
+                      handleInputChange('faixaEtaria', e.target.value);
+                      handleInputChange('bncc', []); // Limpa competências ao mudar faixa
+                    }}
+                    error={!!errors.faixaEtaria}
+                    required
+                  >
+                    {FAIXAS_ETARIAS.map((faixa) => (
+                      <MenuItem key={faixa.id} value={faixa.id}>
+                        {faixa.label}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                  {errors.faixaEtaria && (
+                    <Typography variant="caption" color="error" sx={{ mt: 0.5 }}>
+                      {errors.faixaEtaria}
+                    </Typography>
+                  )}
+                  <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                    Selecione a faixa etária para carregar as competências específicas da BNCC
+                  </Typography>
+                </FormControl>
+                
+                {/* Autocomplete - só aparece após selecionar faixa etária */}
+                {formData.faixaEtaria && competenciasDisponiveis.length > 0 && (
+                  <>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                      {competenciasDisponiveis.length} competências disponíveis para esta faixa etária
+                    </Typography>
+                    
+                    <Autocomplete
+                      multiple
+                      options={competenciasDisponiveis}
+                      value={formData.bncc || []}
+                      onChange={(event, newValue) => {
+                        handleInputChange('bncc', newValue);
+                      }}
+                      getOptionLabel={(option) => `${option.codigo} - ${option.descricao}`}
+                      filterOptions={(options, { inputValue }) => {
+                        return options.filter(option =>
+                          option.codigo.toLowerCase().includes(inputValue.toLowerCase()) ||
+                          option.descricao.toLowerCase().includes(inputValue.toLowerCase())
+                        );
+                      }}
+                      renderInput={(params) => (
+                        <TextField
+                          {...params}
+                          label="Selecione as competências BNCC"
+                          placeholder="Digite para buscar (ex: EF01LP01, EI03EO01)"
+                          variant="outlined"
+                          size="small"
+                        />
+                      )}
+                      renderTags={(value, getTagProps) =>
+                        value.map((option, index) => (
+                          <Chip
+                            variant="outlined"
+                            label={option.codigo}
+                            {...getTagProps({ index })}
+                            key={option.codigo}
+                            size="small"
+                            color="primary"
+                          />
+                        ))
+                      }
+                      renderOption={(props, option) => {
+                        const { key, ...otherProps } = props;
+                        return (
+                          <Box component="li" key={key} {...otherProps} sx={{ display: 'block !important' }}>
+                            <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                              {option.codigo}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {option.descricao}
+                            </Typography>
+                          </Box>
+                        );
+                      }}
+                      sx={{ mb: 1 }}
                     />
-                  )}
-                  renderTags={(value, getTagProps) =>
-                    value.map((option, index) => (
-                      <Chip
-                        variant="outlined"
-                        label={option.codigo}
-                        {...getTagProps({ index })}
-                        key={option.codigo}
-                        size="small"
-                        color="primary"
-                      />
-                    ))
-                  }
-                  renderOption={(props, option) => (
-                    <Box component="li" {...props} sx={{ display: 'block !important' }}>
-                      <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
-                        {option.codigo}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {option.descricao}
-                      </Typography>
-                    </Box>
-                  )}
-                  sx={{ mb: 1 }}
-                />
+                  </>
+                )}
+                
+                {!formData.faixaEtaria && (
+                  <Alert severity="info" sx={{ mt: 2 }}>
+                    Selecione uma faixa etária acima para visualizar e escolher as competências da BNCC
+                  </Alert>
+                )}
               </CardContent>
             </Card>
           </Grid>

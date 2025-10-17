@@ -45,7 +45,7 @@ import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from "fi
 
 
 import FichaMatricula from '../../components/FichaMatricula';
-import ContratoAluno from '../../components/ContratoAluno';
+import ContratoAluno from '../../components/ContratoAlunoNovo';
 import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
 import { useSchoolServices } from '../../hooks/useSchoolServices';
 
@@ -274,7 +274,7 @@ const Alunos = () => {
   const { auditService, financeiroService, LOG_ACTIONS, isReady: servicesReady } = useSchoolServices();
 
   // Hook para acessar banco da escola
-  const { getData, setData, isReady, error: dbError, currentSchool, storage: schoolStorage } = useSchoolDatabase();
+  const { getData, setData, isReady, error: dbError, currentSchool, storage: schoolStorage, db } = useSchoolDatabase();
   
   // Marcar/desmarcar anexo para exclusão (por nome)
   const handleMarcarParaExcluir = (nome) => {
@@ -3699,6 +3699,8 @@ const Alunos = () => {
                       {alunoSelecionadoFicha && (
                         <ContratoAluno 
                           aluno={alunoSelecionadoFicha}
+                          database={db}
+                          getData={getData}
                           onClose={handleFecharContrato}
                         />
                       )}

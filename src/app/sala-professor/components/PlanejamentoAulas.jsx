@@ -354,9 +354,10 @@ const PlanejamentoAulas = () => {
         professorNome: user.displayName || user.email,
         atualizadoEm: new Date().toISOString(),
       };
+      
       if (planoId) {
         // Atualiza plano existente
-        await updateData('planos-aula/${planoId}', planoData);
+        await updateData(`planos-aula/${planoId}`, planoData);
         await auditService.logAction(
           'plano_aula_update',
           user.uid,
@@ -380,18 +381,22 @@ const PlanejamentoAulas = () => {
           }
         );
       }
+      
+      // Recarrega os dados para atualizar a lista
+      await carregarDados();
+      
       setEditorOpen(false);
-  setModalFeedback({ open: true, mensagem: 'Plano de aula salvo com sucesso!' });
+      setModalFeedback({ open: true, mensagem: 'Plano de aula salvo com sucesso!' });
     } catch (error) {
       console.error('Erro ao salvar plano:', error);
-  setModalFeedback({ open: true, mensagem: 'Erro ao salvar plano de aula.' });
+      setModalFeedback({ open: true, mensagem: 'Erro ao salvar plano de aula.' });
     }
   };
 
   const excluirPlano = (planoId, titulo) => {
     const handleConfirm = async () => {
       try {
-        await removeData('planos-aula/${planoId}');
+        await removeData(`planos-aula/${planoId}`);
         await auditService.logAction(
           'plano_aula_delete',
           user.uid,
@@ -400,6 +405,10 @@ const PlanejamentoAulas = () => {
             planoId
           }
         );
+        
+        // Recarrega os dados para atualizar a lista
+        await carregarDados();
+        
         setModalFeedback({ open: true, mensagem: 'Plano de aula excluído com sucesso!' });
       } catch (error) {
         console.error('Erro ao excluir plano:', error);

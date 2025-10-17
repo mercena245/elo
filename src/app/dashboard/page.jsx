@@ -29,6 +29,7 @@ import {
   Chip,
   LinearProgress,
   IconButton,
+  Badge,
   Fade,
   Zoom,
   Button
@@ -90,6 +91,7 @@ const Dashboard = () => {
   const [userId, setUserId] = useState(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [headerConfig, setHeaderConfig] = useState(null);
+  const [totalPendencias, setTotalPendencias] = useState(0);
   const router = useRouter();
 
   // Verificar autenticação
@@ -128,6 +130,7 @@ const Dashboard = () => {
   const getQuickActions = () => {
     const roleActions = {
       coordenadora: [
+        { titulo: 'Pendências', icon: Notifications, rota: '/pendencias', cor: '#EF4444', badgeCount: totalPendencias },
         { titulo: 'Gerenciar Alunos', icon: PersonAdd, rota: '/alunos', cor: '#3B82F6' },
         { titulo: 'Colaboradores', icon: Group, rota: '/colaboradores', cor: '#8B5CF6' },
         { titulo: 'Relatórios & Notas', icon: Assessment, rota: '/notas-frequencia', cor: '#10B981' },
@@ -200,7 +203,8 @@ const Dashboard = () => {
           turmasData,
           usuariosData,
           notasData,
-          frequenciaData
+          frequenciaData,
+          planosData
         ] = await Promise.all([
           getData('alunos'),
           getData('colaboradores'),
@@ -209,7 +213,8 @@ const Dashboard = () => {
           getData('turmas'),
           getData('usuarios'),
           getData('notas'),
-          getData('frequencia')
+          getData('frequencia'),
+          getData('planos-aula')
         ]);
 
         // Processar alunos
@@ -259,6 +264,19 @@ const Dashboard = () => {
           frequenciaMedia,
           mediaGeral
         });
+
+        // Processar pendências (apenas para coordenadores)
+        if (planosData) {
+          const planosList = Object.values(planosData);
+          const pendentes = planosList.filter(p => 
+            !p.statusAprovacao || 
+            p.statusAprovacao === 'pendente' || 
+            p.statusAprovacao === 'rejeitado'
+          );
+          setTotalPendencias(pendentes.length);
+        } else {
+          setTotalPendencias(0);
+        }
 
         // Processar avisos
         if (avisosData) {
@@ -570,31 +588,45 @@ const Dashboard = () => {
                       {getQuickActions().map((acao, idx) => (
                         <SwiperSlide key={idx} style={{ width: 'auto' }}>
                           <Zoom in timeout={1200 + (idx * 150)}>
-                            <Card 
-                              sx={{ 
-                                cursor: 'pointer',
-                                background: `linear-gradient(135deg, ${acao.cor}15, ${acao.cor}08)`,
-                                border: `2px solid ${acao.cor}25`,
-                                borderRadius: 3,
-                                transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-                                width: { xs: 130, sm: 140, md: 150 },
-                                height: { xs: 90, sm: 100, md: 110 },
-                                position: 'relative',
-                                overflow: 'hidden',
-                                '&:hover': {
-                                  transform: 'translateY(-6px) scale(1.02)',
-                                  boxShadow: `0 15px 30px ${acao.cor}30`,
-                                  '& .action-icon': {
-                                    transform: 'scale(1.2) rotate(5deg)'
-                                  },
-                                  '& .action-bg': {
-                                    transform: 'scale(1.1)',
-                                    opacity: 0.3
-                                  }
+                            <Badge 
+                              badgeContent={acao.badgeCount || 0}
+                              color="error"
+                              overlap="circular"
+                              sx={{
+                                '& .MuiBadge-badge': {
+                                  fontSize: '0.75rem',
+                                  fontWeight: 'bold',
+                                  height: 22,
+                                  minWidth: 22,
+                                  borderRadius: '50%'
                                 }
                               }}
-                              onClick={() => router.push(acao.rota)}
                             >
+                              <Card 
+                                sx={{ 
+                                  cursor: 'pointer',
+                                  background: `linear-gradient(135deg, ${acao.cor}15, ${acao.cor}08)`,
+                                  border: `2px solid ${acao.cor}25`,
+                                  borderRadius: 3,
+                                  transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                                  width: { xs: 130, sm: 140, md: 150 },
+                                  height: { xs: 90, sm: 100, md: 110 },
+                                  position: 'relative',
+                                  overflow: 'hidden',
+                                  '&:hover': {
+                                    transform: 'translateY(-6px) scale(1.02)',
+                                    boxShadow: `0 15px 30px ${acao.cor}30`,
+                                    '& .action-icon': {
+                                      transform: 'scale(1.2) rotate(5deg)'
+                                    },
+                                    '& .action-bg': {
+                                      transform: 'scale(1.1)',
+                                      opacity: 0.3
+                                    }
+                                  }
+                                }}
+                                onClick={() => router.push(acao.rota)}
+                              >
                               {/* Background decorativo */}
                               <Box 
                                 className="action-bg"
@@ -659,6 +691,7 @@ const Dashboard = () => {
                                 </CardContent>
                               </CardActionArea>
                             </Card>
+                            </Badge>
                           </Zoom>
                         </SwiperSlide>
                       ))}

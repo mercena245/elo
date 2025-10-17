@@ -779,8 +779,8 @@ const PlanejamentoAulas = () => {
               </Typography>
               
               <Grid container spacing={2}>
-                <Grid item xs={12} sm={6} md={3}>
-                  <FormControl fullWidth size="small">
+                <Grid item xs={12} sm={6} md={4}>
+                  <FormControl fullWidth sx={{ minWidth: '250px' }}>
                     <InputLabel>Turma</InputLabel>
                     <Select
                       value={filtroTurmaAprovados}
@@ -798,7 +798,6 @@ const PlanejamentoAulas = () => {
                 <Grid item xs={12} sm={6} md={3}>
                   <TextField
                     fullWidth
-                    size="small"
                     label="Título da Aula"
                     value={filtroTituloAprovados}
                     onChange={(e) => setFiltroTituloAprovados(e.target.value)}
@@ -806,10 +805,9 @@ const PlanejamentoAulas = () => {
                   />
                 </Grid>
                 
-                <Grid item xs={12} sm={6} md={3}>
+                <Grid item xs={12} sm={6} md={2}>
                   <TextField
                     fullWidth
-                    size="small"
                     label="Competência BNCC"
                     value={filtroCompetenciaAprovados}
                     onChange={(e) => setFiltroCompetenciaAprovados(e.target.value)}
@@ -820,7 +818,6 @@ const PlanejamentoAulas = () => {
                 <Grid item xs={12} sm={6} md={2}>
                   <TextField
                     fullWidth
-                    size="small"
                     type="date"
                     label="Data"
                     value={filtroDataAprovados}
@@ -946,14 +943,14 @@ const PlanejamentoAulas = () => {
                             </Box>
 
                             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, ml: 2 }}>
-                              <Tooltip title="Visualizar e Imprimir">
+                              <Tooltip title="Visualizar e Imprimir Plano">
                                 <Button
                                   variant="contained"
                                   startIcon={<PrintIcon />}
                                   onClick={() => abrirImpressao(plano)}
                                   size="small"
                                 >
-                                  Imprimir
+                                  Visualizar/Imprimir
                                 </Button>
                               </Tooltip>
                               

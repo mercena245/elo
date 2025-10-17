@@ -57,7 +57,7 @@ const MensagensSection = ({ userRole, userData }) => {
   const [loading, setLoading] = useState(true);
   const [abaConversas, setAbaConversas] = useState(0); // 0: Não Lidas, 1: Lidas, 2: Enviados
   const [novaMensagem, setNovaMensagem] = useState({
-    destinatario: null,
+    destinatario: '',
     assunto: '',
     conteudo: '',
     anexos: []
@@ -147,7 +147,7 @@ const MensagensSection = ({ userRole, userData }) => {
       }
 
       // Validar se destinatário foi selecionado
-      if (!novaMensagem.destinatario || !novaMensagem.destinatario.id) {
+      if (!novaMensagem.destinatario) {
         console.error('Destinatário não selecionado');
         alert('Por favor, selecione um destinatário.');
         return;
@@ -165,7 +165,16 @@ const MensagensSection = ({ userRole, userData }) => {
       }
 
       const remetenteId = userData.id;
-      const destinatarioId = novaMensagem.destinatario.id;
+      const destinatarioId = novaMensagem.destinatario;
+      
+      // Buscar dados do destinatário
+      const destinatarioData = usuarios.find(u => u.id === destinatarioId);
+      
+      if (!destinatarioData) {
+        console.error('Dados do destinatário não encontrados');
+        alert('Erro ao encontrar destinatário. Tente novamente.');
+        return;
+      }
 
       const mensagemData = {
         remetente: {
@@ -175,8 +184,8 @@ const MensagensSection = ({ userRole, userData }) => {
         },
         destinatario: {
           id: destinatarioId,
-          nome: novaMensagem.destinatario.nome,
-          role: novaMensagem.destinatario.role
+          nome: destinatarioData.nome,
+          role: destinatarioData.role
         },
         assunto: novaMensagem.assunto,
         conteudo: novaMensagem.conteudo,
@@ -186,19 +195,19 @@ const MensagensSection = ({ userRole, userData }) => {
         participantes: [remetenteId, destinatarioId]
       };
 
-      const mensagensRef = ref(db, 'mensagens');
-      const mensagemRef = await push(mensagensRef, mensagemData);
+      // Usar pushData do hook ao invés de ref/push
+      const mensagemId = await pushData('mensagens', mensagemData);
       
       // Log do envio de mensagem
       await auditService.logAction(
         LOG_ACTIONS.MESSAGE_SENT,
         userData?.id,
         {
-          mensagemId: mensagemRef.key,
+          mensagemId: mensagemId,
           destinatario: {
-            id: novaMensagem.destinatario.id,
-            nome: novaMensagem.destinatario.nome,
-            role: novaMensagem.destinatario.role
+            id: destinatarioData.id,
+            nome: destinatarioData.nome,
+            role: destinatarioData.role
           },
           assunto: novaMensagem.assunto,
           temAnexos: (novaMensagem.anexos || []).length > 0,
@@ -217,7 +226,7 @@ const MensagensSection = ({ userRole, userData }) => {
         userData?.id,
         {
           erro: error.message,
-          destinatario: novaMensagem.destinatario?.nome,
+          destinatario: typeof novaMensagem.destinatario === 'string' ? novaMensagem.destinatario : novaMensagem.destinatario?.nome,
           assunto: novaMensagem.assunto
         }
       );
@@ -240,7 +249,7 @@ const MensagensSection = ({ userRole, userData }) => {
     }
     
     setDialogNovaMensagem(false);
-    setNovaMensagem({ destinatario: null, assunto: '', conteudo: '', anexos: [] });
+    setNovaMensagem({ destinatario: '', assunto: '', conteudo: '', anexos: [] });
   };
 
   const handleUploadAnexo = async (files) => {
@@ -859,7 +868,7 @@ const MensagensSection = ({ userRole, userData }) => {
                 onChange={(e) => setNovaMensagem({ ...novaMensagem, destinatario: e.target.value })}
               >
                 {usuarios.map((usuario) => (
-                  <MenuItem key={usuario.id} value={usuario}>
+                  <MenuItem key={usuario.id} value={usuario.id}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                       <Avatar sx={{ width: 24, height: 24, bgcolor: getRoleColor(usuario.role) }}>
                         {getRoleIcon(usuario.role)}
@@ -936,7 +945,7 @@ const MensagensSection = ({ userRole, userData }) => {
             variant="contained" 
             startIcon={<Send />}
             onClick={enviarMensagem}
-            disabled={!novaMensagem.destinatario || !novaMensagem.destinatario.id || !novaMensagem.assunto || !novaMensagem.conteudo}
+            disabled={!novaMensagem.destinatario || !novaMensagem.assunto || !novaMensagem.conteudo}
           >
             Enviar
           </Button>

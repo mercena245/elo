@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -27,7 +27,13 @@ import {
   ListItemSecondaryAction,
   IconButton,
   Tooltip,
-  Divider
+  Divider,
+  Tabs,
+  Tab,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
+  Autocomplete
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -40,7 +46,12 @@ import {
   CalendarToday as CalendarIcon,
   Assignment as AssignmentIcon,
   Class as ClassIcon,
-  Visibility as VisibilityIcon
+  Visibility as VisibilityIcon,
+  Print as PrintIcon,
+  ExpandMore as ExpandMoreIcon,
+  CheckCircle as CheckCircleIcon,
+  Search as SearchIcon,
+  FilterList as FilterListIcon
 } from '@mui/icons-material';
 import { useAuthUser } from '../../../hooks/useAuthUser';
 import { auditService } from '../../../services/auditService';
@@ -50,6 +61,7 @@ import EditorPlanoAula from './shared/EditorPlanoAula';
 import CalendarioGrade from '../../../app/sala-professor/components/shared/CalendarioGrade';
 import SeletorTurmaAluno from './SeletorTurmaAluno';
 import SeletorPeriodoLetivo from '../../components/shared/SeletorPeriodoLetivo';
+import RelatorioPlanoAula from './shared/RelatorioPlanoAula';
 import { useSchoolDatabase } from '../../../hooks/useSchoolDatabase';
 
 const PlanejamentoAulas = () => {
@@ -88,6 +100,16 @@ const PlanejamentoAulas = () => {
   // Estados de visualização
   const [planosPendentes, setPlanosPendentes] = useState([]);
   const [planosAprovados, setPlanosAprovados] = useState([]);
+  
+  // Novos estados para abas e filtros
+  const [abaAtual, setAbaAtual] = useState(0); // 0: Planejamento, 1: Planos Aprovados
+  const [filtroTurmaAprovados, setFiltroTurmaAprovados] = useState('');
+  const [filtroTituloAprovados, setFiltroTituloAprovados] = useState('');
+  const [filtroCompetenciaAprovados, setFiltroCompetenciaAprovados] = useState('');
+  const [filtroDataAprovados, setFiltroDataAprovados] = useState('');
+  const [planoImpressao, setPlanoImpressao] = useState(null);
+  const [dialogImpressao, setDialogImpressao] = useState(false);
+  const printRef = useRef();
 
   useEffect(() => {
     if (user?.uid && isReady && userRole) {
@@ -450,6 +472,70 @@ const PlanejamentoAulas = () => {
     }
   };
 
+  // Funções para planos aprovados
+  const filtrarPlanosAprovados = () => {
+    let planosFiltrados = [...planosAprovados];
+
+    // Filtro por turma
+    if (filtroTurmaAprovados) {
+      planosFiltrados = planosFiltrados.filter(grupo => grupo.turmaId === filtroTurmaAprovados);
+    }
+
+    // Filtro por título
+    if (filtroTituloAprovados) {
+      planosFiltrados = planosFiltrados.map(grupo => ({
+        ...grupo,
+        planos: grupo.planos.filter(plano => 
+          plano.titulo?.toLowerCase().includes(filtroTituloAprovados.toLowerCase())
+        )
+      })).filter(grupo => grupo.planos.length > 0);
+    }
+
+    // Filtro por competência BNCC
+    if (filtroCompetenciaAprovados) {
+      planosFiltrados = planosFiltrados.map(grupo => ({
+        ...grupo,
+        planos: grupo.planos.filter(plano => 
+          plano.bncc?.some(comp => 
+            comp.codigo?.toLowerCase().includes(filtroCompetenciaAprovados.toLowerCase()) ||
+            comp.descricao?.toLowerCase().includes(filtroCompetenciaAprovados.toLowerCase())
+          )
+        )
+      })).filter(grupo => grupo.planos.length > 0);
+    }
+
+    // Filtro por data
+    if (filtroDataAprovados) {
+      planosFiltrados = planosFiltrados.map(grupo => ({
+        ...grupo,
+        planos: grupo.planos.filter(plano => plano.data === filtroDataAprovados)
+      })).filter(grupo => grupo.planos.length > 0);
+    }
+
+    return planosFiltrados;
+  };
+
+  const abrirImpressao = (plano) => {
+    setPlanoImpressao(plano);
+    setDialogImpressao(true);
+  };
+
+  const fecharImpressao = () => {
+    setDialogImpressao(false);
+    setPlanoImpressao(null);
+  };
+
+  const imprimirPlano = () => {
+    window.print();
+  };
+
+  const limparFiltros = () => {
+    setFiltroTurmaAprovados('');
+    setFiltroTituloAprovados('');
+    setFiltroCompetenciaAprovados('');
+    setFiltroDataAprovados('');
+  };
+
   if (loading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
@@ -508,8 +594,25 @@ const PlanejamentoAulas = () => {
         />
       </Box>
 
-      {/* Grade horária agora carrega automaticamente baseada nas turmas */}
-      <Grid container spacing={4} sx={{ mt: 1 }}>
+      {/* Abas de navegação */}
+      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+        <Tabs value={abaAtual} onChange={(e, newValue) => setAbaAtual(newValue)}>
+          <Tab 
+            label="Planejamento de Aulas" 
+            icon={<AssignmentIcon />} 
+            iconPosition="start"
+          />
+          <Tab 
+            label="Planos Aprovados" 
+            icon={<CheckCircleIcon />} 
+            iconPosition="start"
+          />
+        </Tabs>
+      </Box>
+
+      {/* Aba 0: Planejamento de Aulas */}
+      {abaAtual === 0 && (
+      <Grid container spacing={4}>
         {/* Filtros */}
         <Grid item xs={12} md={4}>
           <Card>
@@ -661,115 +764,280 @@ const PlanejamentoAulas = () => {
             </CardContent>
           </Card>
         </Grid>
+      </Grid>
+      )}
 
-        {/* Quadro de Planos Aprovados */}
-        <Grid item xs={12} md={8}>
-          <Card>
+      {/* Aba 1: Planos Aprovados */}
+      {abaAtual === 1 && (
+        <Box>
+          {/* Filtros de busca */}
+          <Card sx={{ mb: 3 }}>
             <CardContent>
               <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-                <AssignmentIcon color="success" />
-                Planos de Aulas Aprovados
+                <FilterListIcon color="primary" />
+                Filtros de Busca
               </Typography>
-              {planosAprovados.length === 0 ? (
-                <Box sx={{ mt: 2, textAlign: 'center', color: 'text.secondary', fontStyle: 'italic' }}>
-                  <Typography variant="body1" gutterBottom>
-                    ✅ <strong>Nenhum plano de aula aprovado</strong>
+              
+              <Grid container spacing={2}>
+                <Grid item xs={12} sm={6} md={3}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel>Turma</InputLabel>
+                    <Select
+                      value={filtroTurmaAprovados}
+                      onChange={(e) => setFiltroTurmaAprovados(e.target.value)}
+                      label="Turma"
+                    >
+                      <MenuItem value="">Todas</MenuItem>
+                      {Object.entries(turmas).map(([id, turma]) => (
+                        <MenuItem key={id} value={id}>{turma.nome}</MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+                
+                <Grid item xs={12} sm={6} md={3}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Título da Aula"
+                    value={filtroTituloAprovados}
+                    onChange={(e) => setFiltroTituloAprovados(e.target.value)}
+                    placeholder="Digite o título..."
+                  />
+                </Grid>
+                
+                <Grid item xs={12} sm={6} md={3}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Competência BNCC"
+                    value={filtroCompetenciaAprovados}
+                    onChange={(e) => setFiltroCompetenciaAprovados(e.target.value)}
+                    placeholder="Ex: EF01LP01"
+                  />
+                </Grid>
+                
+                <Grid item xs={12} sm={6} md={2}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    type="date"
+                    label="Data"
+                    value={filtroDataAprovados}
+                    onChange={(e) => setFiltroDataAprovados(e.target.value)}
+                    InputLabelProps={{ shrink: true }}
+                  />
+                </Grid>
+                
+                <Grid item xs={12} sm={12} md={1}>
+                  <Button 
+                    fullWidth
+                    variant="outlined" 
+                    onClick={limparFiltros}
+                    sx={{ height: '100%' }}
+                  >
+                    Limpar
+                  </Button>
+                </Grid>
+              </Grid>
+            </CardContent>
+          </Card>
+
+          {/* Lista de planos aprovados agrupados */}
+          {filtrarPlanosAprovados().length === 0 ? (
+            <Card>
+              <CardContent>
+                <Box sx={{ textAlign: 'center', py: 4 }}>
+                  <CheckCircleIcon sx={{ fontSize: 64, color: 'text.disabled', mb: 2 }} />
+                  <Typography variant="h6" color="text.secondary">
+                    Nenhum plano aprovado encontrado
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {(filtroTurmaAprovados || filtroTituloAprovados || filtroCompetenciaAprovados || filtroDataAprovados) 
+                      ? 'Tente ajustar os filtros de busca' 
+                      : 'Quando os planos forem aprovados, eles aparecerão aqui'}
                   </Typography>
                 </Box>
-              ) : (
-                <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center', width: '100%' }}>
-                  <Box sx={{ maxWidth: '1200px', width: '100%', display: 'flex', flexDirection: 'column', gap: 3 }}>
-                    {planosAprovados.map((grupo) => (
-                      <Card key={grupo.turmaId} sx={{ '&:hover': { boxShadow: 6 }, transition: 'box-shadow 0.3s', boxShadow: 2 }}>
+              </CardContent>
+            </Card>
+          ) : (
+            filtrarPlanosAprovados().map((grupo) => (
+              <Accordion key={grupo.turmaId} sx={{ mb: 2 }}>
+                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', pr: 2 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <SchoolIcon color="primary" />
+                      <Typography variant="h6">
+                        {grupo.turma?.nome || `Turma ${grupo.turmaId}`}
+                      </Typography>
+                    </Box>
+                    <Chip 
+                      label={`${grupo.planos.length} plano(s)`} 
+                      color="success" 
+                      size="small"
+                    />
+                  </Box>
+                </AccordionSummary>
+                <AccordionDetails>
+                  {grupo.planos
+                    .sort((a, b) => new Date(b.data) - new Date(a.data))
+                    .map((plano) => (
+                      <Card key={plano.id} sx={{ mb: 2, '&:hover': { boxShadow: 4 } }}>
                         <CardContent>
-                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3, pb: 2, borderBottom: '2px solid #e0e0e0' }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                              <SchoolIcon color="primary" sx={{ fontSize: 32 }} />
-                              <Box>
-                                <Typography variant="h5" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
-                                  {grupo.turma?.nome || `Turma ${grupo.turmaId}`}
-                                </Typography>
-                                <Typography variant="body2" color="text.secondary">
-                                  {grupo.planos.length} plano(s) de aula
-                                </Typography>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                            <Box sx={{ flex: 1 }}>
+                              <Typography variant="h6" sx={{ mb: 1 }}>
+                                {plano.titulo || 'Sem título'}
+                              </Typography>
+                              
+                              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
+                                <Chip 
+                                  label={disciplinas[plano.disciplinaId]?.nome || 'Disciplina'} 
+                                  size="small" 
+                                  color="secondary" 
+                                  variant="outlined"
+                                />
+                                <Chip 
+                                  label={new Date(plano.data).toLocaleDateString('pt-BR')} 
+                                  size="small" 
+                                  icon={<CalendarIcon />}
+                                />
+                                {plano.horaInicio && plano.horaFim && (
+                                  <Chip 
+                                    label={`${plano.horaInicio} - ${plano.horaFim}`} 
+                                    size="small"
+                                  />
+                                )}
+                                <Chip 
+                                  label="APROVADO" 
+                                  size="small" 
+                                  color="success"
+                                />
                               </Box>
-                            </Box>
-                            <Chip label={grupo.planos.length} color="success" variant="filled" sx={{ fontSize: '1rem', height: 32, minWidth: 60 }} />
-                          </Box>
-                          <Grid container spacing={2}>
-                            {grupo.planos.map((plano, index) => (
-                              <Grid item xs={12} key={plano.id}>
-                                <Box sx={{ p: 3, border: '2px solid #e0e0e0', borderRadius: 3, bgcolor: index % 2 === 0 ? '#fafafa' : '#ffffff', '&:hover': { bgcolor: '#e8f5e9', borderColor: 'success.main', boxShadow: 2, transform: 'translateY(-2px)' }, transition: 'all 0.3s ease', boxShadow: 1 }}>
-                                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                    <Box sx={{ flex: 1 }}>
-                                      <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 0.5 }}>
-                                        {plano.titulo || 'Plano sem título'}
-                                      </Typography>
-                                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                                        <Chip label={disciplinas[plano.disciplinaId]?.nome || 'Disciplina'} size="small" color="secondary" variant="outlined" />
-                                        <Chip label="Aprovado" size="small" color="success" variant="filled" />
-                                      </Box>
-                                      <Typography variant="body2" color="text.secondary">
-                                        📅 {plano.data ? new Date(plano.data).toLocaleDateString('pt-BR') : 'Sem data'}
-                                        {plano.horaInicio && plano.horaFim && ` • ⏰ ${plano.horaInicio} às ${plano.horaFim}`}
-                                      </Typography>
-                                      <Typography variant="body2" color="text.secondary" sx={{ mt: 1, display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical', overflow: 'hidden', textOverflow: 'ellipsis', fontStyle: 'italic' }}>
-                                        {Array.isArray(plano.objetivos) && plano.objetivos.length > 0 ? `📝 ${plano.objetivos[0]}${plano.objetivos.length > 1 ? ' (+' + (plano.objetivos.length - 1) + ' mais)' : ''}` : '📝 Sem objetivos definidos'}
-                                      </Typography>
-                                    </Box>
-                                    <Box sx={{ display: 'flex', gap: 1, ml: 2 }}>
-                                      <Tooltip title="Visualizar Plano">
-                                        <IconButton color="primary" onClick={() => abrirVisualizacao(plano, grupo.planos)} sx={{ '&:hover': { backgroundColor: 'primary.light', color: 'white' } }}>
-                                          <VisibilityIcon />
-                                        </IconButton>
-                                      </Tooltip>
-                                      {(userRole === 'professor' || userRole === 'professora') ? (
-                                        <>
-                                          <Tooltip title="Editar Plano (inativo)">
-                                            <span>
-                                              <IconButton color="secondary" disabled>
-                                                <EditIcon />
-                                              </IconButton>
-                                            </span>
-                                          </Tooltip>
-                                          <Tooltip title="Excluir Plano (inativo)">
-                                            <span>
-                                              <IconButton color="error" disabled>
-                                                <DeleteIcon />
-                                              </IconButton>
-                                            </span>
-                                          </Tooltip>
-                                        </>
-                                      ) : (
-                                        <>
-                                          <Tooltip title="Editar Plano">
-                                            <IconButton color="secondary" onClick={() => abrirEditor(plano)} sx={{ '&:hover': { backgroundColor: 'secondary.light', color: 'white' } }}>
-                                              <EditIcon />
-                                            </IconButton>
-                                          </Tooltip>
-                                          <Tooltip title="Excluir Plano">
-                                            <IconButton color="error" onClick={() => excluirPlano(plano.id, plano.titulo)} sx={{ '&:hover': { backgroundColor: 'error.light', color: 'white' } }}>
-                                              <DeleteIcon />
-                                            </IconButton>
-                                          </Tooltip>
-                                        </>
-                                      )}
-                                    </Box>
+
+                              {plano.bncc && plano.bncc.length > 0 && (
+                                <Box sx={{ mb: 1 }}>
+                                  <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 'bold' }}>
+                                    Competências BNCC:
+                                  </Typography>
+                                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
+                                    {plano.bncc.slice(0, 3).map((comp, idx) => (
+                                      <Chip 
+                                        key={idx}
+                                        label={comp.codigo} 
+                                        size="small" 
+                                        variant="outlined"
+                                      />
+                                    ))}
+                                    {plano.bncc.length > 3 && (
+                                      <Chip 
+                                        label={`+${plano.bncc.length - 3}`} 
+                                        size="small" 
+                                        variant="outlined"
+                                      />
+                                    )}
                                   </Box>
                                 </Box>
-                              </Grid>
-                            ))}
-                          </Grid>
+                              )}
+
+                              <Typography variant="body2" color="text.secondary">
+                                Professor(a): {plano.professorNome}
+                              </Typography>
+                            </Box>
+
+                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, ml: 2 }}>
+                              <Tooltip title="Visualizar e Imprimir">
+                                <Button
+                                  variant="contained"
+                                  startIcon={<PrintIcon />}
+                                  onClick={() => abrirImpressao(plano)}
+                                  size="small"
+                                >
+                                  Imprimir
+                                </Button>
+                              </Tooltip>
+                              
+                              {(userRole === 'coordenador' || userRole === 'coordenadora') && (
+                                <>
+                                  <Button
+                                    variant="outlined"
+                                    startIcon={<EditIcon />}
+                                    onClick={() => abrirEditor(plano)}
+                                    size="small"
+                                  >
+                                    Editar
+                                  </Button>
+                                  <Button
+                                    variant="outlined"
+                                    color="error"
+                                    startIcon={<DeleteIcon />}
+                                    onClick={() => excluirPlano(plano.id, plano.titulo)}
+                                    size="small"
+                                  >
+                                    Excluir
+                                  </Button>
+                                </>
+                              )}
+                            </Box>
+                          </Box>
                         </CardContent>
                       </Card>
                     ))}
-                  </Box>
-                </Box>
-              )}
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
+                </AccordionDetails>
+              </Accordion>
+            ))
+          )}
+        </Box>
+      )}
+
+      {/* Modal de Impressão */}
+      <Dialog
+        open={dialogImpressao}
+        onClose={fecharImpressao}
+        maxWidth="lg"
+        fullWidth
+        PaperProps={{
+          sx: {
+            '@media print': {
+              boxShadow: 'none',
+              maxWidth: '100%',
+              margin: 0
+            }
+          }
+        }}
+      >
+        <DialogTitle sx={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center',
+          '@media print': { display: 'none' }
+        }}>
+          <Typography variant="h6">Visualização para Impressão</Typography>
+          <Box>
+            <Button
+              variant="contained"
+              startIcon={<PrintIcon />}
+              onClick={imprimirPlano}
+              sx={{ mr: 1 }}
+            >
+              Imprimir
+            </Button>
+            <IconButton onClick={fecharImpressao}>
+              <CloseIcon />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+        <DialogContent sx={{ p: 0, '@media print': { p: 0 } }}>
+          {planoImpressao && (
+            <RelatorioPlanoAula
+              plano={planoImpressao}
+              turma={turmas[planoImpressao.turmaId]}
+              disciplina={disciplinas[planoImpressao.disciplinaId]}
+              escola={currentSchool}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Modal de Visualização de Plano como Documento */}
       <Dialog 

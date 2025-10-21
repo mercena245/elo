@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import SidebarMenu from '../../components/SidebarMenu';
 import ProtectedRoute from '../../components/ProtectedRoute';
 import { 
@@ -18,7 +19,26 @@ import { PlanejamentoAulas, RelatoriosPedagogicos, CronogramaAcademico, Bibliote
 
 const SalaProfessor = () => {
   const { user, role } = useAuth();
-  const [tabValue, setTabValue] = useState(0);
+  const searchParams = useSearchParams();
+
+  // Função para obter aba inicial baseada no parâmetro da URL
+  const getInitialTab = () => {
+    const tabParam = searchParams.get('tab');
+    switch(tabParam) {
+      case 'relatorios': return 1;
+      case 'cronograma': return 2;
+      case 'biblioteca': return 3;
+      default: return 0; // planos ou sem parâmetro
+    }
+  };
+
+  const [tabValue, setTabValue] = useState(getInitialTab);
+
+  // Atualizar aba quando os parâmetros da URL mudarem
+  useEffect(() => {
+    const newTab = getInitialTab();
+    setTabValue(newTab);
+  }, [searchParams]);
 
   const handleTabChange = (event, newValue) => {
     setTabValue(newValue);
@@ -216,4 +236,11 @@ const SalaProfessor = () => {
   );
 };
 
-export default SalaProfessor;
+// Wrapper com Suspense para useSearchParams
+export default function SalaProfessorWrapper() {
+  return (
+    <Suspense fallback={<div style={{ padding: '20px', textAlign: 'center' }}>Carregando...</div>}>
+      <SalaProfessor />
+    </Suspense>
+  );
+}

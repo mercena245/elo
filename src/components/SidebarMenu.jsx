@@ -26,7 +26,7 @@ import {
 // Versão modernizada do SidebarMenu
 const SidebarMenu = () => {
   // Hook para verificar tipo de acesso
-  const { accessType } = useAuth();
+  const { accessType, currentSchool } = useAuth();
   
   // Hook para acessar banco da escola (se accessType === 'school')
   const schoolDB = useSchoolDatabase();
@@ -44,6 +44,7 @@ const SidebarMenu = () => {
   const [userName, setUserName] = useState('');
   const [userEmail, setUserEmail] = useState('');
   const [userId, setUserId] = useState(null);
+  const [schoolInfo, setSchoolInfo] = useState({ nome: '', logoUrl: '' });
   const router = useRouter();
 
   // Verificar autenticação
@@ -113,6 +114,45 @@ const SidebarMenu = () => {
     }
     fetchRole();
   }, [userId, isReady, getData]);
+
+  // Buscar informações da escola (nome e logo) - atualiza quando trocar de escola
+  useEffect(() => {
+    async function fetchSchoolInfo() {
+      try {
+        if (!isReady || !getData || accessType !== 'school' || !currentSchool) {
+          console.log('⏸️ [SidebarMenu] Aguardando para buscar escola:', { 
+            isReady, 
+            hasGetData: !!getData, 
+            accessType,
+            hasSchool: !!currentSchool 
+          });
+          // Limpar se não houver escola
+          if (!currentSchool) {
+            setSchoolInfo({ nome: '', logoUrl: '' });
+          }
+          return;
+        }
+
+        console.log('🏫 [SidebarMenu] Carregando info da escola:', currentSchool.nome);
+
+        // Buscar nome da escola
+        const escolaData = await getData('configuracoes/escola');
+        // Buscar logo do header
+        const headerData = await getData('configuracoes/header');
+
+        console.log('📋 [SidebarMenu] Escola data:', escolaData);
+        console.log('🎨 [SidebarMenu] Header data:', headerData);
+
+        setSchoolInfo({
+          nome: escolaData?.nome || currentSchool.nome || '',
+          logoUrl: headerData?.logoUrl || ''
+        });
+      } catch (error) {
+        console.log('⚠️ [SidebarMenu] Erro ao buscar info da escola:', error.message);
+      }
+    }
+    fetchSchoolInfo();
+  }, [isReady, getData, accessType, currentSchool]); // ← Adiciona currentSchool como dependência
 
   useEffect(() => {
     async function fetchPendentes() {
@@ -213,12 +253,16 @@ const SidebarMenu = () => {
     ...(userRole === 'pai' ? [
       { icon: FaGraduationCap, label: 'Turma do Filho', path: '/turma-filho', color: '#2563EB' }
     ] : []),
-    { icon: FaStore, label: 'Loja', path: '/loja', color: '#06B6D4' },
+    ...(['coordenadora', 'pai'].includes(userRole) ? [
+      { icon: FaStore, label: 'Loja', path: '/loja', color: '#06B6D4' }
+    ] : []),
     ...(userRole === 'coordenadora' ? [
       { icon: FaUsers, label: 'Colaboradores', path: '/colaboradores', color: '#84CC16' }
     ] : []),
     { icon: FaCalendarAlt, label: 'Agenda', path: '/agenda', color: '#F97316' },
-    { icon: FaCashRegister, label: 'Caixa (Financeiro)', path: '/financeiro', color: '#10B981' },
+    ...(['coordenadora', 'pai'].includes(userRole) ? [
+      { icon: FaCashRegister, label: 'Caixa (Financeiro)', path: '/financeiro', color: '#10B981' }
+    ] : []),
     ...(['coordenadora', 'pai'].includes(userRole) ? [
       { icon: FaCertificate, label: 'Secretaria Digital', path: '/secretaria-digital', color: '#7C3AED' }
     ] : []),
@@ -317,6 +361,52 @@ const SidebarMenu = () => {
             }}>
               {userEmail}
             </Typography>
+          )}
+          
+          {/* Informações da Escola */}
+          {schoolInfo.nome && (
+            <Box sx={{ 
+              mt: 2, 
+              pt: 2, 
+              borderTop: '1px solid rgba(255, 255, 255, 0.15)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1.5
+            }}>
+              <Avatar
+                src={schoolInfo.logoUrl}
+                sx={{
+                  width: 40,
+                  height: 40,
+                  bgcolor: 'rgba(255, 255, 255, 0.2)',
+                  border: '2px solid rgba(255, 255, 255, 0.3)',
+                  fontSize: '1.2rem'
+                }}
+              >
+                {!schoolInfo.logoUrl && '🏫'}
+              </Avatar>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography variant="caption" sx={{ 
+                  color: 'rgba(255, 255, 255, 0.7)',
+                  fontSize: '0.7rem',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px',
+                  display: 'block'
+                }}>
+                  Escola
+                </Typography>
+                <Typography variant="body2" sx={{ 
+                  color: 'white',
+                  fontWeight: 600,
+                  fontSize: '0.85rem',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap'
+                }}>
+                  {schoolInfo.nome}
+                </Typography>
+              </Box>
+            </Box>
           )}
         </Box>
 

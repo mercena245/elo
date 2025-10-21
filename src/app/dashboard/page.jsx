@@ -5,6 +5,7 @@ import SidebarMenu from '../../components/SidebarMenu';
 import ProtectedRoute from '../../components/ProtectedRoute';
 import SimpleCarousel from '../../components/SimpleCarousel';
 import SchoolSelector from '../../components/SchoolSelector';
+
 import SchoolHeader from '../../components/SchoolHeader';
 import HeaderSettingsDialog from '../../components/HeaderSettingsDialog';
 import { useAuth } from '../../context/AuthContext';
@@ -204,7 +205,9 @@ const Dashboard = () => {
           usuariosData,
           notasData,
           frequenciaData,
-          planosData
+          planosData,
+          relatoriosData,
+          titulosData
         ] = await Promise.all([
           getData('alunos'),
           getData('colaboradores'),
@@ -214,7 +217,9 @@ const Dashboard = () => {
           getData('usuarios'),
           getData('notas'),
           getData('frequencia'),
-          getData('planos-aula')
+          getData('planos-aula'),
+          getData('relatorios-pedagogicos'),
+          getData('titulos_financeiros')
         ]);
 
         // Processar alunos
@@ -266,6 +271,9 @@ const Dashboard = () => {
         });
 
         // Processar pendências (apenas para coordenadores)
+        let totalPendenciasCount = 0;
+        
+        // Contar planos de aula pendentes
         if (planosData) {
           const planosList = Object.values(planosData);
           const pendentes = planosList.filter(p => 
@@ -273,10 +281,29 @@ const Dashboard = () => {
             p.statusAprovacao === 'pendente' || 
             p.statusAprovacao === 'rejeitado'
           );
-          setTotalPendencias(pendentes.length);
-        } else {
-          setTotalPendencias(0);
+          totalPendenciasCount += pendentes.length;
         }
+        
+        // Contar relatórios pedagógicos pendentes
+        if (relatoriosData) {
+          const relatoriosList = Object.values(relatoriosData);
+          const pendentes = relatoriosList.filter(r => r.statusAprovacao === 'pendente');
+          totalPendenciasCount += pendentes.length;
+        }
+        
+        // Contar títulos em análise
+        if (titulosData) {
+          console.log('🔍 [Dashboard] Dados de títulos:', titulosData);
+          const titulosList = Object.values(titulosData);
+          console.log('📋 [Dashboard] Lista de títulos:', titulosList);
+          console.log('🔎 [Dashboard] Status dos títulos:', titulosList.map(t => ({ status: t.status, alunoId: t.alunoId })));
+          const emAnalise = titulosList.filter(t => t.status === 'em_analise');
+          console.log('⚠️ [Dashboard] Títulos em análise:', emAnalise.length);
+          totalPendenciasCount += emAnalise.length;
+        }
+        
+        console.log('🎯 [Dashboard] Total de pendências:', totalPendenciasCount);
+        setTotalPendencias(totalPendenciasCount);
 
         // Processar avisos
         if (avisosData) {

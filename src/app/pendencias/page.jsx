@@ -31,7 +31,10 @@ import {
   ChevronRight as ChevronRightIcon,
   ExpandMore as ExpandMoreIcon,
   School as SchoolIcon,
-  ArrowBack as ArrowBackIcon
+  ArrowBack as ArrowBackIcon,
+  Description as DescriptionIcon,
+  AttachMoney as AttachMoneyIcon,
+  Person as PersonIcon
 } from '@mui/icons-material';
 import SidebarMenu from '../../components/SidebarMenu';
 import { useAuthUser } from '../../hooks/useAuthUser';
@@ -44,9 +47,14 @@ const PendenciasPage = () => {
   
   const [loading, setLoading] = useState(true);
   const [planosPendentes, setPlanosPendentes] = useState([]);
+  const [relatoriosPendentes, setRelatoriosPendentes] = useState([]);
+  const [titulosEmAnalise, setTitulosEmAnalise] = useState([]);
   const [turmas, setTurmas] = useState({});
   const [disciplinas, setDisciplinas] = useState({});
+  const [alunos, setAlunos] = useState({});
   const [totalPendencias, setTotalPendencias] = useState(0);
+  const [totalRelatorios, setTotalRelatorios] = useState(0);
+  const [totalTitulos, setTotalTitulos] = useState(0);
 
   useEffect(() => {
     // Aguardar até que userRole esteja definido
@@ -66,14 +74,18 @@ const PendenciasPage = () => {
     try {
       setLoading(true);
 
-      const [planosData, turmasData, disciplinasData] = await Promise.all([
+      const [planosData, relatoriosData, titulosData, turmasData, disciplinasData, alunosData] = await Promise.all([
         getData('planos-aula'),
+        getData('relatorios-pedagogicos'),
+        getData('titulos_financeiros'),
         getData('turmas'),
-        getData('disciplinas')
+        getData('disciplinas'),
+        getData('alunos')
       ]);
 
       setTurmas(turmasData || {});
       setDisciplinas(disciplinasData || {});
+      setAlunos(alunosData || {});
 
       // Filtrar planos pendentes e rejeitados
       if (planosData) {
@@ -106,6 +118,73 @@ const PendenciasPage = () => {
 
         setPlanosPendentes(planosAgrupados);
         setTotalPendencias(pendentes.length);
+      }
+
+      // Processar relatórios pedagógicos pendentes
+      if (relatoriosData) {
+        const relatoriosList = Object.entries(relatoriosData).map(([id, relatorio]) => ({
+          id,
+          ...relatorio
+        }));
+
+        const relatoriosPendentes = relatoriosList.filter(r => 
+          r.statusAprovacao === 'pendente'
+        );
+
+        // Agrupar por turma
+        const relatóriosAgrupados = relatoriosPendentes.reduce((grupos, relatorio) => {
+          const turmaId = relatorio.turmaId;
+          if (!grupos[turmaId]) {
+            grupos[turmaId] = [];
+          }
+          grupos[turmaId].push(relatorio);
+          return grupos;
+        }, {});
+
+        const relatoriosAgrupados = Object.entries(relatóriosAgrupados).map(([turmaId, relatorios]) => ({
+          turmaId,
+          turma: turmasData[turmaId],
+          relatorios: relatorios.sort((a, b) => new Date(b.criadoEm) - new Date(a.criadoEm))
+        }));
+
+        setRelatoriosPendentes(relatoriosAgrupados);
+        setTotalRelatorios(relatoriosPendentes.length);
+      }
+
+      // Processar títulos em análise
+      if (titulosData) {
+        console.log('🔍 [Pendências] Dados de títulos:', titulosData);
+        const titulosList = Object.entries(titulosData).map(([id, titulo]) => ({
+          id,
+          ...titulo
+        }));
+        console.log('📋 [Pendências] Lista de títulos:', titulosList);
+        console.log('🔎 [Pendências] Status dos títulos:', titulosList.map(t => ({ id: t.id, status: t.status, alunoId: t.alunoId })));
+
+        const titulosAnalise = titulosList.filter(t => 
+          t.status === 'em_analise'
+        );
+        console.log('⚠️ [Pendências] Títulos em análise encontrados:', titulosAnalise.length);
+        console.log('📊 [Pendências] Títulos filtrados:', titulosAnalise);
+
+        // Agrupar por aluno
+        const titulosAgrupados = titulosAnalise.reduce((grupos, titulo) => {
+          const alunoId = titulo.alunoId;
+          if (!grupos[alunoId]) {
+            grupos[alunoId] = [];
+          }
+          grupos[alunoId].push(titulo);
+          return grupos;
+        }, {});
+
+        const titulosAgrupadosList = Object.entries(titulosAgrupados).map(([alunoId, titulos]) => ({
+          alunoId,
+          aluno: alunosData[alunoId],
+          titulos: titulos.sort((a, b) => new Date(b.dataPagamento) - new Date(a.dataPagamento))
+        }));
+
+        setTitulosEmAnalise(titulosAgrupadosList);
+        setTotalTitulos(titulosAnalise.length);
       }
 
     } catch (error) {
@@ -205,7 +284,7 @@ const PendenciasPage = () => {
 
         {/* Resumo de Pendências */}
         <Grid container spacing={3} sx={{ mb: 4 }}>
-          <Grid item xs={12} md={4}>
+          <Grid item xs={12} md={3}>
             <Card sx={{ 
               bgcolor: '#FEF3C7', 
               borderLeft: '4px solid #F59E0B',
@@ -219,7 +298,7 @@ const PendenciasPage = () => {
                       {totalPendencias}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
-                      Planos de Aula Pendentes
+                      Planos de Aula
                     </Typography>
                   </Box>
                 </Box>
@@ -227,7 +306,29 @@ const PendenciasPage = () => {
             </Card>
           </Grid>
 
-          <Grid item xs={12} md={4}>
+          <Grid item xs={12} md={3}>
+            <Card sx={{ 
+              bgcolor: '#E0E7FF', 
+              borderLeft: '4px solid #6366F1',
+              boxShadow: 2
+            }}>
+              <CardContent>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <DescriptionIcon sx={{ fontSize: 40, color: '#6366F1' }} />
+                  <Box>
+                    <Typography variant="h3" sx={{ fontWeight: 'bold', color: '#312E81' }}>
+                      {totalRelatorios}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Relatórios Pedagógicos
+                    </Typography>
+                  </Box>
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          <Grid item xs={12} md={3}>
             <Card sx={{ 
               bgcolor: '#DBEAFE', 
               borderLeft: '4px solid #3B82F6',
@@ -235,13 +336,13 @@ const PendenciasPage = () => {
             }}>
               <CardContent>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <SchoolIcon sx={{ fontSize: 40, color: '#3B82F6' }} />
+                  <AttachMoneyIcon sx={{ fontSize: 40, color: '#3B82F6' }} />
                   <Box>
                     <Typography variant="h3" sx={{ fontWeight: 'bold', color: '#1E40AF' }}>
-                      {planosPendentes.length}
+                      {totalTitulos}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
-                      Turmas com Pendências
+                      Pagamentos em Análise
                     </Typography>
                   </Box>
                 </Box>
@@ -249,7 +350,7 @@ const PendenciasPage = () => {
             </Card>
           </Grid>
 
-          <Grid item xs={12} md={4}>
+          <Grid item xs={12} md={3}>
             <Card sx={{ 
               bgcolor: '#D1FAE5', 
               borderLeft: '4px solid #10B981',
@@ -260,10 +361,10 @@ const PendenciasPage = () => {
                   <CheckCircleIcon sx={{ fontSize: 40, color: '#10B981' }} />
                   <Box>
                     <Typography variant="h3" sx={{ fontWeight: 'bold', color: '#065F46' }}>
-                      0
+                      {totalPendencias + totalRelatorios + totalTitulos}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
-                      Outras Pendências
+                      Total de Pendências
                     </Typography>
                   </Box>
                 </Box>
@@ -368,6 +469,222 @@ const PendenciasPage = () => {
                             />
                             
                             <IconButton edge="end" color="primary">
+                              <ChevronRightIcon />
+                            </IconButton>
+                          </ListItem>
+                        </React.Fragment>
+                      ))}
+                    </List>
+                  </AccordionDetails>
+                </Accordion>
+              ))
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Relatórios Pedagógicos Pendentes */}
+        <Card sx={{ mt: 3 }}>
+          <CardContent>
+            <Typography variant="h6" sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 1 }}>
+              <DescriptionIcon sx={{ color: '#6366F1' }} />
+              Relatórios Pedagógicos Aguardando Aprovação
+            </Typography>
+
+            {totalRelatorios === 0 ? (
+              <Alert severity="info" sx={{ mt: 2 }}>
+                <Typography variant="h6">✅ Tudo certo!</Typography>
+                <Typography>Não há relatórios pedagógicos pendentes no momento.</Typography>
+              </Alert>
+            ) : (
+              relatoriosPendentes.map((grupo) => (
+                <Accordion key={grupo.turmaId} sx={{ mb: 2 }}>
+                  <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', pr: 2 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <SchoolIcon sx={{ color: '#6366F1' }} />
+                        <Typography variant="h6">
+                          {grupo.turma?.nome || `Turma ${grupo.turmaId}`}
+                        </Typography>
+                      </Box>
+                      <Badge badgeContent={grupo.relatorios.length} color="error">
+                        <Chip 
+                          label={`${grupo.relatorios.length} relatório(s)`} 
+                          sx={{ bgcolor: '#E0E7FF', color: '#312E81' }}
+                          size="small"
+                        />
+                      </Badge>
+                    </Box>
+                  </AccordionSummary>
+                  
+                  <AccordionDetails>
+                    <List>
+                      {grupo.relatorios.map((relatorio, index) => (
+                        <React.Fragment key={relatorio.id}>
+                          {index > 0 && <Divider />}
+                          <ListItem
+                            sx={{ 
+                              py: 2,
+                              '&:hover': { 
+                                bgcolor: '#f9fafb',
+                                cursor: 'pointer'
+                              },
+                              transition: 'background-color 0.2s'
+                            }}
+                            onClick={() => router.push(`/sala-professor?tab=relatorios&relatorio=${relatorio.id}`)}
+                          >
+                            <ListItemAvatar>
+                              <Avatar sx={{ 
+                                bgcolor: '#E0E7FF',
+                                color: '#6366F1'
+                              }}>
+                                <DescriptionIcon />
+                              </Avatar>
+                            </ListItemAvatar>
+                            
+                            <ListItemText
+                              primary={
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                                  <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
+                                    Relatório Pedagógico
+                                  </Typography>
+                                  <Chip 
+                                    label="Pendente" 
+                                    color="warning"
+                                    size="small"
+                                  />
+                                </Box>
+                              }
+                              secondary={
+                                <Box sx={{ mt: 1 }}>
+                                  <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                                    👤 <strong>Aluno:</strong> {alunos[relatorio.alunoId]?.nomeCompleto || alunos[relatorio.alunoId]?.nome || 'Não informado'}
+                                  </Typography>
+                                  <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                                    🏫 <strong>Turma:</strong> {turmas[relatorio.turmaId]?.nome || 'Não informada'}
+                                  </Typography>
+                                  <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                                    📝 <strong>Template:</strong> {relatorio.template || 'Padrão'}
+                                  </Typography>
+                                  <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                                    📅 <strong>Criado em:</strong> {formatarData(relatorio.criadoEm)}
+                                  </Typography>
+                                  <Typography variant="body2" color="text.secondary">
+                                    👨‍🏫 <strong>Professor(a):</strong> {relatorio.professorNome || 'Não informado'}
+                                  </Typography>
+                                </Box>
+                              }
+                            />
+                            
+                            <IconButton edge="end" sx={{ color: '#6366F1' }}>
+                              <ChevronRightIcon />
+                            </IconButton>
+                          </ListItem>
+                        </React.Fragment>
+                      ))}
+                    </List>
+                  </AccordionDetails>
+                </Accordion>
+              ))
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Títulos em Análise */}
+        <Card sx={{ mt: 3 }}>
+          <CardContent>
+            <Typography variant="h6" sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 1 }}>
+              <AttachMoneyIcon sx={{ color: '#3B82F6' }} />
+              Pagamentos Aguardando Confirmação
+            </Typography>
+
+            {totalTitulos === 0 ? (
+              <Alert severity="info" sx={{ mt: 2 }}>
+                <Typography variant="h6">✅ Tudo certo!</Typography>
+                <Typography>Não há pagamentos aguardando confirmação no momento.</Typography>
+              </Alert>
+            ) : (
+              titulosEmAnalise.map((grupo) => (
+                <Accordion key={grupo.alunoId} sx={{ mb: 2 }}>
+                  <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', pr: 2 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <PersonIcon sx={{ color: '#3B82F6' }} />
+                        <Typography variant="h6">
+                          {grupo.aluno?.nomeCompleto || grupo.aluno?.nome || `Aluno ${grupo.alunoId}`}
+                        </Typography>
+                      </Box>
+                      <Badge badgeContent={grupo.titulos.length} color="error">
+                        <Chip 
+                          label={`${grupo.titulos.length} pagamento(s)`} 
+                          sx={{ bgcolor: '#DBEAFE', color: '#1E40AF' }}
+                          size="small"
+                        />
+                      </Badge>
+                    </Box>
+                  </AccordionSummary>
+                  
+                  <AccordionDetails>
+                    <List>
+                      {grupo.titulos.map((titulo, index) => (
+                        <React.Fragment key={titulo.id}>
+                          {index > 0 && <Divider />}
+                          <ListItem
+                            sx={{ 
+                              py: 2,
+                              '&:hover': { 
+                                bgcolor: '#f9fafb',
+                                cursor: 'pointer'
+                              },
+                              transition: 'background-color 0.2s'
+                            }}
+                            onClick={() => router.push(`/financeiro?tab=titulos&titulo=${titulo.id}`)}
+                          >
+                            <ListItemAvatar>
+                              <Avatar sx={{ 
+                                bgcolor: '#DBEAFE',
+                                color: '#3B82F6'
+                              }}>
+                                <AttachMoneyIcon />
+                              </Avatar>
+                            </ListItemAvatar>
+                            
+                            <ListItemText
+                              primary={
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                                  <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
+                                    {titulo.descricao || 'Mensalidade'}
+                                  </Typography>
+                                  <Chip 
+                                    label="Em Análise" 
+                                    color="info"
+                                    size="small"
+                                  />
+                                </Box>
+                              }
+                              secondary={
+                                <Box sx={{ mt: 1 }}>
+                                  <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                                    💰 <strong>Valor:</strong> R$ {titulo.valor?.toFixed(2) || '0,00'}
+                                  </Typography>
+                                  <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                                    📅 <strong>Vencimento:</strong> {formatarData(titulo.dataVencimento)}
+                                  </Typography>
+                                  <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                                    💳 <strong>Data do Pagamento:</strong> {formatarData(titulo.dataPagamento)}
+                                  </Typography>
+                                  <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                                    📝 <strong>Forma de Pagamento:</strong> {titulo.formaPagamento || 'Não informada'}
+                                  </Typography>
+                                  {titulo.comprovanteUrl && (
+                                    <Typography variant="body2" color="text.secondary">
+                                      📎 <strong>Comprovante:</strong> <a href={titulo.comprovanteUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#3B82F6' }}>Visualizar</a>
+                                    </Typography>
+                                  )}
+                                </Box>
+                              }
+                            />
+                            
+                            <IconButton edge="end" sx={{ color: '#3B82F6' }}>
                               <ChevronRightIcon />
                             </IconButton>
                           </ListItem>

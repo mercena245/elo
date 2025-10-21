@@ -1,6 +1,6 @@
 "use client";
-import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import SidebarMenu from '../../components/SidebarMenu';
 import ProtectedRoute from '../../components/ProtectedRoute';
 import {
@@ -103,10 +103,35 @@ const FinanceiroPage = () => {
   }, [servicesReady, isReady, financeiroService, auditService, currentSchool, serviceSchool, dbError]);
 
   const router = useRouter();
+  const searchParams = useSearchParams();
+  
   const [userRole, setUserRole] = useState(null);
   const [roleChecked, setRoleChecked] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [tabValue, setTabValue] = useState(0);
+  
+  // Função para obter aba inicial baseada no parâmetro da URL
+  const getInitialTab = () => {
+    const tabParam = searchParams.get('tab');
+    // Para coordenadora: 0=Dashboard, 1=Títulos, 2=Créditos, 3=C.Pagar, 4=C.Pagas, 5=Relatórios
+    // Para pai: 0=Dashboard(disabled), 1=Títulos, 2=Créditos
+    switch(tabParam) {
+      case 'titulos': return 1;
+      case 'creditos': return 2;
+      case 'contas-pagar': return 3;
+      case 'contas-pagas': return 4;
+      case 'relatorios': return 5;
+      default: return 0;
+    }
+  };
+  
+  const [tabValue, setTabValue] = useState(getInitialTab);
+  
+  // Atualizar aba quando os parâmetros da URL mudarem
+  useEffect(() => {
+    const newTab = getInitialTab();
+    setTabValue(newTab);
+  }, [searchParams]);
+  
   const [userId, setUserId] = useState(null);
   
   // Estados dos dados
@@ -1821,7 +1846,7 @@ const FinanceiroPage = () => {
     );
   }
 
-  if (!userRole || !['coordenadora', 'coordenador', 'professora', 'professor', 'pai', 'mae'].includes(userRole)) {
+  if (!userRole || !['coordenadora', 'coordenador', 'pai', 'mae'].includes(userRole)) {
     return (
       <ProtectedRoute>
         <Box sx={{ display: 'flex', minHeight: '100vh' }}>
@@ -5007,4 +5032,11 @@ const FinanceiroPage = () => {
   );
 };
 
-export default FinanceiroPage;
+// Wrapper com Suspense para useSearchParams
+export default function FinanceiroPageWrapper() {
+  return (
+    <Suspense fallback={<div style={{ padding: '20px', textAlign: 'center' }}>Carregando...</div>}>
+      <FinanceiroPage />
+    </Suspense>
+  );
+}

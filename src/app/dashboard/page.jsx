@@ -6,6 +6,7 @@ import ProtectedRoute from '../../components/ProtectedRoute';
 import SimpleCarousel from '../../components/SimpleCarousel';
 import SchoolSelector from '../../components/SchoolSelector';
 
+
 import SchoolHeader from '../../components/SchoolHeader';
 import HeaderSettingsDialog from '../../components/HeaderSettingsDialog';
 import { useAuth } from '../../context/AuthContext';
@@ -279,7 +280,8 @@ const Dashboard = () => {
           const pendentes = planosList.filter(p => 
             !p.statusAprovacao || 
             p.statusAprovacao === 'pendente' || 
-            p.statusAprovacao === 'rejeitado'
+            p.statusAprovacao === 'rejeitado' ||
+            p.statusAprovacao === 'em_revisao'
           );
           totalPendenciasCount += pendentes.length;
         }

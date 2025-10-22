@@ -29,7 +29,11 @@ import {
   MenuItem,
   Select,
   FormControl,
-  InputLabel
+  InputLabel,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
+  Collapse
 } from '@mui/material';
 import {
   Close as CloseIcon,
@@ -41,7 +45,9 @@ import {
   MenuBook as MenuBookIcon,
   Assignment as AssignmentIcon,
   Psychology as PsychologyIcon,
-  Assessment as AssessmentIcon
+  Assessment as AssessmentIcon,
+  History as HistoryIcon,
+  ExpandMore as ExpandMoreIcon
 } from '@mui/icons-material';
 import { useSchoolDatabase } from '../../../../hooks/useSchoolDatabase';
 import { FAIXAS_ETARIAS, obterCompetenciasFlat } from './competenciasBNCC';
@@ -99,6 +105,17 @@ const EditorPlanoAula = ({
   const [dataMinima, setDataMinima] = useState('');
   const [dataMaxima, setDataMaxima] = useState('');
   const [competenciasDisponiveis, setCompetenciasDisponiveis] = useState([]); // NOVO: Competências filtradas por faixa etária
+  
+  // Estados para dialog de rejeição
+  const [dialogRejeitar, setDialogRejeitar] = useState(false);
+  const [observacoesRejeicao, setObservacoesRejeicao] = useState('');
+  const [dialogHistorico, setDialogHistorico] = useState(false);
+  const [historicoExpanded, setHistoricoExpanded] = useState(false);
+  
+  // Estados para modais modernos e dropdowns
+  const [infoRevisaoExpanded, setInfoRevisaoExpanded] = useState(false);
+  const [modalRevisaoProfessora, setModalRevisaoProfessora] = useState(false);
+  const [modalRevisaoCoordenadora, setModalRevisaoCoordenadora] = useState(false);
 
   // NOVO: Atualizar competências quando faixa etária mudar
   useEffect(() => {
@@ -111,10 +128,38 @@ const EditorPlanoAula = ({
     }
   }, [formData.faixaEtaria]);
 
+  // NOVO: Abrir modais informativos quando necessário
+  useEffect(() => {
+    if (open && formData.statusAprovacao === 'em_revisao') {
+      if (!isCoordinator()) {
+        // Professora vê modal laranja
+        setModalRevisaoProfessora(true);
+      } else {
+        // Coordenadora vê modal azul
+        setModalRevisaoCoordenadora(true);
+      }
+    }
+  }, [open, formData.statusAprovacao]);
+
   useEffect(() => {
     if (open) {
+      console.log('🔄 [EditorPlanoAula useEffect] Executando...', {
+        open,
+        isEditing,
+        planoId: plano?.id,
+        statusAprovacao: plano?.statusAprovacao
+      });
+      
       if (isEditing && plano) {
         // Editando plano existente
+        console.log('📝 [EditorPlanoAula useEffect] Carregando plano existente:', {
+          id: plano.id,
+          titulo: plano.titulo,
+          statusAprovacao: plano.statusAprovacao,
+          observacoesAprovacao: plano.observacoesAprovacao,
+          historicoRevisoes: plano.historicoRevisoes?.length || 0
+        });
+        
         setFormData({
           titulo: plano.titulo || '',
           turmaId: plano.turmaId || '',
@@ -135,8 +180,13 @@ const EditorPlanoAula = ({
           leituraObrigatoria: plano.leituraObrigatoria || '',
           tarefaCasa: plano.tarefaCasa || '',
           statusAprovacao: plano.statusAprovacao || 'pendente',
+          observacoesAprovacao: plano.observacoesAprovacao || '',
+          aprovadoPor: plano.aprovadoPor || '',
+          dataAprovacao: plano.dataAprovacao || '',
           publicado: plano.publicado || false
         });
+        
+        console.log('✅ [EditorPlanoAula useEffect] FormData atualizado com status:', plano.statusAprovacao);
       } else {
         // Novo plano - resetar tudo primeiro
         setFormData({
@@ -340,12 +390,42 @@ const EditorPlanoAula = ({
 
   const handleSave = () => {
     if (validateForm()) {
+      console.log('💾 [handleSave] Salvando plano...', {
+        statusAtual: formData.statusAprovacao,
+        isCoordinator: isCoordinator(),
+        planoId: plano?.id
+      });
+      
       const dadosPlano = {
         ...formData,
         id: plano?.id || Date.now().toString(),
         criadoEm: plano?.criadoEm || new Date().toISOString(),
         atualizadoEm: new Date().toISOString()
       };
+      
+      // NOVO: Se a coordenadora está editando um plano em revisão, salva e aprova automaticamente
+      if (formData.statusAprovacao === 'em_revisao' && isCoordinator()) {
+        console.log('✅ [handleSave] Coordenadora editando plano em revisão! Salvando e aprovando...');
+        dadosPlano.statusAprovacao = 'aprovado';
+        dadosPlano.observacoesAprovacao = ''; // Limpa as observações
+        dadosPlano.aprovadoPor = user?.uid || '';
+        dadosPlano.dataAprovacao = new Date().toISOString();
+        console.log('🔄 [handleSave] Novo status: aprovado (pela coordenadora)');
+      }
+      // Se a professora está editando um plano em revisão, volta para pendente
+      else if (formData.statusAprovacao === 'em_revisao' && !isCoordinator()) {
+        console.log('✅ [handleSave] Professora editando plano em revisão! Voltando para pendente...');
+        dadosPlano.statusAprovacao = 'pendente';
+        dadosPlano.observacoesAprovacao = ''; // Limpa as observações anteriores
+        console.log('🔄 [handleSave] Novo status:', dadosPlano.statusAprovacao);
+      }
+      
+      console.log('📤 [handleSave] Dados finais a serem salvos:', {
+        id: dadosPlano.id,
+        statusAprovacao: dadosPlano.statusAprovacao,
+        observacoesAprovacao: dadosPlano.observacoesAprovacao
+      });
+      
       // Passa o id do plano para garantir update correto
       onSave(dadosPlano, plano?.id);
       onClose();
@@ -381,41 +461,91 @@ const EditorPlanoAula = ({
 
   const canEdit = () => {
     if (isCoordinator()) return true;
-    return formData.statusAprovacao === 'rejeitado' || formData.statusAprovacao === 'pendente';
+    // Professora pode editar se estiver pendente, em_revisao ou rejeitado
+    return formData.statusAprovacao === 'rejeitado' || 
+           formData.statusAprovacao === 'em_revisao' || 
+           formData.statusAprovacao === 'pendente';
   };
 
   // Aprovação/rejeição: atualiza apenas status e campos de aprovação no Firebase
   const handleApprovar = async () => {
     if (!plano?.id) return;
+    
+    console.log('✅ [handleApprovar] Aprovando plano:', plano.id);
+    
     const dadosAtualizacao = {
       statusAprovacao: 'aprovado',
       aprovadoPor: user?.uid || '',
       dataAprovacao: new Date().toISOString(),
       observacoesAprovacao: ''
     };
-    await updateData(`planos-aula/${plano.id}`, dadosAtualizacao);
-    setFormData(prev => ({ ...prev, ...dadosAtualizacao }));
-    if (onClose) onClose();
+    
+    try {
+      await updateData(`planos-aula/${plano.id}`, dadosAtualizacao);
+      console.log('✅ [handleApprovar] Plano aprovado com sucesso no Firebase');
+      
+      // Fecha o editor para forçar reload ao reabrir
+      if (onClose) {
+        onClose();
+      }
+    } catch (error) {
+      console.error('❌ [handleApprovar] Erro ao aprovar:', error);
+    }
   };
 
-  const handleRejeitar = async (observacoes = '') => {
+  const handleRejeitar = async () => {
     if (!plano?.id) return;
+    
+    // Validar se há observações
+    if (!observacoesRejeicao.trim()) {
+      return; // Validação já é feita pelo botão disabled
+    }
+    
+    console.log('🔄 [EditorPlanoAula] Solicitando revisão do plano:', plano.id);
+    
+    // Criar histórico de revisões
+    const historicoRevisao = {
+      data: new Date().toISOString(),
+      solicitadoPor: user?.uid || '',
+      observacoes: observacoesRejeicao.trim()
+    };
+    
+    // Buscar histórico existente ou criar novo
+    const historicoExistente = plano.historicoRevisoes || [];
+    
     const dadosAtualizacao = {
-      statusAprovacao: 'rejeitado',
+      statusAprovacao: 'em_revisao',
       aprovadoPor: user?.uid || '',
       dataAprovacao: new Date().toISOString(),
-      observacoesAprovacao: observacoes
+      observacoesAprovacao: observacoesRejeicao.trim(),
+      historicoRevisoes: [...historicoExistente, historicoRevisao]
     };
-    await updateData(`planos-aula/${plano.id}`, dadosAtualizacao);
-    setFormData(prev => ({ ...prev, ...dadosAtualizacao }));
-    if (onClose) onClose();
+    
+    console.log('💾 [EditorPlanoAula] Dados de atualização:', dadosAtualizacao);
+    
+    try {
+      await updateData(`planos-aula/${plano.id}`, dadosAtualizacao);
+      console.log('✅ [EditorPlanoAula] Plano atualizado com sucesso - Revisão solicitada!');
+      
+      // Limpar dialog
+      setDialogRejeitar(false);
+      setObservacoesRejeicao('');
+      
+      // Fechar editor para forçar reload
+      if (onClose) {
+        onClose();
+      }
+    } catch (error) {
+      console.error('❌ [EditorPlanoAula] Erro ao solicitar revisão:', error);
+    }
   };
 
   const getStatusColor = () => {
     switch (formData.statusAprovacao) {
       case 'aprovado': return 'success';
       case 'rejeitado': return 'error';
-      case 'pendente': return 'warning';
+      case 'em_revisao': return 'warning';
+      case 'pendente': return 'info';
       default: return 'default';
     }
   };
@@ -424,12 +554,14 @@ const EditorPlanoAula = ({
     switch (formData.statusAprovacao) {
       case 'aprovado': return 'Aprovado';
       case 'rejeitado': return 'Rejeitado';
+      case 'em_revisao': return 'Em Revisão';
       case 'pendente': return 'Pendente de Aprovação';
       default: return 'Desconhecido';
     }
   };
 
   return (
+    <>
     <Dialog 
       open={open} 
       onClose={onClose} 
@@ -463,6 +595,232 @@ const EditorPlanoAula = ({
       </DialogTitle>
 
       <DialogContent sx={{ py: 2 }}>
+        {/* Card de Informações de Revisão - Dropdown Colapsável */}
+        {formData.statusAprovacao === 'em_revisao' && formData.observacoesAprovacao && (
+          <Card 
+            variant="outlined" 
+            sx={{ 
+              mb: 3, 
+              border: '2px solid',
+              borderColor: isCoordinator() ? 'info.main' : 'warning.main',
+              bgcolor: isCoordinator() ? '#E3F2FD' : '#FFF3E0'
+            }}
+          >
+            <CardContent sx={{ pb: 1 }}>
+              <Box 
+                onClick={() => setInfoRevisaoExpanded(!infoRevisaoExpanded)}
+                sx={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center',
+                  cursor: 'pointer',
+                  '&:hover': {
+                    bgcolor: 'rgba(0,0,0,0.02)'
+                  },
+                  p: 1,
+                  borderRadius: 1
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <AssessmentIcon color={isCoordinator() ? 'info' : 'warning'} sx={{ fontSize: '2rem' }} />
+                  <Box>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
+                      {isCoordinator() 
+                        ? 'ℹ️ Plano aguardando revisão' 
+                        : '⚠️ Plano precisa de revisão'
+                      }
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Clique para {infoRevisaoExpanded ? 'ocultar' : 'ver'} detalhes
+                    </Typography>
+                  </Box>
+                </Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  {plano?.historicoRevisoes && plano.historicoRevisoes.length > 0 && (
+                    <Chip 
+                      label={`${plano.historicoRevisoes.length} revisão(ões)`}
+                      size="small"
+                      color="warning"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setDialogHistorico(true);
+                      }}
+                    />
+                  )}
+                  <IconButton size="small">
+                    <ExpandMoreIcon 
+                      sx={{ 
+                        transform: infoRevisaoExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                        transition: 'transform 0.3s'
+                      }}
+                    />
+                  </IconButton>
+                </Box>
+              </Box>
+              
+              <Collapse in={infoRevisaoExpanded}>
+                <Divider sx={{ my: 2 }} />
+                
+                {!isCoordinator() ? (
+                  // Informações para Professora
+                  <>
+                    <Typography variant="body2" sx={{ mb: 2, fontWeight: 'bold' }}>
+                      📝 Observações da Coordenadora:
+                    </Typography>
+                    <Typography 
+                      variant="body1" 
+                      sx={{ 
+                        bgcolor: 'white', 
+                        p: 2, 
+                        borderRadius: 1,
+                        border: '1px solid #FFB74D',
+                        whiteSpace: 'pre-wrap',
+                        mb: 2
+                      }}
+                    >
+                      {formData.observacoesAprovacao}
+                    </Typography>
+                    <Alert severity="info" sx={{ mt: 2 }}>
+                      <Typography variant="body2">
+                        💡 Faça as correções necessárias e clique em <strong>"Salvar Alterações"</strong> para reenviar o plano à aprovação.
+                      </Typography>
+                    </Alert>
+                  </>
+                ) : (
+                  // Informações para Coordenadora
+                  <>
+                    <Typography variant="body2" sx={{ mb: 2 }}>
+                      Este plano está aguardando que a professora faça as correções solicitadas.
+                    </Typography>
+                    <Alert severity="success" sx={{ mb: 2 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                        ✓ Você pode editar este plano diretamente
+                      </Typography>
+                      <Typography variant="body2">
+                        Caso a professora não possa fazer as alterações em tempo hábil, você pode editar e ao clicar em <strong>"Salvar e Aprovar"</strong>, o plano será automaticamente aprovado.
+                      </Typography>
+                    </Alert>
+                    {formData.observacoesAprovacao && (
+                      <>
+                        <Typography variant="body2" sx={{ mb: 1, fontWeight: 'bold' }}>
+                          📝 Suas observações para a professora:
+                        </Typography>
+                        <Typography 
+                          variant="body2" 
+                          sx={{ 
+                            bgcolor: 'white', 
+                            p: 2, 
+                            borderRadius: 1,
+                            border: '1px solid #42A5F5',
+                            whiteSpace: 'pre-wrap'
+                          }}
+                        >
+                          {formData.observacoesAprovacao}
+                        </Typography>
+                      </>
+                    )}
+                  </>
+                )}
+              </Collapse>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Histórico de Revisões - Visível para Coordenadoras após plano voltar para pendente */}
+        {isCoordinator() && plano?.historicoRevisoes && plano.historicoRevisoes.length > 0 && (
+          <Card 
+            variant="outlined" 
+            sx={{ 
+              mb: 3, 
+              border: '1px solid #90CAF9',
+              bgcolor: '#E3F2FD'
+            }}
+          >
+            <CardContent sx={{ pb: 2 }}>
+              <Box 
+                onClick={() => setHistoricoExpanded(!historicoExpanded)}
+                sx={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center',
+                  cursor: 'pointer',
+                  '&:hover': {
+                    bgcolor: 'rgba(0,0,0,0.02)'
+                  },
+                  p: 1,
+                  borderRadius: 1
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <HistoryIcon color="info" />
+                  <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
+                    📋 Histórico de Revisões Solicitadas ({plano.historicoRevisoes.length})
+                  </Typography>
+                </Box>
+                <IconButton size="small">
+                  <ExpandMoreIcon 
+                    sx={{ 
+                      transform: historicoExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                      transition: 'transform 0.3s'
+                    }}
+                  />
+                </IconButton>
+              </Box>
+              
+              <Collapse in={historicoExpanded}>
+                <Divider sx={{ my: 2 }} />
+                <Typography variant="caption" display="block" sx={{ mb: 2, fontStyle: 'italic', color: 'text.secondary' }}>
+                  💡 Utilize este histórico para validar se as correções solicitadas foram realizadas pela professora.
+                </Typography>
+                
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  {plano.historicoRevisoes
+                    .sort((a, b) => new Date(b.data) - new Date(a.data))
+                    .map((revisao, index) => (
+                      <Card 
+                        key={index} 
+                        variant="outlined" 
+                        sx={{ 
+                          bgcolor: 'white',
+                          borderLeft: '4px solid #FF9800'
+                        }}
+                      >
+                        <CardContent>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                            <Chip 
+                              label={`Revisão #${plano.historicoRevisoes.length - index}`}
+                              size="small"
+                              color="warning"
+                              variant="filled"
+                            />
+                            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 'bold' }}>
+                              {new Date(revisao.data).toLocaleString('pt-BR', {
+                                day: '2-digit',
+                                month: '2-digit',
+                                year: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </Typography>
+                          </Box>
+                          <Typography variant="body2" sx={{ 
+                            bgcolor: '#FFF3E0', 
+                            p: 2, 
+                            borderRadius: 1,
+                            border: '1px solid #FFB74D',
+                            whiteSpace: 'pre-wrap'
+                          }}>
+                            {revisao.observacoes}
+                          </Typography>
+                        </CardContent>
+                      </Card>
+                    ))}
+                </Box>
+              </Collapse>
+            </CardContent>
+          </Card>
+        )}
+        
         <Grid container spacing={3}>
           {/* Informações Básicas */}
           <Grid item xs={12}>
@@ -892,12 +1250,12 @@ const EditorPlanoAula = ({
                   Aprovar
                 </Button>
                 <Button 
-                  onClick={() => handleRejeitar()} 
+                  onClick={() => setDialogRejeitar(true)} 
                   variant="contained" 
                   color="error"
                   size="small"
                 >
-                  Rejeitar
+                  Solicitar Revisão
                 </Button>
               </>
             )}
@@ -911,16 +1269,306 @@ const EditorPlanoAula = ({
               <Button 
                 onClick={handleSave} 
                 variant="contained" 
+                color={
+                  isCoordinator() && formData.statusAprovacao === 'em_revisao' 
+                    ? 'success'  // Verde para "Salvar e Aprovar"
+                    : 'primary'  // Azul para salvar normal
+                }
                 startIcon={<SaveIcon />}
-                sx={{ minWidth: 120 }}
+                sx={{ minWidth: 160 }}
               >
-                {isEditing ? 'Salvar Alterações' : 'Criar Plano'}
+                {isCoordinator() && formData.statusAprovacao === 'em_revisao' 
+                  ? '✓ Salvar e Aprovar'
+                  : isEditing 
+                    ? 'Salvar Alterações' 
+                    : 'Criar Plano'
+                }
               </Button>
             )}
           </Box>
         </Box>
       </DialogActions>
     </Dialog>
+    
+    {/* Dialog de Histórico de Revisões */}
+    <Dialog 
+      open={dialogHistorico} 
+      onClose={() => setDialogHistorico(false)}
+      maxWidth="md"
+      fullWidth
+    >
+      <DialogTitle sx={{ bgcolor: 'info.light', color: 'white' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <HistoryIcon />
+          <Typography variant="h6">Histórico de Revisões</Typography>
+        </Box>
+      </DialogTitle>
+      <DialogContent sx={{ mt: 2 }}>
+        {plano?.historicoRevisoes && plano.historicoRevisoes.length > 0 ? (
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {plano.historicoRevisoes
+              .sort((a, b) => new Date(b.data) - new Date(a.data)) // Mais recente primeiro
+              .map((revisao, index) => (
+                <Card key={index} variant="outlined" sx={{ bgcolor: '#f5f5f5' }}>
+                  <CardContent>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                      <Chip 
+                        label={`Revisão #${plano.historicoRevisoes.length - index}`}
+                        size="small"
+                        color="warning"
+                      />
+                      <Typography variant="caption" color="text.secondary">
+                        {new Date(revisao.data).toLocaleString('pt-BR', {
+                          day: '2-digit',
+                          month: '2-digit',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </Typography>
+                    </Box>
+                    <Typography variant="body2" sx={{ 
+                      bgcolor: 'white', 
+                      p: 2, 
+                      borderRadius: 1,
+                      border: '1px solid #ddd',
+                      whiteSpace: 'pre-wrap'
+                    }}>
+                      {revisao.observacoes}
+                    </Typography>
+                  </CardContent>
+                </Card>
+              ))}
+          </Box>
+        ) : (
+          <Alert severity="info">
+            Nenhuma revisão solicitada ainda.
+          </Alert>
+        )}
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={() => setDialogHistorico(false)}>
+          Fechar
+        </Button>
+      </DialogActions>
+    </Dialog>
+    
+    {/* Dialog de Rejeição com Observações */}
+    <Dialog 
+      open={dialogRejeitar} 
+      onClose={() => setDialogRejeitar(false)}
+      maxWidth="sm"
+      fullWidth
+    >
+      <DialogTitle sx={{ bgcolor: 'error.light', color: 'white' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <AssessmentIcon />
+          <Typography variant="h6">Solicitar Revisão do Plano</Typography>
+        </Box>
+      </DialogTitle>
+      <DialogContent sx={{ mt: 2 }}>
+        <Alert severity="info" sx={{ mb: 2 }}>
+          Informe à professora o que precisa ser corrigido ou melhorado no planejamento.
+        </Alert>
+        <TextField
+          autoFocus
+          fullWidth
+          multiline
+          rows={6}
+          label="Observações para a Professora *"
+          value={observacoesRejeicao}
+          onChange={(e) => setObservacoesRejeicao(e.target.value)}
+          placeholder="Exemplo: Por favor, revise os objetivos de aprendizagem para alinhá-los melhor com as competências da BNCC selecionadas. Além disso, especifique os recursos didáticos que serão utilizados na atividade prática."
+          helperText="Seja específico(a) sobre o que precisa ser ajustado"
+        />
+      </DialogContent>
+      <DialogActions sx={{ p: 2 }}>
+        <Button onClick={() => {
+          setDialogRejeitar(false);
+          setObservacoesRejeicao('');
+        }}>
+          Cancelar
+        </Button>
+        <Button 
+          onClick={handleRejeitar} 
+          variant="contained" 
+          color="warning"
+          disabled={!observacoesRejeicao.trim()}
+        >
+          Solicitar Revisão
+        </Button>
+      </DialogActions>
+    </Dialog>
+
+    {/* Modal Moderno - Professora precisa revisar */}
+    <Dialog 
+      open={modalRevisaoProfessora} 
+      onClose={() => setModalRevisaoProfessora(false)}
+      maxWidth="sm"
+      fullWidth
+      PaperProps={{
+        sx: {
+          borderRadius: 3,
+          boxShadow: '0 8px 32px rgba(255, 152, 0, 0.2)'
+        }
+      }}
+    >
+      <DialogTitle sx={{ 
+        bgcolor: 'warning.light', 
+        color: 'white',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 2,
+        pb: 2
+      }}>
+        <Box sx={{ 
+          bgcolor: 'white', 
+          borderRadius: '50%', 
+          p: 1.5,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}>
+          <AssessmentIcon sx={{ fontSize: '2rem', color: 'warning.main' }} />
+        </Box>
+        <Box>
+          <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+            Revisão Necessária
+          </Typography>
+          <Typography variant="caption">
+            Observações da coordenadora
+          </Typography>
+        </Box>
+      </DialogTitle>
+      <DialogContent sx={{ pt: 3 }}>
+        <Alert severity="warning" sx={{ mb: 3 }}>
+          <Typography variant="body2" sx={{ fontWeight: 'bold', mb: 1 }}>
+            Este plano precisa de correções antes da aprovação
+          </Typography>
+        </Alert>
+        
+        <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary' }}>
+          📝 Observações:
+        </Typography>
+        <Box sx={{ 
+          bgcolor: '#FFF3E0', 
+          p: 2.5, 
+          borderRadius: 2,
+          border: '2px solid #FFB74D',
+          mb: 3
+        }}>
+          <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
+            {formData.observacoesAprovacao}
+          </Typography>
+        </Box>
+
+        <Alert severity="info" icon={false} sx={{ bgcolor: '#E3F2FD' }}>
+          <Typography variant="body2">
+            <strong>💡 Próximos passos:</strong>
+          </Typography>
+          <Typography variant="body2" sx={{ mt: 1 }}>
+            1. Realize as correções solicitadas<br/>
+            2. Clique em "Salvar Alterações"<br/>
+            3. O plano voltará para análise da coordenadora
+          </Typography>
+        </Alert>
+      </DialogContent>
+      <DialogActions sx={{ p: 3 }}>
+        <Button 
+          onClick={() => setModalRevisaoProfessora(false)} 
+          variant="contained"
+          fullWidth
+        >
+          Entendi, vou corrigir
+        </Button>
+      </DialogActions>
+    </Dialog>
+
+    {/* Modal Moderno - Coordenadora pode editar */}
+    <Dialog 
+      open={modalRevisaoCoordenadora} 
+      onClose={() => setModalRevisaoCoordenadora(false)}
+      maxWidth="sm"
+      fullWidth
+      PaperProps={{
+        sx: {
+          borderRadius: 3,
+          boxShadow: '0 8px 32px rgba(33, 150, 243, 0.2)'
+        }
+      }}
+    >
+      <DialogTitle sx={{ 
+        bgcolor: 'info.light', 
+        color: 'white',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 2,
+        pb: 2
+      }}>
+        <Box sx={{ 
+          bgcolor: 'white', 
+          borderRadius: '50%', 
+          p: 1.5,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}>
+          <AssessmentIcon sx={{ fontSize: '2rem', color: 'info.main' }} />
+        </Box>
+        <Box>
+          <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+            Plano em Revisão
+          </Typography>
+          <Typography variant="caption">
+            Aguardando professora
+          </Typography>
+        </Box>
+      </DialogTitle>
+      <DialogContent sx={{ pt: 3 }}>
+        <Alert severity="info" sx={{ mb: 3 }}>
+          <Typography variant="body2">
+            Este plano está aguardando que a professora realize as correções solicitadas.
+          </Typography>
+        </Alert>
+
+        <Alert severity="success" icon={false} sx={{ bgcolor: '#E8F5E9', mb: 3 }}>
+          <Typography variant="body2" sx={{ fontWeight: 'bold', mb: 1, color: 'success.dark' }}>
+            ✓ Você tem permissão para editar
+          </Typography>
+          <Typography variant="body2" sx={{ color: 'success.dark' }}>
+            Caso a professora não possa fazer as alterações em tempo hábil, você pode editar o plano diretamente.
+          </Typography>
+        </Alert>
+
+        <Box sx={{ 
+          bgcolor: '#F5F5F5', 
+          p: 2.5, 
+          borderRadius: 2,
+          border: '1px solid #E0E0E0'
+        }}>
+          <Typography variant="subtitle2" sx={{ mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+            <SaveIcon sx={{ fontSize: '1.2rem' }} />
+            Ao salvar suas alterações:
+          </Typography>
+          <Typography variant="body2" sx={{ color: 'success.main', fontWeight: 'bold', pl: 3 }}>
+            → O plano será automaticamente aprovado
+          </Typography>
+          <Typography variant="body2" sx={{ color: 'text.secondary', pl: 3, mt: 0.5 }}>
+            Não será necessário aprovar novamente
+          </Typography>
+        </Box>
+      </DialogContent>
+      <DialogActions sx={{ p: 3 }}>
+        <Button 
+          onClick={() => setModalRevisaoCoordenadora(false)} 
+          variant="contained"
+          fullWidth
+        >
+          Entendi
+        </Button>
+      </DialogActions>
+    </Dialog>
+    </>
   );
 };
 

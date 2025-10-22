@@ -335,7 +335,7 @@ const PlanejamentoAulas = () => {
       planosFiltrados = planosFiltrados.filter(plano => selectedTurmas.includes(plano.turmaId));
     }
     // Separar por status
-    const pendentes = planosFiltrados.filter(p => !p.statusAprovacao || p.statusAprovacao === 'pendente' || p.statusAprovacao === 'rejeitado');
+    const pendentes = planosFiltrados.filter(p => !p.statusAprovacao || p.statusAprovacao === 'pendente' || p.statusAprovacao === 'rejeitado' || p.statusAprovacao === 'em_revisao');
     const aprovados = planosFiltrados.filter(p => p.statusAprovacao === 'aprovado');
     // Agrupar por turma
     function agruparPorTurma(planos) {
@@ -356,8 +356,14 @@ const PlanejamentoAulas = () => {
   };
 
   const abrirEditor = (plano = null, dadosIniciais = null) => {
-    console.log('📝 PlanejamentoAulas - Abrindo editor com dados:', {
-      plano,
+    console.log('📝 [abrirEditor] Abrindo editor com dados:', {
+      plano: plano ? {
+        id: plano.id,
+        titulo: plano.titulo,
+        statusAprovacao: plano.statusAprovacao,
+        observacoesAprovacao: plano.observacoesAprovacao,
+        historicoRevisoes: plano.historicoRevisoes?.length || 0
+      } : null,
       dadosIniciais
     });
     
@@ -369,6 +375,13 @@ const PlanejamentoAulas = () => {
   // Corrigido: sempre faz update se dadosPlano.id existir (inclusive aprovação/rejeição)
   const salvarPlano = async (dadosPlano, idPlano = null) => {
     try {
+      console.log('🔥 [salvarPlano] Iniciando salvamento...', {
+        idPlano,
+        dadosPlano_id: dadosPlano.id,
+        statusAprovacao: dadosPlano.statusAprovacao,
+        observacoesAprovacao: dadosPlano.observacoesAprovacao
+      });
+      
       const planoId = idPlano || dadosPlano.id;
       const planoData = {
         ...dadosPlano,
@@ -377,9 +390,17 @@ const PlanejamentoAulas = () => {
         atualizadoEm: new Date().toISOString(),
       };
       
+      console.log('📝 [salvarPlano] Dados que serão salvos no Firebase:', {
+        planoId,
+        statusAprovacao: planoData.statusAprovacao,
+        observacoesAprovacao: planoData.observacoesAprovacao,
+        historicoRevisoes: planoData.historicoRevisoes?.length || 0
+      });
+      
       if (planoId) {
         // Atualiza plano existente
         await updateData(`planos-aula/${planoId}`, planoData);
+        console.log('✅ [salvarPlano] Plano atualizado no Firebase com sucesso!');
         await auditService.logAction(
           'plano_aula_update',
           user.uid,
@@ -393,6 +414,7 @@ const PlanejamentoAulas = () => {
       } else {
         // Cria novo plano
         await pushData('planos-aula', planoData);
+        console.log('✅ [salvarPlano] Novo plano criado no Firebase com sucesso!');
         await auditService.logAction(
           'plano_aula_create',
           user.uid,
@@ -405,12 +427,18 @@ const PlanejamentoAulas = () => {
       }
       
       // Recarrega os dados para atualizar a lista
+      console.log('🔄 [salvarPlano] Recarregando dados...');
+      
+      // Fecha o editor ANTES de recarregar para evitar dados desatualizados
+      setEditorOpen(false);
+      setPlanoEditando(null);
+      
       await carregarDados();
       
-      setEditorOpen(false);
+      console.log('✅ [salvarPlano] Dados recarregados com sucesso!');
       setModalFeedback({ open: true, mensagem: 'Plano de aula salvo com sucesso!' });
     } catch (error) {
-      console.error('Erro ao salvar plano:', error);
+      console.error('❌ [salvarPlano] Erro ao salvar plano:', error);
       setModalFeedback({ open: true, mensagem: 'Erro ao salvar plano de aula.' });
     }
   };
@@ -699,7 +727,20 @@ const PlanejamentoAulas = () => {
                                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                                         <Chip label={disciplinas[plano.disciplinaId]?.nome || 'Disciplina'} size="small" color="secondary" variant="outlined" />
                                         {plano.statusAprovacao && (
-                                          <Chip label={plano.statusAprovacao === 'rejeitado' ? 'Rejeitado' : 'Pendente'} size="small" color={plano.statusAprovacao === 'rejeitado' ? 'error' : 'warning'} variant="filled" />
+                                          <Chip 
+                                            label={
+                                              plano.statusAprovacao === 'rejeitado' ? 'Rejeitado' : 
+                                              plano.statusAprovacao === 'em_revisao' ? 'Aguardando Revisão' : 
+                                              'Pendente'
+                                            } 
+                                            size="small" 
+                                            color={
+                                              plano.statusAprovacao === 'rejeitado' ? 'error' : 
+                                              plano.statusAprovacao === 'em_revisao' ? 'warning' : 
+                                              'info'
+                                            } 
+                                            variant="filled" 
+                                          />
                                         )}
                                       </Box>
                                       <Typography variant="body2" color="text.secondary">
@@ -1188,11 +1229,14 @@ const PlanejamentoAulas = () => {
                       label={
                         planoVisualizacao.statusAprovacao === 'aprovado' ? '✅ Aprovado' :
                         planoVisualizacao.statusAprovacao === 'rejeitado' ? '❌ Rejeitado' :
+                        planoVisualizacao.statusAprovacao === 'em_revisao' ? '⚠️ Aguardando Revisão' :
                         '⏳ Pendente de Aprovação'
                       }
                       sx={{
                         bgcolor: planoVisualizacao.statusAprovacao === 'aprovado' ? 'success.main' :
-                               planoVisualizacao.statusAprovacao === 'rejeitado' ? 'error.main' : 'warning.main',
+                               planoVisualizacao.statusAprovacao === 'rejeitado' ? 'error.main' : 
+                               planoVisualizacao.statusAprovacao === 'em_revisao' ? 'warning.main' :
+                               'info.main',
                         color: 'white',
                         fontWeight: 'bold',
                         fontSize: '0.9rem'
@@ -1388,9 +1432,13 @@ const PlanejamentoAulas = () => {
       </Dialog>
 
       {/* Editor de Plano de Aula */}
-              <EditorPlanoAula
+      <EditorPlanoAula
+        key={planoEditando?.id || 'novo'} // Força remontagem quando o plano muda
         open={editorOpen}
-        onClose={() => setEditorOpen(false)}
+        onClose={() => {
+          setEditorOpen(false);
+          setPlanoEditando(null);
+        }}
         onSave={salvarPlano}
         plano={planoEditando}
         dadosIniciais={novoPlanoData}

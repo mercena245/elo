@@ -550,10 +550,21 @@ export default function Configuracoes() {
       return;
     }
     
+    console.log('✅ [handleApprove] Aprovando usuário:', { uid, role });
+    
     // Busca os dados atuais do usuário
     const userData = await getData(`usuarios/${uid}`);
     if (userData) {
-      await setData(`usuarios/${uid}`, { ...userData, role });
+      // Atualiza com role E marca como ativo
+      await setData(`usuarios/${uid}`, { 
+        ...userData, 
+        role,
+        ativo: true,  // ← CORREÇÃO: Marca como ativo
+        aprovadoEm: new Date().toISOString(),
+        aprovadoPor: user?.uid
+      });
+      
+      console.log('✅ [handleApprove] Usuário salvo como ativo no banco da escola');
       
       // Log da aprovação do usuário
       await auditService?.logAction({
@@ -566,11 +577,15 @@ export default function Configuracoes() {
           nome: userData.nome,
           roleAtribuido: role,
           statusAnterior: 'pendente',
-          statusNovo: 'ativo'
+          statusNovo: 'ativo',
+          ativo: true
         }
       });
     }
     setDialogOpen(false);
+    
+    // Recarregar lista
+    await carregarDadosUsuarios();
   };
 
   // Função para contar cliques no Card do título

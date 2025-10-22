@@ -97,7 +97,8 @@ const PendenciasPage = () => {
         const pendentes = planosList.filter(p => 
           !p.statusAprovacao || 
           p.statusAprovacao === 'pendente' || 
-          p.statusAprovacao === 'rejeitado'
+          p.statusAprovacao === 'rejeitado' ||
+          p.statusAprovacao === 'em_revisao'
         );
 
         // Agrupar por turma

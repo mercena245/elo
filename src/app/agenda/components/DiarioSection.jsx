@@ -357,15 +357,15 @@ const DiarioSection = ({ userRole, userData }) => {
         turmaId: novaEntrada.turma
       };
 
-      const diarioRef = ref(db, 'diario');
-      const entradaRef = await push(diarioRef, entradaData);
+      // Usar pushData do hook multi-tenant em vez de ref/push direto
+      const entradaId = await pushData('diario', entradaData);
       
       // Log da criação da entrada do diário
       await auditService.logAction(
         LOG_ACTIONS.DIARY_ENTRY_CREATED,
         userData?.id,
         {
-          entradaId: entradaRef.key,
+          entradaId: entradaId,
           turmaId: novaEntrada.turma,
           turma: turmas.find(t => t.id === novaEntrada.turma)?.nome,
           data: novaEntrada.data,

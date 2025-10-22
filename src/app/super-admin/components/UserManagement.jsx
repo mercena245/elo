@@ -88,17 +88,99 @@ export default function UserManagement() {
         const escolasArray = Object.keys(escolasData).map(id => ({
           id,
           nome: escolasData[id].nome,
-          status: escolasData[id].status
+          status: escolasData[id].status,
+          databaseUrl: escolasData[id].databaseUrl
         }));
         
         console.log('✅ Escolas carregadas:', escolasArray.length);
         setSchools(escolasArray);
+        
+        // NOVO: Sincronizar usuários aprovados das escolas
+        await sincronizarUsuariosAprovados(escolasArray);
       } else {
         console.log('ℹ️ Nenhuma escola encontrada no banco');
         setSchools([]);
       }
     } catch (error) {
       console.error('❌ Erro ao carregar escolas:', error);
+    }
+  };
+
+  // NOVA FUNÇÃO: Sincronizar usuários aprovados pelas coordenadoras
+  const sincronizarUsuariosAprovados = async (escolasArray) => {
+    try {
+      console.log('🔄 [Sincronização] Iniciando sincronização de usuários aprovados...');
+      
+      const { initializeApp } = await import('firebase/app');
+      const { getDatabase, ref: dbRef, get: dbGet } = await import('firebase/database');
+      
+      for (const escola of escolasArray) {
+        if (!escola.databaseUrl) continue;
+        
+        try {
+          console.log(`🔍 [Sincronização] Verificando escola: ${escola.nome}`);
+          
+          // Conectar ao banco da escola
+          const appName = `escola-${escola.id}-sync`;
+          const escolaApp = initializeApp({
+            databaseURL: escola.databaseUrl
+          }, appName);
+          const escolaDB = getDatabase(escolaApp);
+          
+          // Buscar usuários ativos da escola
+          const usuariosRef = dbRef(escolaDB, 'usuarios');
+          const snapshot = await dbGet(usuariosRef);
+          
+          if (snapshot.exists()) {
+            const usuariosEscola = snapshot.val();
+            
+            for (const [uid, userData] of Object.entries(usuariosEscola)) {
+              // Verificar se usuário está ativo e tem role definida
+              if (userData.ativo === true && userData.role && userData.role !== 'pendente') {
+                console.log(`✅ [Sincronização] Usuário ativo encontrado: ${userData.nome || userData.email} (${userData.role})`);
+                
+                // Atualizar no banco de gerenciamento
+                const userRefManagement = ref(managementDB, `usuarios/${uid}`);
+                const userSnapshot = await get(userRefManagement);
+                
+                const dadosAtualizados = {
+                  nome: userData.nome || '',
+                  email: userData.email || '',
+                  telefone: userData.telefone || '',
+                  status: 'ativo',
+                  escolas: {
+                    ...(userSnapshot.exists() ? userSnapshot.val().escolas : {}),
+                    [escola.id]: {
+                      role: userData.role,
+                      dataAprovacao: userData.aprovadoEm || new Date().toISOString(),
+                      aprovadoPor: userData.aprovadoPor || 'coordenadora',
+                      turmas: userData.turmas || [],
+                      disciplinas: userData.disciplinas || []
+                    }
+                  }
+                };
+                
+                await update(userRefManagement, dadosAtualizados);
+                console.log(`📝 [Sincronização] Usuário ${uid} atualizado no banco de gerenciamento`);
+              }
+            }
+          }
+          
+          // Limpar app temporário
+          await escolaApp.delete();
+          
+        } catch (error) {
+          console.error(`❌ [Sincronização] Erro ao processar escola ${escola.nome}:`, error);
+        }
+      }
+      
+      console.log('✅ [Sincronização] Sincronização concluída!');
+      
+      // Recarregar lista de usuários após sincronização
+      await loadUsers();
+      
+    } catch (error) {
+      console.error('❌ [Sincronização] Erro geral:', error);
     }
   };
 
@@ -297,18 +379,34 @@ export default function UserManagement() {
             Gerencie todos os usuários do sistema e seus vínculos com escolas
           </p>
         </div>
-        <button
-          onClick={() => {
-            setEditingUser(null);
-            setShowUserForm(true);
-          }}
-          className="mt-4 sm:mt-0 inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
-        >
-          <svg className="mr-2 -ml-1 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          Novo Usuário
-        </button>
+        <div className="mt-4 sm:mt-0 flex gap-2">
+          <button
+            onClick={async () => {
+              setLoading(true);
+              await sincronizarUsuariosAprovados(schools);
+              setLoading(false);
+            }}
+            className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+            title="Sincronizar usuários aprovados pelas coordenadoras"
+          >
+            <svg className="mr-2 -ml-1 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            Sincronizar
+          </button>
+          <button
+            onClick={() => {
+              setEditingUser(null);
+              setShowUserForm(true);
+            }}
+            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
+          >
+            <svg className="mr-2 -ml-1 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Novo Usuário
+          </button>
+        </div>
       </div>
 
       {/* Stats */}

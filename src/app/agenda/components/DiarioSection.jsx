@@ -1060,7 +1060,7 @@ const DiarioSection = ({ userRole, userData }) => {
                               <Typography variant="subtitle2" fontWeight={600} sx={{ color: '#1e40af', mb: 1 }}>
                                 💭 Observações Gerais
                               </Typography>
-                              <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.6 }}>
+                              <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
                                 {entrada.observacoesGerais}
                               </Typography>
                             </Box>
@@ -1798,7 +1798,9 @@ const DiarioSection = ({ userRole, userData }) => {
               {entradaSelecionada.observacoesGerais && (
                 <Paper sx={{ p: 2, mt: 2, bgcolor: '#f0f9ff' }}>
                   <Typography variant="subtitle1" gutterBottom>📝 Observações Gerais</Typography>
-                  <Typography variant="body2">{entradaSelecionada.observacoesGerais}</Typography>
+                  <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+                    {entradaSelecionada.observacoesGerais}
+                  </Typography>
                 </Paper>
               )}
             </Box>

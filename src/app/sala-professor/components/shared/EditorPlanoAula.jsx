@@ -1121,7 +1121,7 @@ const EditorPlanoAula = ({
                 </Box>
                 
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                  {formData.recursos.map((recurso, index) => (
+                  {Array.isArray(formData.recursos) && formData.recursos.map((recurso, index) => (
                     <Chip
                       key={index}
                       label={recurso}

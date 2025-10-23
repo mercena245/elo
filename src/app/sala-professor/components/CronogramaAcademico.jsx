@@ -284,9 +284,25 @@ const CronogramaAcademico = () => {
     const mes = mesAtual.getMonth();
     const primeiroDia = new Date(ano, mes, 1);
     const ultimoDia = new Date(ano, mes + 1, 0);
+    
+    // Debug: verificar ano bissexto e data de hoje
+    const hoje = new Date();
+    const isAnoBissexto = (ano % 4 === 0 && ano % 100 !== 0) || (ano % 400 === 0);
+    
+    console.log('📅 Debug Calendário:', {
+      ano,
+      mes: mes + 1, // Mostrar mês human-readable (1-12)
+      isAnoBissexto,
+      primeiroDia: primeiroDia.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' }),
+      primeiroDiaGetDay: primeiroDia.getDay(),
+      hoje: hoje.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }),
+      hojeGetDay: hoje.getDay(),
+      diasNoMes: ultimoDia.getDate()
+    });
+    
     const dias = [];
 
-    // Adicionar dias vazios do início
+    // Adicionar dias vazios do início (domingo = 0)
     const diasVaziosInicio = primeiroDia.getDay();
     for (let i = 0; i < diasVaziosInicio; i++) {
       dias.push(null);
@@ -419,7 +435,13 @@ const CronogramaAcademico = () => {
 
                   const dateKey = dia.toISOString().split('T')[0];
                   const eventosNoDia = eventosPorDia[dateKey] || [];
-                  const isHoje = dia.toDateString() === new Date().toDateString();
+                  const hoje = new Date();
+                  const isHoje = dia.getDate() === hoje.getDate() && 
+                                 dia.getMonth() === hoje.getMonth() && 
+                                 dia.getFullYear() === hoje.getFullYear();
+                  
+                  // Debug: nome do dia da semana
+                  const nomeDiaSemana = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'][dia.getDay()];
 
                   return (
                     <Grid item xs key={dateKey} sx={{ width: '14.28%' }}>
@@ -434,9 +456,16 @@ const CronogramaAcademico = () => {
                           overflow: 'hidden'
                         }}
                       >
-                        <Typography variant="caption" sx={{ fontWeight: isHoje ? 'bold' : 'normal' }}>
-                          {dia.getDate()}
-                        </Typography>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <Typography variant="caption" sx={{ fontWeight: isHoje ? 'bold' : 'normal' }}>
+                            {dia.getDate()}
+                          </Typography>
+                          {isHoje && (
+                            <Typography variant="caption" sx={{ fontSize: '0.65rem', color: 'primary.main', fontWeight: 'bold' }}>
+                              {nomeDiaSemana}
+                            </Typography>
+                          )}
+                        </Box>
                         
                         {eventosNoDia.slice(0, 2).map((evento, idx) => (
                           <Box

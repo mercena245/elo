@@ -22,8 +22,18 @@ import {
   MenuBook as MenuBookIcon,
   CheckCircle as CheckCircleIcon
 } from '@mui/icons-material';
+import RecursosPreview from './RecursosPreview';
 
 const RelatorioPlanoAula = ({ plano, turma, disciplina, escola }) => {
+  console.log('📄 RelatorioPlanoAula renderizado:', {
+    planoId: plano?.id,
+    titulo: plano?.titulo,
+    recursos: plano?.recursos,
+    tipoRecursos: typeof plano?.recursos,
+    isArray: Array.isArray(plano?.recursos),
+    temUrl: plano?.recursos?.[0]?.url
+  });
+
   const formatarData = (data) => {
     if (!data) return 'Não informada';
     return new Date(data).toLocaleDateString('pt-BR', { 
@@ -226,20 +236,36 @@ const RelatorioPlanoAula = ({ plano, turma, disciplina, escola }) => {
       )}
 
       {/* Recursos */}
-      {plano.recursos && plano.recursos.length > 0 && (
+      {plano.recursos && (
         <>
           <Divider sx={{ my: 3 }} />
           <Box sx={{ mb: 3 }}>
             <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 2, color: 'primary.main' }}>
               🛠️ Recursos Didáticos
             </Typography>
-            <Box component="ul" sx={{ pl: 3 }}>
-              {plano.recursos.map((recurso, index) => (
-                <Typography component="li" key={index} variant="body1" sx={{ mb: 1 }}>
-                  {recurso.nome} {recurso.quantidade && `(${recurso.quantidade})`}
-                </Typography>
-              ))}
-            </Box>
+            
+            {/* Verifica se é array de arquivos (novo formato) ou array de strings (formato antigo) */}
+            {Array.isArray(plano.recursos) && plano.recursos.length > 0 ? (
+              // Novo formato: array de objetos com url
+              plano.recursos[0]?.url ? (
+                <RecursosPreview recursos={plano.recursos} variant="grid" showDownload={true} />
+              ) : (
+                // Formato antigo: array de strings/objetos simples
+                <Box component="ul" sx={{ pl: 3 }}>
+                  {plano.recursos.map((recurso, index) => (
+                    <Typography component="li" key={index} variant="body1" sx={{ mb: 1 }}>
+                      {typeof recurso === 'string' ? recurso : (recurso.nome || recurso)}
+                      {recurso.quantidade && ` (${recurso.quantidade})`}
+                    </Typography>
+                  ))}
+                </Box>
+              )
+            ) : typeof plano.recursos === 'string' && plano.recursos.trim() ? (
+              // Formato string simples
+              <Typography variant="body1" sx={{ whiteSpace: 'pre-line', fontStyle: 'italic' }}>
+                {plano.recursos}
+              </Typography>
+            ) : null}
           </Box>
         </>
       )}

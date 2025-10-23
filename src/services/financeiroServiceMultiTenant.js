@@ -465,7 +465,7 @@ export const createFinanceiroService = (databaseWrapper, storage = null) => {
   },
 
   // Cancelar título
-  async cancelarTitulo(tituloId, motivo, canceladoPor) {
+  async cancelarTitulo(tituloId, motivo, canceladoPor = 'Sistema') {
     try {
       const tituloRef = ref(database, `titulos_financeiros/${tituloId}`);
       const snapshot = await get(tituloRef);
@@ -483,9 +483,9 @@ export const createFinanceiroService = (databaseWrapper, storage = null) => {
       const atualizacao = {
         ...titulo,
         status: 'cancelado',
-        motivoCancelamento: motivo,
+        motivoCancelamento: motivo || 'Não informado',
         dataCancelamento: new Date().toISOString(),
-        canceladoPor,
+        canceladoPor: canceladoPor || 'Sistema',
         updatedAt: new Date().toISOString()
       };
 
@@ -494,6 +494,53 @@ export const createFinanceiroService = (databaseWrapper, storage = null) => {
       return { success: true };
     } catch (error) {
       console.error('Erro ao cancelar título:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  // Registrar pagamento de título
+  async registrarPagamento(dadosPagamento) {
+    try {
+      const { 
+        tituloId, 
+        valorPago, 
+        dataPagamento, 
+        formaPagamento, 
+        observacoes 
+      } = dadosPagamento;
+
+      const tituloRef = ref(database, `titulos_financeiros/${tituloId}`);
+      const snapshot = await get(tituloRef);
+      
+      if (!snapshot.exists()) {
+        return { success: false, error: 'Título não encontrado' };
+      }
+
+      const titulo = snapshot.val();
+      
+      if (titulo.status === 'pago') {
+        return { success: false, error: 'Título já foi pago' };
+      }
+
+      if (titulo.status === 'cancelado') {
+        return { success: false, error: 'Não é possível pagar título cancelado' };
+      }
+
+      const atualizacao = {
+        ...titulo,
+        status: 'pago',
+        valorPago: valorPago || titulo.valor,
+        dataPagamento: dataPagamento || new Date().toISOString().split('T')[0],
+        formaPagamento: formaPagamento || 'dinheiro',
+        observacoesPagamento: observacoes || '',
+        updatedAt: new Date().toISOString()
+      };
+
+      await set(tituloRef, atualizacao);
+      
+      return { success: true, titulo: atualizacao };
+    } catch (error) {
+      console.error('Erro ao registrar pagamento:', error);
       return { success: false, error: error.message };
     }
   },

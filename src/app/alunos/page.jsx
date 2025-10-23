@@ -48,9 +48,10 @@ import FichaMatricula from '../../components/FichaMatricula';
 import ContratoAluno from '../../components/ContratoAlunoNovo';
 import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
 import { useSchoolServices } from '../../hooks/useSchoolServices';
+import RematriculaDialog from './components/RematriculaDialog';
 
 // Componente para indicador de pré-matrícula
-const PreMatriculaIndicator = ({ aluno }) => {
+const PreMatriculaIndicator = ({ aluno, financeiroService }) => {
   const [info, setInfo] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -136,6 +137,66 @@ const PreMatriculaIndicator = ({ aluno }) => {
         fontSize: '0.7rem',
         fontWeight: 'bold',
         minWidth: '40px',
+        cursor: 'help'
+      }}
+    />
+  );
+};
+
+// Componente para indicador de rematrícula aguardando pagamento
+const RematriculaIndicator = ({ aluno, financeiroService }) => {
+  const [aguardando, setAguardando] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const verificar = async () => {
+      try {
+        // Verificar se tem flag de rematrícula recente
+        if (!aluno.dataRematricula || aluno.status === 'ativo') {
+          setLoading(false);
+          return;
+        }
+
+        if (!financeiroService?.buscarTitulosAluno) {
+          setLoading(false);
+          return;
+        }
+
+        const resultado = await financeiroService.buscarTitulosAluno(aluno.id);
+        if (!resultado.success || !resultado.titulos) {
+          setLoading(false);
+          return;
+        }
+
+        // Buscar títulos de matrícula e materiais pendentes criados após rematrícula
+        const titulosRecentes = resultado.titulos.filter(t => 
+          (t.tipo === 'matricula' || t.tipo === 'materiais') && 
+          t.status === 'pendente' &&
+          t.createdAt && new Date(t.createdAt) >= new Date(aluno.dataRematricula)
+        );
+
+        setAguardando(titulosRecentes.length > 0);
+      } catch (error) {
+        console.error('Erro ao verificar rematrícula:', error);
+      }
+      setLoading(false);
+    };
+
+    verificar();
+  }, [aluno.id, aluno.dataRematricula, aluno.status, financeiroService]);
+
+  if (loading || !aguardando) return null;
+
+  return (
+    <Chip 
+      label="🔄 Rematriculado"
+      size="small"
+      title="Aguardando pagamento de matrícula/materiais"
+      sx={{ 
+        bgcolor: '#e0f2fe', 
+        color: '#0369a1',
+        fontSize: '0.7rem',
+        fontWeight: 'bold',
         cursor: 'help'
       }}
     />
@@ -298,6 +359,7 @@ const Alunos = () => {
   const [userRole, setUserRole] = useState('');
   const [roleChecked, setRoleChecked] = useState(false);
   const [userId, setUserId] = useState(null);
+  const [userName, setUserName] = useState('Sistema');
   const [formError, setFormError] = useState('');
   const [filtroNome, setFiltroNome] = useState('');
   const [filtroMatricula, setFiltroMatricula] = useState('');
@@ -335,6 +397,9 @@ const Alunos = () => {
   // Estados para confirmação de fechamento do modal
   const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
   const [pendingClose, setPendingClose] = useState(false);
+  // Estados para rematrícula
+  const [rematriculaDialogOpen, setRematriculaDialogOpen] = useState(false);
+  const [alunoRematricula, setAlunoRematricula] = useState(null);
 
   // Remover anexo do Storage e do registro do aluno
   const handleRemoverAnexo = async (anexo, idx) => {
@@ -766,6 +831,35 @@ const Alunos = () => {
     }
   };
 
+  // Função para verificar se aluno está rematriculado aguardando pagamento
+  const verificarRematriculaAguardandoPagamento = async (aluno) => {
+    try {
+      // Verificar se tem flag de rematrícula recente
+      if (!aluno.dataRematricula) return false;
+      
+      // Se já está ativo, não precisa mostrar como aguardando
+      if (aluno.status === 'ativo') return false;
+
+      // Verificar se tem títulos de matrícula/materiais pendentes
+      if (!financeiroService?.buscarTitulosAluno) return false;
+
+      const resultado = await financeiroService.buscarTitulosAluno(aluno.id);
+      if (!resultado.success || !resultado.titulos) return false;
+
+      // Buscar títulos de matrícula e materiais criados recentemente
+      const titulosRecentes = resultado.titulos.filter(t => 
+        (t.tipo === 'matricula' || t.tipo === 'materiais') && 
+        t.status === 'pendente' &&
+        t.createdAt && new Date(t.createdAt) > new Date(aluno.dataRematricula)
+      );
+
+      return titulosRecentes.length > 0;
+    } catch (error) {
+      console.error('Erro ao verificar rematrícula:', error);
+      return false;
+    }
+  };
+
   // Função para ativar automaticamente aluno após pagamentos obrigatórios
   const ativarAutomaticamenteSeAprovado = async (alunoData) => {
     try {
@@ -778,6 +872,21 @@ const Alunos = () => {
       if (verificacao.podeAtivar) {
         console.log('✅ Ativando aluno automaticamente:', alunoData.nome);
         
+        // Remover valores undefined do objeto verificacao para o Firebase
+        const verificacaoLimpa = {
+          matriculaPaga: verificacao.matriculaPaga || false,
+          materiaisPago: verificacao.materiaisPago || false,
+          podeAtivar: verificacao.podeAtivar || false
+        };
+
+        // Adicionar IDs dos títulos apenas se existirem
+        if (verificacao.tituloMatricula?.id) {
+          verificacaoLimpa.tituloMatriculaId = verificacao.tituloMatricula.id;
+        }
+        if (verificacao.tituloMateriais?.id) {
+          verificacaoLimpa.tituloMateriaisId = verificacao.tituloMateriais.id;
+        }
+        
         const alunoAtualizado = {
           ...alunoData,
           status: 'ativo',
@@ -785,7 +894,7 @@ const Alunos = () => {
           ativacaoAutomatica: {
             data: new Date().toISOString(),
             motivo: 'Pagamentos de matrícula e materiais confirmados',
-            verificacao
+            verificacao: verificacaoLimpa
           }
         };
         
@@ -1019,8 +1128,10 @@ const Alunos = () => {
       const userData = await getData(`usuarios/${userId}`);
       if (userData) {
         setUserRole((userData.role || '').trim().toLowerCase());
+        setUserName(userData.nome || userData.email || 'Sistema');
       } else {
         setUserRole(null);
+        setUserName('Sistema');
       }
       setRoleChecked(true);
     }
@@ -1165,6 +1276,20 @@ const Alunos = () => {
     } else {
       setStatusMatricula(null);
     }
+  };
+
+  // Abrir dialog de rematrícula
+  const handleAbrirRematricula = (aluno) => {
+    setAlunoRematricula(aluno);
+    setRematriculaDialogOpen(true);
+  };
+
+  // Callback após rematrícula bem-sucedida
+  const handleRematriculaSuccess = async () => {
+    // Recarregar dados dos alunos
+    await carregarAlunos();
+    setRematriculaDialogOpen(false);
+    setAlunoRematricula(null);
   };
 
   // Ativar aluno após pagamento da matrícula
@@ -2116,9 +2241,18 @@ const Alunos = () => {
                                       }}
                                     />
                                     
+                                    {/* Indicador de Rematrícula */}
+                                    <RematriculaIndicator 
+                                      aluno={aluno} 
+                                      financeiroService={financeiroService} 
+                                    />
+                                    
                                     {/* Indicador de pendências para pré-matrícula */}
                                     {aluno.status === 'pre_matricula' && (
-                                      <PreMatriculaIndicator aluno={aluno} />
+                                      <PreMatriculaIndicator 
+                                        aluno={aluno} 
+                                        financeiroService={financeiroService} 
+                                      />
                                     )}
                                   </Box>
                                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -2156,6 +2290,24 @@ const Alunos = () => {
                                       title="Imprimir Documentos"
                                     >
                                       🖨️
+                                    </Button>
+                                    <Button
+                                      variant="outlined"
+                                      size="small"
+                                      onClick={() => handleAbrirRematricula(aluno)}
+                                      sx={{
+                                        minWidth: 'auto',
+                                        px: 1.5,
+                                        borderColor: '#d97706',
+                                        color: '#d97706',
+                                        '&:hover': {
+                                          bgcolor: '#fffbeb',
+                                          borderColor: '#b45309'
+                                        }
+                                      }}
+                                      title="Rematrícula"
+                                    >
+                                      🔄
                                     </Button>
                                     <IconButton
                                       onClick={(e) => toggleCardExpansao(aluno.id || `${aluno.matricula}_${idx}`, e)}
@@ -3706,6 +3858,24 @@ const Alunos = () => {
                       )}
                     </DialogContent>
                   </Dialog>
+
+                  {/* Dialog Rematrícula */}
+                  <RematriculaDialog
+                    open={rematriculaDialogOpen}
+                    onClose={() => {
+                      setRematriculaDialogOpen(false);
+                      setAlunoRematricula(null);
+                    }}
+                    aluno={alunoRematricula}
+                    turmas={turmas}
+                    financeiroService={financeiroService}
+                    userId={userId}
+                    userName={userName}
+                    updateAluno={async (id, dados) => {
+                      await setData(`alunos/${id}`, dados);
+                    }}
+                    onRematriculaSuccess={handleRematriculaSuccess}
+                  />
                 </>
               )}
             </CardContent>

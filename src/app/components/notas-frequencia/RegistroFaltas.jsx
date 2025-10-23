@@ -312,7 +312,11 @@ const RegistroFaltas = ({ professorId = null }) => {
   };
 
   const formatarData = (data) => {
-    return new Date(data).toLocaleDateString('pt-BR', {
+    // Evitar problema de fuso horário: criar data no horário local
+    const [ano, mes, dia] = data.split('-');
+    const dataLocal = new Date(ano, mes - 1, dia);
+    
+    return dataLocal.toLocaleDateString('pt-BR', {
       weekday: 'long',
       year: 'numeric',
       month: 'long',

@@ -4384,6 +4384,49 @@ const FinanceiroPage = () => {
                     </Grid>
                   )}
 
+                  {/* Informações de Cancelamento */}
+                  {detalheTitulo.titulo.status === 'cancelado' && detalheTitulo.titulo.motivoCancelamento && (
+                    <Grid item xs={12} md={6}>
+                      <Card sx={{ mb: 2, borderColor: 'error.main', border: 1 }}>
+                        <CardContent>
+                          <Typography variant="h6" gutterBottom color="error">
+                            ❌ Informações de Cancelamento
+                          </Typography>
+                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <Typography variant="body2" color="text.secondary">Data do Cancelamento:</Typography>
+                              <Typography variant="body2" fontWeight="bold">
+                                {detalheTitulo.titulo.dataCancelamento ? 
+                                  formatDate(detalheTitulo.titulo.dataCancelamento) : 'N/A'}
+                              </Typography>
+                            </Box>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <Typography variant="body2" color="text.secondary">Cancelado por:</Typography>
+                              <Typography variant="body2" fontWeight="bold">
+                                {detalheTitulo.titulo.canceladoPor || 'Sistema'}
+                              </Typography>
+                            </Box>
+                            <Box>
+                              <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                                Motivo do Cancelamento:
+                              </Typography>
+                              <Typography variant="body2" fontWeight="bold" sx={{ 
+                                whiteSpace: 'pre-wrap',
+                                backgroundColor: 'error.50',
+                                p: 1.5,
+                                borderRadius: 1,
+                                border: '1px solid',
+                                borderColor: 'error.light'
+                              }}>
+                                {detalheTitulo.titulo.motivoCancelamento}
+                              </Typography>
+                            </Box>
+                          </Box>
+                        </CardContent>
+                      </Card>
+                    </Grid>
+                  )}
+
                   {/* Datas e Vencimentos */}
                   <Grid item xs={12} md={6}>
                     <Card sx={{ mb: 2 }}>

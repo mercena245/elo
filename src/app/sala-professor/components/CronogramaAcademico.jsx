@@ -417,20 +417,50 @@ const CronogramaAcademico = () => {
               </Box>
 
               {/* Grade do Calendário */}
-              <Grid container spacing={1}>
+              <Box sx={{ 
+                display: 'grid',
+                gridTemplateColumns: 'repeat(7, 1fr)',
+                gap: 1,
+                mb: 2,
+                width: '100%',
+                aspectRatio: { xs: 'auto', md: '16/9' }
+              }}>
                 {/* Cabeçalho dos dias da semana */}
                 {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map((dia) => (
-                  <Grid item xs key={dia} sx={{ width: '14.28%' }}>
-                    <Typography variant="caption" sx={{ fontWeight: 'bold', textAlign: 'center', display: 'block' }}>
+                  <Box 
+                    key={dia} 
+                    sx={{ 
+                      textAlign: 'center', 
+                      py: 1,
+                      backgroundColor: '#e3f2fd',
+                      borderRadius: 1,
+                      fontWeight: 'bold'
+                    }}
+                  >
+                    <Typography 
+                      variant="body2" 
+                      sx={{ 
+                        fontWeight: 'bold',
+                        color: 'primary.main'
+                      }}
+                    >
                       {dia}
                     </Typography>
-                  </Grid>
+                  </Box>
                 ))}
 
                 {/* Dias do mês */}
                 {getDiasDoMes().map((dia, index) => {
                   if (!dia) {
-                    return <Grid item xs key={`empty-${index}`} sx={{ width: '14.28%', height: 80 }} />;
+                    return (
+                      <Box 
+                        key={`empty-${index}`} 
+                        sx={{ 
+                          aspectRatio: '1/1',
+                          minHeight: 100
+                        }} 
+                      />
+                    );
                   }
 
                   const dateKey = dia.toISOString().split('T')[0];
@@ -439,63 +469,93 @@ const CronogramaAcademico = () => {
                   const isHoje = dia.getDate() === hoje.getDate() && 
                                  dia.getMonth() === hoje.getMonth() && 
                                  dia.getFullYear() === hoje.getFullYear();
-                  
-                  // Debug: nome do dia da semana
-                  const nomeDiaSemana = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'][dia.getDay()];
 
                   return (
-                    <Grid item xs key={dateKey} sx={{ width: '14.28%' }}>
-                      <Paper
-                        variant="outlined"
-                        sx={{
-                          height: 80,
-                          p: 0.5,
-                          backgroundColor: isHoje ? '#e3f2fd' : 'transparent',
-                          border: isHoje ? '2px solid #2196f3' : undefined,
-                          position: 'relative',
-                          overflow: 'hidden'
+                    <Paper
+                      key={dateKey}
+                      elevation={isHoje ? 3 : 0}
+                      variant="outlined"
+                      onClick={() => {
+                        setFormData({
+                          ...formData,
+                          dataInicio: dateKey,
+                          dataFim: ''
+                        });
+                        setModalOpen(true);
+                      }}
+                      sx={{
+                        aspectRatio: '1/1',
+                        minHeight: 100,
+                        p: 1,
+                        backgroundColor: isHoje ? '#e3f2fd' : 'white',
+                        border: isHoje ? '2px solid #2196f3' : '1px solid #e0e0e0',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        '&:hover': {
+                          boxShadow: 3,
+                          transform: 'scale(1.02)',
+                          zIndex: 1,
+                          backgroundColor: isHoje ? '#e3f2fd' : '#f5f5f5'
+                        }
+                      }}
+                    >
+                      <Typography 
+                        variant="body1" 
+                        sx={{ 
+                          fontWeight: isHoje ? 'bold' : '500',
+                          color: isHoje ? 'primary.main' : 'text.primary',
+                          mb: 0.5,
+                          fontSize: '1rem'
                         }}
                       >
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <Typography variant="caption" sx={{ fontWeight: isHoje ? 'bold' : 'normal' }}>
-                            {dia.getDate()}
-                          </Typography>
-                          {isHoje && (
-                            <Typography variant="caption" sx={{ fontSize: '0.65rem', color: 'primary.main', fontWeight: 'bold' }}>
-                              {nomeDiaSemana}
-                            </Typography>
-                          )}
-                        </Box>
-                        
-                        {eventosNoDia.slice(0, 2).map((evento, idx) => (
+                        {dia.getDate()}
+                      </Typography>
+                      
+                      <Box sx={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', gap: 0.3 }}>
+                        {eventosNoDia.slice(0, 3).map((evento, idx) => (
                           <Box
                             key={idx}
                             sx={{
                               backgroundColor: tiposEventos[evento.tipo]?.cor || '#ccc',
                               color: 'white',
-                              fontSize: '0.6rem',
-                              p: 0.2,
+                              fontSize: '0.7rem',
+                              px: 0.5,
+                              py: 0.2,
                               borderRadius: 0.5,
-                              mb: 0.2,
                               textOverflow: 'ellipsis',
                               overflow: 'hidden',
-                              whiteSpace: 'nowrap'
+                              whiteSpace: 'nowrap',
+                              transition: 'opacity 0.2s',
+                              '&:hover': {
+                                opacity: 0.85
+                              }
                             }}
+                            title={evento.titulo}
                           >
                             {evento.titulo}
                           </Box>
                         ))}
                         
-                        {eventosNoDia.length > 2 && (
-                          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                            +{eventosNoDia.length - 2} mais
+                        {eventosNoDia.length > 3 && (
+                          <Typography 
+                            variant="caption" 
+                            sx={{ 
+                              color: 'primary.main',
+                              fontSize: '0.65rem',
+                              fontWeight: 'bold',
+                              mt: 0.3
+                            }}
+                          >
+                            +{eventosNoDia.length - 3} evento{eventosNoDia.length - 3 > 1 ? 's' : ''}
                           </Typography>
                         )}
-                      </Paper>
-                    </Grid>
+                      </Box>
+                    </Paper>
                   );
                 })}
-              </Grid>
+              </Box>
             </CardContent>
           </Card>
         </Grid>
@@ -578,109 +638,216 @@ const CronogramaAcademico = () => {
       </Card>
 
       {/* Modal de Criação/Edição */}
-      <Dialog open={modalOpen} onClose={() => setModalOpen(false)} maxWidth="md" fullWidth>
-        <DialogTitle>
-          {eventoEditando ? 'Editar Evento' : 'Novo Evento'}
+      <Dialog 
+        open={modalOpen} 
+        onClose={() => setModalOpen(false)} 
+        maxWidth="md" 
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 2,
+            minHeight: '500px'
+          }
+        }}
+      >
+        <DialogTitle sx={{ 
+          pb: 1,
+          borderBottom: '1px solid',
+          borderColor: 'divider',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1
+        }}>
+          <EventIcon color="primary" />
+          <Typography variant="h6" component="span">
+            {eventoEditando ? 'Editar Evento' : 'Novo Evento'}
+          </Typography>
         </DialogTitle>
-        <DialogContent>
-          <Grid container spacing={2} sx={{ mt: 1 }}>
+        
+        <DialogContent sx={{ pt: 3 }}>
+          <Grid container spacing={3}>
+            {/* Título */}
             <Grid item xs={12}>
               <TextField
                 fullWidth
-                label="Título"
+                label="Título do Evento"
+                placeholder="Ex: Reunião de Pais, Prova de Matemática..."
                 value={formData.titulo}
                 onChange={(e) => setFormData({ ...formData, titulo: e.target.value })}
                 required
+                variant="outlined"
+                InputLabelProps={{
+                  sx: { fontSize: '1rem' }
+                }}
               />
             </Grid>
+
+            {/* Descrição */}
             <Grid item xs={12}>
               <TextField
                 fullWidth
                 label="Descrição"
+                placeholder="Descreva os detalhes do evento..."
                 multiline
-                rows={3}
+                rows={4}
                 value={formData.descricao}
                 onChange={(e) => setFormData({ ...formData, descricao: e.target.value })}
+                variant="outlined"
+                InputLabelProps={{
+                  sx: { fontSize: '1rem' }
+                }}
               />
             </Grid>
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                label="Data de Início"
-                type="date"
-                value={formData.dataInicio}
-                onChange={(e) => setFormData({ ...formData, dataInicio: e.target.value })}
-                InputLabelProps={{ shrink: true }}
-                required
-              />
+
+            {/* Datas */}
+            <Grid item xs={12}>
+              <Typography variant="subtitle2" sx={{ mb: 2, color: 'text.secondary', fontWeight: 600 }}>
+                📅 Período do Evento
+              </Typography>
+              <Grid container spacing={2}>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    label="Data de Início"
+                    type="date"
+                    value={formData.dataInicio}
+                    onChange={(e) => setFormData({ ...formData, dataInicio: e.target.value })}
+                    InputLabelProps={{ 
+                      shrink: true,
+                      sx: { fontSize: '1rem' }
+                    }}
+                    required
+                    variant="outlined"
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    label="Data de Término (opcional)"
+                    type="date"
+                    value={formData.dataFim}
+                    onChange={(e) => setFormData({ ...formData, dataFim: e.target.value })}
+                    InputLabelProps={{ 
+                      shrink: true,
+                      sx: { fontSize: '1rem' }
+                    }}
+                    variant="outlined"
+                  />
+                </Grid>
+              </Grid>
             </Grid>
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                label="Data de Fim (opcional)"
-                type="date"
-                value={formData.dataFim}
-                onChange={(e) => setFormData({ ...formData, dataFim: e.target.value })}
-                InputLabelProps={{ shrink: true }}
-              />
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <FormControl fullWidth>
-                <InputLabel>Tipo</InputLabel>
-                <Select
-                  value={formData.tipo}
-                  onChange={(e) => setFormData({ ...formData, tipo: e.target.value })}
-                  label="Tipo"
-                >
-                  {Object.entries(tiposEventos).map(([key, tipo]) => (
-                    <MenuItem key={key} value={key}>
-                      {tipo.nome}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <FormControl fullWidth>
-                <InputLabel>Prioridade</InputLabel>
-                <Select
-                  value={formData.prioridade}
-                  onChange={(e) => setFormData({ ...formData, prioridade: e.target.value })}
-                  label="Prioridade"
-                >
-                  {Object.entries(prioridades).map(([key, prioridade]) => (
-                    <MenuItem key={key} value={key}>
-                      {prioridade.nome}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <FormControl fullWidth>
-                <InputLabel>Turma (opcional)</InputLabel>
-                <Select
-                  value={formData.turmaId}
-                  onChange={(e) => setFormData({ ...formData, turmaId: e.target.value })}
-                  label="Turma (opcional)"
-                >
-                  <MenuItem value="">Nenhuma</MenuItem>
-                  {Object.entries(turmas).map(([id, turma]) => (
-                    <MenuItem key={id} value={id}>
-                      {turma.nome}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+
+            {/* Classificação */}
+            <Grid item xs={12}>
+              <Typography variant="subtitle2" sx={{ mb: 2, color: 'text.secondary', fontWeight: 600 }}>
+                🏷️ Classificação
+              </Typography>
+              <Grid container spacing={2}>
+                <Grid item xs={12} sm={4}>
+                  <FormControl fullWidth variant="outlined">
+                    <InputLabel sx={{ fontSize: '1rem' }}>Tipo</InputLabel>
+                    <Select
+                      value={formData.tipo}
+                      onChange={(e) => setFormData({ ...formData, tipo: e.target.value })}
+                      label="Tipo"
+                      sx={{ minHeight: '56px' }}
+                    >
+                      {Object.entries(tiposEventos).map(([key, tipo]) => (
+                        <MenuItem key={key} value={key}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Box
+                              sx={{
+                                width: 12,
+                                height: 12,
+                                borderRadius: '50%',
+                                backgroundColor: tipo.cor
+                              }}
+                            />
+                            {tipo.nome}
+                          </Box>
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+                
+                <Grid item xs={12} sm={4}>
+                  <FormControl fullWidth variant="outlined">
+                    <InputLabel sx={{ fontSize: '1rem' }}>Prioridade</InputLabel>
+                    <Select
+                      value={formData.prioridade}
+                      onChange={(e) => setFormData({ ...formData, prioridade: e.target.value })}
+                      label="Prioridade"
+                      sx={{ minHeight: '56px' }}
+                    >
+                      {Object.entries(prioridades).map(([key, prioridade]) => (
+                        <MenuItem key={key} value={key}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Box
+                              sx={{
+                                width: 12,
+                                height: 12,
+                                borderRadius: '50%',
+                                backgroundColor: prioridade.cor
+                              }}
+                            />
+                            {prioridade.nome}
+                          </Box>
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+                
+                <Grid item xs={12} sm={4}>
+                  <FormControl fullWidth variant="outlined">
+                    <InputLabel sx={{ fontSize: '1rem' }}>Turma (opcional)</InputLabel>
+                    <Select
+                      value={formData.turmaId}
+                      onChange={(e) => setFormData({ ...formData, turmaId: e.target.value })}
+                      label="Turma (opcional)"
+                      sx={{ minHeight: '56px' }}
+                    >
+                      <MenuItem value="">
+                        <em>Todas as turmas</em>
+                      </MenuItem>
+                      {Object.entries(turmas).map(([id, turma]) => (
+                        <MenuItem key={id} value={id}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <SchoolIcon fontSize="small" color="primary" />
+                            {turma.nome}
+                          </Box>
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+              </Grid>
             </Grid>
           </Grid>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setModalOpen(false)}>
+        
+        <DialogActions sx={{ 
+          px: 3, 
+          py: 2, 
+          borderTop: '1px solid',
+          borderColor: 'divider',
+          gap: 1
+        }}>
+          <Button 
+            onClick={() => setModalOpen(false)}
+            variant="outlined"
+            size="large"
+          >
             Cancelar
           </Button>
-          <Button onClick={salvarEvento} variant="contained">
-            {eventoEditando ? 'Atualizar' : 'Criar'}
+          <Button 
+            onClick={salvarEvento} 
+            variant="contained"
+            size="large"
+            startIcon={eventoEditando ? <EditIcon /> : <AddIcon />}
+          >
+            {eventoEditando ? 'Atualizar Evento' : 'Criar Evento'}
           </Button>
         </DialogActions>
       </Dialog>

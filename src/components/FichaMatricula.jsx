@@ -671,7 +671,11 @@ const FichaMatricula = ({ aluno, turmas, onClose }) => {
               {aluno.anexos.map((anexo, idx) => (
                 <div key={idx} className="field-row">
                   <span className="field-label">Documento {idx + 1}:</span>
-                  <span className="field-value">{anexo.nome || anexo}</span>
+                  <span className="field-value">
+                    {typeof anexo === 'string' 
+                      ? anexo 
+                      : anexo?.nome || anexo?.name || 'Documento'}
+                  </span>
                 </div>
               ))}
             </div>

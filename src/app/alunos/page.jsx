@@ -1240,6 +1240,8 @@ const Alunos = () => {
       financeiro: {
         mensalidadeValor: aluno.financeiro?.mensalidadeValor || '',
         descontoPercentual: aluno.financeiro?.descontoPercentual || '',
+        percentualMulta: aluno.financeiro?.percentualMulta ?? 2,
+        jurosDia: aluno.financeiro?.jurosDia ?? 0.033,
         diaVencimento: aluno.financeiro?.diaVencimento || '10',
         dataInicioCompetencia: aluno.financeiro?.dataInicioCompetencia || '',
         dataFimCompetencia: aluno.financeiro?.dataFimCompetencia || '',
@@ -1440,6 +1442,8 @@ const Alunos = () => {
       financeiro: {
         mensalidadeValor: '',
         descontoPercentual: '',
+        percentualMulta: 2,
+        jurosDia: 0.033,
         diaVencimento: '',
         valorMatricula: '',
         valorMateriais: '',
@@ -3213,11 +3217,37 @@ const Alunos = () => {
                             inputProps={{ min: 0, max: 100, step: 0.1 }}
                           />
                           
+                          <TextField
+                            label="Multa por Atraso (%)"
+                            name="financeiro.percentualMulta"
+                            type="number"
+                            value={editForm.financeiro?.percentualMulta ?? 2}
+                            onChange={handleFormChange}
+                            fullWidth
+                            inputProps={{ min: 0, max: 100, step: 0.1 }}
+                            helperText="Percentual de multa aplicado sobre o valor em caso de atraso (padrão: 2%)"
+                          />
+                          
+                          <TextField
+                            label="Juros por Dia de Atraso (%)"
+                            name="financeiro.jurosDia"
+                            type="number"
+                            value={editForm.financeiro?.jurosDia ?? 0.033}
+                            onChange={handleFormChange}
+                            fullWidth
+                            inputProps={{ min: 0, max: 100, step: 0.001 }}
+                            helperText="Percentual de juros por dia de atraso (padrão: 0,033% = 1% ao mês)"
+                          />
+                          
                           <Box sx={{ fontSize: 14, color: 'text.secondary', mt: -1, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
                             📊 <strong>Resumo Financeiro:</strong><br />
                             Mensalidade original: R$ {(parseFloat(editForm.financeiro?.mensalidadeValor || '0')).toFixed(2)}<br />
                             Desconto: {(parseFloat(editForm.financeiro?.descontoPercentual || '0')).toFixed(1)}%<br />
-                            <strong>Valor final: R$ {valorComDesconto.toFixed(2)}</strong>
+                            <strong>Valor final: R$ {valorComDesconto.toFixed(2)}</strong><br />
+                            <Box component="span" sx={{ fontSize: 12, color: 'warning.main', mt: 1, display: 'block' }}>
+                              ⚠️ Multa: {(parseFloat(editForm.financeiro?.percentualMulta ?? 2)).toFixed(1)}% | 
+                              Juros: {(parseFloat(editForm.financeiro?.jurosDia ?? 0.033)).toFixed(3)}%/dia
+                            </Box>
                           </Box>
                           
                           <TextField
@@ -3839,15 +3869,35 @@ const Alunos = () => {
                     onClose={handleFecharContrato}
                     maxWidth="lg"
                     fullWidth
+                    className="dialog-contrato-impressao"
                     PaperProps={{
+                      className: 'paper-contrato-impressao',
                       sx: { 
                         width: '95vw', 
                         height: '95vh',
-                        maxWidth: 'none'
+                        maxWidth: 'none',
+                        '@media print': {
+                          maxWidth: '100%',
+                          maxHeight: '100%',
+                          width: '100%',
+                          height: '100%',
+                          boxShadow: 'none',
+                          margin: 0,
+                          position: 'static'
+                        }
                       }
                     }}
                   >
-                    <DialogContent sx={{ p: 0, overflow: 'auto' }}>
+                    <DialogContent 
+                      className="content-contrato-impressao"
+                      sx={{ 
+                        p: 0, 
+                        overflow: 'auto',
+                        '@media print': {
+                          overflow: 'visible',
+                          p: 0
+                        }
+                      }}>
                       {alunoSelecionadoFicha && (
                         <ContratoAluno 
                           aluno={alunoSelecionadoFicha}
@@ -3882,6 +3932,81 @@ const Alunos = () => {
           </Card>
         </Box>
       </main>
+      
+      {/* Estilos globais para impressão do contrato */}
+      <style jsx global>{`
+        @media print {
+          /* Oculta TUDO primeiro */
+          * {
+            visibility: hidden !important;
+          }
+          
+          /* Mostra APENAS o contrato e seus filhos */
+          .dialog-contrato-impressao,
+          .dialog-contrato-impressao *,
+          .paper-contrato-impressao,
+          .paper-contrato-impressao *,
+          .content-contrato-impressao,
+          .content-contrato-impressao *,
+          .contrato-wrapper,
+          .contrato-wrapper * {
+            visibility: visible !important;
+          }
+          
+          /* Remove backdrop */
+          .MuiBackdrop-root {
+            display: none !important;
+          }
+          
+          /* Posiciona o dialog na origem */
+          .dialog-contrato-impressao {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            height: auto !important;
+          }
+          
+          .dialog-contrato-impressao .MuiDialog-container {
+            position: static !important;
+            display: block !important;
+            height: auto !important;
+          }
+          
+          .paper-contrato-impressao {
+            position: static !important;
+            max-width: none !important;
+            max-height: none !important;
+            width: 100% !important;
+            height: auto !important;
+            margin: 0 !important;
+            box-shadow: none !important;
+          }
+          
+          .content-contrato-impressao {
+            padding: 0 !important;
+            overflow: visible !important;
+          }
+          
+          /* Remove margens do body */
+          body {
+            margin: 0 !important;
+            padding: 0 !important;
+            background: white !important;
+          }
+          
+          html, body {
+            height: auto !important;
+            overflow: visible !important;
+          }
+          
+          /* Configuração da página */
+          @page {
+            size: A4 portrait;
+            margin: 0;
+          }
+        }
+      `}</style>
     </div>
   );
 };

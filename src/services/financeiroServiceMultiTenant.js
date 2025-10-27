@@ -54,6 +54,8 @@ export const createFinanceiroService = (databaseWrapper, storage = null) => {
         mensalidadeValor = 0,
         diaVencimento = 10,
         descontoPercentual = 0,
+        percentualMulta = 2,
+        jurosDia = 0.033,
         valorMatricula = 0,
         valorMateriais = 0,
         dataInicioCompetencia = '',
@@ -85,6 +87,8 @@ export const createFinanceiroService = (databaseWrapper, storage = null) => {
           descricao: `Taxa de Matrícula - ${nome}`,
           valor: valorMatriculaNum,
           valorOriginal: valorMatriculaNum,
+          percentualMulta,
+          jurosDia,
           vencimento: vencimentoMatricula.toISOString().split('T')[0],
           status: 'pendente',
           observacoes: 'Pagamento necessário para confirmar matrícula',
@@ -109,6 +113,8 @@ export const createFinanceiroService = (databaseWrapper, storage = null) => {
           descricao: `Taxa de Materiais - ${nome}`,
           valor: valorMateriaisNum,
           valorOriginal: valorMateriaisNum,
+          percentualMulta,
+          jurosDia,
           vencimento: vencimentoMateriais.toISOString().split('T')[0],
           status: 'pendente',
           observacoes: 'Pagamento para aquisição de materiais escolares',
@@ -167,6 +173,8 @@ export const createFinanceiroService = (databaseWrapper, storage = null) => {
           valor: valorMensalidadeComDesconto,
           valorOriginal: mensalidadeNum,
           desconto: descontoNum,
+          percentualMulta,
+          jurosDia,
           vencimento: vencimento.toISOString().split('T')[0],
           status: 'pendente',
           observacoes: `Turma: ${turmaId || 'Não definida'} | Competência: ${dataInicio.toLocaleDateString('pt-BR')} a ${dataFim.toLocaleDateString('pt-BR')}`,
@@ -526,11 +534,20 @@ export const createFinanceiroService = (databaseWrapper, storage = null) => {
         return { success: false, error: 'Não é possível pagar título cancelado' };
       }
 
+      // Obter data local no formato YYYY-MM-DD
+      const dataLocal = dataPagamento || (() => {
+        const hoje = new Date();
+        const ano = hoje.getFullYear();
+        const mes = String(hoje.getMonth() + 1).padStart(2, '0');
+        const dia = String(hoje.getDate()).padStart(2, '0');
+        return `${ano}-${mes}-${dia}`;
+      })();
+
       const atualizacao = {
         ...titulo,
         status: 'pago',
         valorPago: valorPago || titulo.valor,
-        dataPagamento: dataPagamento || new Date().toISOString().split('T')[0],
+        dataPagamento: dataLocal,
         formaPagamento: formaPagamento || 'dinheiro',
         observacoesPagamento: observacoes || '',
         updatedAt: new Date().toISOString()
@@ -542,6 +559,98 @@ export const createFinanceiroService = (databaseWrapper, storage = null) => {
     } catch (error) {
       console.error('Erro ao registrar pagamento:', error);
       return { success: false, error: error.message };
+    }
+  },
+
+  /**
+   * Calcular juros e multa sobre título em atraso
+   * @param {Object} titulo - Objeto do título financeiro
+   * @param {Date} dataReferencia - Data de referência para cálculo (padrão: hoje)
+   * @returns {Object} - { valorOriginal, multa, juros, diasAtraso, total, percentualMulta, jurosDia }
+   */
+  calcularJurosMulta(titulo, dataReferencia = new Date()) {
+    try {
+      // Validação básica
+      if (!titulo || !titulo.vencimento || !titulo.valor) {
+        return {
+          valorOriginal: titulo?.valor || 0,
+          multa: 0,
+          juros: 0,
+          diasAtraso: 0,
+          total: titulo?.valor || 0,
+          percentualMulta: 0,
+          jurosDia: 0
+        };
+      }
+
+      // Se já está pago, retornar valores zerados
+      if (titulo.status === 'pago') {
+        return {
+          valorOriginal: titulo.valor,
+          multa: 0,
+          juros: 0,
+          diasAtraso: 0,
+          total: titulo.valorPago || titulo.valor,
+          percentualMulta: titulo.percentualMulta ?? 0,
+          jurosDia: titulo.jurosDia ?? 0
+        };
+      }
+
+      // Calcular dias de atraso
+      const vencimento = new Date(titulo.vencimento + 'T00:00:00');
+      const hoje = new Date(dataReferencia);
+      hoje.setHours(0, 0, 0, 0);
+      vencimento.setHours(0, 0, 0, 0);
+
+      const diasAtraso = Math.floor((hoje - vencimento) / (1000 * 60 * 60 * 24));
+
+      // Se não está em atraso, retornar valores zerados
+      if (diasAtraso <= 0) {
+        return {
+          valorOriginal: titulo.valor,
+          multa: 0,
+          juros: 0,
+          diasAtraso: 0,
+          total: titulo.valor,
+          percentualMulta: titulo.percentualMulta ?? 2,
+          jurosDia: titulo.jurosDia ?? 0.033
+        };
+      }
+
+      // Obter percentuais (usar padrões se não definidos)
+      const percentualMulta = titulo.percentualMulta ?? 2;
+      const jurosDia = titulo.jurosDia ?? 0.033;
+
+      // Calcular multa (aplicada uma única vez)
+      const multa = titulo.valor * (percentualMulta / 100);
+
+      // Calcular juros (aplicado por dia de atraso)
+      const juros = titulo.valor * (jurosDia / 100) * diasAtraso;
+
+      // Total a pagar
+      const total = titulo.valor + multa + juros;
+
+      return {
+        valorOriginal: titulo.valor,
+        multa: parseFloat(multa.toFixed(2)),
+        juros: parseFloat(juros.toFixed(2)),
+        diasAtraso,
+        total: parseFloat(total.toFixed(2)),
+        percentualMulta,
+        jurosDia
+      };
+    } catch (error) {
+      console.error('Erro ao calcular juros e multa:', error);
+      return {
+        valorOriginal: titulo?.valor || 0,
+        multa: 0,
+        juros: 0,
+        diasAtraso: 0,
+        total: titulo?.valor || 0,
+        percentualMulta: 0,
+        jurosDia: 0,
+        erro: error.message
+      };
     }
   },
 

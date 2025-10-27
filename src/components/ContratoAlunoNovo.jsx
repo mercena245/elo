@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 const ContratoAlunoNovo = ({ aluno, database, getData, onClose }) => {
   const [configEscola, setConfigEscola] = useState({
     nomeEscola: '',
+    nome: '',
     cnpj: '',
     endereco: '',
     diretor: '',
@@ -45,31 +46,11 @@ const ContratoAlunoNovo = ({ aluno, database, getData, onClose }) => {
 
   // Gerar contrato quando dados estiverem disponíveis
   useEffect(() => {
-    if (!carregando && aluno && configEscola.nomeEscola) {
+    if (!carregando && aluno && (configEscola.nomeEscola || configEscola.nome)) {
       console.log('🎨 [Contrato] Gerando contrato com dados:', { aluno, configEscola });
       const html = gerarContratoHtml();
-      
-      // Abre em nova janela para impressão adequada
-      setTimeout(() => {
-        const newWindow = window.open('', '_blank', 'width=900,height=700');
-        if (newWindow) {
-          newWindow.document.write(html);
-          newWindow.document.close();
-          
-          // Aguarda carregar completamente
-          newWindow.onload = function() {
-            newWindow.focus();
-          };
-          
-          // Fecha o modal atual
-          if (onClose) {
-            onClose();
-          }
-        } else {
-          // Fallback: se popup bloqueado, usa o modal
-          setContratoHtml(html);
-        }
-      }, 200);
+      setContratoHtml(html);
+      console.log('✅ [Contrato] HTML gerado com sucesso');
     }
   }, [carregando, aluno, configEscola]);
 
@@ -257,6 +238,10 @@ const ContratoAlunoNovo = ({ aluno, database, getData, onClose }) => {
   // ==================== GERAÇÃO DO CONTRATO HTML ====================
 
   const gerarContratoHtml = () => {
+    console.log('🎨 [gerarContratoHtml] Iniciando geração do contrato...');
+    console.log('📋 [gerarContratoHtml] Aluno:', aluno?.nome);
+    console.log('🏫 [gerarContratoHtml] Escola:', configEscola?.nomeEscola);
+    
     const respFinanceiro = obterResponsavelFinanceiro();
     const dataHoje = new Date();
     
@@ -291,7 +276,7 @@ const ContratoAlunoNovo = ({ aluno, database, getData, onClose }) => {
       RESPONSAVEL_FINANCEIRO_PAI: respFinanceiro.tipo === 'PAI' ? '<strong>' + respFinanceiro.texto + '</strong>' : '',
       
       // Escola
-      NOME_ESCOLA: configEscola.nomeEscola?.toUpperCase() || 'ESCOLA',
+      NOME_ESCOLA: (configEscola.nomeEscola || configEscola.nome || 'ESCOLA')?.toUpperCase(),
       CNPJ_ESCOLA: configEscola.cnpj || '',
       ENDERECO_ESCOLA: configEscola.endereco || '',
       NOME_DIRETOR: configEscola.diretor?.toUpperCase() || '',
@@ -312,176 +297,147 @@ const ContratoAlunoNovo = ({ aluno, database, getData, onClose }) => {
       CIDADE_ESCOLA: extrairCidade(configEscola.endereco) || 'Goiânia'
     };
 
-    // Template do contrato COMPLETO
+    // Template do contrato - Apenas conteúdo (sem HTML/HEAD/BODY)
     let html = `
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Contrato de Prestação de Serviços Educacionais</title>
-  <style>
+<style>
+  @page {
+    size: A4 portrait;
+    margin: 1.5cm;
+  }
+  .contrato-wrapper {
+    font-family: 'Times New Roman', Times, serif;
+    font-size: 10pt;
+    line-height: 1.4;
+    color: #000;
+    background: white;
+    padding: 15mm;
+    max-width: 210mm;
+    margin: 0 auto;
+  }
+  .contrato-wrapper h1 {
+    text-align: center;
+    font-size: 13pt;
+    font-weight: bold;
+    margin: 10px 0 8px;
+    text-transform: uppercase;
+    page-break-after: avoid;
+  }
+  .contrato-wrapper h2 {
+    text-align: center;
+    font-size: 11pt;
+    font-weight: bold;
+    margin: 5px 0 10px;
+    page-break-after: avoid;
+  }
+  .contrato-wrapper h3 {
+    font-size: 10pt;
+    font-weight: bold;
+    margin: 10px 0 6px;
+    text-transform: uppercase;
+    page-break-after: avoid;
+  }
+  .contrato-wrapper .clausula {
+    margin: 12px 0;
+    page-break-inside: auto;
+  }
+  .contrato-wrapper .clausula-title {
+    font-weight: bold;
+    text-transform: uppercase;
+    margin: 10px 0 6px;
+    font-size: 10pt;
+    page-break-after: avoid;
+  }
+  .contrato-wrapper .paragrafo {
+    text-align: justify;
+    margin: 6px 0;
+    line-height: 1.5;
+  }
+  .contrato-wrapper .info-qualificacao {
+    margin: 6px 0;
+    line-height: 1.5;
+    text-align: justify;
+  }
+  .contrato-wrapper .info-qualificacao p {
+    margin: 5px 0;
+  }
+  .contrato-wrapper .info-destaque {
+    font-weight: bold;
+  }
+  .contrato-wrapper table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 10px 0;
+    page-break-inside: avoid;
+  }
+  .contrato-wrapper th, 
+  .contrato-wrapper td {
+    border: 1px solid #000;
+    padding: 5px;
+    text-align: center;
+    font-size: 9pt;
+  }
+  .contrato-wrapper th {
+    background-color: #f0f0f0;
+    font-weight: bold;
+  }
+  .contrato-wrapper .assinatura {
+    margin-top: 25px;
+    page-break-inside: avoid;
+  }
+  .contrato-wrapper .linha-assinatura {
+    margin: 20px auto 3px;
+    border-top: 1px solid #000;
+    width: 55%;
+  }
+  .contrato-wrapper .bloco-assinatura {
+    text-align: center;
+    margin: 15px 0;
+    page-break-inside: avoid;
+  }
+  .contrato-wrapper hr {
+    border: none;
+    border-top: 1.5px solid #000;
+    margin: 12px 0;
+  }
+  .contrato-wrapper ul {
+    margin: 6px 0 6px 30px;
+  }
+  .contrato-wrapper li {
+    margin: 3px 0;
+    text-align: justify;
+  }
+  .contrato-wrapper strong {
+    font-weight: bold;
+  }
+  @media print {
     @page {
       size: A4 portrait;
       margin: 1.5cm;
     }
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
+    .contrato-wrapper {
+      padding: 0 !important;
+      margin: 0 !important;
+      max-width: none !important;
     }
-    html {
-      width: 100%;
-      height: auto;
+    .no-print {
+      display: none !important;
     }
-    body {
-      font-family: 'Times New Roman', Times, serif;
-      font-size: 10pt;
-      line-height: 1.4;
-      color: #000;
-      background: white;
-      padding: 15mm;
-      width: 100%;
-      height: auto;
-      margin: 0;
+    .page-break {
+      page-break-before: always;
     }
-    h1 {
-      text-align: center;
-      font-size: 13pt;
-      font-weight: bold;
-      margin: 10px 0 8px;
-      text-transform: uppercase;
-      page-break-after: avoid;
-    }
-    h2 {
-      text-align: center;
-      font-size: 11pt;
-      font-weight: bold;
-      margin: 5px 0 10px;
-      page-break-after: avoid;
-    }
-    h3 {
-      font-size: 10pt;
-      font-weight: bold;
-      margin: 10px 0 6px;
-      text-transform: uppercase;
-      page-break-after: avoid;
-    }
+    h1, h2, h3, .clausula-title {
+      page-break-after: avoid !important;
+      }
     .clausula {
-      margin: 12px 0;
-      page-break-inside: auto;
+      page-break-inside: auto !important;
     }
-    .clausula-title {
-      font-weight: bold;
-      text-transform: uppercase;
-      margin: 10px 0 6px;
-      font-size: 10pt;
-      page-break-after: avoid;
+    table, .bloco-assinatura {
+      page-break-inside: avoid !important;
     }
-    .paragrafo {
-      text-align: justify;
-      margin: 6px 0;
-      line-height: 1.5;
-    }
-    .info-qualificacao {
-      margin: 6px 0;
-      line-height: 1.5;
-      text-align: justify;
-    }
-    .info-qualificacao p {
-      margin: 5px 0;
-    }
-    .info-destaque {
-      font-weight: bold;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin: 10px 0;
-      page-break-inside: avoid;
-    }
-    th, td {
-      border: 1px solid #000;
-      padding: 5px;
-      text-align: center;
-      font-size: 9pt;
-    }
-    th {
-      background-color: #f0f0f0;
-      font-weight: bold;
-    }
-    .assinatura {
-      margin-top: 25px;
-      page-break-inside: avoid;
-    }
-    .linha-assinatura {
-      margin: 20px auto 3px;
-      border-top: 1px solid #000;
-      width: 55%;
-    }
-    .bloco-assinatura {
-      text-align: center;
-      margin: 15px 0;
-      page-break-inside: avoid;
-    }
-    hr {
-      border: none;
-      border-top: 1.5px solid #000;
-      margin: 12px 0;
-    }
-    ul {
-      margin: 6px 0 6px 30px;
-    }
-    li {
-      margin: 3px 0;
-      text-align: justify;
-    }
-    strong {
-      font-weight: bold;
-    }
-    @media print {
-      @page {
-        size: A4 portrait;
-        margin: 1.5cm;
-      }
-      html {
-        width: 210mm;
-        height: auto;
-      }
-      body {
-        width: 210mm;
-        height: auto;
-        padding: 0 !important;
-        margin: 0 !important;
-        background: white !important;
-      }
-      .no-print {
-        display: none !important;
-      }
-      .page-break {
-        page-break-before: always;
-      }
-      h1, h2, h3, .clausula-title {
-        page-break-after: avoid !important;
-      }
-      .clausula {
-        page-break-inside: auto !important;
-      }
-      table, .bloco-assinatura {
-        page-break-inside: avoid !important;
-      }
-    }
-    @media screen {
-      body {
-        max-width: 21cm;
-        margin: 20px auto;
-        box-shadow: 0 0 10px rgba(0,0,0,0.1);
-        padding: 20mm;
-      }
-    }
-  </style>
-</head>
-<body>
+  }
+</style>
+
+<div class="contrato-wrapper">
 
 <h1>CONTRATO DE PRESTAÇÃO DE SERVIÇOS EDUCACIONAIS</h1>
 <h2>ANO LETIVO ${variaveis.ANO_LETIVO}</h2>
@@ -810,17 +766,8 @@ const ContratoAlunoNovo = ({ aluno, database, getData, onClose }) => {
   <p>Lei n.º 13.709/2018 (LGPD) • Código Civil (Lei n.º 10.406/2002) • CDC (Lei n.º 8.078/1990)</p>
 </div>
 
-<div class="no-print" style="margin-top: 30px; text-align: center; padding: 20px; background: #f5f5f5; border-radius: 8px;">
-  <button onclick="window.print()" style="padding: 12px 40px; font-size: 15px; cursor: pointer; background: #4CAF50; color: white; border: none; border-radius: 5px; margin: 5px;">
-    🖨️ Imprimir Contrato
-  </button>
-  <button onclick="window.close()" style="padding: 12px 40px; font-size: 15px; cursor: pointer; background: #f44336; color: white; border: none; border-radius: 5px; margin: 5px;">
-    ✖️ Fechar
-  </button>
 </div>
-
-</body>
-</html>
+<!-- Fim do contrato-wrapper -->
     `;
 
     return html;
@@ -832,7 +779,8 @@ const ContratoAlunoNovo = ({ aluno, database, getData, onClose }) => {
 
   // ==================== RENDERIZAÇÃO ====================
 
-  if (carregando) {
+  // Mostra loading apenas se estiver carregando E não tiver HTML
+  if (carregando && !contratoHtml) {
     return (
       <div style={{ 
         display: 'flex', 
@@ -869,12 +817,94 @@ const ContratoAlunoNovo = ({ aluno, database, getData, onClose }) => {
     );
   }
 
+  // Se não tem HTML gerado ainda mas tem aluno, mostra mensagem
+  if (!contratoHtml) {
+    console.log('⚠️ [Contrato] HTML não gerado ainda. Estado:', { carregando, aluno: !!aluno, configEscola });
+    return (
+      <div style={{ padding: '40px', textAlign: 'center' }}>
+        <p style={{ color: '#f59e0b' }}>⏳ Aguardando dados do contrato...</p>
+        <p style={{ fontSize: '12px', color: '#666', marginTop: '10px' }}>
+          {!(configEscola.nomeEscola || configEscola.nome) && 'Carregando configurações da escola...'}
+        </p>
+      </div>
+    );
+  }
+
+  const handleImprimir = () => {
+    window.print();
+  };
+
   return (
-    <div style={{ width: '100%', minHeight: '100vh' }}>
+    <div style={{ width: '100%', minHeight: '100vh', position: 'relative' }}>
+      {/* Botão de Imprimir - Visível apenas na tela */}
+      <div style={{ 
+        position: 'sticky',
+        top: 0,
+        zIndex: 1000,
+        background: 'white',
+        padding: '10px 20px',
+        borderBottom: '2px solid #e5e7eb',
+        display: 'flex',
+        gap: '10px',
+        justifyContent: 'flex-end'
+      }} className="no-print">
+        <button
+          onClick={handleImprimir}
+          style={{
+            padding: '10px 20px',
+            backgroundColor: '#3b82f6',
+            color: 'white',
+            border: 'none',
+            borderRadius: '6px',
+            cursor: 'pointer',
+            fontSize: '14px',
+            fontWeight: '600',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}
+          onMouseOver={(e) => e.target.style.backgroundColor = '#2563eb'}
+          onMouseOut={(e) => e.target.style.backgroundColor = '#3b82f6'}
+        >
+          🖨️ Imprimir Contrato
+        </button>
+        {onClose && (
+          <button
+            onClick={onClose}
+            style={{
+              padding: '10px 20px',
+              backgroundColor: '#ef4444',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: '600'
+            }}
+            onMouseOver={(e) => e.target.style.backgroundColor = '#dc2626'}
+            onMouseOut={(e) => e.target.style.backgroundColor = '#ef4444'}
+          >
+            ✕ Fechar
+          </button>
+        )}
+      </div>
+      
+      {/* Conteúdo do Contrato */}
       <div 
         dangerouslySetInnerHTML={{ __html: contratoHtml }}
         style={{ width: '100%' }}
+        className="contrato-content"
       />
+      
+      {/* Estilos para impressão */}
+      <style>{`
+        @media print {
+          /* Oculta botões na impressão */
+          .no-print {
+            display: none !important;
+          }
+        }
+      `}</style>
     </div>
   );
 };

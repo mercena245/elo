@@ -60,13 +60,25 @@ const BaixaTituloDialog = ({ open, onClose, titulo, onSuccess, userId }) => {
   const [creditoAUtilizar, setCreditoAUtilizar] = useState(0);
   const [carregandoCredito, setCarregandoCredito] = useState(false);
   
+  // Estados para juros e multa
+  const [calculoJurosMulta, setCalculoJurosMulta] = useState(null);
+  
+  // Função para obter data local no formato YYYY-MM-DD
+  const getDataLocal = () => {
+    const hoje = new Date();
+    const ano = hoje.getFullYear();
+    const mes = String(hoje.getMonth() + 1).padStart(2, '0');
+    const dia = String(hoje.getDate()).padStart(2, '0');
+    return `${ano}-${mes}-${dia}`;
+  };
+  
   const [dadosPagamento, setDadosPagamento] = useState({
     formaPagamento: 'dinheiro',
     valorPago: '',
     valorDesconto: 0,
     motivoDesconto: '',
     observacoes: '',
-    dataRecebimento: new Date().toISOString().split('T')[0],
+    dataRecebimento: getDataLocal(),
     numeroComprovante: '',
     contaDestino: '',
     gerarRecibo: true,
@@ -93,8 +105,27 @@ const BaixaTituloDialog = ({ open, onClose, titulo, onSuccess, userId }) => {
     if (open && titulo) {
       resetDialog();
       buscarCreditoAluno();
+      calcularJurosMultaTitulo();
     }
   }, [open, titulo]);
+
+  const calcularJurosMultaTitulo = () => {
+    if (!financeiroService || !titulo) {
+      setCalculoJurosMulta(null);
+      return;
+    }
+
+    const calculo = financeiroService.calcularJurosMulta(titulo);
+    setCalculoJurosMulta(calculo);
+    
+    // Atualizar valor a pagar se houver juros/multa
+    if (calculo.total > titulo.valor) {
+      setDadosPagamento(prev => ({
+        ...prev,
+        valorPago: calculo.total.toString()
+      }));
+    }
+  };
 
   const buscarCreditoAluno = async () => {
     if (!titulo?.alunoId) return;
@@ -132,7 +163,7 @@ const BaixaTituloDialog = ({ open, onClose, titulo, onSuccess, userId }) => {
       valorDesconto: 0,
       motivoDesconto: '',
       observacoes: '',
-      dataRecebimento: new Date().toISOString().split('T')[0],
+      dataRecebimento: getDataLocal(),
       numeroComprovante: '',
       contaDestino: '',
       gerarRecibo: true,
@@ -374,6 +405,52 @@ const BaixaTituloDialog = ({ open, onClose, titulo, onSuccess, userId }) => {
                 </Typography>
               </Grid>
             </Grid>
+
+            {/* Detalhamento de Juros e Multa */}
+            {calculoJurosMulta && calculoJurosMulta.diasAtraso > 0 && (
+              <>
+                <Divider sx={{ my: 2 }} />
+                <Alert severity="warning" icon={<Warning />} sx={{ mb: 2 }}>
+                  <Typography variant="body2" fontWeight="bold" gutterBottom>
+                    ⚠️ Título em Atraso - {calculoJurosMulta.diasAtraso} dia(s)
+                  </Typography>
+                  <Grid container spacing={2} sx={{ mt: 1 }}>
+                    <Grid item xs={12} sm={3}>
+                      <Typography variant="caption" color="text.secondary">
+                        Valor Original:
+                      </Typography>
+                      <Typography variant="body2" fontWeight="bold">
+                        {formatCurrency(calculoJurosMulta.valorOriginal)}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={12} sm={3}>
+                      <Typography variant="caption" color="text.secondary">
+                        Multa ({calculoJurosMulta.percentualMulta}%):
+                      </Typography>
+                      <Typography variant="body2" fontWeight="bold" color="error">
+                        + {formatCurrency(calculoJurosMulta.multa)}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={12} sm={3}>
+                      <Typography variant="caption" color="text.secondary">
+                        Juros ({calculoJurosMulta.jurosDia}% × {calculoJurosMulta.diasAtraso} dias):
+                      </Typography>
+                      <Typography variant="body2" fontWeight="bold" color="error">
+                        + {formatCurrency(calculoJurosMulta.juros)}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={12} sm={3}>
+                      <Typography variant="caption" color="text.secondary">
+                        Total a Pagar:
+                      </Typography>
+                      <Typography variant="h6" fontWeight="bold" color="error">
+                        {formatCurrency(calculoJurosMulta.total)}
+                      </Typography>
+                    </Grid>
+                  </Grid>
+                </Alert>
+              </>
+            )}
           </CardContent>
         </Card>
 

@@ -45,7 +45,8 @@ import {
   FormControlLabel,
   Checkbox,
   Snackbar,
-  Backdrop
+  Backdrop,
+  Divider
 } from '@mui/material';
 import {
   AttachMoney,
@@ -157,6 +158,7 @@ const FinanceiroPage = () => {
   const [pagamentoDialog, setPagamentoDialog] = useState(false);
   const [comprovanteDialog, setComprovanteDialog] = useState(false);
   const [tituloSelecionado, setTituloSelecionado] = useState(null);
+  const [calculoJurosMultaPai, setCalculoJurosMultaPai] = useState(null);
   
   // Estados dos formulários
   const [novoTitulo, setNovoTitulo] = useState({
@@ -894,6 +896,15 @@ const FinanceiroPage = () => {
       comprovante: null,
       carregando: false
     });
+    
+    // Calcular juros e multa se houver atraso
+    if (financeiroService && financeiroService.calcularJurosMulta) {
+      const calculo = financeiroService.calcularJurosMulta(titulo);
+      setCalculoJurosMultaPai(calculo);
+    } else {
+      setCalculoJurosMultaPai(null);
+    }
+    
     setPagamentoDialog(true);
   };
 
@@ -1075,9 +1086,12 @@ const FinanceiroPage = () => {
         return false;
       }
       
-      // Filtro por status
-      if (filtrosTitulos.status && filtrosTitulos.status !== 'todos' && titulo.status !== filtrosTitulos.status) {
-        return false;
+      // Filtro por status (considera status visual incluindo vencimento)
+      if (filtrosTitulos.status && filtrosTitulos.status !== 'todos') {
+        const statusVisual = getStatusVisual(titulo);
+        if (statusVisual !== filtrosTitulos.status) {
+          return false;
+        }
       }
       
       // Filtro por data de vencimento
@@ -1837,6 +1851,29 @@ const FinanceiroPage = () => {
     }
   };
 
+  // Verificar se título está vencido
+  const verificarSeVencido = (titulo) => {
+    if (titulo.status === 'pago' || titulo.status === 'cancelado') {
+      return false;
+    }
+    
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    
+    const vencimento = new Date(titulo.vencimento + 'T00:00:00');
+    vencimento.setHours(0, 0, 0, 0);
+    
+    return vencimento < hoje;
+  };
+
+  // Obter status visual do título (considerando vencimento)
+  const getStatusVisual = (titulo) => {
+    if (titulo.status === 'pago') return 'pago';
+    if (titulo.status === 'em_analise') return 'em_analise';
+    if (verificarSeVencido(titulo)) return 'vencido';
+    return 'pendente';
+  };
+
   // Verificações de acesso
   if (!roleChecked) {
     return (
@@ -2559,7 +2596,52 @@ const FinanceiroPage = () => {
                                 fontSize: { xs: '0.75rem', md: '0.875rem' },
                                 fontWeight: 'bold'
                               }}>
-                                {formatCurrency(titulo.valor)}
+                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.25 }}>
+                                  {(() => {
+                                    if (verificarSeVencido(titulo) && financeiroService?.calcularJurosMulta) {
+                                      const calculo = financeiroService.calcularJurosMulta(titulo);
+                                      return (
+                                        <>
+                                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                            <Typography 
+                                              variant="body2" 
+                                              sx={{ 
+                                                textDecoration: 'line-through',
+                                                color: 'text.secondary',
+                                                fontSize: '0.7rem'
+                                              }}
+                                            >
+                                              {formatCurrency(titulo.valor)}
+                                            </Typography>
+                                            <Tooltip title={`Multa: ${formatCurrency(calculo.multa)} + Juros: ${formatCurrency(calculo.juros)} (${calculo.diasAtraso} dias)`}>
+                                              <Chip 
+                                                label="+ J/M" 
+                                                size="small" 
+                                                color="error" 
+                                                sx={{ 
+                                                  height: 16, 
+                                                  fontSize: '0.55rem',
+                                                  '& .MuiChip-label': { px: 0.5 }
+                                                }} 
+                                              />
+                                            </Tooltip>
+                                          </Box>
+                                          <Typography 
+                                            variant="body2" 
+                                            sx={{ 
+                                              color: 'error.main',
+                                              fontWeight: 'bold',
+                                              fontSize: '0.875rem'
+                                            }}
+                                          >
+                                            {formatCurrency(calculo.total)}
+                                          </Typography>
+                                        </>
+                                      );
+                                    }
+                                    return formatCurrency(titulo.valor);
+                                  })()}
+                                </Box>
                               </TableCell>
                               <TableCell sx={{ 
                                 whiteSpace: 'nowrap',
@@ -2569,8 +2651,8 @@ const FinanceiroPage = () => {
                               </TableCell>
                               <TableCell>
                                 <Chip
-                                  label={getStatusLabel(titulo.status)}
-                                  color={getStatusColor(titulo.status)}
+                                  label={getStatusLabel(getStatusVisual(titulo))}
+                                  color={getStatusColor(getStatusVisual(titulo))}
                                   size="small"
                                   sx={{ fontSize: { xs: '0.6rem', md: '0.75rem' } }}
                                 />
@@ -3008,9 +3090,16 @@ const FinanceiroPage = () => {
                                     variant="contained"
                                     color="success"
                                     onClick={() => {
+                                      // Obter data local no formato YYYY-MM-DD
+                                      const hoje = new Date();
+                                      const ano = hoje.getFullYear();
+                                      const mes = String(hoje.getMonth() + 1).padStart(2, '0');
+                                      const dia = String(hoje.getDate()).padStart(2, '0');
+                                      const dataLocal = `${ano}-${mes}-${dia}`;
+                                      
                                       setDialogPagamentoConta({ open: true, conta });
                                       setPagamentoConta({
-                                        dataPagamento: new Date().toISOString().split('T')[0],
+                                        dataPagamento: dataLocal,
                                         formaPagamento: '',
                                         observacoes: ''
                                       });
@@ -3729,11 +3818,56 @@ const FinanceiroPage = () => {
                   Título: {tituloSelecionado.descricao}
                 </Typography>
                 <Typography variant="h6" color="primary">
-                  Valor: {formatCurrency(tituloSelecionado.valor)}
+                  Valor Original: {formatCurrency(tituloSelecionado.valor)}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
                   Vencimento: {formatDate(tituloSelecionado.vencimento)}
                 </Typography>
+
+                {/* Detalhamento de Juros e Multa */}
+                {calculoJurosMultaPai && calculoJurosMultaPai.diasAtraso > 0 && (
+                  <Alert severity="warning" icon={<Warning />} sx={{ mt: 2 }}>
+                    <Typography variant="body2" fontWeight="bold" gutterBottom>
+                      ⚠️ Título em Atraso - {calculoJurosMultaPai.diasAtraso} dia(s)
+                    </Typography>
+                    <Box sx={{ mt: 1.5 }}>
+                      <Grid container spacing={1}>
+                        <Grid item xs={6}>
+                          <Typography variant="caption" color="text.secondary">
+                            Valor Original:
+                          </Typography>
+                          <Typography variant="body2" fontWeight="bold">
+                            {formatCurrency(calculoJurosMultaPai.valorOriginal)}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={6}>
+                          <Typography variant="caption" color="text.secondary">
+                            Multa ({calculoJurosMultaPai.percentualMulta}%):
+                          </Typography>
+                          <Typography variant="body2" fontWeight="bold" color="error">
+                            + {formatCurrency(calculoJurosMultaPai.multa)}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={6}>
+                          <Typography variant="caption" color="text.secondary">
+                            Juros ({calculoJurosMultaPai.jurosDia}% × {calculoJurosMultaPai.diasAtraso} dias):
+                          </Typography>
+                          <Typography variant="body2" fontWeight="bold" color="error">
+                            + {formatCurrency(calculoJurosMultaPai.juros)}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={6}>
+                          <Typography variant="caption" color="text.secondary">
+                            Total a Pagar:
+                          </Typography>
+                          <Typography variant="h6" fontWeight="bold" color="error">
+                            {formatCurrency(calculoJurosMultaPai.total)}
+                          </Typography>
+                        </Grid>
+                      </Grid>
+                    </Box>
+                  </Alert>
+                )}
               </Box>
             )}
             
@@ -4252,18 +4386,61 @@ const FinanceiroPage = () => {
                             </Typography>
                           </Box>
                           <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                            <Typography variant="body2" color="text.secondary">Valor:</Typography>
+                            <Typography variant="body2" color="text.secondary">Valor Original:</Typography>
                             <Typography variant="body2" fontWeight="bold" color="primary">
                               {formatCurrency(detalheTitulo.titulo.valor)}
                             </Typography>
                           </Box>
+                          
+                          {/* Mostrar Juros e Multa se vencido */}
+                          {verificarSeVencido(detalheTitulo.titulo) && financeiroService?.calcularJurosMulta && (() => {
+                            const calculo = financeiroService.calcularJurosMulta(detalheTitulo.titulo);
+                            if (calculo.diasAtraso > 0) {
+                              return (
+                                <>
+                                  <Divider sx={{ my: 1 }} />
+                                  <Alert severity="warning" sx={{ my: 1 }}>
+                                    <Typography variant="caption" fontWeight="bold" gutterBottom>
+                                      ⚠️ Título Vencido - {calculo.diasAtraso} dia(s) de atraso
+                                    </Typography>
+                                  </Alert>
+                                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                    <Typography variant="body2" color="text.secondary">
+                                      Multa ({calculo.percentualMulta}%):
+                                    </Typography>
+                                    <Typography variant="body2" fontWeight="bold" color="error">
+                                      + {formatCurrency(calculo.multa)}
+                                    </Typography>
+                                  </Box>
+                                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                    <Typography variant="body2" color="text.secondary">
+                                      Juros ({calculo.jurosDia}% × {calculo.diasAtraso} dias):
+                                    </Typography>
+                                    <Typography variant="body2" fontWeight="bold" color="error">
+                                      + {formatCurrency(calculo.juros)}
+                                    </Typography>
+                                  </Box>
+                                  <Divider sx={{ my: 1 }} />
+                                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                    <Typography variant="body2" color="text.secondary" fontWeight="bold">
+                                      Total a Pagar:
+                                    </Typography>
+                                    <Typography variant="h6" fontWeight="bold" color="error">
+                                      {formatCurrency(calculo.total)}
+                                    </Typography>
+                                  </Box>
+                                </>
+                              );
+                            }
+                            return null;
+                          })()}
+                          
                           <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                             <Typography variant="body2" color="text.secondary">Status:</Typography>
                             <Chip 
-                              label={detalheTitulo.titulo.status} 
+                              label={getStatusLabel(getStatusVisual(detalheTitulo.titulo))} 
                               size="small"
-                              color={detalheTitulo.titulo.status === 'pago' ? 'success' : 
-                                     detalheTitulo.titulo.status === 'pendente' ? 'warning' : 'error'}
+                              color={getStatusColor(getStatusVisual(detalheTitulo.titulo))}
                             />
                           </Box>
                         </Box>
@@ -4438,13 +4615,17 @@ const FinanceiroPage = () => {
                           <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                             <Typography variant="body2" color="text.secondary">Data de Criação:</Typography>
                             <Typography variant="body2" fontWeight="bold">
-                              {detalheTitulo.titulo.dataCriacao ? formatDate(detalheTitulo.titulo.dataCriacao) : 'N/A'}
+                              {detalheTitulo.titulo.dataGeracao ? 
+                                formatDate(detalheTitulo.titulo.dataGeracao) : 
+                                (detalheTitulo.titulo.createdAt ? 
+                                  formatDate(detalheTitulo.titulo.createdAt) : 'N/A')}
                             </Typography>
                           </Box>
                           <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                             <Typography variant="body2" color="text.secondary">Data de Vencimento:</Typography>
                             <Typography variant="body2" fontWeight="bold">
-                              {detalheTitulo.titulo.dataVencimento ? formatDate(detalheTitulo.titulo.dataVencimento) : 'N/A'}
+                              {detalheTitulo.titulo.vencimento ? 
+                                formatDate(detalheTitulo.titulo.vencimento) : 'N/A'}
                             </Typography>
                           </Box>
                           {detalheTitulo.titulo.dataPagamento && (
@@ -4469,7 +4650,19 @@ const FinanceiroPage = () => {
                             📝 Observações
                           </Typography>
                           <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
-                            {detalheTitulo.titulo.observacoes}
+                            {(() => {
+                              // Substituir ID da turma pelo nome da turma nas observações
+                              let obs = detalheTitulo.titulo.observacoes;
+                              if (obs && obs.includes('Turma:')) {
+                                const aluno = alunos.find(a => a.id === detalheTitulo.titulo.alunoId);
+                                const turmaId = aluno?.turmaId;
+                                if (turmaId && turmas[turmaId]) {
+                                  // Substituir o ID da turma pelo nome
+                                  obs = obs.replace(/Turma:\s*[^\s|]+/, `Turma: ${turmas[turmaId].nome}`);
+                                }
+                              }
+                              return obs;
+                            })()}
                           </Typography>
                         </CardContent>
                       </Card>

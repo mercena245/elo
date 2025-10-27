@@ -75,6 +75,8 @@ const RematriculaDialog = ({
     mensalidadeValor: 0,
     diaVencimento: 10,
     descontoPercentual: 0,
+    percentualMulta: 2,
+    jurosDia: 0.033,
     valorMatricula: 0,
     valorMateriais: 0,
     dataInicioCompetencia: '',
@@ -117,6 +119,8 @@ const RematriculaDialog = ({
         mensalidadeValor: aluno.financeiro?.mensalidadeValor || 0,
         diaVencimento: aluno.financeiro?.diaVencimento || 10,
         descontoPercentual: aluno.financeiro?.descontoPercentual || 0,
+        percentualMulta: aluno.financeiro?.percentualMulta ?? 2,
+        jurosDia: aluno.financeiro?.jurosDia ?? 0.033,
         valorMatricula: aluno.financeiro?.valorMatricula || 0,
         valorMateriais: aluno.financeiro?.valorMateriais || 0,
         dataInicioCompetencia: '',
@@ -337,12 +341,19 @@ const RematriculaDialog = ({
   const baixarTodosTitulos = async () => {
     if (!titulosAbertos || !Array.isArray(titulosAbertos)) return;
     
+    // Obter data local
+    const hoje = new Date();
+    const ano = hoje.getFullYear();
+    const mes = String(hoje.getMonth() + 1).padStart(2, '0');
+    const dia = String(hoje.getDate()).padStart(2, '0');
+    const dataLocal = `${ano}-${mes}-${dia}`;
+    
     for (const titulo of titulosAbertos) {
       if (financeiroService?.registrarPagamento && titulo?.id) {
         await financeiroService.registrarPagamento({
           tituloId: titulo.id,
           valorPago: titulo.valor || 0,
-          dataPagamento: new Date().toISOString().split('T')[0],
+          dataPagamento: dataLocal,
           formaPagamento: 'rematricula',
           observacoes: 'Pagamento confirmado na rematrícula'
         });
@@ -473,6 +484,30 @@ const RematriculaDialog = ({
               value={dadosRematricula.descontoPercentual}
               onChange={(e) => setDadosRematricula({ ...dadosRematricula, descontoPercentual: parseFloat(e.target.value) })}
               inputProps={{ min: 0, max: 100 }}
+            />
+          </Grid>
+
+          <Grid item xs={12} sm={4}>
+            <TextField
+              fullWidth
+              label="Multa por Atraso (%)"
+              type="number"
+              value={dadosRematricula.percentualMulta ?? 2}
+              onChange={(e) => setDadosRematricula({ ...dadosRematricula, percentualMulta: parseFloat(e.target.value) })}
+              inputProps={{ min: 0, max: 100, step: 0.1 }}
+              helperText="Percentual de multa aplicado sobre o valor em caso de atraso (padrão: 2%)"
+            />
+          </Grid>
+
+          <Grid item xs={12} sm={4}>
+            <TextField
+              fullWidth
+              label="Juros por Dia de Atraso (%)"
+              type="number"
+              value={dadosRematricula.jurosDia ?? 0.033}
+              onChange={(e) => setDadosRematricula({ ...dadosRematricula, jurosDia: parseFloat(e.target.value) })}
+              inputProps={{ min: 0, max: 100, step: 0.001 }}
+              helperText="Percentual de juros por dia de atraso (padrão: 0,033% = 1% ao mês)"
             />
           </Grid>
 

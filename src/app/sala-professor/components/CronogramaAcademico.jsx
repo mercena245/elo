@@ -5,11 +5,7 @@ import {
   Box,
   Typography,
   Card,
-  CardContent,
-  Grid,
   Button,
-  Alert,
-  CircularProgress,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -19,82 +15,64 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  Chip,
-  Paper,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemSecondaryAction,
   IconButton,
-  Calendar,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
+  Paper,
   Divider,
-  Badge
+  Stack,
+  CircularProgress,
+  Tooltip,
+  Menu
 } from '@mui/material';
 import {
-  ExpandMore as ExpandMoreIcon,
-  Event as EventIcon,
   Add as AddIcon,
+  ChevronLeft,
+  ChevronRight,
+  Today as TodayIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
-  School as SchoolIcon,
-  Today as TodayIcon,
-  Assignment as AssignmentIcon,
-  Warning as WarningIcon,
-  CheckCircle as CheckCircleIcon,
-  Schedule as ScheduleIcon,
-  CalendarMonth as CalendarMonthIcon
+  Event as EventIcon
 } from '@mui/icons-material';
 import { useAuthUser } from '../../../hooks/useAuthUser';
 import { auditService } from '../../../services/auditService';
 import { useSchoolDatabase } from '../../../hooks/useSchoolDatabase';
 
 const CronogramaAcademico = () => {
-  // Hook para acessar banco da escola
-  const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, storage: schoolStorage } = useSchoolDatabase();
-
+  const { getData, setData, pushData, removeData, updateData, isReady, error: dbError } = useSchoolDatabase();
   const { user, userRole } = useAuthUser();
+  
   const [loading, setLoading] = useState(true);
   const [eventos, setEventos] = useState({});
   const [turmas, setTurmas] = useState({});
-  const [disciplinas, setDisciplinas] = useState({});
-  
-  // Estados de visualização
   const [mesAtual, setMesAtual] = useState(new Date());
-  const [eventosPorDia, setEventosPorDia] = useState({});
-  const [eventosProximos, setEventosProximos] = useState([]);
-  
-  // Estados do modal
   const [modalOpen, setModalOpen] = useState(false);
   const [eventoEditando, setEventoEditando] = useState(null);
+  const [anchorEl, setAnchorEl] = useState(null);
+  const [eventoSelecionado, setEventoSelecionado] = useState(null);
+  
   const [formData, setFormData] = useState({
     titulo: '',
     descricao: '',
     dataInicio: '',
     dataFim: '',
-    tipo: 'pedagogico',
-    turmaId: '',
-    disciplinaId: '',
+    tipo: 'aula',
     prioridade: 'media',
-    status: 'ativo'
+    turmaId: ''
   });
 
-  // Tipos de eventos acadêmicos
+  // Tipos e prioridades
   const tiposEventos = {
-    pedagogico: { nome: 'Pedagógico', cor: '#2196F3', icon: <SchoolIcon /> },
-    avaliacao: { nome: 'Avaliação', cor: '#FF9800', icon: <AssignmentIcon /> },
-    reuniao: { nome: 'Reunião', cor: '#9C27B0', icon: <EventIcon /> },
-    feriado: { nome: 'Feriado', cor: '#F44336', icon: <TodayIcon /> },
-    evento: { nome: 'Evento Escolar', cor: '#4CAF50', icon: <EventIcon /> },
-    planejamento: { nome: 'Planejamento', cor: '#00BCD4', icon: <ScheduleIcon /> }
+    aula: { nome: 'Aula', cor: '#4285f4' },
+    prova: { nome: 'Prova/Avaliação', cor: '#ea4335' },
+    reuniao: { nome: 'Reunião', cor: '#fbbc04' },
+    evento: { nome: 'Evento Especial', cor: '#34a853' },
+    feriado: { nome: 'Feriado', cor: '#9e9e9e' },
+    outro: { nome: 'Outro', cor: '#ab47bc' }
   };
 
   const prioridades = {
-    baixa: { nome: 'Baixa', cor: '#4CAF50' },
-    media: { nome: 'Média', cor: '#FF9800' },
-    alta: { nome: 'Alta', cor: '#F44336' }
+    baixa: { nome: 'Baixa', cor: '#5f6368' },
+    media: { nome: 'Média', cor: '#1967d2' },
+    alta: { nome: 'Alta', cor: '#d93025' }
   };
 
   useEffect(() => {

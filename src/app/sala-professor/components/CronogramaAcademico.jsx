@@ -30,7 +30,12 @@ import {
   Today as TodayIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
-  Event as EventIcon
+  Event as EventIcon,
+  Visibility as VisibilityIcon,
+  CalendarMonth as CalendarMonthIcon,
+  AccessTime as AccessTimeIcon,
+  School as SchoolIcon,
+  PriorityHigh as PriorityHighIcon
 } from '@mui/icons-material';
 import { useAuthUser } from '../../../hooks/useAuthUser';
 import { auditService } from '../../../services/auditService';
@@ -45,6 +50,7 @@ const CronogramaAcademico = () => {
   const [turmas, setTurmas] = useState({});
   const [mesAtual, setMesAtual] = useState(new Date());
   const [modalOpen, setModalOpen] = useState(false);
+  const [modalVisualizarOpen, setModalVisualizarOpen] = useState(false);
   const [eventoEditando, setEventoEditando] = useState(null);
   const [anchorEl, setAnchorEl] = useState(null);
   const [eventoSelecionado, setEventoSelecionado] = useState(null);
@@ -159,6 +165,12 @@ const CronogramaAcademico = () => {
     setAnchorEl(null);
   };
 
+  const visualizarEvento = (evento) => {
+    setEventoSelecionado(evento);
+    setModalVisualizarOpen(true);
+    setAnchorEl(null);
+  };
+
   const salvarEvento = async () => {
     if (!formData.titulo || !formData.dataInicio) {
       alert('Preencha o título e a data de início');
@@ -250,9 +262,20 @@ const CronogramaAcademico = () => {
         </Box>
       </Card>
 
-      <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => setAnchorEl(null)} PaperProps={{ sx: { borderRadius: 2, minWidth: 160 } }}>
-        <MenuItem onClick={() => editarEvento(eventoSelecionado)} sx={{ gap: 1.5, py: 1.5 }}><EditIcon fontSize="small" /><Typography variant="body2">Editar</Typography></MenuItem>
-        <MenuItem onClick={excluirEvento} sx={{ gap: 1.5, py: 1.5, color: 'error.main' }}><DeleteIcon fontSize="small" /><Typography variant="body2">Excluir</Typography></MenuItem>
+      <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => setAnchorEl(null)} PaperProps={{ sx: { borderRadius: 2, minWidth: 180 } }}>
+        <MenuItem onClick={() => visualizarEvento(eventoSelecionado)} sx={{ gap: 1.5, py: 1.5 }}>
+          <VisibilityIcon fontSize="small" />
+          <Typography variant="body2">Ver detalhes</Typography>
+        </MenuItem>
+        <MenuItem onClick={() => editarEvento(eventoSelecionado)} sx={{ gap: 1.5, py: 1.5 }}>
+          <EditIcon fontSize="small" />
+          <Typography variant="body2">Editar</Typography>
+        </MenuItem>
+        <Divider />
+        <MenuItem onClick={excluirEvento} sx={{ gap: 1.5, py: 1.5, color: 'error.main' }}>
+          <DeleteIcon fontSize="small" />
+          <Typography variant="body2">Excluir</Typography>
+        </MenuItem>
       </Menu>
 
       <Dialog open={modalOpen} onClose={() => setModalOpen(false)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
@@ -300,6 +323,219 @@ const CronogramaAcademico = () => {
           <Button onClick={() => setModalOpen(false)} variant="text" sx={{ textTransform: 'none', fontWeight: 500 }}>Cancelar</Button>
           <Button onClick={salvarEvento} variant="contained" sx={{ textTransform: 'none', fontWeight: 500, px: 3 }}>{eventoEditando ? 'Salvar alterações' : 'Criar evento'}</Button>
         </DialogActions>
+      </Dialog>
+
+      {/* Modal de Visualização - Elegante */}
+      <Dialog 
+        open={modalVisualizarOpen}
+        onClose={() => setModalVisualizarOpen(false)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: { borderRadius: 4, overflow: 'hidden' }
+        }}
+      >
+        {eventoSelecionado && (
+          <>
+            {/* Header com cor do tipo de evento */}
+            <Box 
+              sx={{ 
+                height: 8,
+                backgroundColor: tiposEventos[eventoSelecionado.tipo]?.cor || '#039BE5'
+              }} 
+            />
+            
+            <DialogTitle sx={{ 
+              pb: 2,
+              pt: 3,
+              px: 3
+            }}>
+              <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
+                <Box
+                  sx={{
+                    width: 48,
+                    height: 48,
+                    borderRadius: 2,
+                    backgroundColor: tiposEventos[eventoSelecionado.tipo]?.cor || '#039BE5',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0
+                  }}
+                >
+                  <EventIcon sx={{ color: 'white', fontSize: 28 }} />
+                </Box>
+                <Box sx={{ flex: 1 }}>
+                  <Typography variant="h5" sx={{ fontWeight: 600, mb: 0.5 }}>
+                    {eventoSelecionado.titulo}
+                  </Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                    <Box 
+                      sx={{ 
+                        px: 1.5,
+                        py: 0.5,
+                        borderRadius: 1,
+                        backgroundColor: tiposEventos[eventoSelecionado.tipo]?.cor || '#039BE5',
+                        color: 'white',
+                        fontSize: '0.75rem',
+                        fontWeight: 600
+                      }}
+                    >
+                      {tiposEventos[eventoSelecionado.tipo]?.nome || 'Evento'}
+                    </Box>
+                    <Box 
+                      sx={{ 
+                        px: 1.5,
+                        py: 0.5,
+                        borderRadius: 1,
+                        backgroundColor: prioridades[eventoSelecionado.prioridade]?.cor || '#F09300',
+                        color: 'white',
+                        fontSize: '0.75rem',
+                        fontWeight: 600
+                      }}
+                    >
+                      {prioridades[eventoSelecionado.prioridade]?.nome || 'Prioridade'}
+                    </Box>
+                  </Box>
+                </Box>
+              </Box>
+            </DialogTitle>
+            
+            <DialogContent sx={{ px: 3, pb: 3 }}>
+              <Stack spacing={3}>
+                {/* Data */}
+                <Box>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+                    <CalendarMonthIcon sx={{ color: 'primary.main', fontSize: 22 }} />
+                    <Typography variant="subtitle2" sx={{ fontWeight: 600, color: 'text.secondary' }}>
+                      Data
+                    </Typography>
+                  </Box>
+                  <Box sx={{ pl: 4.5 }}>
+                    <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                      {new Date(eventoSelecionado.dataInicio + 'T00:00:00').toLocaleDateString('pt-BR', { 
+                        day: '2-digit',
+                        month: 'long',
+                        year: 'numeric'
+                      })}
+                      {eventoSelecionado.dataFim && eventoSelecionado.dataFim !== eventoSelecionado.dataInicio && (
+                        <>
+                          {' até '}
+                          {new Date(eventoSelecionado.dataFim + 'T00:00:00').toLocaleDateString('pt-BR', { 
+                            day: '2-digit',
+                            month: 'long',
+                            year: 'numeric'
+                          })}
+                        </>
+                      )}
+                    </Typography>
+                  </Box>
+                </Box>
+
+                {/* Descrição */}
+                {eventoSelecionado.descricao && (
+                  <Box>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+                      <AccessTimeIcon sx={{ color: 'primary.main', fontSize: 22 }} />
+                      <Typography variant="subtitle2" sx={{ fontWeight: 600, color: 'text.secondary' }}>
+                        Descrição
+                      </Typography>
+                    </Box>
+                    <Box sx={{ pl: 4.5 }}>
+                      <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
+                        {eventoSelecionado.descricao}
+                      </Typography>
+                    </Box>
+                  </Box>
+                )}
+
+                {/* Turma */}
+                {eventoSelecionado.turmaId && turmas[eventoSelecionado.turmaId] && (
+                  <Box>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+                      <SchoolIcon sx={{ color: 'primary.main', fontSize: 22 }} />
+                      <Typography variant="subtitle2" sx={{ fontWeight: 600, color: 'text.secondary' }}>
+                        Turma
+                      </Typography>
+                    </Box>
+                    <Box sx={{ pl: 4.5 }}>
+                      <Box 
+                        sx={{ 
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 1,
+                          px: 2,
+                          py: 1,
+                          borderRadius: 2,
+                          backgroundColor: 'primary.50',
+                          border: '1px solid',
+                          borderColor: 'primary.200'
+                        }}
+                      >
+                        <SchoolIcon sx={{ color: 'primary.main', fontSize: 20 }} />
+                        <Typography variant="body1" sx={{ fontWeight: 500, color: 'primary.main' }}>
+                          {turmas[eventoSelecionado.turmaId].nome}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  </Box>
+                )}
+
+                <Divider />
+
+                {/* Informações adicionais */}
+                <Box sx={{ backgroundColor: 'grey.50', p: 2, borderRadius: 2 }}>
+                  <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 0.5 }}>
+                    Criado em
+                  </Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                    {eventoSelecionado.criadoEm ? 
+                      new Date(eventoSelecionado.criadoEm).toLocaleDateString('pt-BR', { 
+                        day: '2-digit',
+                        month: 'long',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      }) : 'Data não disponível'}
+                  </Typography>
+                </Box>
+              </Stack>
+            </DialogContent>
+            
+            <DialogActions sx={{ 
+              px: 3,
+              py: 2.5,
+              backgroundColor: 'grey.50',
+              gap: 1.5
+            }}>
+              <Button 
+                onClick={() => setModalVisualizarOpen(false)}
+                variant="text"
+                sx={{ 
+                  textTransform: 'none',
+                  fontWeight: 500,
+                  color: 'text.secondary'
+                }}
+              >
+                Fechar
+              </Button>
+              <Button 
+                onClick={() => {
+                  setModalVisualizarOpen(false);
+                  editarEvento(eventoSelecionado);
+                }}
+                variant="outlined"
+                startIcon={<EditIcon />}
+                sx={{ 
+                  textTransform: 'none',
+                  fontWeight: 500
+                }}
+              >
+                Editar evento
+              </Button>
+            </DialogActions>
+          </>
+        )}
       </Dialog>
     </Box>
   );

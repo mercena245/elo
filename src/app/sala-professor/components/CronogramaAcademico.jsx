@@ -54,6 +54,8 @@ const CronogramaAcademico = () => {
   const [eventoEditando, setEventoEditando] = useState(null);
   const [anchorEl, setAnchorEl] = useState(null);
   const [eventoSelecionado, setEventoSelecionado] = useState(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogMessage, setDialogMessage] = useState({ title: '', message: '', type: 'error' });
   
   const [formData, setFormData] = useState({
     titulo: '',
@@ -173,35 +175,115 @@ const CronogramaAcademico = () => {
 
   const salvarEvento = async () => {
     if (!formData.titulo || !formData.dataInicio) {
-      alert('Preencha o título e a data de início');
+      setDialogMessage({
+        title: 'Campos obrigatórios',
+        message: 'Por favor, preencha o título e a data de início do evento.',
+        type: 'error'
+      });
+      setDialogOpen(true);
       return;
     }
+    
     try {
-      const eventoData = { ...formData, criadoPor: user?.uid, criadoEm: new Date().toISOString() };
+      // Se dataFim for igual a dataInicio ou vazia, remove do objeto
+      const eventoData = { 
+        ...formData, 
+        dataFim: formData.dataFim && formData.dataFim !== formData.dataInicio ? formData.dataFim : null,
+        criadoPor: user?.uid, 
+        criadoEm: new Date().toISOString() 
+      };
+      
       if (eventoEditando) {
         await updateData(`cronograma-academico/${eventoEditando.id}`, eventoData);
-        await auditService.log({ acao: 'editar_evento_cronograma', detalhes: `Evento editado: ${formData.titulo}`, usuarioEmail: user?.email });
       } else {
         await pushData('cronograma-academico', eventoData);
-        await auditService.log({ acao: 'criar_evento_cronograma', detalhes: `Novo evento: ${formData.titulo}`, usuarioEmail: user?.email });
       }
+      
+      // Tenta fazer o log de auditoria (não bloqueia se falhar)
+      try {
+        if (eventoEditando) {
+          await auditService.log({ acao: 'editar_evento_cronograma', detalhes: `Evento editado: ${formData.titulo}`, usuarioEmail: user?.email });
+        } else {
+          await auditService.log({ acao: 'criar_evento_cronograma', detalhes: `Novo evento: ${formData.titulo}`, usuarioEmail: user?.email });
+        }
+      } catch (auditError) {
+        console.warn('Erro ao registrar auditoria:', auditError);
+      }
+      
+      // Fecha o modal e recarrega os dados
       setModalOpen(false);
+      setEventoEditando(null);
+      setFormData({
+        titulo: '',
+        descricao: '',
+        dataInicio: '',
+        dataFim: '',
+        tipo: 'aula',
+        prioridade: 'media',
+        turmaId: ''
+      });
+      
+      // Recarrega os dados de forma assíncrona
       carregarDados();
+      
+      // Mostra mensagem de sucesso
+      setDialogMessage({
+        title: 'Sucesso!',
+        message: eventoEditando ? 'Evento atualizado com sucesso!' : 'Evento criado com sucesso!',
+        type: 'success'
+      });
+      setDialogOpen(true);
+      
     } catch (error) {
-      alert('Erro ao salvar evento');
+      console.error('Erro ao salvar evento:', error);
+      setDialogMessage({
+        title: 'Erro',
+        message: 'Ocorreu um erro ao salvar o evento. Tente novamente.',
+        type: 'error'
+      });
+      setDialogOpen(true);
     }
   };
 
   const excluirEvento = async () => {
-    if (!eventoSelecionado || !confirm(`Deseja excluir "${eventoSelecionado.titulo}"?`)) return;
+    if (!eventoSelecionado) return;
+    
+    // Confirma exclusão
+    const confirmacao = window.confirm(`Deseja excluir "${eventoSelecionado.titulo}"?`);
+    if (!confirmacao) return;
+    
     try {
       await removeData(`cronograma-academico/${eventoSelecionado.id}`);
-      await auditService.log({ acao: 'excluir_evento_cronograma', detalhes: `Evento excluído: ${eventoSelecionado.titulo}`, usuarioEmail: user?.email });
+      
+      // Tenta fazer o log de auditoria (não bloqueia se falhar)
+      try {
+        await auditService.log({ acao: 'excluir_evento_cronograma', detalhes: `Evento excluído: ${eventoSelecionado.titulo}`, usuarioEmail: user?.email });
+      } catch (auditError) {
+        console.warn('Erro ao registrar auditoria:', auditError);
+      }
+      
       setAnchorEl(null);
       setEventoSelecionado(null);
+      
+      // Recarrega os dados de forma assíncrona
       carregarDados();
+      
+      // Mostra mensagem de sucesso
+      setDialogMessage({
+        title: 'Sucesso!',
+        message: 'Evento excluído com sucesso!',
+        type: 'success'
+      });
+      setDialogOpen(true);
+      
     } catch (error) {
-      alert('Erro ao excluir evento');
+      console.error('Erro ao excluir evento:', error);
+      setDialogMessage({
+        title: 'Erro',
+        message: 'Ocorreu um erro ao excluir o evento. Tente novamente.',
+        type: 'error'
+      });
+      setDialogOpen(true);
     }
   };
 
@@ -288,7 +370,18 @@ const CronogramaAcademico = () => {
             <TextField fullWidth label="Adicionar título" placeholder="Ex: Reunião de Pais..." value={formData.titulo} onChange={(e) => setFormData({ ...formData, titulo: e.target.value })} required autoFocus />
             <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
               <TextField fullWidth label="Data de início" type="date" value={formData.dataInicio} onChange={(e) => setFormData({ ...formData, dataInicio: e.target.value })} InputLabelProps={{ shrink: true }} required />
-              <TextField fullWidth label="Data de término" type="date" value={formData.dataFim} onChange={(e) => setFormData({ ...formData, dataFim: e.target.value })} InputLabelProps={{ shrink: true }} helperText="Opcional" />
+              <TextField 
+                fullWidth 
+                label="Data de término" 
+                type="date" 
+                value={formData.dataFim} 
+                onChange={(e) => setFormData({ ...formData, dataFim: e.target.value })} 
+                InputLabelProps={{ shrink: true }} 
+                helperText="Opcional (deixe em branco se for apenas 1 dia)"
+                inputProps={{
+                  min: formData.dataInicio // Define a data mínima como a data de início
+                }}
+              />
             </Box>
             <TextField fullWidth label="Adicionar descrição" placeholder="Detalhes..." multiline rows={3} value={formData.descricao} onChange={(e) => setFormData({ ...formData, descricao: e.target.value })} />
             <Divider />
@@ -413,19 +506,29 @@ const CronogramaAcademico = () => {
                   </Box>
                   <Box sx={{ pl: 4.5 }}>
                     <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                      {new Date(eventoSelecionado.dataInicio + 'T00:00:00').toLocaleDateString('pt-BR', { 
-                        day: '2-digit',
-                        month: 'long',
-                        year: 'numeric'
-                      })}
+                      {(() => {
+                        const dataInicio = eventoSelecionado.dataInicio?.includes('T') 
+                          ? new Date(eventoSelecionado.dataInicio) 
+                          : new Date(eventoSelecionado.dataInicio + 'T00:00:00');
+                        return dataInicio.toLocaleDateString('pt-BR', { 
+                          day: '2-digit',
+                          month: 'long',
+                          year: 'numeric'
+                        });
+                      })()}
                       {eventoSelecionado.dataFim && eventoSelecionado.dataFim !== eventoSelecionado.dataInicio && (
                         <>
                           {' até '}
-                          {new Date(eventoSelecionado.dataFim + 'T00:00:00').toLocaleDateString('pt-BR', { 
-                            day: '2-digit',
-                            month: 'long',
-                            year: 'numeric'
-                          })}
+                          {(() => {
+                            const dataFim = eventoSelecionado.dataFim?.includes('T') 
+                              ? new Date(eventoSelecionado.dataFim) 
+                              : new Date(eventoSelecionado.dataFim + 'T00:00:00');
+                            return dataFim.toLocaleDateString('pt-BR', { 
+                              day: '2-digit',
+                              month: 'long',
+                              year: 'numeric'
+                            });
+                          })()}
                         </>
                       )}
                     </Typography>
@@ -536,6 +639,63 @@ const CronogramaAcademico = () => {
             </DialogActions>
           </>
         )}
+      </Dialog>
+
+      {/* Dialog de Mensagens */}
+      <Dialog
+        open={dialogOpen}
+        onClose={() => setDialogOpen(false)}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{
+          sx: { borderRadius: 3 }
+        }}
+      >
+        <DialogTitle sx={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: 1.5,
+          pb: 2,
+          borderBottom: '1px solid',
+          borderColor: 'divider'
+        }}>
+          <Box 
+            sx={{ 
+              width: 40, 
+              height: 40, 
+              borderRadius: '50%', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center',
+              backgroundColor: dialogMessage.type === 'success' ? 'success.light' : 'error.light',
+              color: dialogMessage.type === 'success' ? 'success.dark' : 'error.dark'
+            }}
+          >
+            {dialogMessage.type === 'success' ? '✓' : '!'}
+          </Box>
+          <Typography variant="h6" sx={{ fontWeight: 600 }}>
+            {dialogMessage.title}
+          </Typography>
+        </DialogTitle>
+        <DialogContent sx={{ pt: 3 }}>
+          <Typography variant="body1">
+            {dialogMessage.message}
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, py: 2.5, borderTop: '1px solid', borderColor: 'divider' }}>
+          <Button 
+            onClick={() => setDialogOpen(false)}
+            variant="contained"
+            fullWidth
+            sx={{ 
+              textTransform: 'none',
+              fontWeight: 500,
+              py: 1.2
+            }}
+          >
+            OK
+          </Button>
+        </DialogActions>
       </Dialog>
     </Box>
   );

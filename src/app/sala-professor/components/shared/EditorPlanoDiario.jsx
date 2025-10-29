@@ -82,49 +82,74 @@ const EditorPlanoDiario = ({
   const [observacoesRejeicao, setObservacoesRejeicao] = useState('');
   const [dialogHistorico, setDialogHistorico] = useState(false);
 
-  // Função para buscar aulas do dia com base na data selecionada
-  const buscarAulasDoDia = (dataSelecionada, turmaIdSelecionada) => {
-    if (!dataSelecionada || !turmaIdSelecionada || !gradeHoraria) {
-      console.log('🔍 Dados insuficientes para buscar aulas:', { dataSelecionada, turmaIdSelecionada, temGrade: !!gradeHoraria });
+  // Função para buscar aulas do dia com base na data selecionada - BUSCA DIRETA NO BANCO
+  const buscarAulasDoDia = async (dataSelecionada, turmaIdSelecionada) => {
+    if (!dataSelecionada || !turmaIdSelecionada || !isReady) {
+      console.log('🔍 Dados insuficientes para buscar aulas:', { dataSelecionada, turmaIdSelecionada, isReady });
       return [];
     }
 
-    // Converter string de data para objeto Date e obter dia da semana
-    const dataObj = new Date(dataSelecionada + 'T00:00:00');
-    const diasSemana = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'];
-    const diaSemana = diasSemana[dataObj.getDay()];
-    
-    console.log('🔍 Buscando aulas para:', { dataSelecionada, turmaIdSelecionada, diaSemana });
+    try {
+      // Converter string de data para objeto Date e obter dia da semana
+      const dataObj = new Date(dataSelecionada + 'T00:00:00');
+      const diasSemana = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'];
+      const diaSemana = diasSemana[dataObj.getDay()];
+      
+      console.log('🔍 Buscando aulas para:', { dataSelecionada, turmaIdSelecionada, diaSemana });
 
-    // Filtrar aulas da grade horária para o dia e turma selecionados
-    const aulasDoDia = Object.entries(gradeHoraria)
-      .filter(([id, aula]) => {
-        return aula.turmaId === turmaIdSelecionada && aula.dia === diaSemana;
-      })
-      .map(([id, aula]) => ({
-        id,
-        disciplinaId: aula.disciplinaId || '',
-        disciplinaNome: disciplinas[aula.disciplinaId]?.nome || '',
-        horario: aula.horario || '',
-        professorUid: aula.professorUid || '',
-        professorNome: aula.professorNome || '',
-        faixaEtaria: '',
-        competenciasBNCC: [],
-        objetivosAprendizagem: '',
-        conteudo: '',
-        metodologia: '',
-        tarefaCasa: '',
-        recursos: []
-      }))
-      .sort((a, b) => {
-        // Ordenar por horário (ex: "07:00 - 08:00")
-        const horaA = a.horario.split(' - ')[0];
-        const horaB = b.horario.split(' - ')[0];
-        return horaA.localeCompare(horaB);
-      });
+      // Buscar a turma para pegar o periodoId
+      const turma = turmas[turmaIdSelecionada];
+      if (!turma || !turma.periodoId) {
+        console.log('❌ Turma não encontrada ou sem período letivo:', turmaIdSelecionada);
+        return [];
+      }
 
-    console.log('✅ Aulas encontradas:', aulasDoDia.length, aulasDoDia);
-    return aulasDoDia;
+      console.log('� Buscando grade horária direto do banco:', `GradeHoraria/${turma.periodoId}/${turmaIdSelecionada}`);
+
+      // Buscar grade horária diretamente do banco de dados
+      const gradeData = await getData(`GradeHoraria/${turma.periodoId}/${turmaIdSelecionada}`);
+      
+      if (!gradeData) {
+        console.log('❌ Nenhuma grade horária encontrada no banco');
+        return [];
+      }
+
+      console.log('📊 Grade horária carregada:', gradeData);
+
+      // Filtrar aulas do dia da semana
+      const aulasDoDia = Object.entries(gradeData)
+        .filter(([id, aula]) => {
+          console.log('🔎 Verificando aula:', { id, dia: aula.dia, diaBuscado: diaSemana, disciplina: aula.disciplinaNome || aula.disciplinaId });
+          return aula.dia === diaSemana;
+        })
+        .map(([id, aula]) => ({
+          id,
+          disciplinaId: aula.disciplinaId || '',
+          disciplinaNome: disciplinas[aula.disciplinaId]?.nome || aula.disciplinaNome || '',
+          horario: aula.horario || '',
+          professorUid: aula.professorUid || '',
+          professorNome: aula.professorNome || '',
+          faixaEtaria: '',
+          competenciasBNCC: [],
+          objetivosAprendizagem: '',
+          conteudo: '',
+          metodologia: '',
+          tarefaCasa: '',
+          recursos: []
+        }))
+        .sort((a, b) => {
+          // Ordenar por horário (ex: "07:00 - 08:00")
+          const horaA = a.horario.split(' - ')[0];
+          const horaB = b.horario.split(' - ')[0];
+          return horaA.localeCompare(horaB);
+        });
+
+      console.log('✅ Aulas encontradas:', aulasDoDia.length, aulasDoDia);
+      return aulasDoDia;
+    } catch (error) {
+      console.error('❌ Erro ao buscar aulas do dia:', error);
+      return [];
+    }
   };
 
   // Carregar competências dinamicamente para cada aula quando faixa etária mudar
@@ -197,17 +222,17 @@ const EditorPlanoDiario = ({
     }
   }, [open, plano, isEditing, user]);
 
-  const handleChange = (field, value) => {
+  const handleChange = async (field, value) => {
     // Se mudou a data ou turma, buscar aulas do dia
     if (field === 'data' && formData.turmaId) {
-      const aulasDoDia = buscarAulasDoDia(value, formData.turmaId);
+      const aulasDoDia = await buscarAulasDoDia(value, formData.turmaId);
       setFormData(prev => ({ 
         ...prev, 
         [field]: value,
         aulasDetalhadas: aulasDoDia
       }));
     } else if (field === 'turmaId' && formData.data) {
-      const aulasDoDia = buscarAulasDoDia(formData.data, value);
+      const aulasDoDia = await buscarAulasDoDia(formData.data, value);
       setFormData(prev => ({ 
         ...prev, 
         [field]: value,

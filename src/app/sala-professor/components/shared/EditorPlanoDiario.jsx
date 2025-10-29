@@ -92,10 +92,9 @@ const EditorPlanoDiario = ({
     try {
       // Converter string de data para objeto Date e obter dia da semana
       const dataObj = new Date(dataSelecionada + 'T00:00:00');
-      const diasSemana = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'];
-      const diaSemana = diasSemana[dataObj.getDay()];
+      const numeroDiaSemana = dataObj.getDay(); // 0 = domingo, 1 = segunda, etc
       
-      console.log('🔍 Buscando aulas para:', { dataSelecionada, turmaIdSelecionada, diaSemana });
+      console.log('🔍 Buscando aulas para:', { dataSelecionada, turmaIdSelecionada, numeroDiaSemana });
 
       // Buscar a turma para pegar o periodoId
       const turma = turmas[turmaIdSelecionada];
@@ -119,15 +118,15 @@ const EditorPlanoDiario = ({
       // Filtrar aulas do dia da semana
       const aulasDoDia = Object.entries(gradeData)
         .filter(([id, aula]) => {
-          console.log('🔎 Verificando aula:', { id, dia: aula.dia, diaBuscado: diaSemana, disciplina: aula.disciplinaNome || aula.disciplinaId });
-          return aula.dia === diaSemana;
+          console.log('🔎 Verificando aula:', { id, diaSemana: aula.diaSemana, numeroBuscado: numeroDiaSemana, disciplina: aula.disciplinaNome || aula.disciplinaId });
+          return aula.diaSemana === numeroDiaSemana;
         })
         .map(([id, aula]) => ({
           id,
           disciplinaId: aula.disciplinaId || '',
           disciplinaNome: disciplinas[aula.disciplinaId]?.nome || aula.disciplinaNome || '',
           horario: aula.horario || '',
-          professorUid: aula.professorUid || '',
+          professorUid: aula.professorUid || aula.professorId || '',
           professorNome: aula.professorNome || '',
           faixaEtaria: '',
           competenciasBNCC: [],

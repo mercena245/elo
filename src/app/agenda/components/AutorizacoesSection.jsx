@@ -203,8 +203,12 @@ const AutorizacoesSection = ({ userRole, userData }) => {
         respostas: {}
       };
 
-      const autorizacoesRef = ref(db, 'autorizacoes');
-      await push(autorizacoesRef, autorizacaoData);
+      if (!isReady || !pushData) {
+        console.error('❌ Banco não pronto');
+        return;
+      }
+
+      await pushData('autorizacoes', autorizacaoData);
       
       setDialogNovaAutorizacao(false);
       setNovaAutorizacao({
@@ -221,6 +225,8 @@ const AutorizacoesSection = ({ userRole, userData }) => {
   };
 
   const responderAutorizacao = async (autorizacaoId, resposta, observacoes = '') => {
+    if (!isReady || !updateData) return;
+    
     try {
       const respostaData = {
         resposta,
@@ -229,8 +235,7 @@ const AutorizacoesSection = ({ userRole, userData }) => {
         dataResposta: new Date().toISOString()
       };
 
-      const autorizacaoRef = ref(db, `autorizacoes/${autorizacaoId}`);
-      await update(autorizacaoRef, {
+      await updateData(`autorizacoes/${autorizacaoId}`, {
         status: resposta,
         [`respostas.${userData?.id || userData?.uid}`]: respostaData
       });

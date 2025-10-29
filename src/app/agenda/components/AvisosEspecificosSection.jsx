@@ -233,8 +233,12 @@ const AvisosEspecificosSection = ({ userRole, userData }) => {
         confirmacoes: {}
       };
 
-      const avisosRef = ref(db, 'avisosEspecificos');
-      await push(avisosRef, avisoData);
+      if (!isReady || !pushData) {
+        console.error('❌ Banco não pronto ou pushData indisponível');
+        return;
+      }
+
+      await pushData('avisosEspecificos', avisoData);
       
       setDialogNovoAviso(false);
       setNovoAviso({
@@ -250,9 +254,10 @@ const AvisosEspecificosSection = ({ userRole, userData }) => {
   };
 
   const marcarComoLido = async (avisoId) => {
+    if (!isReady || !setData) return;
+    
     try {
-      const leituraRef = ref(db, `avisosEspecificos/${avisoId}/leituras/${userData?.id || userData?.uid}`);
-      await set(leituraRef, new Date().toISOString());
+      await setData(`avisosEspecificos/${avisoId}/leituras/${userData?.id || userData?.uid}`, new Date().toISOString());
       
       fetchAvisos();
     } catch (error) {
@@ -261,9 +266,10 @@ const AvisosEspecificosSection = ({ userRole, userData }) => {
   };
 
   const confirmarRecebimento = async (avisoId) => {
+    if (!isReady || !setData) return;
+    
     try {
-      const confirmacaoRef = ref(db, `avisosEspecificos/${avisoId}/confirmacoes/${userData?.id || userData?.uid}`);
-      await set(confirmacaoRef, new Date().toISOString());
+      await setData(`avisosEspecificos/${avisoId}/confirmacoes/${userData?.id || userData?.uid}`, new Date().toISOString());
       
       fetchAvisos();
     } catch (error) {

@@ -132,15 +132,16 @@ const Escola = () => {
 
   // Função para limpar avisos expirados do banco (opcional - executa periodicamente)
   const limparAvisosExpirados = async () => {
+    if (!isReady) return;
+    
     try {
-      const avisosSnap = await get(ref(db, 'avisos'));
-      if (avisosSnap.exists()) {
-        const avisosData = avisosSnap.val();
+      const avisosData = await getData('avisos');
+      if (avisosData) {
         let contadorRemovidos = 0;
         
         for (const [id, aviso] of Object.entries(avisosData)) {
           if (isAvisoExpirado(aviso)) {
-            await remove(ref(db, `avisos/${id}`));
+            await removeData(`avisos/${id}`);
             contadorRemovidos++;
           }
         }
@@ -292,10 +293,15 @@ const Escola = () => {
     setGestaoTurma(turma);
     setGestaoTurmaOpen(true);
     // Buscar alunos vinculados
+    if (!isReady) {
+      setAlunosTurma([]);
+      return;
+    }
+    
     try {
-      const snap = await get(ref(db, 'alunos'));
-      if (snap.exists()) {
-        const alunos = Object.values(snap.val()).filter(a => a.turmaId === turma.id);
+      const alunosData = await getData('alunos');
+      if (alunosData) {
+        const alunos = Object.values(alunosData).filter(a => a.turmaId === turma.id);
         setAlunosTurma(alunos);
       } else {
         setAlunosTurma([]);
@@ -559,7 +565,7 @@ const Escola = () => {
         ativo: true
       };
       
-      await set(ref(db, `avisos/${avisoId}`), avisoData);
+      await setData(`avisos/${avisoId}`, avisoData);
       
       // Log da criação do aviso
       await auditService?.logAction({
@@ -621,9 +627,11 @@ const Escola = () => {
   // Função antiga mantida para compatibilidade
   const handleAddAvisoAntigo = async () => {
     if (!novoAviso.trim()) return;
+    if (!isReady) return;
+    
     setSalvandoAviso(true);
     const avisoId = `aviso_${Date.now()}`;
-    await set(ref(db, `avisos/${avisoId}`), { 
+    await setData(`avisos/${avisoId}`, { 
       texto: novoAviso,
       titulo: 'Aviso',
       conteudo: novoAviso,
@@ -640,12 +648,12 @@ const Escola = () => {
   };
 
   const handleRemoveAviso = async id => {
-    // Buscar dados do aviso antes de excluir para o log
-    const avisoRef = ref(db, `avisos/${id}`);
-    const avisoSnap = await get(avisoRef);
-    const avisoData = avisoSnap.exists() ? avisoSnap.val() : {};
+    if (!isReady) return;
     
-    await set(avisoRef, null);
+    // Buscar dados do aviso antes de excluir para o log
+    const avisoData = await getData(`avisos/${id}`) || {};
+    
+    await removeData(`avisos/${id}`);
     
     // Log da remoção do aviso
     await auditService?.logAction({
@@ -697,6 +705,8 @@ const Escola = () => {
   };
 
   const handleSaveColab = async () => {
+    if (!isReady) return;
+    
     setSavingColab(true);
     try {
       const colabData = { ...editColabForm };
@@ -705,9 +715,9 @@ const Escola = () => {
       }
       if (isNewColab) {
         const novoId = `id_colab_${editColabForm.nome.replace(/\s/g, '').toLowerCase()}`;
-        await set(ref(db, `colaboradores/${novoId}`), colabData);
+        await setData(`colaboradores/${novoId}`, colabData);
       } else if (editColab && editColab.id) {
-        await set(ref(db, `colaboradores/${editColab.id}`), colabData);
+        await setData(`colaboradores/${editColab.id}`, colabData);
       }
       setOpenColabModal(false);
       await fetchData();

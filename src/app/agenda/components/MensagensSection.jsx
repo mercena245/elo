@@ -377,9 +377,10 @@ const MensagensSection = ({ userRole, userData }) => {
   };
 
   const marcarComoLida = async (mensagemId) => {
+    if (!isReady || !setData) return;
+    
     try {
-      const mensagemRef = ref(db, `mensagens/${mensagemId}`);
-      await set(mensagemRef, { ...conversaSelecionada, lida: true });
+      await setData(`mensagens/${mensagemId}`, { ...conversaSelecionada, lida: true });
       
       // Atualizar o estado local
       setConversas(prev => prev.map(conv => 

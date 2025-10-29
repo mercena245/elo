@@ -91,8 +91,13 @@ const EditorPlanoDiario = ({
   // Carregar competências quando faixa etária mudar
   useEffect(() => {
     if (formData.faixaEtaria) {
-      const competencias = obterCompetenciasFlat(formData.faixaEtaria);
-      setCompetenciasDisponiveis(competencias);
+      // Função assíncrona agora
+      obterCompetenciasFlat(formData.faixaEtaria).then(competencias => {
+        setCompetenciasDisponiveis(competencias);
+      }).catch(error => {
+        console.error('Erro ao carregar competências:', error);
+        setCompetenciasDisponiveis([]);
+      });
     } else {
       setCompetenciasDisponiveis([]);
     }

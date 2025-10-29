@@ -24,7 +24,10 @@ import {
   Select,
   MenuItem,
   Autocomplete,
-  Collapse
+  Collapse,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails
 } from '@mui/material';
 import {
   Close as CloseIcon,
@@ -49,7 +52,8 @@ const EditorPlanoDiario = ({
   minhasTurmas,
   minhasDisciplinas,
   isEditing = false,
-  userRole
+  userRole,
+  gradeHoraria = {}
 }) => {
   const { user } = useAuth();
   const { getData, updateData, isReady } = useSchoolDatabase();
@@ -57,17 +61,9 @@ const EditorPlanoDiario = ({
   const [formData, setFormData] = useState({
     tipo_plano: 'diario',
     turmaId: '',
-    disciplinaId: [], // Array para múltiplas disciplinas
     data: '',
-    faixaEtaria: '',
-    competenciasBNCC: [],
-    objetivosAprendizagem: '',
-    conteudo: '',
-    metodologia: '',
-    tarefaCasa: '',
-    recursos: [], // Array de arquivos
-    imagens: [],
-    observacoes: '',
+    aulasDetalhadas: [], // Novo formato: array de objetos para cada disciplina do dia
+    observacoes: '', // Campo único para o dia inteiro
     statusAprovacao: 'pendente',
     observacoesAprovacao: '',
     aprovadoPor: '',
@@ -77,47 +73,102 @@ const EditorPlanoDiario = ({
   });
 
   const [errors, setErrors] = useState({});
-  const [competenciasDisponiveis, setCompetenciasDisponiveis] = useState([]);
   const [infoExpanded, setInfoExpanded] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [arquivos, setArquivos] = useState([]);
   
   // Estados para aprovação/rejeição (coordenador)
   const [dialogRejeitar, setDialogRejeitar] = useState(false);
   const [observacoesRejeicao, setObservacoesRejeicao] = useState('');
   const [dialogHistorico, setDialogHistorico] = useState(false);
 
-  // Carregar competências quando faixa etária mudar
-  useEffect(() => {
-    if (formData.faixaEtaria) {
-      // Função assíncrona agora
-      obterCompetenciasFlat(formData.faixaEtaria).then(competencias => {
-        setCompetenciasDisponiveis(competencias);
-      }).catch(error => {
-        console.error('Erro ao carregar competências:', error);
-        setCompetenciasDisponiveis([]);
-      });
-    } else {
-      setCompetenciasDisponiveis([]);
+  // Função para buscar aulas do dia com base na data selecionada
+  const buscarAulasDoDia = (dataSelecionada, turmaIdSelecionada) => {
+    if (!dataSelecionada || !turmaIdSelecionada || !gradeHoraria) {
+      console.log('🔍 Dados insuficientes para buscar aulas:', { dataSelecionada, turmaIdSelecionada, temGrade: !!gradeHoraria });
+      return [];
     }
-  }, [formData.faixaEtaria]);
+
+    // Converter string de data para objeto Date e obter dia da semana
+    const dataObj = new Date(dataSelecionada + 'T00:00:00');
+    const diasSemana = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'];
+    const diaSemana = diasSemana[dataObj.getDay()];
+    
+    console.log('🔍 Buscando aulas para:', { dataSelecionada, turmaIdSelecionada, diaSemana });
+
+    // Filtrar aulas da grade horária para o dia e turma selecionados
+    const aulasDoDia = Object.entries(gradeHoraria)
+      .filter(([id, aula]) => {
+        return aula.turmaId === turmaIdSelecionada && aula.dia === diaSemana;
+      })
+      .map(([id, aula]) => ({
+        id,
+        disciplinaId: aula.disciplinaId || '',
+        disciplinaNome: disciplinas[aula.disciplinaId]?.nome || '',
+        horario: aula.horario || '',
+        professorUid: aula.professorUid || '',
+        professorNome: aula.professorNome || '',
+        faixaEtaria: '',
+        competenciasBNCC: [],
+        objetivosAprendizagem: '',
+        conteudo: '',
+        metodologia: '',
+        tarefaCasa: '',
+        recursos: []
+      }))
+      .sort((a, b) => {
+        // Ordenar por horário (ex: "07:00 - 08:00")
+        const horaA = a.horario.split(' - ')[0];
+        const horaB = b.horario.split(' - ')[0];
+        return horaA.localeCompare(horaB);
+      });
+
+    console.log('✅ Aulas encontradas:', aulasDoDia.length, aulasDoDia);
+    return aulasDoDia;
+  };
+
+  // Carregar competências dinamicamente para cada aula quando faixa etária mudar
+  useEffect(() => {
+    const carregarCompetenciasParaAulas = async () => {
+      if (formData.aulasDetalhadas.length === 0) return;
+
+      const aulasAtualizadas = await Promise.all(
+        formData.aulasDetalhadas.map(async (aula) => {
+          if (aula.faixaEtaria && aula.competenciasBNCC.length === 0) {
+            try {
+              const competencias = await obterCompetenciasFlat(aula.faixaEtaria);
+              return { ...aula, competenciasDisponiveis: competencias };
+            } catch (error) {
+              console.error('Erro ao carregar competências para aula:', error);
+              return { ...aula, competenciasDisponiveis: [] };
+            }
+          }
+          return aula;
+        })
+      );
+
+      // Só atualizar se realmente houve mudança
+      const houveAlteracao = aulasAtualizadas.some((aula, index) => 
+        aula.competenciasDisponiveis !== formData.aulasDetalhadas[index].competenciasDisponiveis
+      );
+
+      if (houveAlteracao) {
+        setFormData(prev => ({ ...prev, aulasDetalhadas: aulasAtualizadas }));
+      }
+    };
+
+    carregarCompetenciasParaAulas();
+  }, [formData.aulasDetalhadas.map(a => a.faixaEtaria).join(',')]);
+
   useEffect(() => {
     if (open) {
       if (isEditing && plano) {
+        // Modo edição: carregar plano existente
         setFormData({
           tipo_plano: 'diario',
           turmaId: plano.turmaId || '',
-          disciplinaId: Array.isArray(plano.disciplinaId) ? plano.disciplinaId : (plano.disciplinaId ? [plano.disciplinaId] : []),
           data: plano.data || '',
-          faixaEtaria: plano.faixaEtaria || '',
-          competenciasBNCC: plano.competenciasBNCC || plano.bncc || [],
-          objetivosAprendizagem: plano.objetivosAprendizagem || plano.objetivos?.join('\n') || '',
-          conteudo: plano.conteudo || plano.conteudoProgramatico || '',
-          metodologia: plano.metodologia || '',
-          tarefaCasa: plano.tarefaCasa || '',
-          recursos: plano.recursos || [],
-          imagens: plano.imagens || [],
+          aulasDetalhadas: plano.aulasDetalhadas || [],
           observacoes: plano.observacoes || '',
           statusAprovacao: plano.statusAprovacao || 'pendente',
           observacoesAprovacao: plano.observacoesAprovacao || '',
@@ -126,25 +177,13 @@ const EditorPlanoDiario = ({
           professorNome: plano.professorNome || user?.displayName || user?.email || '',
           professorUid: plano.professorUid || user?.uid || ''
         });
-        // Carregar arquivos existentes
-        if (Array.isArray(plano.recursos)) {
-          setArquivos(plano.recursos);
-        }
       } else {
-        // Resetar para novo plano
+        // Modo criação: resetar para novo plano
         setFormData({
           tipo_plano: 'diario',
           turmaId: '',
-          disciplinaId: [],
           data: new Date().toISOString().split('T')[0],
-          faixaEtaria: '',
-          competenciasBNCC: [],
-          objetivosAprendizagem: '',
-          conteudo: '',
-          metodologia: '',
-          tarefaCasa: '',
-          recursos: [],
-          imagens: [],
+          aulasDetalhadas: [],
           observacoes: '',
           statusAprovacao: 'pendente',
           observacoesAprovacao: '',
@@ -153,27 +192,66 @@ const EditorPlanoDiario = ({
           professorNome: user?.displayName || user?.email || '',
           professorUid: user?.uid || ''
         });
-        setArquivos([]);
       }
       setErrors({});
     }
   }, [open, plano, isEditing, user]);
 
   const handleChange = (field, value) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    // Se mudou a data ou turma, buscar aulas do dia
+    if (field === 'data' && formData.turmaId) {
+      const aulasDoDia = buscarAulasDoDia(value, formData.turmaId);
+      setFormData(prev => ({ 
+        ...prev, 
+        [field]: value,
+        aulasDetalhadas: aulasDoDia
+      }));
+    } else if (field === 'turmaId' && formData.data) {
+      const aulasDoDia = buscarAulasDoDia(formData.data, value);
+      setFormData(prev => ({ 
+        ...prev, 
+        [field]: value,
+        aulasDetalhadas: aulasDoDia
+      }));
+    } else {
+      setFormData(prev => ({ ...prev, [field]: value }));
+    }
+    
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
     }
+  };
+
+  // Nova função para atualizar uma aula específica dentro de aulasDetalhadas
+  const handleAulaChange = (aulaIndex, field, value) => {
+    setFormData(prev => {
+      const novasAulas = [...prev.aulasDetalhadas];
+      novasAulas[aulaIndex] = {
+        ...novasAulas[aulaIndex],
+        [field]: value
+      };
+      return { ...prev, aulasDetalhadas: novasAulas };
+    });
   };
 
   const validateForm = () => {
     const newErrors = {};
     
     if (!formData.turmaId) newErrors.turmaId = 'Selecione uma turma';
-    if (!formData.disciplinaId || formData.disciplinaId.length === 0) newErrors.disciplinaId = 'Selecione ao menos uma disciplina';
     if (!formData.data) newErrors.data = 'Selecione uma data';
-    if (!formData.objetivosAprendizagem?.trim()) newErrors.objetivosAprendizagem = 'Defina os objetivos de aprendizagem';
-    if (!formData.conteudo?.trim()) newErrors.conteudo = 'Descreva o conteúdo';
+    if (!formData.aulasDetalhadas || formData.aulasDetalhadas.length === 0) {
+      newErrors.aulasDetalhadas = 'Nenhuma aula encontrada para esta data. Verifique se há grade horária cadastrada.';
+    } else {
+      // Validar cada aula
+      formData.aulasDetalhadas.forEach((aula, index) => {
+        if (!aula.objetivosAprendizagem?.trim()) {
+          newErrors[`aula_${index}_objetivos`] = 'Defina os objetivos de aprendizagem';
+        }
+        if (!aula.conteudo?.trim()) {
+          newErrors[`aula_${index}_conteudo`] = 'Descreva o conteúdo';
+        }
+      });
+    }
     
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -258,7 +336,6 @@ const EditorPlanoDiario = ({
     
     const dadosPlano = {
       ...formData,
-      recursos: arquivos, // ← CRÍTICO: Incluir arquivos salvos no estado separado
       id: plano?.id || Date.now().toString(),
       criadoEm: plano?.criadoEm || new Date().toISOString(),
       atualizadoEm: new Date().toISOString(),
@@ -266,9 +343,9 @@ const EditorPlanoDiario = ({
       professorUid: user?.uid
     };
     
-    console.log('📎 [handleSave] Recursos sendo salvos:', {
-      numRecursos: arquivos?.length || 0,
-      recursos: arquivos
+    console.log('� [handleSave] Aulas detalhadas sendo salvas:', {
+      numAulas: dadosPlano.aulasDetalhadas?.length || 0,
+      aulas: dadosPlano.aulasDetalhadas
     });
     
     // Se a coordenadora está editando um plano em revisão, salva e aprova automaticamente
@@ -298,8 +375,8 @@ const EditorPlanoDiario = ({
     onClose();
   };
 
-  // Função para fazer upload de arquivo
-  const handleFileUpload = async (event) => {
+  // Função para fazer upload de arquivo para uma aula específica
+  const handleFileUpload = async (event, aulaIndex) => {
     const files = Array.from(event.target.files);
     if (files.length === 0) return;
 
@@ -337,8 +414,16 @@ const EditorPlanoDiario = ({
       });
 
       const uploadedFiles = await Promise.all(uploadPromises);
-      setArquivos([...arquivos, ...uploadedFiles]);
-      handleChange('recursos', [...(formData.recursos || []), ...uploadedFiles]);
+      
+      // Adicionar arquivos à aula específica
+      setFormData(prev => {
+        const novasAulas = [...prev.aulasDetalhadas];
+        novasAulas[aulaIndex] = {
+          ...novasAulas[aulaIndex],
+          recursos: [...(novasAulas[aulaIndex].recursos || []), ...uploadedFiles]
+        };
+        return { ...prev, aulasDetalhadas: novasAulas };
+      });
       
     } catch (error) {
       console.error('Erro ao fazer upload:', error);
@@ -349,18 +434,25 @@ const EditorPlanoDiario = ({
     }
   };
 
-  // Função para remover arquivo
-  const handleRemoveFile = async (index) => {
+  // Função para remover arquivo de uma aula específica
+  const handleRemoveFile = async (aulaIndex, fileIndex) => {
     try {
-      const arquivo = arquivos[index];
+      const aula = formData.aulasDetalhadas[aulaIndex];
+      const arquivo = aula.recursos[fileIndex];
+      
       if (arquivo.path) {
         const storageRef = ref(storage, arquivo.path);
         await deleteObject(storageRef);
       }
       
-      const novosArquivos = arquivos.filter((_, i) => i !== index);
-      setArquivos(novosArquivos);
-      handleChange('recursos', novosArquivos);
+      setFormData(prev => {
+        const novasAulas = [...prev.aulasDetalhadas];
+        novasAulas[aulaIndex] = {
+          ...novasAulas[aulaIndex],
+          recursos: aula.recursos.filter((_, i) => i !== fileIndex)
+        };
+        return { ...prev, aulasDetalhadas: novasAulas };
+      });
     } catch (error) {
       console.error('Erro ao remover arquivo:', error);
       alert('Erro ao remover arquivo. Tente novamente.');
@@ -553,6 +645,7 @@ const EditorPlanoDiario = ({
                     value={formData.turmaId}
                     onChange={(e) => handleChange('turmaId', e.target.value)}
                     label="Turma *"
+                    disabled={!canEdit()}
                   >
                     <MenuItem value="">
                       <em>Selecione uma turma</em>
@@ -566,45 +659,6 @@ const EditorPlanoDiario = ({
                   {errors.turmaId && <Typography variant="caption" color="error" sx={{ ml: 2 }}>{errors.turmaId}</Typography>}
                 </FormControl>
 
-                <Box>
-                  <Autocomplete
-                    multiple
-                    fullWidth
-                    options={getDisciplinasDisponiveis() || []}
-                    getOptionLabel={(option) => option.nome || ''}
-                    value={getDisciplinasDisponiveis()?.filter(disc => 
-                      formData.disciplinaId?.includes(disc.id)
-                    ) || []}
-                    onChange={(event, newValue) => {
-                      handleChange('disciplinaId', newValue.map(disc => disc.id));
-                    }}
-                    isOptionEqualToValue={(option, value) => option.id === value.id}
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        label="Disciplinas *"
-                        placeholder="Selecione uma ou mais disciplinas"
-                        error={!!errors.disciplinaId}
-                      />
-                    )}
-                    renderTags={(value, getTagProps) =>
-                      value.map((option, index) => {
-                        const { key, ...tagProps } = getTagProps({ index });
-                        return (
-                          <Chip
-                            key={key}
-                            label={option.nome}
-                            {...tagProps}
-                            color="secondary"
-                            size="small"
-                          />
-                        );
-                      })
-                    }
-                  />
-                  {errors.disciplinaId && <Typography variant="caption" color="error" sx={{ ml: 2 }}>{errors.disciplinaId}</Typography>}
-                </Box>
-
                 <TextField
                   fullWidth
                   label="Data *"
@@ -612,8 +666,9 @@ const EditorPlanoDiario = ({
                   value={formData.data}
                   onChange={(e) => handleChange('data', e.target.value)}
                   error={!!errors.data}
-                  helperText={errors.data}
+                  helperText={errors.data || "Selecione a data para ver as aulas do dia"}
                   InputLabelProps={{ shrink: true }}
+                  disabled={!canEdit()}
                 />
 
                 <TextField
@@ -624,277 +679,301 @@ const EditorPlanoDiario = ({
                   InputProps={{
                     readOnly: true,
                   }}
+                  sx={{ gridColumn: { sm: '1 / -1' } }}
                 />
               </Box>
-            </CardContent>
-          </Card>
 
-          {/* Competências BNCC */}
-          <Card variant="outlined">
-            <CardContent>
-              <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                🎯 Competências BNCC
-              </Typography>
-              <Divider sx={{ mb: 2 }} />
-              
-              {/* Seletor de Faixa Etária */}
-              <FormControl fullWidth sx={{ mb: 3 }}>
-                <InputLabel id="faixa-etaria-label">Faixa Etária / Nível de Ensino *</InputLabel>
-                <Select
-                  labelId="faixa-etaria-label"
-                  value={formData.faixaEtaria}
-                  label="Faixa Etária / Nível de Ensino *"
-                  onChange={(e) => {
-                    handleChange('faixaEtaria', e.target.value);
-                    handleChange('competenciasBNCC', []); // Limpa competências ao mudar faixa
-                  }}
-                  error={!!errors.faixaEtaria}
-                >
-                  <MenuItem value="">
-                    <em>Selecione uma faixa etária</em>
-                  </MenuItem>
-                  {FAIXAS_ETARIAS.map((faixa) => (
-                    <MenuItem key={faixa.id} value={faixa.id}>
-                      {faixa.label}
-                    </MenuItem>
-                  ))}
-                </Select>
-                {errors.faixaEtaria && (
-                  <Typography variant="caption" color="error" sx={{ mt: 0.5, ml: 2 }}>
-                    {errors.faixaEtaria}
-                  </Typography>
-                )}
-                <Typography variant="caption" color="text.secondary" sx={{ mt: 1, ml: 2, display: 'block' }}>
-                  Selecione a faixa etária para carregar as competências específicas da BNCC
-                </Typography>
-              </FormControl>
-              
-              {/* Autocomplete - só aparece após selecionar faixa etária */}
-              {formData.faixaEtaria && competenciasDisponiveis.length > 0 ? (
-                <>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                    {competenciasDisponiveis.length} competências disponíveis para esta faixa etária
-                  </Typography>
-                  
-                  <Autocomplete
-                    multiple
-                    options={competenciasDisponiveis}
-                    getOptionLabel={(option) => {
-                      if (typeof option === 'string') return option;
-                      return `${option.codigo} - ${option.descricao}`;
-                    }}
-                    value={formData.competenciasBNCC || []}
-                    onChange={(e, newValue) => handleChange('competenciasBNCC', newValue)}
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        label="Selecione as competências"
-                        placeholder="Digite para buscar..."
-                      />
-                    )}
-                    renderTags={(value, getTagProps) =>
-                      value.map((option, index) => {
-                        const label = typeof option === 'string' ? option : `${option.codigo} - ${option.descricao}`;
-                        const { key, ...tagProps } = getTagProps({ index });
-                        return (
-                          <Chip
-                            key={key}
-                            label={label}
-                            {...tagProps}
-                            size="small"
-                            color="primary"
-                            variant="outlined"
-                          />
-                        );
-                      })
-                    }
-                    isOptionEqualToValue={(option, value) => {
-                      if (typeof option === 'string' && typeof value === 'string') {
-                        return option === value;
-                      }
-                      return option.codigo === value.codigo;
-                    }}
-                    filterSelectedOptions
-                  />
-                </>
-              ) : formData.faixaEtaria && competenciasDisponiveis.length === 0 ? (
-                <Alert severity="warning">
-                  <Typography variant="body2">
-                    Nenhuma competência BNCC encontrada para a faixa etária <strong>{formData.faixaEtaria}</strong>.
-                  </Typography>
+              {errors.aulasDetalhadas && (
+                <Alert severity="warning" sx={{ mt: 2 }}>
+                  {errors.aulasDetalhadas}
                 </Alert>
-              ) : null}
+              )}
             </CardContent>
           </Card>
 
-          {/* Planejamento Pedagógico */}
-          <Card variant="outlined">
-            <CardContent>
-              <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                📚 Planejamento Pedagógico
+          {/* Planejamento por Aula - Acordeões */}
+          {formData.aulasDetalhadas && formData.aulasDetalhadas.length > 0 ? (
+            <Box>
+              <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                📚 Planejamento por Disciplina
               </Typography>
-              <Divider sx={{ mb: 2 }} />
-              
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                {formData.aulasDetalhadas.length} aula(s) encontrada(s) para este dia
+              </Typography>
+
+              {formData.aulasDetalhadas.map((aula, index) => (
+                <Accordion key={index} defaultExpanded={index === 0} sx={{ mb: 2 }}>
+                  <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, width: '100%' }}>
+                      <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                        {aula.disciplinaNome || 'Disciplina'}
+                      </Typography>
+                      <Chip 
+                        label={aula.horario} 
+                        size="small" 
+                        color="primary" 
+                        variant="outlined"
+                      />
+                      {aula.professorNome && (
+                        <Chip 
+                          label={aula.professorNome} 
+                          size="small" 
+                          color="default" 
+                          variant="outlined"
+                        />
+                      )}
+                    </Box>
+                  </AccordionSummary>
+                  
+                  <AccordionDetails>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                      {/* Seletor de Faixa Etária */}
+                      <FormControl fullWidth>
+                        <InputLabel>Faixa Etária / Nível de Ensino *</InputLabel>
+                        <Select
+                          value={aula.faixaEtaria || ''}
+                          label="Faixa Etária / Nível de Ensino *"
+                          onChange={(e) => {
+                            handleAulaChange(index, 'faixaEtaria', e.target.value);
+                            handleAulaChange(index, 'competenciasBNCC', []); // Limpa competências
+                          }}
+                          disabled={!canEdit()}
+                        >
+                          <MenuItem value="">
+                            <em>Selecione uma faixa etária</em>
+                          </MenuItem>
+                          {FAIXAS_ETARIAS.map((faixa) => (
+                            <MenuItem key={faixa.id} value={faixa.id}>
+                              {faixa.label}
+                            </MenuItem>
+                          ))}
+                        </Select>
+                        <Typography variant="caption" color="text.secondary" sx={{ mt: 1, ml: 2, display: 'block' }}>
+                          Selecione a faixa etária para carregar as competências BNCC
+                        </Typography>
+                      </FormControl>
+
+                      {/* Competências BNCC */}
+                      {aula.faixaEtaria && aula.competenciasDisponiveis && aula.competenciasDisponiveis.length > 0 && (
+                        <Autocomplete
+                          multiple
+                          options={aula.competenciasDisponiveis}
+                          getOptionLabel={(option) => {
+                            if (typeof option === 'string') return option;
+                            return `${option.codigo} - ${option.descricao}`;
+                          }}
+                          value={aula.competenciasBNCC || []}
+                          onChange={(e, newValue) => handleAulaChange(index, 'competenciasBNCC', newValue)}
+                          renderInput={(params) => (
+                            <TextField
+                              {...params}
+                              label="Competências BNCC"
+                              placeholder="Digite para buscar..."
+                            />
+                          )}
+                          renderTags={(value, getTagProps) =>
+                            value.map((option, tagIndex) => {
+                              const label = typeof option === 'string' ? option : `${option.codigo}`;
+                              const { key, ...tagProps } = getTagProps({ index: tagIndex });
+                              return (
+                                <Chip
+                                  key={key}
+                                  label={label}
+                                  {...tagProps}
+                                  size="small"
+                                  color="primary"
+                                  variant="outlined"
+                                />
+                              );
+                            })
+                          }
+                          isOptionEqualToValue={(option, value) => {
+                            if (typeof option === 'string' && typeof value === 'string') {
+                              return option === value;
+                            }
+                            return option.codigo === value.codigo;
+                          }}
+                          filterSelectedOptions
+                          disabled={!canEdit()}
+                        />
+                      )}
+
+                      <TextField
+                        fullWidth
+                        multiline
+                        rows={4}
+                        label="Objetivos de Aprendizagem *"
+                        value={aula.objetivosAprendizagem || ''}
+                        onChange={(e) => handleAulaChange(index, 'objetivosAprendizagem', e.target.value)}
+                        error={!!errors[`aula_${index}_objetivos`]}
+                        helperText={errors[`aula_${index}_objetivos`] || "O que os alunos devem aprender nesta aula?"}
+                        placeholder="Ex: Identificar e diferenciar figuras geométricas planas..."
+                        disabled={!canEdit()}
+                      />
+
+                      <TextField
+                        fullWidth
+                        multiline
+                        rows={5}
+                        label="Conteúdo *"
+                        value={aula.conteudo || ''}
+                        onChange={(e) => handleAulaChange(index, 'conteudo', e.target.value)}
+                        error={!!errors[`aula_${index}_conteudo`]}
+                        helperText={errors[`aula_${index}_conteudo`] || "Descreva o conteúdo que será trabalhado"}
+                        placeholder="Ex: Formas geométricas: círculo, quadrado, triângulo..."
+                        disabled={!canEdit()}
+                      />
+
+                      <TextField
+                        fullWidth
+                        multiline
+                        rows={5}
+                        label="Metodologia"
+                        value={aula.metodologia || ''}
+                        onChange={(e) => handleAulaChange(index, 'metodologia', e.target.value)}
+                        helperText="Como você vai ensinar? Estratégias e atividades"
+                        placeholder="Ex: Aula expositiva com uso de materiais concretos..."
+                        disabled={!canEdit()}
+                      />
+
+                      <TextField
+                        fullWidth
+                        multiline
+                        rows={3}
+                        label="Tarefa de Casa"
+                        value={aula.tarefaCasa || ''}
+                        onChange={(e) => handleAulaChange(index, 'tarefaCasa', e.target.value)}
+                        helperText="Atividade para os alunos fazerem em casa"
+                        placeholder="Ex: Desenhar 3 objetos de cada forma geométrica estudada..."
+                        disabled={!canEdit()}
+                      />
+
+                      {/* Campo de Recursos com Upload */}
+                      <Box>
+                        <Typography variant="subtitle2" gutterBottom sx={{ mb: 1, fontWeight: 'bold' }}>
+                          📎 Recursos e Materiais
+                        </Typography>
+                        
+                        {canEdit() && (
+                          <Button
+                            variant="outlined"
+                            component="label"
+                            startIcon={<UploadIcon />}
+                            disabled={uploadingImage}
+                            fullWidth
+                            sx={{ mb: 2 }}
+                          >
+                            {uploadingImage ? `Enviando... ${Math.round(uploadProgress)}%` : 'Adicionar Arquivos'}
+                            <input
+                              type="file"
+                              hidden
+                              multiple
+                              accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
+                              onChange={(e) => handleFileUpload(e, index)}
+                            />
+                          </Button>
+                        )}
+
+                        {/* Preview dos arquivos */}
+                        {aula.recursos && aula.recursos.length > 0 && (
+                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                            {aula.recursos.map((arquivo, fileIndex) => (
+                              <Card key={fileIndex} variant="outlined" sx={{ p: 2 }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flex: 1 }}>
+                                    {/* Preview da imagem ou ícone do arquivo */}
+                                    {arquivo.tipo?.startsWith('image/') ? (
+                                      <Box
+                                        component="img"
+                                        src={arquivo.url}
+                                        alt={arquivo.nome}
+                                        sx={{
+                                          width: 60,
+                                          height: 60,
+                                          objectFit: 'cover',
+                                          borderRadius: 1,
+                                          border: '1px solid #e0e0e0'
+                                        }}
+                                      />
+                                    ) : (
+                                      <Box
+                                        sx={{
+                                          width: 60,
+                                          height: 60,
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          bgcolor: 'primary.light',
+                                          borderRadius: 1,
+                                          color: 'white',
+                                          fontSize: '1.5rem'
+                                        }}
+                                      >
+                                        📄
+                                      </Box>
+                                    )}
+                                    
+                                    {/* Informações do arquivo */}
+                                    <Box sx={{ flex: 1 }}>
+                                      <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                                        {arquivo.nome}
+                                      </Typography>
+                                      <Typography variant="caption" color="text.secondary">
+                                        {(arquivo.tamanho / 1024).toFixed(2)} KB
+                                      </Typography>
+                                    </Box>
+                                  </Box>
+
+                                  {/* Botão para remover */}
+                                  {canEdit() && (
+                                    <IconButton
+                                      color="error"
+                                      size="small"
+                                      onClick={() => handleRemoveFile(index, fileIndex)}
+                                    >
+                                      <DeleteIcon />
+                                    </IconButton>
+                                  )}
+                                </Box>
+                              </Card>
+                            ))}
+                          </Box>
+                        )}
+                      </Box>
+                    </Box>
+                  </AccordionDetails>
+                </Accordion>
+              ))}
+            </Box>
+          ) : formData.data && formData.turmaId ? (
+            <Alert severity="info">
+              Nenhuma aula encontrada para esta data. Verifique se há grade horária cadastrada para a turma selecionada.
+            </Alert>
+          ) : null}
+
+          {/* Observações Gerais do Dia - Campo Único */}
+          {formData.aulasDetalhadas && formData.aulasDetalhadas.length > 0 && (
+            <Card variant="outlined">
+              <CardContent>
+                <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  📝 Observações do Dia
+                </Typography>
+                <Divider sx={{ mb: 2 }} />
+                
                 <TextField
                   fullWidth
                   multiline
                   rows={4}
-                  label="Objetivos de Aprendizagem *"
-                  value={formData.objetivosAprendizagem}
-                  onChange={(e) => handleChange('objetivosAprendizagem', e.target.value)}
-                  error={!!errors.objetivosAprendizagem}
-                  helperText={errors.objetivosAprendizagem || "O que os alunos devem aprender hoje?"}
-                  placeholder="Ex: Identificar e diferenciar figuras geométricas planas..."
-                />
-
-                <TextField
-                  fullWidth
-                  multiline
-                  rows={5}
-                  label="Conteúdo *"
-                  value={formData.conteudo}
-                  onChange={(e) => handleChange('conteudo', e.target.value)}
-                  error={!!errors.conteudo}
-                  helperText={errors.conteudo || "Descreva o conteúdo que será trabalhado"}
-                  placeholder="Ex: Formas geométricas: círculo, quadrado, triângulo e retângulo..."
-                />
-
-                <TextField
-                  fullWidth
-                  multiline
-                  rows={5}
-                  label="Metodologia"
-                  value={formData.metodologia}
-                  onChange={(e) => handleChange('metodologia', e.target.value)}
-                  helperText="Como você vai ensinar? Estratégias e atividades"
-                  placeholder="Ex: Aula expositiva com uso de materiais concretos, seguida de atividade prática em grupos..."
-                />
-
-                {/* Campo de Recursos com Upload */}
-                <Box>
-                  <Typography variant="subtitle2" gutterBottom sx={{ mb: 1, fontWeight: 'bold' }}>
-                    📎 Recursos e Materiais
-                  </Typography>
-                  
-                  <Button
-                    variant="outlined"
-                    component="label"
-                    startIcon={<UploadIcon />}
-                    disabled={uploadingImage}
-                    fullWidth
-                    sx={{ mb: 2 }}
-                  >
-                    {uploadingImage ? `Enviando... ${Math.round(uploadProgress)}%` : 'Adicionar Arquivos'}
-                    <input
-                      type="file"
-                      hidden
-                      multiple
-                      accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
-                      onChange={handleFileUpload}
-                    />
-                  </Button>
-
-                  {/* Preview dos arquivos */}
-                  {arquivos.length > 0 && (
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                      {arquivos.map((arquivo, index) => (
-                        <Card key={index} variant="outlined" sx={{ p: 2 }}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flex: 1 }}>
-                              {/* Preview da imagem ou ícone do arquivo */}
-                              {arquivo.tipo?.startsWith('image/') ? (
-                                <Box
-                                  component="img"
-                                  src={arquivo.url}
-                                  alt={arquivo.nome}
-                                  sx={{
-                                    width: 60,
-                                    height: 60,
-                                    objectFit: 'cover',
-                                    borderRadius: 1,
-                                    border: '1px solid #e0e0e0'
-                                  }}
-                                />
-                              ) : (
-                                <Box
-                                  sx={{
-                                    width: 60,
-                                    height: 60,
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    bgcolor: 'primary.light',
-                                    borderRadius: 1,
-                                    color: 'white',
-                                    fontSize: '1.5rem'
-                                  }}
-                                >
-                                  📄
-                                </Box>
-                              )}
-                              
-                              {/* Informações do arquivo */}
-                              <Box sx={{ flex: 1 }}>
-                                <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
-                                  {arquivo.nome}
-                                </Typography>
-                                <Typography variant="caption" color="text.secondary">
-                                  {(arquivo.tamanho / 1024).toFixed(2)} KB
-                                </Typography>
-                              </Box>
-                            </Box>
-
-                            {/* Botão para remover */}
-                            <IconButton
-                              color="error"
-                              size="small"
-                              onClick={() => handleRemoveFile(index)}
-                            >
-                              <DeleteIcon />
-                            </IconButton>
-                          </Box>
-                        </Card>
-                      ))}
-                    </Box>
-                  )}
-                </Box>
-
-                <TextField
-                  fullWidth
-                  multiline
-                  rows={3}
-                  label="Recursos"
-                  value={formData.recursos}
-                  onChange={(e) => handleChange('recursos', e.target.value)}
-                  helperText="Materiais e recursos necessários"
-                  placeholder="Ex: Blocos lógicos, cartolina, tesoura, cola, quadro branco..."
-                />
-
-                <TextField
-                  fullWidth
-                  multiline
-                  rows={3}
-                  label="Tarefa de Casa"
-                  value={formData.tarefaCasa}
-                  onChange={(e) => handleChange('tarefaCasa', e.target.value)}
-                  helperText="Atividade para os alunos fazerem em casa"
-                  placeholder="Ex: Desenhar 3 objetos de cada forma geométrica estudada..."
-                />
-
-                <TextField
-                  fullWidth
-                  multiline
-                  rows={3}
-                  label="Observações"
-                  value={formData.observacoes}
+                  label="Observações Gerais"
+                  value={formData.observacoes || ''}
                   onChange={(e) => handleChange('observacoes', e.target.value)}
-                  helperText="Anotações gerais, adaptações, lembretes..."
-                  placeholder="Ex: Preparar material adaptado para o aluno João..."
+                  helperText="Anotações gerais do dia, adaptações, lembretes..."
+                  placeholder="Ex: Preparar material adaptado, lembrar de avisar sobre..."
+                  disabled={!canEdit()}
                 />
-              </Box>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
         </Box>
       </DialogContent>
 

@@ -1238,6 +1238,7 @@ const PlanejamentoAulas = () => {
         minhasTurmas={minhasTurmas}
         minhasDisciplinas={minhasDisciplinas}
         isEditing={!!planoDiarioEditando}
+        gradeHoraria={gradeHoraria}
       />
     </Box>
     </>

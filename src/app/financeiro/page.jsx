@@ -1366,8 +1366,23 @@ const FinanceiroPage = () => {
   };
 
   const criarConta = async () => {
+    // 🔒 Verificar se banco está pronto
+    if (!isReady) {
+      showFeedback('error', 'Erro', 'Sistema não está pronto. Aguarde um momento e tente novamente.');
+      console.error('❌ Banco não está pronto para criar conta');
+      return;
+    }
+
+    if (!pushData) {
+      showFeedback('error', 'Erro', 'Serviço de banco de dados não disponível.');
+      console.error('❌ pushData não está disponível');
+      return;
+    }
+
     setProcessingOperation(true);
     try {
+      console.log('📝 Criando nova conta:', novaConta);
+      
       const contaData = {
         ...novaConta,
         valor: parseFloat(novaConta.valor),
@@ -1385,25 +1400,34 @@ const FinanceiroPage = () => {
         contaData.pagoEm = new Date().toISOString();
         
         // Conta já paga vai apenas para contas_pagas no banco da escola
+        console.log('💾 Salvando conta paga em contas_pagas...');
         novaContaId = await pushData('contas_pagas', contaData);
+        console.log('✅ Conta paga salva com ID:', novaContaId);
       } else {
         // Conta pendente vai para contas_pagar no banco da escola
+        console.log('💾 Salvando conta pendente em contas_pagar...');
         novaContaId = await pushData('contas_pagar', contaData);
+        console.log('✅ Conta pendente salva com ID:', novaContaId);
         
         // Se for recorrente, criar próximas parcelas
         if (novaConta.recorrente) {
+          console.log('🔄 Criando parcelas recorrentes...');
           await criarContasRecorrentes(novaContaId, contaData);
         }
       }
 
       // Log da ação
-      await auditService?.logAction({
-        action: LOG_ACTIONS.FINANCE_CREATE,
-        entity: 'conta',
-        entityId: novaContaId,
-        description: `Conta criada: ${novaConta.descricao}`,
-        changes: { valor: novaConta.valor, vencimento: novaConta.vencimento }
-      });
+      try {
+        await auditService?.logAction({
+          action: LOG_ACTIONS.FINANCE_CREATE,
+          entity: 'conta',
+          entityId: novaContaId,
+          description: `Conta criada: ${novaConta.descricao}`,
+          changes: { valor: novaConta.valor, vencimento: novaConta.vencimento }
+        });
+      } catch (auditError) {
+        console.warn('⚠️ Erro ao registrar auditoria:', auditError);
+      }
 
       setNovaContaDialog(false);
       setNovaConta({
@@ -1420,11 +1444,12 @@ const FinanceiroPage = () => {
         formaPagamento: '',
         anexos: []
       });
-      fetchContasPagar();
+      
+      await fetchContasPagar();
       showFeedback('success', 'Conta Criada', 'Conta criada com sucesso!');
     } catch (error) {
-      console.error('Erro ao criar conta:', error);
-      showFeedback('error', 'Erro na Criação', 'Erro ao criar conta. Tente novamente.');
+      console.error('❌ Erro ao criar conta:', error);
+      showFeedback('error', 'Erro na Criação', `Erro ao criar conta: ${error.message}`);
     } finally {
       setProcessingOperation(false);
     }

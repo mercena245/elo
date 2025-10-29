@@ -88,6 +88,7 @@ const BaixaTituloDialog = ({ open, onClose, titulo, onSuccess, userId }) => {
   });
 
   const [resumoOperacao, setResumoOperacao] = useState(null);
+  const [alertaValorZerado, setAlertaValorZerado] = useState(false);
 
   const steps = ['Forma de Pagamento', 'Confirmação', 'Finalização'];
 
@@ -207,9 +208,17 @@ const BaixaTituloDialog = ({ open, onClose, titulo, onSuccess, userId }) => {
         // Se usar crédito e ele cobrir o valor total, não precisa de valor pago
         const creditoCobre = dadosPagamento.usarCredito && valorFinal === 0;
         
+        // Se o valor final for 0 (bolsista 100%), permitir prosseguir sem valor pago
+        const valorZerado = valorFinal === 0;
+        
+        // Permitir se:
+        // 1. Crédito cobre tudo
+        // 2. Valor final é zero (bolsista)
+        // 3. Valor pago é maior ou igual ao valor final
         return dadosPagamento.formaPagamento && 
                (creditoCobre || 
-                (parseFloat(dadosPagamento.valorPago) > 0 && 
+                valorZerado ||
+                (dadosPagamento.valorPago !== '' && 
                  parseFloat(dadosPagamento.valorPago) >= valorFinal));
       case 1:
         return true;
@@ -220,8 +229,15 @@ const BaixaTituloDialog = ({ open, onClose, titulo, onSuccess, userId }) => {
 
   const handleNext = () => {
     if (step === 0) {
-      // Gerar resumo da operação
       const valorFinal = calcularValorFinal();
+      
+      // Se o valor a pagar for zero, mostrar alerta de confirmação
+      if (valorFinal === 0 && !dadosPagamento.usarCredito) {
+        setAlertaValorZerado(true);
+        return;
+      }
+      
+      // Gerar resumo da operação
       const resumo = {
         titulo: titulo,
         formaPagamento: dadosPagamento.formaPagamento,
@@ -895,6 +911,67 @@ const BaixaTituloDialog = ({ open, onClose, titulo, onSuccess, userId }) => {
           </Button>
         )}
       </DialogActions>
+
+      {/* Dialog de Alerta para Valor Zerado */}
+      <Dialog
+        open={alertaValorZerado}
+        onClose={() => setAlertaValorZerado(false)}
+        maxWidth="sm"
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Warning color="warning" />
+            <Typography variant="h6">
+              Valor Zerado - Bolsista 100%
+            </Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            <Typography variant="body1" gutterBottom>
+              <strong>Atenção:</strong> O valor a pagar está zerado!
+            </Typography>
+            <Typography variant="body2">
+              Este título será dado como baixa sem valor financeiro associado.
+              Isso geralmente ocorre com alunos bolsistas 100%.
+            </Typography>
+          </Alert>
+          <Typography variant="body2" color="text.secondary">
+            Deseja continuar com a baixa deste título?
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setAlertaValorZerado(false)}>
+            Cancelar
+          </Button>
+          <Button 
+            onClick={() => {
+              setAlertaValorZerado(false);
+              // Continuar com o processo normal
+              const valorFinal = calcularValorFinal();
+              const resumo = {
+                titulo: titulo,
+                formaPagamento: dadosPagamento.formaPagamento,
+                valorOriginal: titulo?.valor || 0,
+                valorDesconto: parseFloat(dadosPagamento.valorDesconto || 0),
+                creditoUtilizado: dadosPagamento.usarCredito ? creditoAUtilizar : 0,
+                valorFinal: valorFinal,
+                valorPago: valorFinal > 0 ? parseFloat(dadosPagamento.valorPago || 0) : 0,
+                troco: valorFinal > 0 ? parseFloat(dadosPagamento.valorPago || 0) - valorFinal : 0,
+                dataRecebimento: dadosPagamento.dataRecebimento,
+                observacoes: dadosPagamento.observacoes,
+                usouCredito: dadosPagamento.usarCredito
+              };
+              setResumoOperacao(resumo);
+              setStep(prev => prev + 1);
+            }}
+            variant="contained"
+            color="warning"
+          >
+            Sim, Confirmar Baixa
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Dialog>
   );
 };

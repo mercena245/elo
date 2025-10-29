@@ -292,6 +292,19 @@ const AgendaMedicaSection = ({ userRole, userData }) => {
   };
 
   const salvarMedicamento = async () => {
+    // 🔒 Verificar se banco está pronto
+    if (!isReady) {
+      alert('Sistema não está pronto. Aguarde um momento e tente novamente.');
+      console.error('❌ Banco não está pronto para salvar medicamento');
+      return;
+    }
+
+    if (!pushData) {
+      alert('Serviço de banco de dados não disponível.');
+      console.error('❌ pushData não está disponível');
+      return;
+    }
+
     try {
       // Validação especial para pais - receita obrigatória
       if (userRole === 'pai' && !novoMedicamento.receita) {
@@ -299,18 +312,22 @@ const AgendaMedicaSection = ({ userRole, userData }) => {
         return;
       }
 
+      console.log('📝 Salvando medicamento:', novoMedicamento);
+
       const medicamentoData = {
         ...novoMedicamento,
         criadoPor: userData?.id || userData?.uid,
         solicitadoPor: userData?.nome || userData?.email || 'Usuário',
         dataCriacao: new Date().toISOString(),
         dataSolicitacao: new Date().toISOString(),
-        status: userRole === 'coordenadora' ? 'aprovado' : 'pendente', // Coordenadora aprova automaticamente
+        status: userRole === 'coordenadora' ? 'aprovado' : 'pendente',
         proximaDose: userRole === 'coordenadora' ? calcularProximaDose(novoMedicamento.horarios) : null
       };
 
-      const medicamentosRef = ref(db, 'medicamentos');
-      await push(medicamentosRef, medicamentoData);
+      // 🔒 Usar pushData do hook multi-tenant
+      console.log('💾 Salvando em medicamentos...');
+      const novoId = await pushData('medicamentos', medicamentoData);
+      console.log('✅ Medicamento salvo com ID:', novoId);
       
       // Feedback diferenciado por role
       if (userRole === 'pai') {
@@ -326,11 +343,11 @@ const AgendaMedicaSection = ({ userRole, userData }) => {
         aluno: '', receita: null, status: 'pendente', solicitadoPor: '', dataSolicitacao: ''
       });
       
-      fetchMedicamentos();
-      fetchSolicitacoesPendentes();
+      await fetchMedicamentos();
+      await fetchSolicitacoesPendentes();
     } catch (error) {
-      console.error('Erro ao salvar medicamento:', error);
-      alert('❌ Erro ao salvar medicamento. Tente novamente.');
+      console.error('❌ Erro ao salvar medicamento:', error);
+      alert(`❌ Erro ao salvar medicamento: ${error.message}`);
     }
   };
 
@@ -361,6 +378,12 @@ const AgendaMedicaSection = ({ userRole, userData }) => {
   };
 
   const marcarDoseAdministrada = async (medicamentoId) => {
+    // 🔒 Verificar se banco está pronto
+    if (!isReady || !pushData || !updateData) {
+      alert('Sistema não está pronto. Aguarde um momento e tente novamente.');
+      return;
+    }
+
     try {
       const medicamento = medicamentos.find(m => m.id === medicamentoId);
       if (!medicamento) return;
@@ -386,20 +409,24 @@ const AgendaMedicaSection = ({ userRole, userData }) => {
         observacoes: ''
       };
 
-      const historicoRef = ref(db, 'historicoMedicacao');
-      await push(historicoRef, registroData);
+      // 🔒 Usar pushData do hook multi-tenant
+      console.log('💾 Salvando histórico de medicação...');
+      await pushData('historicoMedicacao', registroData);
       
       // Atualizar próxima dose e última dose
       const proximaDose = calcularProximaDose(medicamento.horarios);
-      const medicamentoRef = ref(db, `medicamentos/${medicamentoId}`);
-      await set(medicamentoRef, {
-        ...medicamento,
+      
+      // 🔒 Usar updateData do hook multi-tenant
+      console.log('📝 Atualizando medicamento...');
+      await updateData(`medicamentos/${medicamentoId}`, {
         proximaDose,
         ultimaDose: new Date().toISOString()
       });
       
-      fetchMedicamentos();
-      fetchHistorico();
+      await fetchMedicamentos();
+      await fetchHistorico();
+      
+      alert('✅ Dose administrada e registrada com sucesso!');
     } catch (error) {
       console.error('Erro ao marcar dose:', error);
     }

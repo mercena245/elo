@@ -26,7 +26,17 @@ import {
   Paper,
   LinearProgress,
   IconButton,
-  Fab
+  Fab,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Tooltip
 } from '@mui/material';
 import {
   Psychology,
@@ -43,7 +53,11 @@ import {
   Edit,
   Visibility,
   TrendingUp,
-  TrendingDown
+  TrendingDown,
+  ExpandMore,
+  FilterList,
+  Assessment,
+  Delete
 } from '@mui/icons-material';
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useSchoolDatabase } from '../../../hooks/useSchoolDatabase';
@@ -60,6 +74,11 @@ const ComportamentosSection = ({ userRole, userData }) => {
   const [alunos, setAlunos] = useState([]);
   const [usuarios, setUsuarios] = useState([]);
   const [estatisticas, setEstatisticas] = useState({});
+  const [filtrosEstatisticas, setFiltrosEstatisticas] = useState({
+    aluno: '',
+    turma: '',
+    periodo: '30' // dias
+  });
   const [novoComportamento, setNovoComportamento] = useState({
     aluno: '',
     tipo: '',
@@ -107,10 +126,10 @@ const ComportamentosSection = ({ userRole, userData }) => {
   }, [userData, isReady]);
 
   useEffect(() => {
-    if (comportamentos.length > 0) {
+    if (comportamentos.length > 0 && alunos.length > 0) {
       calcularEstatisticas();
     }
-  }, [comportamentos]);
+  }, [comportamentos, alunos, filtrosEstatisticas]);
 
   // Reprocessar alunos quando usuários carregarem (apenas para associar responsáveis)
   useEffect(() => {
@@ -236,22 +255,53 @@ const ComportamentosSection = ({ userRole, userData }) => {
   const calcularEstatisticas = () => {
     const stats = {};
     
-    alunos.forEach(aluno => {
+    // Filtrar alunos baseado nos filtros
+    let alunosFiltrados = [...alunos];
+    
+    // Filtrar por turma primeiro
+    if (filtrosEstatisticas.turma) {
+      alunosFiltrados = alunosFiltrados.filter(a => a.turmaId === filtrosEstatisticas.turma);
+    }
+    
+    // Filtrar por nome (busca por texto enquanto digita)
+    if (filtrosEstatisticas.aluno) {
+      alunosFiltrados = alunosFiltrados.filter(a => 
+        a.nome.toLowerCase().includes(filtrosEstatisticas.aluno.toLowerCase())
+      );
+    }
+    
+    const diasPeriodo = parseInt(filtrosEstatisticas.periodo) || 30;
+    
+    alunosFiltrados.forEach(aluno => {
       const comportamentosAluno = comportamentos.filter(c => c.aluno === aluno.id);
-      const ultimo30Dias = comportamentosAluno.filter(c => {
+      const ultimosDias = comportamentosAluno.filter(c => {
         const dataComp = new Date(c.data);
         const agora = new Date();
         const diasAtras = (agora - dataComp) / (1000 * 60 * 60 * 24);
-        return diasAtras <= 30;
+        return diasAtras <= diasPeriodo;
       });
       
+      const total = comportamentosAluno.length;
+      const positivos = ultimosDias.filter(c => c.categoria === 'positivo').length;
+      const neutros = ultimosDias.filter(c => c.categoria === 'neutro').length;
+      const atencao = ultimosDias.filter(c => c.categoria === 'atencao').length;
+      const incidentes = ultimosDias.filter(c => c.categoria === 'incidente').length;
+      
+      // Calcular score geral (últimos N dias)
+      const scoreGeral = (positivos * 2) - (atencao * 1) - (incidentes * 3);
+      
       stats[aluno.id] = {
-        total: comportamentosAluno.length,
-        positivos: ultimo30Dias.filter(c => c.categoria === 'positivo').length,
-        neutros: ultimo30Dias.filter(c => c.categoria === 'neutro').length,
-        atencao: ultimo30Dias.filter(c => c.categoria === 'atencao').length,
-        incidentes: ultimo30Dias.filter(c => c.categoria === 'incidente').length,
-        tendencia: calcularTendencia(comportamentosAluno)
+        aluno,
+        total,
+        positivos,
+        neutros,
+        atencao,
+        incidentes,
+        scoreGeral,
+        ultimosDias: ultimosDias.length,
+        tendencia: calcularTendencia(comportamentosAluno),
+        ultimoRegistro: comportamentosAluno.length > 0 ? 
+          new Date(comportamentosAluno[0].data).toLocaleDateString('pt-BR') : 'Sem registros'
       };
     });
     
@@ -290,6 +340,19 @@ const ComportamentosSection = ({ userRole, userData }) => {
   };
 
   const salvarComportamento = async () => {
+    // 🔒 Verificar se banco está pronto
+    if (!isReady) {
+      alert('Sistema não está pronto. Aguarde um momento e tente novamente.');
+      console.error('❌ Banco não está pronto para salvar comportamento');
+      return;
+    }
+
+    if (!pushData) {
+      alert('Serviço de banco de dados não disponível.');
+      console.error('❌ pushData não está disponível');
+      return;
+    }
+
     try {
       // Validar dados obrigatórios
       if (!novoComportamento.aluno || !novoComportamento.categoria || !novoComportamento.tipo) {
@@ -299,13 +362,15 @@ const ComportamentosSection = ({ userRole, userData }) => {
 
       const alunoSelecionado = alunos.find(a => a.id === novoComportamento.aluno);
       
+      console.log('📝 Salvando comportamento:', novoComportamento);
+      
       const comportamentoData = {
         ...novoComportamento,
         registradoPor: userData?.id || userData?.uid,
         registradorNome: userData?.nome || userData?.displayName || 'N/A',
         registradorRole: userRole || 'N/A',
         dataRegistro: new Date().toISOString(),
-        turma: alunoSelecionado?.turmaId || 'N/A', // Usar turmaId do aluno
+        turma: alunoSelecionado?.turmaId || 'N/A',
         alunoNome: alunoSelecionado?.nome || 'N/A'
       };
 
@@ -316,8 +381,10 @@ const ComportamentosSection = ({ userRole, userData }) => {
         }
       });
 
-      const comportamentosRef = ref(db, 'comportamentos');
-      await push(comportamentosRef, comportamentoData);
+      // 🔒 Usar pushData do hook multi-tenant
+      console.log('💾 Salvando em comportamentos...');
+      const novoId = await pushData('comportamentos', comportamentoData);
+      console.log('✅ Comportamento salvo com ID:', novoId);
       
       setDialogNovoComportamento(false);
       setNovoComportamento({
@@ -325,9 +392,11 @@ const ComportamentosSection = ({ userRole, userData }) => {
         acao: '', gravidade: 1, data: new Date().toISOString().split('T')[0]
       });
       
-      fetchComportamentos();
+      await fetchComportamentos();
+      alert('Comportamento registrado com sucesso!');
     } catch (error) {
-      console.error('Erro ao salvar comportamento:', error);
+      console.error('❌ Erro ao salvar comportamento:', error);
+      alert(`Erro ao salvar comportamento: ${error.message}`);
     }
   };
 
@@ -615,57 +684,321 @@ const ComportamentosSection = ({ userRole, userData }) => {
           </Card>
         </Grid>
 
-        {/* Estatísticas por Aluno */}
-        <Grid item xs={12} md={4}>
-          <Card>
-            <CardContent>
-              <Typography variant="h6" gutterBottom>
-                📊 Estatísticas por Aluno
-              </Typography>
-              
-              {Object.keys(estatisticas).length === 0 ? (
-                <Typography color="text.secondary" variant="body2">
-                  Estatísticas serão exibidas após registros
+        {/* Estatísticas por Aluno - VERSÃO EXPANDIDA */}
+        <Grid item xs={12}>
+          <Accordion defaultExpanded>
+            <AccordionSummary expandIcon={<ExpandMore />}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, width: '100%' }}>
+                <Assessment color="primary" />
+                <Typography variant="h6">
+                  📊 Estatísticas Detalhadas por Aluno
                 </Typography>
+                <Chip 
+                  label={`${Object.keys(estatisticas).length} ${Object.keys(estatisticas).length === 1 ? 'aluno' : 'alunos'}`} 
+                  size="small" 
+                  color="primary"
+                />
+              </Box>
+            </AccordionSummary>
+            <AccordionDetails>
+              {/* Filtros */}
+              <Box sx={{ 
+                display: 'flex', 
+                gap: 2, 
+                mb: 3, 
+                p: 2, 
+                borderRadius: 3, 
+                bgcolor: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                flexWrap: 'wrap'
+              }}>
+                <FormControl sx={{ 
+                  minWidth: 200,
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 2,
+                    '&:hover': {
+                      '& > fieldset': {
+                        borderColor: '#6366f1'
+                      }
+                    }
+                  }
+                }}>
+                  <InputLabel id="turma-filter-label">Turma</InputLabel>
+                  <Select
+                    labelId="turma-filter-label"
+                    value={filtrosEstatisticas.turma}
+                    label="Turma"
+                    onChange={(e) => setFiltrosEstatisticas(prev => ({ ...prev, turma: e.target.value, aluno: '' }))}
+                  >
+                    <MenuItem value="">Todas</MenuItem>
+                    {[...new Set(alunos.map(a => a.turmaId))].filter(Boolean).map((turmaId) => {
+                      const aluno = alunos.find(a => a.turmaId === turmaId);
+                      return (
+                        <MenuItem key={turmaId} value={turmaId}>
+                          {aluno?.turmaNome || turmaId}
+                        </MenuItem>
+                      );
+                    })}
+                  </Select>
+                </FormControl>
+                
+                <TextField
+                  label="Nome do Aluno"
+                  value={filtrosEstatisticas.aluno}
+                  onChange={(e) => setFiltrosEstatisticas(prev => ({ ...prev, aluno: e.target.value }))}
+                  placeholder="Digite o nome"
+                  variant="outlined"
+                  fullWidth
+                  disabled={filtrosEstatisticas.turma === ""}
+                  sx={{
+                    flex: 1,
+                    minWidth: 200,
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: 2,
+                      '&:hover': {
+                        '& > fieldset': {
+                          borderColor: '#6366f1'
+                        }
+                      }
+                    }
+                  }}
+                />
+                
+                <FormControl sx={{ 
+                  minWidth: 180,
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 2,
+                    '&:hover': {
+                      '& > fieldset': {
+                        borderColor: '#6366f1'
+                      }
+                    }
+                  }
+                }}>
+                  <InputLabel id="periodo-filter-label">Período</InputLabel>
+                  <Select
+                    labelId="periodo-filter-label"
+                    value={filtrosEstatisticas.periodo}
+                    label="Período"
+                    onChange={(e) => setFiltrosEstatisticas(prev => ({ ...prev, periodo: e.target.value }))}
+                  >
+                    <MenuItem value="7">Últimos 7 dias</MenuItem>
+                    <MenuItem value="15">Últimos 15 dias</MenuItem>
+                    <MenuItem value="30">Últimos 30 dias</MenuItem>
+                    <MenuItem value="60">Últimos 60 dias</MenuItem>
+                    <MenuItem value="90">Últimos 90 dias</MenuItem>
+                    <MenuItem value="365">Último ano</MenuItem>
+                  </Select>
+                </FormControl>
+              </Box>
+
+              {/* Tabela de Estatísticas */}
+              {Object.keys(estatisticas).length === 0 ? (
+                <Alert severity="info">
+                  <Typography variant="body2">
+                    {alunos.length === 0 
+                      ? 'Nenhum aluno encontrado. Cadastre alunos para visualizar estatísticas.'
+                      : comportamentos.length === 0
+                      ? 'Nenhum comportamento registrado ainda. As estatísticas serão exibidas após os primeiros registros.'
+                      : 'Nenhum resultado para os filtros selecionados.'}
+                  </Typography>
+                </Alert>
               ) : (
-                <List sx={{ p: 0 }}>
-                  {Object.entries(estatisticas).map(([alunoId, stats]) => {
-                    const aluno = alunos.find(a => a.id === alunoId);
-                    if (!aluno) return null;
-                    
-                    return (
-                      <ListItem key={alunoId} sx={{ px: 0, border: '1px solid #f3f4f6', borderRadius: 1, mb: 1 }}>
-                        <ListItemAvatar>
-                          <Avatar sx={{ bgcolor: '#3B82F6' }}>
-                            <Person />
-                          </Avatar>
-                        </ListItemAvatar>
-                        <ListItemText
-                          primary={aluno.nome}
-                          secondary={
-                            <Box>
-                              <Box sx={{ display: 'flex', gap: 0.5, mb: 1 }}>
-                                <Chip size="small" label={`+${stats.positivos}`} color="success" />
-                                <Chip size="small" label={`⚠${stats.atencao}`} color="warning" />
-                                <Chip size="small" label={`!${stats.incidentes}`} color="error" />
-                              </Box>
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                {getTendenciaIcon(stats.tendencia)}
-                                <Typography variant="caption">
-                                  {stats.tendencia === 'melhorando' ? 'Melhorando' :
-                                   stats.tendencia === 'piorando' ? 'Precisa atenção' : 'Estável'}
+                <TableContainer component={Paper} sx={{ maxHeight: 600 }}>
+                  <Table stickyHeader>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F3F4F6' }}>Aluno</TableCell>
+                        <TableCell align="center" sx={{ fontWeight: 'bold', bgcolor: '#F3F4F6' }}>
+                          <Tooltip title="Total de registros no período">
+                            <span>Total</span>
+                          </Tooltip>
+                        </TableCell>
+                        <TableCell align="center" sx={{ fontWeight: 'bold', bgcolor: '#E8F5E9' }}>
+                          <Tooltip title="Comportamentos positivos">
+                            <span>✅ Positivos</span>
+                          </Tooltip>
+                        </TableCell>
+                        <TableCell align="center" sx={{ fontWeight: 'bold', bgcolor: '#FFF3E0' }}>
+                          <Tooltip title="Pontos de atenção">
+                            <span>⚠️ Atenção</span>
+                          </Tooltip>
+                        </TableCell>
+                        <TableCell align="center" sx={{ fontWeight: 'bold', bgcolor: '#FFEBEE' }}>
+                          <Tooltip title="Incidentes graves">
+                            <span>❗ Incidentes</span>
+                          </Tooltip>
+                        </TableCell>
+                        <TableCell align="center" sx={{ fontWeight: 'bold', bgcolor: '#F3F4F6' }}>
+                          <Tooltip title="Score geral: Positivos (+2) - Atenção (-1) - Incidentes (-3)">
+                            <span>Score</span>
+                          </Tooltip>
+                        </TableCell>
+                        <TableCell align="center" sx={{ fontWeight: 'bold', bgcolor: '#F3F4F6' }}>Tendência</TableCell>
+                        <TableCell align="center" sx={{ fontWeight: 'bold', bgcolor: '#F3F4F6' }}>Último Registro</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {Object.entries(estatisticas)
+                        .sort(([, a], [, b]) => b.scoreGeral - a.scoreGeral) // Ordenar por score
+                        .map(([alunoId, stats]) => {
+                          const scorePercent = Math.max(0, Math.min(100, ((stats.scoreGeral + 10) / 20) * 100));
+                          const scoreColor = stats.scoreGeral > 5 ? 'success.main' : 
+                                           stats.scoreGeral > 0 ? 'info.main' :
+                                           stats.scoreGeral > -5 ? 'warning.main' : 'error.main';
+                          
+                          return (
+                            <TableRow key={alunoId} hover>
+                              <TableCell>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                  <Avatar sx={{ bgcolor: 'primary.main', width: 32, height: 32 }}>
+                                    <Person fontSize="small" />
+                                  </Avatar>
+                                  <Box>
+                                    <Typography variant="body2" fontWeight={600}>
+                                      {stats.aluno.nome}
+                                    </Typography>
+                                    <Typography variant="caption" color="text.secondary">
+                                      {stats.aluno.turmaNome || 'Sem turma'}
+                                    </Typography>
+                                  </Box>
+                                </Box>
+                              </TableCell>
+                              <TableCell align="center">
+                                <Chip 
+                                  label={stats.ultimosDias} 
+                                  size="small" 
+                                  variant="outlined"
+                                />
+                              </TableCell>
+                              <TableCell align="center">
+                                <Chip 
+                                  label={stats.positivos} 
+                                  size="small" 
+                                  color="success"
+                                  sx={{ minWidth: 40 }}
+                                />
+                              </TableCell>
+                              <TableCell align="center">
+                                <Chip 
+                                  label={stats.atencao} 
+                                  size="small" 
+                                  color="warning"
+                                  sx={{ minWidth: 40 }}
+                                />
+                              </TableCell>
+                              <TableCell align="center">
+                                <Chip 
+                                  label={stats.incidentes} 
+                                  size="small" 
+                                  color="error"
+                                  sx={{ minWidth: 40 }}
+                                />
+                              </TableCell>
+                              <TableCell align="center">
+                                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
+                                  <Typography 
+                                    variant="h6" 
+                                    sx={{ 
+                                      color: scoreColor,
+                                      fontWeight: 'bold'
+                                    }}
+                                  >
+                                    {stats.scoreGeral > 0 ? '+' : ''}{stats.scoreGeral}
+                                  </Typography>
+                                  <LinearProgress 
+                                    variant="determinate" 
+                                    value={scorePercent} 
+                                    sx={{ 
+                                      width: 60, 
+                                      height: 6, 
+                                      borderRadius: 3,
+                                      bgcolor: 'grey.200',
+                                      '& .MuiLinearProgress-bar': {
+                                        bgcolor: scoreColor
+                                      }
+                                    }} 
+                                  />
+                                </Box>
+                              </TableCell>
+                              <TableCell align="center">
+                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+                                  {getTendenciaIcon(stats.tendencia)}
+                                  <Typography variant="caption" fontWeight={600}>
+                                    {stats.tendencia === 'melhorando' ? 'Melhorando' :
+                                     stats.tendencia === 'piorando' ? 'Precisa Atenção' : 
+                                     stats.tendencia === 'estavel' ? 'Estável' : 'Sem dados'}
+                                  </Typography>
+                                </Box>
+                              </TableCell>
+                              <TableCell align="center">
+                                <Typography variant="caption" color="text.secondary">
+                                  {stats.ultimoRegistro}
                                 </Typography>
-                              </Box>
-                            </Box>
-                          }
-                        />
-                      </ListItem>
-                    );
-                  })}
-                </List>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
               )}
-            </CardContent>
-          </Card>
+
+              {/* Resumo Geral */}
+              {Object.keys(estatisticas).length > 0 && (
+                <Grid container spacing={2} sx={{ mt: 2 }}>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Card sx={{ bgcolor: '#E8F5E9', textAlign: 'center' }}>
+                      <CardContent>
+                        <Typography variant="h4" color="success.main" fontWeight="bold">
+                          {Object.values(estatisticas).reduce((acc, s) => acc + s.positivos, 0)}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          Comportamentos Positivos
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Card sx={{ bgcolor: '#FFF3E0', textAlign: 'center' }}>
+                      <CardContent>
+                        <Typography variant="h4" color="warning.main" fontWeight="bold">
+                          {Object.values(estatisticas).reduce((acc, s) => acc + s.atencao, 0)}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          Pontos de Atenção
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Card sx={{ bgcolor: '#FFEBEE', textAlign: 'center' }}>
+                      <CardContent>
+                        <Typography variant="h4" color="error.main" fontWeight="bold">
+                          {Object.values(estatisticas).reduce((acc, s) => acc + s.incidentes, 0)}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          Incidentes
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Card sx={{ bgcolor: '#E3F2FD', textAlign: 'center' }}>
+                      <CardContent>
+                        <Typography variant="h4" color="primary.main" fontWeight="bold">
+                          {Object.values(estatisticas).reduce((acc, s) => acc + s.ultimosDias, 0)}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          Total no Período
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                </Grid>
+              )}
+            </AccordionDetails>
+          </Accordion>
         </Grid>
       </Grid>
 

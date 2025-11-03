@@ -175,9 +175,146 @@ const VisualizacaoDocumentoPlano = ({
     </Paper>
   );
 
-  // Renderiza BNCC (apenas para planos diários)
+  // Renderiza detalhes de cada aula (nova estrutura de planos diários)
+  const renderAulasDetalhadas = () => {
+    if (!isDiario || !plano.aulasDetalhadas || plano.aulasDetalhadas.length === 0) {
+      return null;
+    }
+
+    return (
+      <Box sx={{ mb: 3 }}>
+        {plano.aulasDetalhadas.map((aula, index) => (
+          <Paper key={index} elevation={2} sx={{ p: 3, mb: 3, border: '2px solid', borderColor: 'primary.light' }}>
+            {/* Cabeçalho da Aula */}
+            <Box sx={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center',
+              mb: 2,
+              pb: 2,
+              borderBottom: '2px solid',
+              borderColor: 'primary.main'
+            }}>
+              <Typography variant="h5" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+                📚 {aula.disciplinaNome || getNomeDisciplina(aula.disciplinaId)}
+              </Typography>
+              {aula.horario && (
+                <Chip 
+                  icon={<AccessTimeIcon />} 
+                  label={aula.horario}
+                  color="primary"
+                  variant="outlined"
+                />
+              )}
+            </Box>
+
+            {/* Faixa Etária */}
+            {aula.faixaEtaria && (
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="subtitle2" color="text.secondary" sx={{ fontWeight: 'bold', mb: 1 }}>
+                  👶 Faixa Etária:
+                </Typography>
+                <Typography variant="body1">
+                  {aula.faixaEtaria === 'educacao_infantil' ? 'Educação Infantil' :
+                   aula.faixaEtaria === 'anos_iniciais_1_2' ? 'Anos Iniciais (1º e 2º ano)' :
+                   aula.faixaEtaria === 'anos_iniciais_3_5' ? 'Anos Iniciais (3º ao 5º ano)' :
+                   aula.faixaEtaria === 'anos_finais_6_7' ? 'Anos Finais (6º e 7º ano)' :
+                   aula.faixaEtaria === 'anos_finais_8_9' ? 'Anos Finais (8º e 9º ano)' :
+                   aula.faixaEtaria === 'ensino_medio' ? 'Ensino Médio' :
+                   aula.faixaEtaria}
+                </Typography>
+              </Box>
+            )}
+
+            {/* Competências BNCC */}
+            {aula.competenciasBNCC && aula.competenciasBNCC.length > 0 && (
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="subtitle2" color="text.secondary" sx={{ fontWeight: 'bold', mb: 1 }}>
+                  📚 Competências BNCC:
+                </Typography>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                  {aula.competenciasBNCC.map((comp, idx) => (
+                    <Paper key={idx} elevation={0} sx={{ p: 1.5, backgroundColor: 'grey.50' }}>
+                      <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+                        {typeof comp === 'string' ? comp : `${comp.codigo}`}
+                      </Typography>
+                      {typeof comp === 'object' && comp.descricao && (
+                        <Typography variant="caption" color="text.secondary">
+                          {comp.descricao}
+                        </Typography>
+                      )}
+                    </Paper>
+                  ))}
+                </Box>
+              </Box>
+            )}
+
+            {/* Objetivos de Aprendizagem */}
+            {aula.objetivosAprendizagem && (
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="subtitle2" color="text.secondary" sx={{ fontWeight: 'bold', mb: 1 }}>
+                  🎯 Objetivos de Aprendizagem:
+                </Typography>
+                <Typography variant="body1" sx={{ whiteSpace: 'pre-line', pl: 2 }}>
+                  {aula.objetivosAprendizagem}
+                </Typography>
+              </Box>
+            )}
+
+            {/* Conteúdo */}
+            {aula.conteudo && (
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="subtitle2" color="text.secondary" sx={{ fontWeight: 'bold', mb: 1 }}>
+                  📖 Conteúdo:
+                </Typography>
+                <Typography variant="body1" sx={{ whiteSpace: 'pre-line', pl: 2 }}>
+                  {aula.conteudo}
+                </Typography>
+              </Box>
+            )}
+
+            {/* Metodologia */}
+            {aula.metodologia && (
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="subtitle2" color="text.secondary" sx={{ fontWeight: 'bold', mb: 1 }}>
+                  🔧 Metodologia:
+                </Typography>
+                <Typography variant="body1" sx={{ whiteSpace: 'pre-line', pl: 2 }}>
+                  {aula.metodologia}
+                </Typography>
+              </Box>
+            )}
+
+            {/* Tarefa de Casa */}
+            {aula.tarefaCasa && (
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="subtitle2" color="text.secondary" sx={{ fontWeight: 'bold', mb: 1 }}>
+                  🏠 Tarefa de Casa:
+                </Typography>
+                <Typography variant="body1" sx={{ whiteSpace: 'pre-line', pl: 2 }}>
+                  {aula.tarefaCasa}
+                </Typography>
+              </Box>
+            )}
+
+            {/* Recursos */}
+            {aula.recursos && aula.recursos.length > 0 && (
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="subtitle2" color="text.secondary" sx={{ fontWeight: 'bold', mb: 1 }}>
+                  📎 Recursos:
+                </Typography>
+                <RecursosPreview recursos={aula.recursos} variant="list" showDownload={true} />
+              </Box>
+            )}
+          </Paper>
+        ))}
+      </Box>
+    );
+  };
+
+  // Renderiza BNCC (apenas para planos diários antigos sem aulasDetalhadas)
   const renderBNCC = () => {
-    if (!isDiario || !plano.competenciasBNCC || plano.competenciasBNCC.length === 0) {
+    if (!isDiario || plano.aulasDetalhadas || !plano.competenciasBNCC || plano.competenciasBNCC.length === 0) {
       return null;
     }
 
@@ -212,8 +349,13 @@ const VisualizacaoDocumentoPlano = ({
     );
   };
 
-  // Renderiza objetivos
+  // Renderiza objetivos (apenas para planos por grade ou planos diários antigos)
   const renderObjetivos = () => {
+    // Se for plano diário com nova estrutura, pula (renderizado em renderAulasDetalhadas)
+    if (isDiario && plano.aulasDetalhadas) {
+      return null;
+    }
+
     const hasObjetivos = isDiario 
       ? plano.objetivosAprendizagem 
       : (Array.isArray(plano.objetivos) && plano.objetivos.length > 0);
@@ -252,8 +394,13 @@ const VisualizacaoDocumentoPlano = ({
     );
   };
 
-  // Renderiza conteúdo programático
+  // Renderiza conteúdo programático (apenas para planos por grade ou planos diários antigos)
   const renderConteudo = () => {
+    // Se for plano diário com nova estrutura, pula (renderizado em renderAulasDetalhadas)
+    if (isDiario && plano.aulasDetalhadas) {
+      return null;
+    }
+
     if (!plano.conteudo) return null;
 
     return (
@@ -276,8 +423,13 @@ const VisualizacaoDocumentoPlano = ({
     );
   };
 
-  // Renderiza metodologia
+  // Renderiza metodologia (apenas para planos por grade ou planos diários antigos)
   const renderMetodologia = () => {
+    // Se for plano diário com nova estrutura, pula (renderizado em renderAulasDetalhadas)
+    if (isDiario && plano.aulasDetalhadas) {
+      return null;
+    }
+
     if (!plano.metodologia) return null;
 
     return (
@@ -300,18 +452,15 @@ const VisualizacaoDocumentoPlano = ({
     );
   };
 
-  // Renderiza recursos
+  // Renderiza recursos (apenas para planos por grade ou planos diários antigos)
   const renderRecursos = () => {
+    // Se for plano diário com nova estrutura, pula (renderizado em renderAulasDetalhadas)
+    if (isDiario && plano.aulasDetalhadas) {
+      return null;
+    }
+
     const hasRecursos = Array.isArray(plano.recursos) && plano.recursos.length > 0;
     const hasRecursosString = typeof plano.recursos === 'string' && plano.recursos.trim();
-
-    console.log('📎 VisualizacaoDocumento - renderRecursos:', {
-      planoId: plano.id,
-      recursos: plano.recursos,
-      hasRecursos,
-      hasRecursosString,
-      tipoRecursos: typeof plano.recursos
-    });
 
     if (!hasRecursos && !hasRecursosString) return null;
 
@@ -374,9 +523,9 @@ const VisualizacaoDocumentoPlano = ({
     );
   };
 
-  // Renderiza tarefa de casa (apenas planos diários)
+  // Renderiza tarefa de casa (apenas planos diários antigos sem aulasDetalhadas)
   const renderTarefaCasa = () => {
-    if (!isDiario || !plano.tarefaCasa) return null;
+    if (!isDiario || plano.aulasDetalhadas || !plano.tarefaCasa) return null;
 
     return (
       <Paper elevation={1} sx={{ p: 3, mb: 3 }}>
@@ -493,6 +642,7 @@ const VisualizacaoDocumentoPlano = ({
       }}>
         {renderCabecalho()}
         {renderInformacoesGerais()}
+        {renderAulasDetalhadas()}
         {renderBNCC()}
         {renderObjetivos()}
         {renderConteudo()}

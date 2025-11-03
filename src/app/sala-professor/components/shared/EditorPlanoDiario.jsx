@@ -355,11 +355,14 @@ const EditorPlanoDiario = ({
     console.log('💾 [handleSave] Salvando plano diário...', {
       statusAtual: formData.statusAprovacao,
       isCoordinator: isCoordinator(),
-      planoId: plano?.id
+      planoId: plano?.id,
+      tipo_plano: formData.tipo_plano,
+      formDataKeys: Object.keys(formData)
     });
     
     const dadosPlano = {
       ...formData,
+      tipo_plano: 'diario', // Garantir que sempre seja 'diario'
       id: plano?.id || Date.now().toString(),
       criadoEm: plano?.criadoEm || new Date().toISOString(),
       atualizadoEm: new Date().toISOString(),
@@ -367,9 +370,16 @@ const EditorPlanoDiario = ({
       professorUid: user?.uid
     };
     
-    console.log('� [handleSave] Aulas detalhadas sendo salvas:', {
+    console.log('📦 [handleSave] Aulas detalhadas sendo salvas:', {
       numAulas: dadosPlano.aulasDetalhadas?.length || 0,
       aulas: dadosPlano.aulasDetalhadas
+    });
+    
+    console.log('🔍 [handleSave] Dados do plano a salvar:', {
+      id: dadosPlano.id,
+      tipo_plano: dadosPlano.tipo_plano,
+      hasAulasDetalhadas: !!dadosPlano.aulasDetalhadas,
+      numAulas: dadosPlano.aulasDetalhadas?.length
     });
     
     // Se a coordenadora está editando um plano em revisão, salva e aprova automaticamente

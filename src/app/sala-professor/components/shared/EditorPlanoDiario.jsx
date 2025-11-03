@@ -204,10 +204,15 @@ const EditorPlanoDiario = ({
         });
       } else {
         // Modo criação: resetar para novo plano
+        const hoje = new Date();
+        const dataLocal = new Date(hoje.getTime() - (hoje.getTimezoneOffset() * 60000))
+          .toISOString()
+          .split('T')[0];
+        
         setFormData({
           tipo_plano: 'diario',
           turmaId: '',
-          data: new Date().toISOString().split('T')[0],
+          data: dataLocal,
           aulasDetalhadas: [],
           observacoes: '',
           statusAprovacao: 'pendente',

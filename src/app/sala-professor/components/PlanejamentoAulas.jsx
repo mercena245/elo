@@ -557,8 +557,9 @@ const PlanejamentoAulas = () => {
   };
 
   const abrirImpressao = (plano) => {
-    setPlanoImpressao(plano);
-    setDialogImpressao(true);
+    // Usar visualização em documento para todos os planos (suporta ambas estruturas)
+    setPlanoVisualizacao(plano);
+    setModalVisualizacao(true);
   };
 
   const fecharImpressao = () => {

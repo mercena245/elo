@@ -44,6 +44,17 @@ const VisualizacaoDocumentoPlano = ({
 
   const isDiario = plano.tipo_plano === 'diario';
 
+  // Debug: verificar estrutura do plano
+  console.log('🔍 VisualizacaoDocumento - Plano recebido:', {
+    id: plano.id,
+    tipo_plano: plano.tipo_plano,
+    isDiario,
+    hasAulasDetalhadas: !!plano.aulasDetalhadas,
+    aulasDetalhadas: plano.aulasDetalhadas,
+    objetivosAprendizagem: plano.objetivosAprendizagem,
+    keys: Object.keys(plano)
+  });
+
   // Função para obter nome da turma
   const getNomeTurma = (turmaId) => {
     return turmas[turmaId]?.nome || 'Turma não encontrada';

@@ -186,139 +186,216 @@ const VisualizacaoDocumentoPlano = ({
     </Paper>
   );
 
-  // Renderiza detalhes de cada aula (nova estrutura de planos diários)
-  const renderAulasDetalhadas = () => {
+  // Renderiza detalhes de cada aula consolidados por seção (nova estrutura de planos diários)
+  const renderAulasDetalhadasConsolidadas = () => {
     if (!isDiario || !plano.aulasDetalhadas || plano.aulasDetalhadas.length === 0) {
       return null;
     }
 
+    const aulasComConteudo = plano.aulasDetalhadas.filter(aula => 
+      aula.disciplinaNome || aula.disciplinaId
+    );
+
+    if (aulasComConteudo.length === 0) return null;
+
     return (
       <Box sx={{ mb: 3 }}>
-        {plano.aulasDetalhadas.map((aula, index) => (
-          <Paper key={index} elevation={2} sx={{ p: 3, mb: 3, border: '2px solid', borderColor: 'primary.light' }}>
-            {/* Cabeçalho da Aula */}
-            <Box sx={{ 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              alignItems: 'center',
-              mb: 2,
-              pb: 2,
+        {/* Competências BNCC */}
+        {aulasComConteudo.some(aula => aula.competenciasBNCC && aula.competenciasBNCC.length > 0) && (
+          <Paper elevation={1} sx={{ p: 3, mb: 3 }}>
+            <Typography variant="h6" sx={{ 
+              mb: 2, 
+              fontWeight: 'bold',
+              color: 'primary.main',
               borderBottom: '2px solid',
-              borderColor: 'primary.main'
+              borderColor: 'primary.main',
+              pb: 1
             }}>
-              <Typography variant="h5" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
-                📚 {aula.disciplinaNome || getNomeDisciplina(aula.disciplinaId)}
-              </Typography>
-              {aula.horario && (
-                <Chip 
-                  icon={<AccessTimeIcon />} 
-                  label={aula.horario}
-                  color="primary"
-                  variant="outlined"
-                />
-              )}
+              📚 Competências BNCC
+            </Typography>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              {aulasComConteudo.map((aula, index) => (
+                aula.competenciasBNCC && aula.competenciasBNCC.length > 0 && (
+                  <Box key={index}>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 'bold', color: 'secondary.main', mb: 1 }}>
+                      {aula.disciplinaNome || getNomeDisciplina(aula.disciplinaId)}
+                      {aula.horario && ` (${aula.horario})`}
+                    </Typography>
+                    <Box sx={{ pl: 2 }}>
+                      {aula.competenciasBNCC.map((comp, idx) => (
+                        <Paper key={idx} elevation={0} sx={{ p: 1.5, mb: 1, backgroundColor: 'grey.50' }}>
+                          <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+                            {typeof comp === 'string' ? comp : `${comp.codigo}`}
+                          </Typography>
+                          {typeof comp === 'object' && comp.descricao && (
+                            <Typography variant="caption" color="text.secondary">
+                              {comp.descricao}
+                            </Typography>
+                          )}
+                        </Paper>
+                      ))}
+                    </Box>
+                  </Box>
+                )
+              ))}
             </Box>
-
-            {/* Faixa Etária */}
-            {aula.faixaEtaria && (
-              <Box sx={{ mb: 2 }}>
-                <Typography variant="subtitle2" color="text.secondary" sx={{ fontWeight: 'bold', mb: 1 }}>
-                  👶 Faixa Etária:
-                </Typography>
-                <Typography variant="body1">
-                  {aula.faixaEtaria === 'educacao_infantil' ? 'Educação Infantil' :
-                   aula.faixaEtaria === 'anos_iniciais_1_2' ? 'Anos Iniciais (1º e 2º ano)' :
-                   aula.faixaEtaria === 'anos_iniciais_3_5' ? 'Anos Iniciais (3º ao 5º ano)' :
-                   aula.faixaEtaria === 'anos_finais_6_7' ? 'Anos Finais (6º e 7º ano)' :
-                   aula.faixaEtaria === 'anos_finais_8_9' ? 'Anos Finais (8º e 9º ano)' :
-                   aula.faixaEtaria === 'ensino_medio' ? 'Ensino Médio' :
-                   aula.faixaEtaria}
-                </Typography>
-              </Box>
-            )}
-
-            {/* Competências BNCC */}
-            {aula.competenciasBNCC && aula.competenciasBNCC.length > 0 && (
-              <Box sx={{ mb: 2 }}>
-                <Typography variant="subtitle2" color="text.secondary" sx={{ fontWeight: 'bold', mb: 1 }}>
-                  📚 Competências BNCC:
-                </Typography>
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                  {aula.competenciasBNCC.map((comp, idx) => (
-                    <Paper key={idx} elevation={0} sx={{ p: 1.5, backgroundColor: 'grey.50' }}>
-                      <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
-                        {typeof comp === 'string' ? comp : `${comp.codigo}`}
-                      </Typography>
-                      {typeof comp === 'object' && comp.descricao && (
-                        <Typography variant="caption" color="text.secondary">
-                          {comp.descricao}
-                        </Typography>
-                      )}
-                    </Paper>
-                  ))}
-                </Box>
-              </Box>
-            )}
-
-            {/* Objetivos de Aprendizagem */}
-            {aula.objetivosAprendizagem && (
-              <Box sx={{ mb: 2 }}>
-                <Typography variant="subtitle2" color="text.secondary" sx={{ fontWeight: 'bold', mb: 1 }}>
-                  🎯 Objetivos de Aprendizagem:
-                </Typography>
-                <Typography variant="body1" sx={{ whiteSpace: 'pre-line', pl: 2 }}>
-                  {aula.objetivosAprendizagem}
-                </Typography>
-              </Box>
-            )}
-
-            {/* Conteúdo */}
-            {aula.conteudo && (
-              <Box sx={{ mb: 2 }}>
-                <Typography variant="subtitle2" color="text.secondary" sx={{ fontWeight: 'bold', mb: 1 }}>
-                  📖 Conteúdo:
-                </Typography>
-                <Typography variant="body1" sx={{ whiteSpace: 'pre-line', pl: 2 }}>
-                  {aula.conteudo}
-                </Typography>
-              </Box>
-            )}
-
-            {/* Metodologia */}
-            {aula.metodologia && (
-              <Box sx={{ mb: 2 }}>
-                <Typography variant="subtitle2" color="text.secondary" sx={{ fontWeight: 'bold', mb: 1 }}>
-                  🔧 Metodologia:
-                </Typography>
-                <Typography variant="body1" sx={{ whiteSpace: 'pre-line', pl: 2 }}>
-                  {aula.metodologia}
-                </Typography>
-              </Box>
-            )}
-
-            {/* Tarefa de Casa */}
-            {aula.tarefaCasa && (
-              <Box sx={{ mb: 2 }}>
-                <Typography variant="subtitle2" color="text.secondary" sx={{ fontWeight: 'bold', mb: 1 }}>
-                  🏠 Tarefa de Casa:
-                </Typography>
-                <Typography variant="body1" sx={{ whiteSpace: 'pre-line', pl: 2 }}>
-                  {aula.tarefaCasa}
-                </Typography>
-              </Box>
-            )}
-
-            {/* Recursos */}
-            {aula.recursos && aula.recursos.length > 0 && (
-              <Box sx={{ mb: 2 }}>
-                <Typography variant="subtitle2" color="text.secondary" sx={{ fontWeight: 'bold', mb: 1 }}>
-                  📎 Recursos:
-                </Typography>
-                <RecursosPreview recursos={aula.recursos} variant="list" showDownload={true} />
-              </Box>
-            )}
           </Paper>
-        ))}
+        )}
+
+        {/* Objetivos de Aprendizagem */}
+        {aulasComConteudo.some(aula => aula.objetivosAprendizagem) && (
+          <Paper elevation={1} sx={{ p: 3, mb: 3 }}>
+            <Typography variant="h6" sx={{ 
+              mb: 2, 
+              fontWeight: 'bold',
+              color: 'primary.main',
+              borderBottom: '2px solid',
+              borderColor: 'primary.main',
+              pb: 1
+            }}>
+              🎯 Objetivos de Aprendizagem
+            </Typography>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              {aulasComConteudo.map((aula, index) => (
+                aula.objetivosAprendizagem && (
+                  <Box key={index}>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 'bold', color: 'secondary.main', mb: 1 }}>
+                      {aula.disciplinaNome || getNomeDisciplina(aula.disciplinaId)}
+                      {aula.horario && ` (${aula.horario})`}
+                    </Typography>
+                    <Typography variant="body1" sx={{ whiteSpace: 'pre-line', pl: 2 }}>
+                      {aula.objetivosAprendizagem}
+                    </Typography>
+                  </Box>
+                )
+              ))}
+            </Box>
+          </Paper>
+        )}
+
+        {/* Conteúdo */}
+        {aulasComConteudo.some(aula => aula.conteudo) && (
+          <Paper elevation={1} sx={{ p: 3, mb: 3 }}>
+            <Typography variant="h6" sx={{ 
+              mb: 2, 
+              fontWeight: 'bold',
+              color: 'primary.main',
+              borderBottom: '2px solid',
+              borderColor: 'primary.main',
+              pb: 1
+            }}>
+              📖 Conteúdo Programático
+            </Typography>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              {aulasComConteudo.map((aula, index) => (
+                aula.conteudo && (
+                  <Box key={index}>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 'bold', color: 'secondary.main', mb: 1 }}>
+                      {aula.disciplinaNome || getNomeDisciplina(aula.disciplinaId)}
+                      {aula.horario && ` (${aula.horario})`}
+                    </Typography>
+                    <Typography variant="body1" sx={{ whiteSpace: 'pre-line', pl: 2 }}>
+                      {aula.conteudo}
+                    </Typography>
+                  </Box>
+                )
+              ))}
+            </Box>
+          </Paper>
+        )}
+
+        {/* Metodologia */}
+        {aulasComConteudo.some(aula => aula.metodologia) && (
+          <Paper elevation={1} sx={{ p: 3, mb: 3 }}>
+            <Typography variant="h6" sx={{ 
+              mb: 2, 
+              fontWeight: 'bold',
+              color: 'primary.main',
+              borderBottom: '2px solid',
+              borderColor: 'primary.main',
+              pb: 1
+            }}>
+              🔧 Metodologia
+            </Typography>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              {aulasComConteudo.map((aula, index) => (
+                aula.metodologia && (
+                  <Box key={index}>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 'bold', color: 'secondary.main', mb: 1 }}>
+                      {aula.disciplinaNome || getNomeDisciplina(aula.disciplinaId)}
+                      {aula.horario && ` (${aula.horario})`}
+                    </Typography>
+                    <Typography variant="body1" sx={{ whiteSpace: 'pre-line', pl: 2 }}>
+                      {aula.metodologia}
+                    </Typography>
+                  </Box>
+                )
+              ))}
+            </Box>
+          </Paper>
+        )}
+
+        {/* Tarefa de Casa */}
+        {aulasComConteudo.some(aula => aula.tarefaCasa) && (
+          <Paper elevation={1} sx={{ p: 3, mb: 3 }}>
+            <Typography variant="h6" sx={{ 
+              mb: 2, 
+              fontWeight: 'bold',
+              color: 'primary.main',
+              borderBottom: '2px solid',
+              borderColor: 'primary.main',
+              pb: 1
+            }}>
+              🏠 Tarefa de Casa
+            </Typography>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              {aulasComConteudo.map((aula, index) => (
+                aula.tarefaCasa && (
+                  <Box key={index}>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 'bold', color: 'secondary.main', mb: 1 }}>
+                      {aula.disciplinaNome || getNomeDisciplina(aula.disciplinaId)}
+                      {aula.horario && ` (${aula.horario})`}
+                    </Typography>
+                    <Typography variant="body1" sx={{ whiteSpace: 'pre-line', pl: 2 }}>
+                      {aula.tarefaCasa}
+                    </Typography>
+                  </Box>
+                )
+              ))}
+            </Box>
+          </Paper>
+        )}
+
+        {/* Recursos */}
+        {aulasComConteudo.some(aula => aula.recursos && aula.recursos.length > 0) && (
+          <Paper elevation={1} sx={{ p: 3, mb: 3 }}>
+            <Typography variant="h6" sx={{ 
+              mb: 2, 
+              fontWeight: 'bold',
+              color: 'primary.main',
+              borderBottom: '2px solid',
+              borderColor: 'primary.main',
+              pb: 1
+            }}>
+              📎 Recursos Didáticos
+            </Typography>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              {aulasComConteudo.map((aula, index) => (
+                aula.recursos && aula.recursos.length > 0 && (
+                  <Box key={index}>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 'bold', color: 'secondary.main', mb: 1 }}>
+                      {aula.disciplinaNome || getNomeDisciplina(aula.disciplinaId)}
+                      {aula.horario && ` (${aula.horario})`}
+                    </Typography>
+                    <Box sx={{ pl: 2 }}>
+                      <RecursosPreview recursos={aula.recursos} variant="list" showDownload={true} />
+                    </Box>
+                  </Box>
+                )
+              ))}
+            </Box>
+          </Paper>
+        )}
       </Box>
     );
   };
@@ -653,7 +730,7 @@ const VisualizacaoDocumentoPlano = ({
       }}>
         {renderCabecalho()}
         {renderInformacoesGerais()}
-        {renderAulasDetalhadas()}
+        {renderAulasDetalhadasConsolidadas()}
         {renderBNCC()}
         {renderObjetivos()}
         {renderConteudo()}

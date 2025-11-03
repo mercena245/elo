@@ -1231,6 +1231,7 @@ const PlanejamentoAulas = () => {
           setPlanoDiarioEditando(null);
         }}
         onSave={salvarPlano}
+        onStatusChange={carregarDados} // Recarrega dados quando status mudar
         plano={planoDiarioEditando}
         turmas={turmas}
         disciplinas={disciplinas}

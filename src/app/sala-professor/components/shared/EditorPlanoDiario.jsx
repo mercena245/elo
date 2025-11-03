@@ -53,7 +53,8 @@ const EditorPlanoDiario = ({
   minhasDisciplinas,
   isEditing = false,
   userRole,
-  gradeHoraria = {}
+  gradeHoraria = {},
+  onStatusChange // Novo callback para notificar mudança de status
 }) => {
   const { user } = useAuth();
   const { getData, updateData, isReady } = useSchoolDatabase();
@@ -298,6 +299,11 @@ const EditorPlanoDiario = ({
       await updateData(`planos-aula/${plano.id}`, dadosAtualizacao);
       console.log('✅ [handleAprovar] Plano diário aprovado com sucesso no Firebase');
       
+      // Notificar componente pai para recarregar dados
+      if (onStatusChange) {
+        onStatusChange();
+      }
+      
       if (onClose) {
         onClose();
       }
@@ -340,6 +346,11 @@ const EditorPlanoDiario = ({
       
       setDialogRejeitar(false);
       setObservacoesRejeicao('');
+      
+      // Notificar componente pai para recarregar dados
+      if (onStatusChange) {
+        onStatusChange();
+      }
       
       if (onClose) {
         onClose();

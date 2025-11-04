@@ -104,23 +104,36 @@ const EditorPlanoDiario = ({
         return [];
       }
 
-      console.log('� Buscando grade horária direto do banco:', `GradeHoraria/${turma.periodoId}/${turmaIdSelecionada}`);
+      console.log('📚 Buscando grade horária direto do banco:', `GradeHoraria/${turma.periodoId}/${turmaIdSelecionada}`);
 
       // Buscar grade horária diretamente do banco de dados
       const gradeData = await getData(`GradeHoraria/${turma.periodoId}/${turmaIdSelecionada}`);
       
-      if (!gradeData) {
+      console.log('📊 Dados brutos recebidos:', gradeData);
+      console.log('📊 Tipo dos dados:', typeof gradeData);
+      console.log('📊 É objeto?', gradeData && typeof gradeData === 'object');
+
+      if (!gradeData || typeof gradeData !== 'object') {
         console.log('❌ Nenhuma grade horária encontrada no banco');
         return [];
       }
 
-      console.log('📊 Grade horária carregada:', gradeData);
+      console.log('✅ Grade horária carregada com sucesso');
+      console.log('📊 Chaves encontradas:', Object.keys(gradeData));
 
       // Filtrar aulas do dia da semana
       const aulasDoDia = Object.entries(gradeData)
         .filter(([id, aula]) => {
-          console.log('🔎 Verificando aula:', { id, diaSemana: aula.diaSemana, numeroBuscado: numeroDiaSemana, disciplina: aula.disciplinaNome || aula.disciplinaId });
-          return aula.diaSemana === numeroDiaSemana;
+          console.log('🔎 Verificando aula:', { 
+            id, 
+            aula: aula,
+            diaSemana: aula?.diaSemana, 
+            numeroBuscado: numeroDiaSemana, 
+            disciplina: aula?.disciplinaNome || aula?.disciplinaId,
+            temDiaSemana: aula && 'diaSemana' in aula,
+            match: aula?.diaSemana === numeroDiaSemana
+          });
+          return aula && aula.diaSemana === numeroDiaSemana;
         })
         .map(([id, aula]) => ({
           id,

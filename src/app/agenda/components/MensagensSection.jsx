@@ -42,7 +42,6 @@ import {
   School,
   Circle
 } from '@mui/icons-material';
-import { ArrowBack, Reply } from '@mui/icons-material';
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import { auth } from '../../../firebase';
 import { auditService, LOG_ACTIONS } from '../../../services/auditService';
@@ -64,7 +63,6 @@ const MensagensSection = ({ userRole, userData }) => {
     anexos: []
   });
   const [usuarios, setUsuarios] = useState([]);
-  const [visuMensagem, setVisuMensagem] = useState(false); // Controle da visualização inline
 
   useEffect(() => {
     fetchConversas();
@@ -411,17 +409,6 @@ const MensagensSection = ({ userRole, userData }) => {
     }
   };
 
-  // Função para responder a uma mensagem
-  const responderMensagem = (mensagem) => {
-    setNovaMensagem({
-      destinatario: mensagem.remetente?.id || '',
-      assunto: `Resposta a: "${mensagem.assunto}"`,
-      conteudo: '',
-      anexos: []
-    });
-    setDialogNovaMensagem(true);
-  };
-
   const getConversasFiltradas = () => {
     const userId = userData?.id;
     
@@ -528,13 +515,11 @@ const MensagensSection = ({ userRole, userData }) => {
             mx: conversaSelecionada ? 0 : 'auto'
           }}>
             <CardContent sx={{ p: 0, height: '100%', display: 'flex', flexDirection: 'column' }}>
-              {!visuMensagem ? (
-                <>
-                  {/* Header com Abas */}
-                  <Box sx={{ bgcolor: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
-                    <Typography variant="h6" sx={{ p: 2, pb: 1 }}>
-                      Conversas
-                    </Typography>
+              {/* Header com Abas */}
+              <Box sx={{ bgcolor: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
+                <Typography variant="h6" sx={{ p: 2, pb: 1 }}>
+                  Conversas
+                </Typography>
                 <Tabs 
                   value={abaConversas} 
                   onChange={(e, newValue) => {
@@ -633,7 +618,6 @@ const MensagensSection = ({ userRole, userData }) => {
                         selected={conversaSelecionada?.id === conversa.id}
                         onClick={() => {
                           setConversaSelecionada(conversa);
-                          setVisuMensagem(true); // Ativar visualização inline
                           // Marcar como lida automaticamente quando clicar (somente mensagens recebidas)
                           if (isNaoLida && !isEnviada) {
                             marcarComoLida(conversa.id);
@@ -741,122 +725,12 @@ const MensagensSection = ({ userRole, userData }) => {
                   })}
                 </List>
               )}
-              </>
-              ) : (
-                <>
-                  {/* Header com Navegação - DETALHE */}
-                  <Box sx={{ 
-                    bgcolor: '#f8fafc', 
-                    borderBottom: '1px solid #e5e7eb',
-                    p: 2,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 2
-                  }}>
-                    <IconButton 
-                      onClick={() => {
-                        setVisuMensagem(false);
-                        setConversaSelecionada(null);
-                      }}
-                      sx={{ 
-                        bgcolor: '#e5e7eb',
-                        '&:hover': { bgcolor: '#d1d5db' },
-                        width: 36,
-                        height: 36
-                      }}
-                    >
-                      <ArrowBack fontSize="small" />
-                    </IconButton>
-                    <Box sx={{ flex: 1 }}>
-                      <Typography variant="h6" sx={{ fontSize: '1rem', fontWeight: 600 }}>
-                        {conversaSelecionada?.assunto || 'Sem assunto'}
-                      </Typography>
-                      <Typography variant="body2" color="textSecondary">
-                        {conversaSelecionada?.remetente?.id === userData?.id ? 
-                          `Para: ${conversaSelecionada?.destinatario?.nome || 'Usuário'}` : 
-                          `De: ${conversaSelecionada?.remetente?.nome || 'Usuário'}`
-                        }
-                      </Typography>
-                    </Box>
-                  </Box>
-
-                  {/* Conteúdo da Mensagem */}
-                  <Box sx={{ flex: 1, overflow: 'auto', p: 3 }}>
-                    <Paper sx={{ p: 3, bgcolor: '#f8fafc', border: '1px solid #e5e7eb' }}>
-                      <Typography variant="body1" sx={{ 
-                        whiteSpace: 'pre-wrap',
-                        lineHeight: 1.6,
-                        color: '#374151'
-                      }}>
-                        {conversaSelecionada?.conteudo || 'Sem conteúdo'}
-                      </Typography>
-                      
-                      {conversaSelecionada?.anexos && conversaSelecionada.anexos.length > 0 && (
-                        <Box sx={{ mt: 3 }}>
-                          <Typography variant="subtitle2" sx={{ mb: 2, color: '#6b7280' }}>
-                            Anexos:
-                          </Typography>
-                          <List sx={{ pt: 0 }}>
-                            {conversaSelecionada.anexos.map((anexo, index) => (
-                              <ListItem key={index} sx={{ pl: 0 }}>
-                                <ListItemIcon>
-                                  <AttachFile color="primary" />
-                                </ListItemIcon>
-                                <ListItemText 
-                                  primary={anexo.nome}
-                                  secondary={`${anexo.tamanho || 'Tamanho desconhecido'}`}
-                                />
-                              </ListItem>
-                            ))}
-                          </List>
-                        </Box>
-                      )}
-                      
-                      <Box sx={{ 
-                        mt: 3, 
-                        pt: 2, 
-                        borderTop: '1px solid #e5e7eb',
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center'
-                      }}>
-                        <Typography variant="caption" color="textSecondary">
-                          {conversaSelecionada?.dataEnvio ? 
-                            `Enviado em ${formatarData(conversaSelecionada.dataEnvio)}` : 
-                            'Data não disponível'
-                          }
-                        </Typography>
-                        
-                        {/* Botão de Resposta */}
-                        {conversaSelecionada?.remetente?.id !== userData?.id && (
-                          <Button
-                            variant="outlined"
-                            size="small"
-                            startIcon={<Reply />}
-                            onClick={() => responderMensagem(conversaSelecionada)}
-                            sx={{ 
-                              textTransform: 'none',
-                              borderColor: '#3b82f6',
-                              color: '#3b82f6',
-                              '&:hover': {
-                                borderColor: '#2563eb',
-                                bgcolor: '#eff6ff'
-                              }
-                            }}
-                          >
-                            Responder
-                          </Button>
-                        )}
-                      </Box>
-                    </Paper>
-                  </Box>
-                </>
-              )}
             </CardContent>
           </Card>
         </Grid>
-      </Grid>
-        {conversaSelecionada && (
+
+        {/* Visualizador de Conversa */}
+        {false && conversaSelecionada && (
           <Grid item xs={12} md={8} lg={4}>
           <Card sx={{ height: '600px', display: 'flex', flexDirection: 'column' }}>
             {conversaSelecionada ? (

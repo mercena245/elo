@@ -27,7 +27,9 @@ import {
   DialogActions,
   TextField,
   Divider,
-  Badge
+  Badge,
+  Checkbox,
+  FormControlLabel
 } from '@mui/material';
 import { 
   Save, 
@@ -53,6 +55,7 @@ const RegistroFaltas = ({ professorId = null }) => {
   const [professores, setProfessores] = useState([]);
   const [alunos, setAlunos] = useState([]);
   const [faltas, setFaltas] = useState([]);
+  const [modoDiario, setModoDiario] = useState(false); // Novo estado para modo falta diária
   
   const [filtros, setFiltros] = useState({
     turmaId: '',
@@ -76,10 +79,16 @@ const RegistroFaltas = ({ professorId = null }) => {
   }, [filtros.turmaId, turmas]);
 
   useEffect(() => {
-    if (filtros.turmaId && filtros.disciplinaId && filtros.professorIdSelecionado && filtros.data) {
+    // Carregar faltas se:
+    // - Modo diário: turma, professor e data (disciplina não necessária)
+    // - Modo normal: turma, disciplina, professor e data
+    const podeCarregar = filtros.turmaId && filtros.professorIdSelecionado && filtros.data &&
+                         (modoDiario || filtros.disciplinaId) && alunos.length > 0;
+    
+    if (podeCarregar) {
       carregarFaltas();
     }
-  }, [filtros.turmaId, filtros.disciplinaId, filtros.professorIdSelecionado, filtros.data]);
+  }, [filtros.turmaId, filtros.disciplinaId, filtros.professorIdSelecionado, filtros.data, modoDiario, alunos.length]);
 
   const carregarDados = async () => {
     if (!isReady) return;
@@ -181,15 +190,21 @@ const RegistroFaltas = ({ professorId = null }) => {
       const presencasIniciais = {};
       
       if (faltasData) {
+        // Em modo diário, não filtrar por disciplina
+        // Em modo normal, filtrar por disciplina específica
         faltasArray = Object.entries(faltasData)
-          .filter(([id, data]) =>
+          .filter(([id, data]) => 
             data.turmaId === filtros.turmaId &&
-            data.disciplinaId === filtros.disciplinaId &&
+            (modoDiario || data.disciplinaId === filtros.disciplinaId) &&
             data.professorId === filtros.professorIdSelecionado &&
             data.data === filtros.data
           )
           .map(([id, data]) => {
-            presencasIniciais[data.alunoId] = data.presente;
+            // Em modo diário, pegar a primeira ocorrência de cada aluno
+            // (todas as disciplinas devem ter o mesmo status)
+            if (!presencasIniciais[data.alunoId]) {
+              presencasIniciais[data.alunoId] = data.presente;
+            }
             return { id, ...data };
           });
       }
@@ -206,9 +221,7 @@ const RegistroFaltas = ({ professorId = null }) => {
     } catch (error) {
       console.error('Erro ao carregar faltas:', error);
     }
-  };
-
-  const handlePresencaChange = (alunoId, presente) => {
+  };  const handlePresencaChange = (alunoId, presente) => {
     setPresencas(prev => ({
       ...prev,
       [alunoId]: presente
@@ -244,46 +257,96 @@ const RegistroFaltas = ({ professorId = null }) => {
       const disciplina = disciplinas.find(d => d.id === filtros.disciplinaId);
       const professor = professores.find(p => p.id === filtros.professorIdSelecionado);
 
-      for (const [alunoId, presente] of Object.entries(presencas)) {
-        const faltaExistente = faltas.find(f => f.alunoId === alunoId);
-        const frequenciaId = faltaExistente ? faltaExistente.id : `freq_${Date.now()}_${alunoId}`;
-        const aluno = alunos.find(a => a.id === alunoId);
+      // MODO DIÁRIO - Aplicar para todas as disciplinas
+      if (modoDiario) {
+        const todasDisciplinas = disciplinas.filter(d => d.turmaId === filtros.turmaId || !d.turmaId);
         
-        const frequenciaData = {
-          alunoId,
-          turmaId: filtros.turmaId,
-          disciplinaId: filtros.disciplinaId,
-          professorId: filtros.professorIdSelecionado,
-          data: filtros.data,
-          presente: presente,
-          dataRegistro: new Date().toISOString(),
-          createdAt: faltaExistente?.createdAt || new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        };
+        for (const [alunoId, presente] of Object.entries(presencas)) {
+          const aluno = alunos.find(a => a.id === alunoId);
+          
+          // Aplicar a mesma presença para TODAS as disciplinas
+          for (const disc of todasDisciplinas) {
+            const frequenciaId = `freq_${filtros.data}_${alunoId}_${disc.id}`;
+            
+            const frequenciaData = {
+              alunoId,
+              turmaId: filtros.turmaId,
+              disciplinaId: disc.id,
+              professorId: filtros.professorIdSelecionado,
+              data: filtros.data,
+              presente: presente,
+              modoDiario: true, // Flag para indicar que foi registrado em modo diário
+              dataRegistro: new Date().toISOString(),
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString()
+            };
 
-        promises.push(setData(`frequencia/${frequenciaId}`, frequenciaData));
-        
-        // Log apenas se houve mudança no status de presença
-        const presencaAnterior = faltaExistente ? faltaExistente.presente : null;
-        if (presencaAnterior !== presente) {
+            promises.push(setData(`frequencia/${frequenciaId}`, frequenciaData));
+          }
+          
+          // Log para modo diário
           const logData = {
             action: LOG_ACTIONS.ATTENDANCE_UPDATE,
             entity: 'attendance',
-            entityId: frequenciaId,
-            details: `Frequência ${faltaExistente ? 'atualizada' : 'registrada'}: ${aluno?.nome || 'Aluno'} - ${presente ? 'Presente' : 'Faltou'} (${filtros.data})`,
+            entityId: `diario_${filtros.data}_${alunoId}`,
+            details: `Frequência DIÁRIA registrada: ${aluno?.nome || 'Aluno'} - ${presente ? 'Presente' : 'Faltou'} em TODAS as disciplinas (${filtros.data})`,
             changes: {
               aluno: aluno?.nome || 'Nome não encontrado',
               matricula: aluno?.matricula || 'S/N',
-              disciplina: disciplina?.nome || 'Disciplina não encontrada',
-              professor: professor?.nome || 'Professor não encontrado',
               turma: turma?.nome || 'Turma não encontrada',
               data: filtros.data,
-              presencaAnterior: presencaAnterior === null ? 'Não registrada' : (presencaAnterior ? 'Presente' : 'Faltou'),
-              presencaNova: presente ? 'Presente' : 'Faltou'
+              modoDiario: true,
+              totalDisciplinas: todasDisciplinas.length,
+              status: presente ? 'Presente' : 'Faltou'
             }
           };
           
           logsPromises.push(logAction(logData));
+        }
+        
+      } else {
+        // MODO NORMAL - Uma disciplina por vez
+        for (const [alunoId, presente] of Object.entries(presencas)) {
+          const faltaExistente = faltas.find(f => f.alunoId === alunoId);
+          const frequenciaId = faltaExistente ? faltaExistente.id : `freq_${Date.now()}_${alunoId}`;
+          const aluno = alunos.find(a => a.id === alunoId);
+          
+          const frequenciaData = {
+            alunoId,
+            turmaId: filtros.turmaId,
+            disciplinaId: filtros.disciplinaId,
+            professorId: filtros.professorIdSelecionado,
+            data: filtros.data,
+            presente: presente,
+            dataRegistro: new Date().toISOString(),
+            createdAt: faltaExistente?.createdAt || new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          };
+
+          promises.push(setData(`frequencia/${frequenciaId}`, frequenciaData));
+          
+          // Log apenas se houve mudança no status de presença
+          const presencaAnterior = faltaExistente ? faltaExistente.presente : null;
+          if (presencaAnterior !== presente) {
+            const logData = {
+              action: LOG_ACTIONS.ATTENDANCE_UPDATE,
+              entity: 'attendance',
+              entityId: frequenciaId,
+              details: `Frequência ${faltaExistente ? 'atualizada' : 'registrada'}: ${aluno?.nome || 'Aluno'} - ${presente ? 'Presente' : 'Faltou'} (${filtros.data})`,
+              changes: {
+                aluno: aluno?.nome || 'Nome não encontrado',
+                matricula: aluno?.matricula || 'S/N',
+                disciplina: disciplina?.nome || 'Disciplina não encontrada',
+                professor: professor?.nome || 'Professor não encontrado',
+                turma: turma?.nome || 'Turma não encontrada',
+                data: filtros.data,
+                presencaAnterior: presencaAnterior === null ? 'Não registrada' : (presencaAnterior ? 'Presente' : 'Faltou'),
+                presencaNova: presente ? 'Presente' : 'Faltou'
+              }
+            };
+            
+            logsPromises.push(logAction(logData));
+          }
         }
       }
 
@@ -295,7 +358,8 @@ const RegistroFaltas = ({ professorId = null }) => {
       const totalPresentes = Object.values(presencas).filter(p => p).length;
       const totalFaltosos = Object.values(presencas).filter(p => !p).length;
       
-      setMensagem(`✅ Frequência salva! ${totalPresentes} presente(s), ${totalFaltosos} falta(s).`);
+      const mensagemModo = modoDiario ? ' (aplicado a TODAS as disciplinas)' : '';
+      setMensagem(`✅ Frequência salva${mensagemModo}! ${totalPresentes} presente(s), ${totalFaltosos} falta(s).`);
 
     } catch (error) {
       console.error('Erro ao salvar frequência:', error);
@@ -376,8 +440,8 @@ const RegistroFaltas = ({ professorId = null }) => {
             </Grid>
 
             <Grid item xs={12} sx={{ minWidth: '300px' }}>
-              <FormControl fullWidth sx={{ minWidth: '250px' }}>
-                <InputLabel>Disciplina</InputLabel>
+              <FormControl fullWidth sx={{ minWidth: '250px' }} disabled={modoDiario}>
+                <InputLabel>Disciplina {modoDiario && '(desabilitado no modo diário)'}</InputLabel>
                 <Select
                   value={filtros.disciplinaId}
                   label="Disciplina"
@@ -424,6 +488,35 @@ const RegistroFaltas = ({ professorId = null }) => {
                 }}
               />
             </Grid>
+
+            {/* Checkbox Modo Diário */}
+            <Grid item xs={12}>
+              <Divider sx={{ my: 2 }} />
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={modoDiario}
+                    onChange={(e) => setModoDiario(e.target.checked)}
+                    color="primary"
+                  />
+                }
+                label={
+                  <Box>
+                    <Typography variant="body1" fontWeight={600}>
+                      📅 Falta Diária (aplicar a todas as disciplinas)
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Quando ativado, a presença/falta será registrada para TODAS as disciplinas do dia
+                    </Typography>
+                  </Box>
+                }
+              />
+              {modoDiario && (
+                <Alert severity="info" sx={{ mt: 2 }}>
+                  <strong>Modo Diário Ativado:</strong> A frequência será aplicada automaticamente para todas as disciplinas da turma nesta data.
+                </Alert>
+              )}
+            </Grid>
           </Grid>
         </CardContent>
       </Card>
@@ -440,11 +533,12 @@ const RegistroFaltas = ({ professorId = null }) => {
       )}
 
       {/* Resumo da Aula */}
-      {filtros.turmaId && filtros.disciplinaId && filtros.professorIdSelecionado && filtros.data && alunos.length > 0 && (
+      {filtros.turmaId && (modoDiario || filtros.disciplinaId) && filtros.professorIdSelecionado && filtros.data && alunos.length > 0 && (
         <Card sx={{ mb: 3 }}>
           <CardContent>
             <Typography variant="h6" fontWeight={600} gutterBottom>
               📊 Resumo da Aula - {formatarData(filtros.data)}
+              {modoDiario && <Chip label="MODO DIÁRIO" color="primary" size="small" sx={{ ml: 2 }} />}
             </Typography>
             
             <Grid container spacing={2}>
@@ -518,12 +612,19 @@ const RegistroFaltas = ({ professorId = null }) => {
       )}
 
       {/* Lista de Frequência */}
-      {filtros.turmaId && filtros.disciplinaId && filtros.professorIdSelecionado && filtros.data && alunos.length > 0 && (
+      {filtros.turmaId && (modoDiario || filtros.disciplinaId) && filtros.professorIdSelecionado && filtros.data && alunos.length > 0 && (
         <Card>
           <CardContent>
             <Typography variant="h6" fontWeight={600} gutterBottom>
               👥 Lista de Frequência
+              {modoDiario && <Chip label="MODO DIÁRIO ATIVO" color="primary" size="small" sx={{ ml: 2 }} />}
             </Typography>
+
+            {modoDiario && (
+              <Alert severity="info" sx={{ mb: 2 }}>
+                <strong>Atenção:</strong> A presença/falta será registrada para TODAS as disciplinas da turma nesta data.
+              </Alert>
+            )}
 
             <TableContainer component={Paper}>
               <Table>

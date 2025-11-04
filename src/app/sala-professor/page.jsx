@@ -16,6 +16,7 @@ import {
 } from '@mui/material';
 import { useAuth } from '../../context/AuthContext';
 import { PlanejamentoAulas, RelatoriosPedagogicos, CronogramaAcademico, BibliotecaMateriais } from './components';
+import DiarioClasse from './components/DiarioClasse';
 
 const SalaProfessor = () => {
   const { user, role } = useAuth();
@@ -25,9 +26,10 @@ const SalaProfessor = () => {
   const getInitialTab = () => {
     const tabParam = searchParams.get('tab');
     switch(tabParam) {
-      case 'relatorios': return 1;
-      case 'cronograma': return 2;
-      case 'biblioteca': return 3;
+      case 'diario': return 1;
+      case 'relatorios': return 2;
+      case 'cronograma': return 3;
+      case 'biblioteca': return 4;
       default: return 0; // planos ou sem parâmetro
     }
   };
@@ -49,10 +51,12 @@ const SalaProfessor = () => {
       case 0:
         return <PlanejamentoAulas />;
       case 1:
-        return <RelatoriosPedagogicos />;
+        return <DiarioClasse />;
       case 2:
-        return <CronogramaAcademico />;
+        return <RelatoriosPedagogicos />;
       case 3:
+        return <CronogramaAcademico />;
+      case 4:
         return <BibliotecaMateriais />;
       default:
         return <PlanejamentoAulas />;
@@ -187,7 +191,16 @@ const SalaProfessor = () => {
                   }}
                 />
                 <Tab 
-                  icon="📊" 
+                  icon="�" 
+                  label="Diário de Classe" 
+                  sx={{ 
+                    flexDirection: { xs: 'column', sm: 'row' }, 
+                    gap: { xs: 0.5, sm: 1 },
+                    minHeight: { xs: 64, md: 72 }
+                  }}
+                />
+                <Tab 
+                  icon="�📊" 
                   label="Relatórios Pedagógicos" 
                   sx={{ 
                     flexDirection: { xs: 'column', sm: 'row' }, 

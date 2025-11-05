@@ -1301,6 +1301,7 @@ const PlanejamentoAulas = () => {
         minhasDisciplinas={minhasDisciplinas}
         isEditing={!!planoDiarioEditando}
         gradeHoraria={gradeHoraria}
+        periodoLetivoSelecionado={periodoLetivoSelecionado} // Adicionada prop que estava faltando
       />
     </Box>
     </>

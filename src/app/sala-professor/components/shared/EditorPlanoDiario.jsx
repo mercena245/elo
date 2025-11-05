@@ -54,6 +54,7 @@ const EditorPlanoDiario = ({
   isEditing = false,
   userRole,
   gradeHoraria = {},
+  periodoLetivoSelecionado, // Adicionada prop que estava faltando
   onStatusChange // Novo callback para notificar mudança de status
 }) => {
   const { user } = useAuth();

@@ -179,11 +179,26 @@ const PlanejamentoAulas = () => {
         console.log(`🔍 [DEBUG] Período selecionado globalmente:`, periodoLetivoSelecionado?.id);
         console.log(`🔍 [DEBUG] Período da turma:`, turma.periodoId);
         
-        // FIXME: Verificar se devemos usar o período da turma ou o período selecionado
-        const periodoParaBusca = turma.periodoId;
-        console.log(`🎯 [DEBUG] Buscando em: GradeHoraria/${periodoParaBusca}/${turmaId}`);
+        // ESTRATÉGIA: Tentar primeiro o período da turma, depois o selecionado
+        let gradeData = null;
+        const periodosParaTentar = [
+          turma.periodoId,
+          periodoLetivoSelecionado?.id
+        ].filter(Boolean).filter((period, index, arr) => arr.indexOf(period) === index); // Remove duplicatas
         
-        const gradeData = await getData(`GradeHoraria/${periodoParaBusca}/${turmaId}`);
+        console.log(`🎯 [DEBUG] Tentando períodos:`, periodosParaTentar);
+        
+        for (const periodo of periodosParaTentar) {
+          console.log(`🔍 [DEBUG] Tentando buscar em: GradeHoraria/${periodo}/${turmaId}`);
+          const tentativa = await getData(`GradeHoraria/${periodo}/${turmaId}`);
+          if (tentativa && Object.keys(tentativa).length > 0) {
+            console.log(`✅ [DEBUG] Dados encontrados no período: ${periodo}`);
+            gradeData = tentativa;
+            break;
+          } else {
+            console.log(`❌ [DEBUG] Nenhum dado no período: ${periodo}`);
+          }
+        }
         
         if (gradeData) {
           // A estrutura pode ter horarios aninhados (horario_XXXXX)

@@ -279,6 +279,15 @@ const PlanejamentoAulas = () => {
         getData(`GradeHoraria/${periodoLetivoSelecionado.id}`)
       ]);
       
+      console.log('🔍 [DEBUG] Dados recebidos da grade:', {
+        gradeDataPorTurma,
+        isNull: gradeDataPorTurma === null,
+        isUndefined: gradeDataPorTurma === undefined,
+        isEmpty: gradeDataPorTurma && Object.keys(gradeDataPorTurma).length === 0,
+        type: typeof gradeDataPorTurma,
+        keys: gradeDataPorTurma ? Object.keys(gradeDataPorTurma) : 'N/A'
+      });
+      
       // Processar planos
       setPlanos(planosData || {});
       

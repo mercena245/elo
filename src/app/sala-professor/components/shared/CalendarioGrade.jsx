@@ -84,14 +84,21 @@ const CalendarioGrade = ({
       gradeHoraria,
       gradeHorariaType: typeof gradeHoraria,
       gradeHorariaKeys: Object.keys(gradeHoraria || {}),
-      gradeHorariaValues: Object.values(gradeHoraria || {}),
+      gradeHorariaLength: Object.keys(gradeHoraria || {}).length,
       selectedTurmas,
+      selectedTurmasLength: selectedTurmas.length,
       professorUid,
       userRole
     });
     
     if (!gradeHoraria || typeof gradeHoraria !== 'object') {
       console.log('❌ Grade horária inválida ou vazia');
+      setMinhasAulas([]);
+      return;
+    }
+
+    if (Object.keys(gradeHoraria).length === 0) {
+      console.log('❌ Grade horária está vazia (sem dados)');
       setMinhasAulas([]);
       return;
     }

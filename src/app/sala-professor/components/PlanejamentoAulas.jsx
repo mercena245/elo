@@ -204,20 +204,22 @@ const PlanejamentoAulas = () => {
           // A estrutura pode ter horarios aninhados (horario_XXXXX)
           console.log(`🔍 Dados brutos da turma ${turmaId}:`, gradeData);
           
-          // Processar os dados - podem estar diretamente ou dentro de horario_XXXXX
+          // Processar os dados - cada horario_XXXXX é uma aula direta
           const processarHorarios = (dados) => {
             const aulasProcessadas = {};
             
             Object.entries(dados).forEach(([key, value]) => {
-              if (key.startsWith('horario_') && value && typeof value === 'object') {
-                // É um contêiner de horário, processar recursivamente
-                console.log(`📂 Processando contêiner de horário: ${key}`);
-                const subAulas = processarHorarios(value);
-                Object.assign(aulasProcessadas, subAulas);
-              } else if (value && typeof value === 'object' && (value.disciplinaId || value.diaSemana)) {
-                // É uma aula direta
-                console.log(`📝 Aula encontrada: ${key}`);
-                aulasProcessadas[key] = value;
+              if (value && typeof value === 'object') {
+                // Verificar se é uma aula (tem diaSemana, disciplinaId, etc.)
+                if (value.diaSemana !== undefined || value.disciplinaId || value.periodoAula) {
+                  console.log(`📝 Aula encontrada: ${key}`, value);
+                  aulasProcessadas[key] = value;
+                } else if (key.startsWith('horario_')) {
+                  // É um contêiner de horário, processar recursivamente
+                  console.log(`� Processando contêiner de horário: ${key}`);
+                  const subAulas = processarHorarios(value);
+                  Object.assign(aulasProcessadas, subAulas);
+                }
               }
             });
             

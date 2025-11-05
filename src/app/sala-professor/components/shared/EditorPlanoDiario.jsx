@@ -107,14 +107,18 @@ const EditorPlanoDiario = ({
 
       console.log('📚 Buscando grade horária direto do banco:', `GradeHoraria/${turma.periodoId}/${turmaIdSelecionada}`);
 
-      // ESTRATÉGIA: Tentar múltiplos períodos para encontrar dados (mesma lógica do PlanejamentoAulas)
+      // ESTRATÉGIA: Tentar múltiplos períodos para encontrar dados
       let gradeData = null;
       const periodosParaTentar = [
         turma.periodoId,
-        periodoLetivoSelecionado?.id
+        periodoLetivoSelecionado?.id,
+        '2025_meio-periodo_1761693393875', // Período conhecido onde estão os dados
+        '2025_meio-periodo_1760724478064'  // Outro período para fallback
       ].filter(Boolean).filter((period, index, arr) => arr.indexOf(period) === index); // Remove duplicatas
       
       console.log(`🎯 [EditorPlanoDiario] Tentando períodos para turma ${turmaIdSelecionada}:`, periodosParaTentar);
+      console.log(`🔍 [EditorPlanoDiario] Detalhes da turma:`, turma);
+      console.log(`🔍 [EditorPlanoDiario] Período letivo selecionado:`, periodoLetivoSelecionado);
       
       for (const periodo of periodosParaTentar) {
         console.log(`🔍 [EditorPlanoDiario] Tentando buscar em: GradeHoraria/${periodo}/${turmaIdSelecionada}`);

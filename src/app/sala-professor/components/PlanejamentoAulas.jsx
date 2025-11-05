@@ -177,15 +177,40 @@ const PlanejamentoAulas = () => {
         const gradeData = await getData(`GradeHoraria/${turma.periodoId}/${turmaId}`);
         
         if (gradeData) {
-          // Adicionar cada horário à grade completa
-          Object.entries(gradeData).forEach(([horarioId, horario]) => {
-            gradeCompleta[horarioId] = {
-              ...horario,
+          // A estrutura pode ter horarios aninhados (horario_XXXXX)
+          console.log(`🔍 Dados brutos da turma ${turmaId}:`, gradeData);
+          
+          // Processar os dados - podem estar diretamente ou dentro de horario_XXXXX
+          const processarHorarios = (dados) => {
+            const aulasProcessadas = {};
+            
+            Object.entries(dados).forEach(([key, value]) => {
+              if (key.startsWith('horario_') && value && typeof value === 'object') {
+                // É um contêiner de horário, processar recursivamente
+                console.log(`📂 Processando contêiner de horário: ${key}`);
+                const subAulas = processarHorarios(value);
+                Object.assign(aulasProcessadas, subAulas);
+              } else if (value && typeof value === 'object' && (value.disciplinaId || value.diaSemana)) {
+                // É uma aula direta
+                console.log(`📝 Aula encontrada: ${key}`);
+                aulasProcessadas[key] = value;
+              }
+            });
+            
+            return aulasProcessadas;
+          };
+          
+          const aulasProcessadas = processarHorarios(gradeData);
+          
+          // Adicionar cada aula à grade completa
+          Object.entries(aulasProcessadas).forEach(([aulaId, aula]) => {
+            gradeCompleta[aulaId] = {
+              ...aula,
               turmaId: turmaId // Garantir que tenha o turmaId
             };
           });
           
-          console.log(`✅ Grade da turma ${turmaId} carregada:`, Object.keys(gradeData).length, 'aulas');
+          console.log(`✅ Grade da turma ${turmaId} carregada:`, Object.keys(aulasProcessadas).length, 'aulas');
         } else {
           console.log(`❌ Nenhuma grade encontrada para turma ${turmaId} no período ${turma.periodoId}`);
         }

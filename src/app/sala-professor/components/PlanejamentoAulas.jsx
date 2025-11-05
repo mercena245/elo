@@ -169,12 +169,21 @@ const PlanejamentoAulas = () => {
         const turma = turmas[turmaId];
         if (!turma || !turma.periodoId) {
           console.log(`❌ Turma ${turmaId} não encontrada ou sem período letivo`);
+          console.log(`🔍 Turma disponível:`, turma);
+          console.log(`🔍 Todas as turmas:`, Object.keys(turmas));
           continue;
         }
 
         console.log(`📚 Carregando grade da turma ${turmaId} no período ${turma.periodoId}`);
+        console.log(`🔍 [DEBUG] Detalhes da turma:`, turma);
+        console.log(`🔍 [DEBUG] Período selecionado globalmente:`, periodoLetivoSelecionado?.id);
+        console.log(`🔍 [DEBUG] Período da turma:`, turma.periodoId);
         
-        const gradeData = await getData(`GradeHoraria/${turma.periodoId}/${turmaId}`);
+        // FIXME: Verificar se devemos usar o período da turma ou o período selecionado
+        const periodoParaBusca = turma.periodoId;
+        console.log(`🎯 [DEBUG] Buscando em: GradeHoraria/${periodoParaBusca}/${turmaId}`);
+        
+        const gradeData = await getData(`GradeHoraria/${periodoParaBusca}/${turmaId}`);
         
         if (gradeData) {
           // A estrutura pode ter horarios aninhados (horario_XXXXX)

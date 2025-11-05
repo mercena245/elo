@@ -106,8 +106,26 @@ const EditorPlanoDiario = ({
 
       console.log('📚 Buscando grade horária direto do banco:', `GradeHoraria/${turma.periodoId}/${turmaIdSelecionada}`);
 
-      // Buscar grade horária diretamente do banco de dados
-      const gradeData = await getData(`GradeHoraria/${turma.periodoId}/${turmaIdSelecionada}`);
+      // ESTRATÉGIA: Tentar múltiplos períodos para encontrar dados (mesma lógica do PlanejamentoAulas)
+      let gradeData = null;
+      const periodosParaTentar = [
+        turma.periodoId,
+        periodoLetivoSelecionado?.id
+      ].filter(Boolean).filter((period, index, arr) => arr.indexOf(period) === index); // Remove duplicatas
+      
+      console.log(`🎯 [EditorPlanoDiario] Tentando períodos para turma ${turmaIdSelecionada}:`, periodosParaTentar);
+      
+      for (const periodo of periodosParaTentar) {
+        console.log(`🔍 [EditorPlanoDiario] Tentando buscar em: GradeHoraria/${periodo}/${turmaIdSelecionada}`);
+        const tentativa = await getData(`GradeHoraria/${periodo}/${turmaIdSelecionada}`);
+        if (tentativa && Object.keys(tentativa).length > 0) {
+          console.log(`✅ [EditorPlanoDiario] Dados encontrados no período: ${periodo}`);
+          gradeData = tentativa;
+          break;
+        } else {
+          console.log(`❌ [EditorPlanoDiario] Nenhum dado no período: ${periodo}`);
+        }
+      }
       
       console.log('📊 Dados brutos recebidos:', gradeData);
       console.log('📊 Tipo dos dados:', typeof gradeData);
@@ -121,8 +139,33 @@ const EditorPlanoDiario = ({
       console.log('✅ Grade horária carregada com sucesso');
       console.log('📊 Chaves encontradas:', Object.keys(gradeData));
 
+      // Processar dados da estrutura horario_XXXXX (mesma lógica do PlanejamentoAulas)
+      const processarHorarios = (dados) => {
+        const aulasProcessadas = {};
+        
+        Object.entries(dados).forEach(([key, value]) => {
+          if (value && typeof value === 'object') {
+            // Verificar se é uma aula (tem diaSemana, disciplinaId, etc.)
+            if (value.diaSemana !== undefined || value.disciplinaId || value.periodoAula) {
+              console.log(`📝 [EditorPlanoDiario] Aula encontrada: ${key}`, value);
+              aulasProcessadas[key] = value;
+            } else if (key.startsWith('horario_')) {
+              // É um contêiner de horário, processar recursivamente
+              console.log(`📂 [EditorPlanoDiario] Processando contêiner: ${key}`);
+              const subAulas = processarHorarios(value);
+              Object.assign(aulasProcessadas, subAulas);
+            }
+          }
+        });
+        
+        return aulasProcessadas;
+      };
+
+      const aulasProcessadas = processarHorarios(gradeData);
+      console.log('🎯 [EditorPlanoDiario] Total de aulas processadas:', Object.keys(aulasProcessadas).length);
+
       // Filtrar aulas do dia da semana
-      const aulasDoDia = Object.entries(gradeData)
+      const aulasDoDia = Object.entries(aulasProcessadas)
         .filter(([id, aula]) => {
           console.log('🔎 Verificando aula:', { 
             id, 

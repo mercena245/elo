@@ -76,6 +76,36 @@ class SecretariaDigitalService {
   }
 
   /**
+   * Buscar nome da disciplina por ID
+   */
+  async getNomeDisciplina(disciplinaId) {
+    try {
+      const disciplinaRef = ref(db, `disciplinas/${disciplinaId}`);
+      const snapshot = await get(disciplinaRef);
+      
+      if (snapshot.exists()) {
+        const disciplina = snapshot.val();
+        return disciplina.nome || disciplina.nomeDisciplina || disciplinaId;
+      }
+      
+      // Tentar buscar em Escola/Disciplinas (estrutura alternativa)
+      const escolaRef = ref(db, `Escola/Disciplinas/${disciplinaId}`);
+      const escolaSnapshot = await get(escolaRef);
+      
+      if (escolaSnapshot.exists()) {
+        const disciplina = escolaSnapshot.val();
+        return disciplina.nome || disciplina.nomeDisciplina || disciplinaId;
+      }
+      
+      // Retornar o ID se não encontrar
+      return disciplinaId;
+    } catch (error) {
+      console.error('Erro ao buscar nome da disciplina:', error);
+      return disciplinaId;
+    }
+  }
+
+  /**
    * Buscar dados da instituição
    */
   async getDadosInstituicao() {
@@ -161,59 +191,230 @@ class SecretariaDigitalService {
   }
 
   /**
-   * Gerar Histórico Escolar Digital
+   * Sanitizar documento removendo valores undefined para Firebase
    */
-  async gerarHistoricoEscolar(alunoId, anoLetivo, observacoes = '') {
+  sanitizarDocumento(obj) {
+    if (obj === null || obj === undefined) {
+      return null;
+    }
+    
+    if (Array.isArray(obj)) {
+      return obj.map(item => this.sanitizarDocumento(item)).filter(item => item !== null);
+    }
+    
+    if (typeof obj === 'object') {
+      const resultado = {};
+      for (const [key, value] of Object.entries(obj)) {
+        if (value !== undefined && value !== null) {
+          const valorSanitizado = this.sanitizarDocumento(value);
+          if (valorSanitizado !== null) {
+            resultado[key] = valorSanitizado;
+          }
+        }
+      }
+      return Object.keys(resultado).length > 0 ? resultado : null;
+    }
+    
+    return obj;
+  }
+
+  /**
+   * Gerar Histórico Escolar Digital - NOVA VERSÃO COM PRESERVAÇÃO DE HISTÓRICO
+   */
+  async gerarHistoricoEscolar(alunoId, anosLetivos = [], observacoes = '') {
     try {
       const dadosAluno = await this.getDadosAluno(alunoId);
       const dadosInstituicao = await this.getDadosInstituicao();
       const verificationCode = this.generateVerificationCode();
       
-      // Buscar notas e frequência do aluno
-      const notasRef = ref(db, 'notas');
-      const notasQuery = query(notasRef, orderByChild('alunoId'), equalTo(alunoId));
-      const notasSnapshot = await get(notasQuery);
+      // 🆕 Buscar histórico acadêmico completo do aluno
+      const historicoAcademico = dadosAluno.historicoAcademico || {};
+      const periodosAcademicos = [];
       
-      const disciplinas = [];
-      if (notasSnapshot.exists()) {
-        Object.values(notasSnapshot.val()).forEach(nota => {
-          if (nota.anoLetivo === anoLetivo) {
-            disciplinas.push({
-              nome: nota.disciplina,
-              nota: nota.nota,
-              frequencia: nota.frequencia || 100,
-              situacao: nota.nota >= 7 ? 'Aprovado' : 'Reprovado'
-            });
-          }
-        });
+      // Se não especificou anos, pegar todos os períodos do histórico
+      const anosProcurar = anosLetivos.length > 0 ? anosLetivos : Object.keys(historicoAcademico);
+      
+      if (anosProcurar.length === 0) {
+        // Fallback para sistema antigo - usar ano atual
+        const anoAtual = new Date().getFullYear().toString();
+        anosProcurar.push(anoAtual);
       }
 
+      // Buscar todas as notas e frequências uma única vez (mais eficiente e sem precisar de índice)
+      const notasRef = ref(db, 'notas');
+      const notasSnapshot = await get(notasRef);
+      
+      const frequenciaRef = ref(db, 'frequencia');
+      const frequenciaSnapshot = await get(frequenciaRef);
+      
+      // Para cada ano letivo, processar dados
+      for (const anoLetivo of anosProcurar) {
+        const periodoDados = historicoAcademico[anoLetivo];
+        
+        const disciplinasNotas = new Map();
+        const disciplinasFrequencia = new Map();
+
+        // Processar notas
+        if (notasSnapshot.exists()) {
+          Object.values(notasSnapshot.val()).forEach(nota => {
+            // 🔍 Filtrar apenas notas deste aluno
+            if (nota.alunoId !== alunoId) return;
+            
+            // Filtrar por ano letivo - priorizar campo anoLetivo, fallback para turmaId do período
+            const notaAnoLetivo = nota.anoLetivo || anoLetivo;
+            const turmaNotaId = nota.turmaId;
+            const turmaPeriodoId = periodoDados?.turmaId;
+            
+            if (notaAnoLetivo === anoLetivo || turmaNotaId === turmaPeriodoId) {
+              const disciplinaId = nota.disciplinaId;
+              if (!disciplinasNotas.has(disciplinaId)) {
+                disciplinasNotas.set(disciplinaId, {
+                  disciplinaId,
+                  nome: nota.disciplinaNome || disciplinaId,
+                  notas: {},
+                  mediaFinal: 0,
+                  situacao: 'Pendente'
+                });
+              }
+              
+              const disciplina = disciplinasNotas.get(disciplinaId);
+              disciplina.notas[nota.bimestre] = parseFloat(nota.nota);
+            }
+          });
+        }
+
+        // Processar frequência
+        if (frequenciaSnapshot.exists()) {
+          Object.values(frequenciaSnapshot.val()).forEach(freq => {
+            // 🔍 Filtrar apenas frequência deste aluno
+            if (freq.alunoId !== alunoId) return;
+            
+            const freqAnoLetivo = freq.anoLetivo || anoLetivo;
+            const turmaFreqId = freq.turmaId;
+            const turmaPeriodoId = periodoDados?.turmaId;
+            
+            if (freqAnoLetivo === anoLetivo || turmaFreqId === turmaPeriodoId) {
+              const disciplinaId = freq.disciplinaId;
+              if (!disciplinasFrequencia.has(disciplinaId)) {
+                disciplinasFrequencia.set(disciplinaId, {
+                  totalAulas: 0,
+                  totalPresencas: 0,
+                  percentualFrequencia: 0
+                });
+              }
+              
+              const disciplina = disciplinasFrequencia.get(disciplinaId);
+              disciplina.totalAulas++;
+              if (freq.presente) {
+                disciplina.totalPresencas++;
+              }
+            }
+          });
+        }
+
+        // Calcular estatísticas finais para cada disciplina
+        const disciplinasFinais = [];
+        
+        // Processar disciplinas em batch para obter nomes corretos
+        const disciplinaIds = Array.from(disciplinasNotas.keys());
+        const nomesDisciplinas = new Map();
+        
+        // Buscar nomes das disciplinas
+        for (const disciplinaId of disciplinaIds) {
+          const nomeCompleto = await this.getNomeDisciplina(disciplinaId);
+          nomesDisciplinas.set(disciplinaId, nomeCompleto);
+        }
+        
+        disciplinasNotas.forEach((disciplina, disciplinaId) => {
+          const notas = Object.values(disciplina.notas);
+          const mediaFinal = notas.length > 0 ? notas.reduce((sum, nota) => sum + nota, 0) / notas.length : 0;
+          
+          const freqData = disciplinasFrequencia.get(disciplinaId) || { totalAulas: 0, totalPresencas: 0 };
+          const percentualFrequencia = freqData.totalAulas > 0 ? 
+            (freqData.totalPresencas / freqData.totalAulas) * 100 : 100;
+          
+          const situacao = mediaFinal >= 7 && percentualFrequencia >= 75 ? 'Aprovado' : 'Reprovado';
+          
+          disciplinasFinais.push({
+            nome: disciplina.nome, // Nome original (fallback)
+            nomeCompleto: nomesDisciplinas.get(disciplinaId), // Nome correto do banco
+            disciplinaId: disciplinaId,
+            notas: disciplina.notas,
+            mediaFinal: parseFloat(mediaFinal.toFixed(2)),
+            frequencia: parseFloat(percentualFrequencia.toFixed(1)),
+            frequenciaPercentual: `${percentualFrequencia.toFixed(0)}%`,
+            totalAulas: freqData.totalAulas,
+            totalPresencas: freqData.totalPresencas,
+            totalFaltas: freqData.totalAulas - freqData.totalPresencas,
+            situacao
+          });
+        });
+
+        // Adicionar período ao histórico
+        if (disciplinasFinais.length > 0 || periodoDados) {
+          periodosAcademicos.push({
+            anoLetivo,
+            periodoLetivo: periodoDados?.periodoLetivo || `Período ${anoLetivo}`,
+            turmaId: periodoDados?.turmaId,
+            situacao: periodoDados?.situacao || 'Concluído',
+            dataInicio: periodoDados?.dataInicio,
+            dataFim: periodoDados?.dataFim,
+            resultadoFinal: periodoDados?.resultadoFinal || 
+              (disciplinasFinais.every(d => d.situacao === 'Aprovado') ? 'Aprovado' : 'Reprovado'),
+            disciplinas: disciplinasFinais
+          });
+        }
+      }
+
+      // Gerar documento final
       const documento = {
         id: verificationCode,
         tipo: DOCUMENT_TYPES.HISTORICO_ESCOLAR,
         status: DOCUMENT_STATUS.PENDENTE_ASSINATURA,
         dadosAluno: {
-          nome: dadosAluno.nome,
-          cpf: dadosAluno.cpf,
-          rg: dadosAluno.rg,
-          dataNascimento: dadosAluno.dataNascimento,
-          naturalidade: dadosAluno.naturalidade,
-          uf: dadosAluno.uf,
-          nomePai: dadosAluno.nomePai,
-          nomeMae: dadosAluno.nomeMae
+          nome: dadosAluno.nome || 'Nome não informado',
+          matricula: dadosAluno.matricula || alunoId,
+          cpf: dadosAluno.cpf || 'CPF não informado',
+          rg: dadosAluno.rg || 'RG não informado',
+          dataNascimento: dadosAluno.dataNascimento || 'Data não informada',
+          sexo: dadosAluno.sexo || 'M',
+          naturalidade: dadosAluno.naturalidade || 'Naturalidade não informada',
+          uf: dadosAluno.uf || 'UF não informada',
+          nomePai: dadosAluno.pai?.nome || dadosAluno.nomePai || 'Nome do pai não informado',
+          nomeMae: dadosAluno.mae?.nome || dadosAluno.nomeMae || 'Nome da mãe não informado'
         },
+        
+        // Adicionar matrícula diretamente no documento também
+        matricula: dadosAluno.matricula || alunoId,
+        alunoId: alunoId,
+        
+        // 🆕 Nova estrutura com histórico completo
+        historicoCompleto: {
+          totalPeriodos: periodosAcademicos.length,
+          periodosAcademicos: periodosAcademicos,
+          situacaoGeral: periodosAcademicos.every(p => p.resultadoFinal === 'Aprovado') ? 'Aprovado' : 'Em Análise'
+        },
+        
+        // Manter compatibilidade com estrutura antiga
         curso: {
           nome: dadosAluno.serie || 'Ensino Fundamental',
           nivel: 'Fundamental',
-          anoLetivo: anoLetivo,
-          cargaHoraria: '800 horas'
+          anosLetivos: anosProcurar,
+          cargaHoraria: `${periodosAcademicos.length * 800} horas`
         },
-        disciplinas: disciplinas,
-        situacaoFinal: disciplinas.every(d => d.situacao === 'Aprovado') ? 'Aprovado' : 'Reprovado',
+        
+        // Resumo das disciplinas (para compatibilidade)
+        disciplinas: periodosAcademicos.flatMap(p => p.disciplinas || []),
+        situacaoFinal: periodosAcademicos.every(p => p.resultadoFinal === 'Aprovado') ? 'Aprovado' : 'Pendente',
         observacoes: observacoes,
         dadosInstituicao: dadosInstituicao,
         dataEmissao: new Date().toISOString(),
-        codigoVerificacao: verificationCode
+        codigoVerificacao: verificationCode,
+        
+        // 🆕 Metadados do novo sistema
+        versaoSistema: '2.0',
+        preservacaoHistorico: true,
+        totalRematriculas: dadosAluno.historicoRematriculas?.length || 0
       };
 
       // Gerar QR Code
@@ -225,15 +426,19 @@ class SecretariaDigitalService {
       documento.assinatura = assinatura;
       documento.status = DOCUMENT_STATUS.ASSINADO;
 
+      // Sanitizar documento removendo valores undefined
+      const documentoSanitizado = this.sanitizarDocumento(documento);
+
       // Salvar no Firebase
       const documentoRef = ref(db, `secretariaDigital/documentos/historicos/${verificationCode}`);
-      await set(documentoRef, documento);
+      await set(documentoRef, documentoSanitizado);
 
       // Log da ação
       await logAction('DIGITAL_SECRETARY_HISTORIC_GENERATED', {
         alunoId: alunoId,
         alunoNome: dadosAluno.nome,
-        anoLetivo: anoLetivo,
+        anosLetivos: anosProcurar,
+        totalPeriodos: periodosAcademicos.length,
         codigoVerificacao: verificationCode,
         documentoId: documento.id
       });
@@ -466,83 +671,324 @@ class SecretariaDigitalService {
   }
 
   /**
-   * Gerar PDF do documento
+   * Gerar PDF do Histórico Escolar - Modelo Oficial
    */
   async gerarPDF(documento) {
     try {
-      const pdf = new jsPDF();
+      const pdf = new jsPDF('p', 'mm', 'a4');
       const pageWidth = pdf.internal.pageSize.getWidth();
-      
-      // Cabeçalho
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 15;
+      let yPosition = 20;
+
+      // 🏫 CABEÇALHO DA INSTITUIÇÃO
+      this.adicionarCabecalhoInstituicao(pdf, documento, yPosition);
+      yPosition += 60;
+
+      // 📋 TÍTULO DO DOCUMENTO
       pdf.setFontSize(16);
       pdf.setFont('helvetica', 'bold');
-      pdf.text(documento.dadosInstituicao.nome, pageWidth/2, 30, { align: 'center' });
-      
-      pdf.setFontSize(12);
-      pdf.setFont('helvetica', 'normal');
-      pdf.text(documento.dadosInstituicao.endereco.rua, pageWidth/2, 40, { align: 'center' });
-      pdf.text(`${documento.dadosInstituicao.endereco.cidade} - ${documento.dadosInstituicao.endereco.estado}`, pageWidth/2, 50, { align: 'center' });
-      
-      // Título do documento
-      pdf.setFontSize(14);
-      pdf.setFont('helvetica', 'bold');
-      let titulo = '';
-      switch (documento.tipo) {
-        case DOCUMENT_TYPES.HISTORICO_ESCOLAR:
-          titulo = 'HISTÓRICO ESCOLAR';
-          break;
-        case DOCUMENT_TYPES.DECLARACAO_MATRICULA:
-          titulo = 'DECLARAÇÃO DE MATRÍCULA';
-          break;
-        default:
-          titulo = 'DOCUMENTO ESCOLAR';
-      }
-      pdf.text(titulo, pageWidth/2, 70, { align: 'center' });
-      
-      // Dados do aluno
-      pdf.setFontSize(10);
-      pdf.setFont('helvetica', 'normal');
-      let yPosition = 90;
-      
-      pdf.text(`Nome: ${documento.dadosAluno.nome}`, 20, yPosition);
-      yPosition += 10;
-      pdf.text(`CPF: ${documento.dadosAluno.cpf}`, 20, yPosition);
-      yPosition += 10;
-      pdf.text(`RG: ${documento.dadosAluno.rg}`, 20, yPosition);
-      yPosition += 20;
-      
-      // Conteúdo específico do documento
+      const titulo = documento.tipo === DOCUMENT_TYPES.HISTORICO_ESCOLAR ? 'HISTÓRICO ESCOLAR' : 'DECLARAÇÃO DE MATRÍCULA';
+      pdf.text(titulo, pageWidth/2, yPosition, { align: 'center' });
+      yPosition += 15;
+
       if (documento.tipo === DOCUMENT_TYPES.HISTORICO_ESCOLAR) {
-        pdf.text('DISCIPLINAS CURSADAS:', 20, yPosition);
-        yPosition += 10;
+        // 👤 DADOS DO ALUNO
+        yPosition = this.adicionarDadosAluno(pdf, documento, yPosition, margin, pageWidth);
         
-        documento.disciplinas.forEach(disciplina => {
-          pdf.text(`${disciplina.nome}: Nota ${disciplina.nota} - ${disciplina.situacao}`, 25, yPosition);
-          yPosition += 8;
-        });
+        // 🎓 DADOS DO CURSO/SÉRIE
+        yPosition = this.adicionarDadosCurso(pdf, documento, yPosition, margin, pageWidth);
         
-        yPosition += 10;
-        pdf.text(`Situação Final: ${documento.situacaoFinal}`, 20, yPosition);
+        // 📚 HISTÓRICO ACADÊMICO POR PERÍODO
+        yPosition = this.adicionarHistoricoAcademico(pdf, documento, yPosition, margin, pageWidth, pageHeight);
+        
+        // ✅ SITUAÇÃO FINAL
+        yPosition = this.adicionarSituacaoFinal(pdf, documento, yPosition, margin, pageWidth);
+        
+        // 🔒 ASSINATURA E QR CODE
+        this.adicionarAssinaturaQR(pdf, documento, pageWidth, pageHeight);
       }
-      
-      // QR Code
-      if (documento.qrCode) {
-        const qrSize = 40;
-        pdf.addImage(documento.qrCode, 'PNG', pageWidth - qrSize - 20, 200, qrSize, qrSize);
-        pdf.text(`Código: ${documento.codigoVerificacao}`, pageWidth - qrSize - 20, 250);
-      }
-      
-      // Assinatura
-      yPosition = 260;
-      pdf.text(`${documento.dadosInstituicao.responsavel.nome}`, 20, yPosition);
-      pdf.text(`${documento.dadosInstituicao.responsavel.cargo}`, 20, yPosition + 8);
-      pdf.text(`Documento assinado digitalmente`, 20, yPosition + 16);
       
       return pdf;
     } catch (error) {
       console.error('Erro ao gerar PDF:', error);
       throw error;
     }
+  }
+
+  /**
+   * Adicionar cabeçalho da instituição no PDF
+   */
+  adicionarCabecalhoInstituicao(pdf, documento, yStart) {
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const margin = 15;
+    
+    // Nome da Instituição
+    pdf.setFontSize(14);
+    pdf.setFont('helvetica', 'bold');
+    const nomeInstituicao = documento.dadosInstituicao?.nome || 'ESCOLA ELO';
+    pdf.text(nomeInstituicao, pageWidth/2, yStart, { align: 'center' });
+    
+    // Endereço
+    pdf.setFontSize(10);
+    pdf.setFont('helvetica', 'normal');
+    const endereco = documento.dadosInstituicao?.endereco || {};
+    pdf.text(endereco.rua || 'Endereço não informado', pageWidth/2, yStart + 8, { align: 'center' });
+    pdf.text(`${endereco.cidade || 'Cidade'} - ${endereco.estado || 'UF'}`, pageWidth/2, yStart + 16, { align: 'center' });
+    pdf.text(`CEP: ${endereco.cep || '00000-000'}`, pageWidth/2, yStart + 24, { align: 'center' });
+    
+    // CNPJ
+    if (documento.dadosInstituicao?.cnpj) {
+      pdf.text(`CNPJ: ${documento.dadosInstituicao.cnpj}`, pageWidth/2, yStart + 32, { align: 'center' });
+    }
+    
+    // Data e página
+    const dataEmissao = new Date(documento.dataEmissao).toLocaleDateString('pt-BR');
+    pdf.text(`${dataEmissao}`, pageWidth - margin, yStart, { align: 'right' });
+    pdf.text('Página: 1 de 1', pageWidth - margin, yStart + 8, { align: 'right' });
+  }
+
+  /**
+   * Adicionar dados do aluno
+   */
+  adicionarDadosAluno(pdf, documento, yStart, margin, pageWidth) {
+    let yPos = yStart;
+    
+    // Título da seção
+    pdf.setFontSize(10);
+    pdf.setFont('helvetica', 'bold');
+    
+    // Tabela de dados pessoais
+    const dados = documento.dadosAluno;
+    
+    // Linha 1: Nome e Matrícula
+    pdf.rect(margin, yPos, pageWidth - 2*margin, 8);
+    pdf.text('Nome', margin + 2, yPos + 5);
+    pdf.text('Matrícula', pageWidth - 50, yPos + 5);
+    yPos += 8;
+    
+    pdf.setFont('helvetica', 'normal');
+    pdf.rect(margin, yPos, pageWidth - 80, 8);
+    pdf.rect(pageWidth - 80, yPos, 80 - margin, 8);
+    pdf.text(dados.nome || 'Nome não informado', margin + 2, yPos + 5);
+    // Buscar matrícula do aluno ou usar ID
+    const matriculaAluno = dados.matricula || documento.alunoId || 'S/N';
+    pdf.text(matriculaAluno, pageWidth - 48, yPos + 5);
+    yPos += 8;
+    
+    // Linha 2: Data de Nascimento, Sexo, Naturalidade, Nacionalidade, CPF
+    pdf.setFont('helvetica', 'bold');
+    pdf.rect(margin, yPos, 30, 8);
+    pdf.rect(margin + 30, yPos, 20, 8);
+    pdf.rect(margin + 50, yPos, 35, 8);
+    pdf.rect(margin + 85, yPos, 35, 8);
+    pdf.rect(margin + 120, yPos, pageWidth - margin - 120, 8);
+    
+    pdf.text('Data de Nascimento', margin + 2, yPos + 5);
+    pdf.text('Sexo', margin + 32, yPos + 5);
+    pdf.text('Naturalidade', margin + 52, yPos + 5);
+    pdf.text('Nacionalidade', margin + 87, yPos + 5);
+    pdf.text('CPF', margin + 122, yPos + 5);
+    yPos += 8;
+    
+    pdf.setFont('helvetica', 'normal');
+    pdf.rect(margin, yPos, 30, 8);
+    pdf.rect(margin + 30, yPos, 20, 8);
+    pdf.rect(margin + 50, yPos, 35, 8);
+    pdf.rect(margin + 85, yPos, 35, 8);
+    pdf.rect(margin + 120, yPos, pageWidth - margin - 120, 8);
+    
+    pdf.text(dados.dataNascimento || 'N/I', margin + 2, yPos + 5);
+    pdf.text(dados.sexo || 'M', margin + 32, yPos + 5);
+    pdf.text(dados.naturalidade || 'N/I', margin + 52, yPos + 5);
+    pdf.text('BRASILEIRA', margin + 87, yPos + 5);
+    pdf.text(dados.cpf || 'N/I', margin + 122, yPos + 5);
+    
+    return yPos + 15;
+  }
+
+  /**
+   * Adicionar dados do curso/série
+   */
+  adicionarDadosCurso(pdf, documento, yStart, margin, pageWidth) {
+    let yPos = yStart;
+    
+    // Título: Conclusão do Ensino Fundamental/Médio
+    pdf.setFontSize(10);
+    pdf.setFont('helvetica', 'bold');
+    pdf.rect(margin, yPos, pageWidth - 2*margin, 8);
+    pdf.text('Conclusão do Ensino Fundamental', pageWidth/2, yPos + 5, { align: 'center' });
+    yPos += 8;
+    
+    // Estabelecimento
+    pdf.rect(margin, yPos, (pageWidth - 2*margin) * 0.7, 8);
+    pdf.rect(margin + (pageWidth - 2*margin) * 0.7, yPos, (pageWidth - 2*margin) * 0.15, 8);
+    pdf.rect(margin + (pageWidth - 2*margin) * 0.85, yPos, (pageWidth - 2*margin) * 0.15, 8);
+    
+    pdf.text('Estabelecimento', margin + 2, yPos + 5);
+    pdf.text('Ano / Série', margin + (pageWidth - 2*margin) * 0.7 + 2, yPos + 5);
+    pdf.text('Local', margin + (pageWidth - 2*margin) * 0.85 + 2, yPos + 5);
+    yPos += 8;
+    
+    pdf.setFont('helvetica', 'normal');
+    pdf.rect(margin, yPos, (pageWidth - 2*margin) * 0.7, 8);
+    pdf.rect(margin + (pageWidth - 2*margin) * 0.7, yPos, (pageWidth - 2*margin) * 0.15, 8);
+    pdf.rect(margin + (pageWidth - 2*margin) * 0.85, yPos, (pageWidth - 2*margin) * 0.15, 8);
+    
+    pdf.text(documento.dadosInstituicao?.nome || 'ESCOLA ELO', margin + 2, yPos + 5);
+    pdf.text('2025', margin + (pageWidth - 2*margin) * 0.7 + 2, yPos + 5);
+    
+    // Usar endereço da instituição
+    const endereco = documento.dadosInstituicao?.endereco || {};
+    const localCompleto = `${endereco.cidade || 'São Paulo'} / ${endereco.estado || 'SP'}`;
+    pdf.text(localCompleto, margin + (pageWidth - 2*margin) * 0.85 + 2, yPos + 5);
+    
+    return yPos + 15;
+  }
+
+  /**
+   * Adicionar histórico acadêmico com disciplinas
+   */
+  adicionarHistoricoAcademico(pdf, documento, yStart, margin, pageWidth, pageHeight) {
+    let yPos = yStart;
+    
+    // Título: DISCIPLINAS CURSADAS
+    pdf.setFontSize(10);
+    pdf.setFont('helvetica', 'bold');
+    pdf.rect(margin, yPos, pageWidth - 2*margin, 8);
+    pdf.text('DISCIPLINAS CURSADAS', pageWidth/2, yPos + 5, { align: 'center' });
+    yPos += 8;
+    
+    // Cabeçalho da tabela - sem carga horária, com frequência
+    const colWidths = {
+      ano: 25,
+      disciplina: 90,
+      frequencia: 25,
+      media: 20,
+      situacao: 25
+    };
+    
+    pdf.rect(margin, yPos, colWidths.ano, 8);
+    pdf.rect(margin + colWidths.ano, yPos, colWidths.disciplina, 8);
+    pdf.rect(margin + colWidths.ano + colWidths.disciplina, yPos, colWidths.frequencia, 8);
+    pdf.rect(margin + colWidths.ano + colWidths.disciplina + colWidths.frequencia, yPos, colWidths.media, 8);
+    pdf.rect(margin + colWidths.ano + colWidths.disciplina + colWidths.frequencia + colWidths.media, yPos, colWidths.situacao, 8);
+    
+    pdf.text('Ano/Série', margin + 2, yPos + 5);
+    pdf.text('Disciplinas', margin + colWidths.ano + 2, yPos + 5);
+    pdf.text('Frequência', margin + colWidths.ano + colWidths.disciplina + 2, yPos + 5);
+    pdf.text('Média', margin + colWidths.ano + colWidths.disciplina + colWidths.frequencia + 2, yPos + 5);
+    pdf.text('Situação Final', margin + colWidths.ano + colWidths.disciplina + colWidths.frequencia + colWidths.media + 2, yPos + 5);
+    yPos += 8;
+    
+    // Dados das disciplinas
+    pdf.setFont('helvetica', 'normal');
+    const periodosAcademicos = documento.historicoCompleto?.periodosAcademicos || [];
+    
+    if (periodosAcademicos.length > 0) {
+      periodosAcademicos.forEach(periodo => {
+        if (periodo.disciplinas && periodo.disciplinas.length > 0) {
+          periodo.disciplinas.forEach(disciplina => {
+            // Verificar se precisa de nova página
+            if (yPos > pageHeight - 30) {
+              pdf.addPage();
+              yPos = 20;
+            }
+            
+            const anoSerie = `${periodo.anoLetivo}`;
+            // Calcular média de frequência ou usar o valor direto
+            const frequencia = disciplina.frequenciaPercentual || disciplina.mediaFrequencia || 
+                             (disciplina.aulasPresentes && disciplina.totalAulas ? 
+                               ((disciplina.aulasPresentes / disciplina.totalAulas) * 100).toFixed(0) + '%' : '100%');
+            const media = disciplina.mediaFinal ? disciplina.mediaFinal.toFixed(1) : 'N/A';
+            const situacao = disciplina.situacao || 'Aprovado';
+            
+            // Obter nome real da disciplina
+            const nomeDisciplina = disciplina.nomeCompleto || disciplina.nome || 'Disciplina';
+            
+            pdf.rect(margin, yPos, colWidths.ano, 6);
+            pdf.rect(margin + colWidths.ano, yPos, colWidths.disciplina, 6);
+            pdf.rect(margin + colWidths.ano + colWidths.disciplina, yPos, colWidths.frequencia, 6);
+            pdf.rect(margin + colWidths.ano + colWidths.disciplina + colWidths.frequencia, yPos, colWidths.media, 6);
+            pdf.rect(margin + colWidths.ano + colWidths.disciplina + colWidths.frequencia + colWidths.media, yPos, colWidths.situacao, 6);
+            
+            pdf.setFontSize(8);
+            pdf.text(anoSerie, margin + 2, yPos + 4);
+            pdf.text(nomeDisciplina, margin + colWidths.ano + 2, yPos + 4);
+            pdf.text(frequencia, margin + colWidths.ano + colWidths.disciplina + 2, yPos + 4);
+            pdf.text(media, margin + colWidths.ano + colWidths.disciplina + colWidths.frequencia + 2, yPos + 4);
+            pdf.text(situacao, margin + colWidths.ano + colWidths.disciplina + colWidths.frequencia + colWidths.media + 2, yPos + 4);
+            
+            yPos += 6;
+          });
+        }
+      });
+    } else {
+      // Se não há períodos, mostrar mensagem
+      pdf.rect(margin, yPos, pageWidth - 2*margin, 8);
+      pdf.text('Nenhuma disciplina registrada', pageWidth/2, yPos + 5, { align: 'center' });
+      yPos += 8;
+    }
+    
+    return yPos + 10;
+  }
+
+  /**
+   * Adicionar situação final do aluno
+   */
+  adicionarSituacaoFinal(pdf, documento, yStart, margin, pageWidth) {
+    let yPos = yStart;
+    
+    pdf.setFontSize(10);
+    pdf.setFont('helvetica', 'bold');
+    
+    const situacaoFinal = documento.historicoCompleto?.situacaoGeral || documento.situacaoFinal || 'Aprovado';
+    pdf.text(`SITUAÇÃO FINAL: ${situacaoFinal}`, margin, yPos);
+    
+    if (documento.observacoes) {
+      yPos += 10;
+      pdf.text('OBSERVAÇÕES:', margin, yPos);
+      yPos += 8;
+      pdf.setFont('helvetica', 'normal');
+      pdf.text(documento.observacoes, margin, yPos);
+    }
+    
+    return yPos + 15;
+  }
+
+  /**
+   * Adicionar assinatura e QR Code
+   */
+  adicionarAssinaturaQR(pdf, documento, pageWidth, pageHeight) {
+    const margin = 15;
+    let yPos = pageHeight - 60;
+    
+    // Data de emissão
+    pdf.setFontSize(9);
+    pdf.setFont('helvetica', 'normal');
+    const dataEmissao = new Date(documento.dataEmissao).toLocaleDateString('pt-BR');
+    pdf.text(`Emitido em: ${dataEmissao}`, margin, yPos);
+    
+    // QR Code
+    if (documento.qrCode) {
+      const qrSize = 30;
+      pdf.addImage(documento.qrCode, 'PNG', pageWidth - qrSize - margin, yPos - 15, qrSize, qrSize);
+    }
+    
+    // Código de verificação
+    yPos += 8;
+    pdf.text(`Código de Verificação: ${documento.codigoVerificacao}`, margin, yPos);
+    
+    // Assinatura digital
+    yPos += 15;
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('DOCUMENTO ASSINADO DIGITALMENTE', pageWidth/2, yPos, { align: 'center' });
+    
+    yPos += 8;
+    pdf.setFont('helvetica', 'normal');
+    const responsavel = documento.dadosInstituicao?.responsavel || {};
+    pdf.text(responsavel.nome || 'Diretor(a)', pageWidth/2, yPos, { align: 'center' });
+    pdf.text(responsavel.cargo || 'Direção', pageWidth/2, yPos + 8, { align: 'center' });
   }
 }
 

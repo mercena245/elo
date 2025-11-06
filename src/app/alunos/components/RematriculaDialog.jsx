@@ -29,6 +29,7 @@ import {
   Radio,
   RadioGroup,
   FormControlLabel,
+  Switch,
   Table,
   TableBody,
   TableCell,
@@ -68,7 +69,7 @@ const RematriculaDialog = ({
   const [loading, setLoading] = useState(true);
   const [processando, setProcessando] = useState(false);
   const [titulosAbertos, setTitulosAbertos] = useState([]);
-  const [etapa, setEtapa] = useState('conferencia'); // conferencia, pendencias, confirmacao
+  const [etapa, setEtapa] = useState('conferencia'); // conferencia, pendencias (renegociacao), confirmacao
   const [acaoEscolhida, setAcaoEscolhida] = useState('');
   const [dadosRematricula, setDadosRematricula] = useState({
     turmaId: '',
@@ -80,7 +81,8 @@ const RematriculaDialog = ({
     valorMatricula: 0,
     valorMateriais: 0,
     dataInicioCompetencia: '',
-    dataFimCompetencia: ''
+    dataFimCompetencia: '',
+    transicaoAutomatica: false
   });
   const [renegociacaoConfig, setRenegociacaoConfig] = useState({
     valorTotal: 0,
@@ -89,6 +91,12 @@ const RematriculaDialog = ({
     valorParcela: 0
   });
   const [mensagem, setMensagem] = useState({ tipo: '', texto: '' });
+
+  // Função auxiliar para formatação segura de valores monetários
+  const formatMoney = (value) => {
+    const numericValue = parseFloat(value) || 0;
+    return numericValue.toFixed(2);
+  };
 
   useEffect(() => {
     if (open && aluno) {
@@ -201,17 +209,9 @@ const RematriculaDialog = ({
       // 2. Gerar novos títulos da rematrícula
       await gerarTitulosRematricula();
 
-      // 3. Atualizar aluno com data de rematrícula
+      // 3. Atualizar aluno preservando histórico acadêmico completo
       if (updateAluno && aluno?.id) {
-        await updateAluno(aluno.id, {
-          ...aluno,
-          dataRematricula: new Date().toISOString(),
-          ultimaRematricula: {
-            data: new Date().toISOString(),
-            usuario: userName || 'Sistema',
-            turmaId: dadosRematricula?.turmaId || aluno.turmaId
-          }
-        });
+        await atualizarAlunoComHistorico();
       }
 
       // 4. Sucesso
@@ -272,7 +272,7 @@ const RematriculaDialog = ({
       if (financeiroService?.cancelarTitulo && titulo?.id) {
         await financeiroService.cancelarTitulo(
           titulo.id, 
-          `Cancelado por renegociação de rematrícula. Valor total: R$ ${valorTotal.toFixed(2)}. Data: ${new Date(dataRenegociacao).toLocaleDateString('pt-BR')}`,
+          `Cancelado por renegociação de rematrícula. Valor total: R$ ${formatMoney(valorTotal)}. Data: ${new Date(dataRenegociacao).toLocaleDateString('pt-BR')}`,
           userName || 'Sistema'
         );
       }
@@ -309,7 +309,7 @@ const RematriculaDialog = ({
       if (financeiroService?.cancelarTitulo && titulo?.id) {
         await financeiroService.cancelarTitulo(
           titulo.id, 
-          `Cancelado por renegociação em ${numeroParcelas} parcelas (rematrícula). Valor total: R$ ${valorTotal.toFixed(2)}. Data: ${new Date(dataRenegociacao).toLocaleDateString('pt-BR')}`,
+          `Cancelado por renegociação em ${numeroParcelas} parcelas (rematrícula). Valor total: R$ ${formatMoney(valorTotal)}. Data: ${new Date(dataRenegociacao).toLocaleDateString('pt-BR')}`,
           userName || 'Sistema'
         );
       }
@@ -381,6 +381,177 @@ const RematriculaDialog = ({
     
     if (!resultado?.success) {
       throw new Error(resultado?.error || 'Erro ao gerar títulos da rematrícula');
+    }
+  };
+
+  // 🆕 FUNÇÃO PARA PRESERVAR HISTÓRICO ACADÊMICO NA REMATRÍCULA
+  const atualizarAlunoComHistorico = async () => {
+    try {
+      const agora = new Date().toISOString();
+      const turmaAtual = aluno.turmaId || aluno.turmaAtual;
+      const novaTurmaId = dadosRematricula?.turmaId;
+      
+      if (!novaTurmaId || novaTurmaId === turmaAtual) {
+        // Se não mudou de turma, só atualiza dados financeiros
+        await updateAluno(aluno.id, {
+          ...aluno,
+          dataRematricula: agora,
+          ultimaRematricula: {
+            data: agora,
+            usuario: userName || 'Sistema',
+            turmaId: turmaAtual,
+            tipo: 'Atualização Financeira'
+          }
+        });
+        return;
+      }
+
+      // 🎓 PRESERVAR HISTÓRICO ACADÊMICO COMPLETO
+      
+      // 1. Determinar anos letivos (assumindo formato "2024" no nome da turma ou usar ano atual)
+      const anoAtual = new Date().getFullYear().toString();
+      const anoAnterior = (new Date().getFullYear() - 1).toString();
+      
+      // 2. Construir histórico acadêmico
+      const historicoAtual = aluno.historicoAcademico || {};
+      
+      // Finalizar período anterior se existir turma atual
+      if (turmaAtual) {
+        const anoLetivoAnterior = historicoAtual[anoAtual] ? anoAtual : anoAnterior;
+        
+        if (historicoAtual[anoLetivoAnterior] && historicoAtual[anoLetivoAnterior].situacao === "Em Andamento") {
+          historicoAtual[anoLetivoAnterior] = {
+            ...historicoAtual[anoLetivoAnterior],
+            situacao: "Concluído",
+            dataFim: agora,
+            resultadoFinal: "Aprovado" // Assume aprovação na rematrícula
+          };
+        } else if (!historicoAtual[anoLetivoAnterior]) {
+          // Criar registro do período anterior se não existir
+          historicoAtual[anoLetivoAnterior] = {
+            anoLetivo: anoLetivoAnterior,
+            periodoLetivo: `Período ${anoLetivoAnterior}`,
+            turmaId: turmaAtual,
+            situacao: "Concluído",
+            dataInicio: aluno.dataMatricula || agora,
+            dataFim: agora,
+            resultadoFinal: "Aprovado"
+          };
+        }
+      }
+      
+      // Criar novo período acadêmico
+      historicoAtual[anoAtual] = {
+        anoLetivo: anoAtual,
+        periodoLetivo: `Período ${anoAtual}`,
+        turmaId: novaTurmaId,
+        situacao: "Em Andamento", 
+        dataInicio: agora,
+        dataFim: null,
+        resultadoFinal: null
+      };
+
+      // 3. Registrar rematrícula no histórico
+      const historicoRematriculas = aluno.historicoRematriculas || [];
+      const novaRematricula = {
+        data: agora,
+        turmaOrigem: turmaAtual,
+        turmaDestino: novaTurmaId,
+        anoLetivoOrigem: turmaAtual ? (historicoAtual[anoAnterior] ? anoAnterior : anoAtual) : null,
+        anoLetivoDestino: anoAtual,
+        usuario: userName || 'Sistema',
+        motivo: 'Rematrícula',
+        observacoes: `Rematrícula de ${turmaAtual || 'sem turma'} para ${novaTurmaId}`,
+        dadosFinanceiros: {
+          mensalidadeValor: dadosRematricula.mensalidadeValor,
+          diaVencimento: dadosRematricula.diaVencimento,
+          descontoPercentual: dadosRematricula.descontoPercentual
+        }
+      };
+
+      // 4. Determinar se deve fazer transição imediata ou agendada
+      const temTransicaoAutomatica = dadosRematricula.transicaoAutomatica;
+      const novosStatusETurma = temTransicaoAutomatica ? 
+        {
+          // TRANSIÇÃO AUTOMÁTICA: Aguarda fim do período + pagamento
+          status: 'rematriculado_aguardando',
+          turmaId: turmaAtual, // Mantém turma atual por enquanto
+          turmaAtual: turmaAtual,
+          transicaoPendente: {
+            turmaDestino: novaTurmaId,
+            dataAgendamento: agora,
+            condicoes: {
+              aguardandoFimPeriodo: true,
+              aguardandoPagamento: true
+            },
+            automatica: true
+          }
+        } : 
+        {
+          // TRANSIÇÃO MANUAL: Muda imediatamente, mas com alerta
+          status: 'rematriculado_manual',
+          turmaId: novaTurmaId,
+          turmaAtual: novaTurmaId,
+          transicaoPendente: null,
+          alertaCoordenacao: {
+            tipo: 'efetivacao_manual_necessaria',
+            data: agora,
+            turmaOrigem: turmaAtual,
+            turmaDestino: novaTurmaId,
+            observacoes: 'Transição automática desabilitada - requer aprovação manual da coordenação'
+          }
+        };
+
+      // 5. Atualizar aluno com PRESERVAÇÃO TOTAL do histórico
+      const dadosAtualizados = {
+        ...aluno,
+        
+        // Aplicar estratégia de transição
+        ...novosStatusETurma,
+        
+        // 🆕 Nova estrutura preservando histórico
+        historicoAcademico: historicoAtual,
+        historicoRematriculas: [...historicoRematriculas, novaRematricula],
+        
+        // Dados de controle
+        dataRematricula: agora,
+        dataUltimaRematricula: agora,
+        ultimaRematricula: {
+          data: agora,
+          usuario: userName || 'Sistema',
+          turmaOrigem: turmaAtual,
+          turmaDestino: novaTurmaId,
+          tipo: temTransicaoAutomatica ? 'Rematrícula com Transição Automática' : 'Rematrícula com Transição Manual',
+          transicaoAutomatica: temTransicaoAutomatica,
+          preservouHistorico: true
+        },
+        
+        // Atualizar dados financeiros
+        financeiro: {
+          ...aluno.financeiro,
+          mensalidadeValor: dadosRematricula.mensalidadeValor,
+          diaVencimento: dadosRematricula.diaVencimento,
+          descontoPercentual: dadosRematricula.descontoPercentual,
+          percentualMulta: dadosRematricula.percentualMulta,
+          jurosDia: dadosRematricula.jurosDia,
+          valorMatricula: dadosRematricula.valorMatricula,
+          valorMateriais: dadosRematricula.valorMateriais
+        }
+      };
+
+      await updateAluno(aluno.id, dadosAtualizados);
+      
+      console.log('✅ Rematrícula realizada com preservação de histórico:', {
+        aluno: aluno.nome,
+        turmaOrigem: turmaAtual,
+        turmaDestino: novaTurmaId,
+        totalRematriculas: historicoRematriculas.length + 1,
+        periodosAcademicos: Object.keys(historicoAtual).length
+      });
+
+    } catch (error) {
+      console.error('❌ Erro ao atualizar aluno com histórico:', error);
+      throw new Error(`Erro ao preservar histórico acadêmico: ${error.message}`);
     }
   };
 
@@ -554,6 +725,49 @@ const RematriculaDialog = ({
               InputProps={{ startAdornment: 'R$ ' }}
             />
           </Grid>
+
+          {/* Configuração de Transição Automática */}
+          <Grid item xs={12}>
+            <Paper sx={{ p: 2, bgcolor: '#f8fafc', border: '1px solid #e2e8f0' }}>
+              <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={dadosRematricula.transicaoAutomatica || false}
+                      onChange={(e) => setDadosRematricula({ 
+                        ...dadosRematricula, 
+                        transicaoAutomatica: e.target.checked 
+                      })}
+                      color="primary"
+                    />
+                  }
+                  label=""
+                  sx={{ m: 0 }}
+                />
+                <Box sx={{ flex: 1 }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#374151', mb: 1 }}>
+                    ⚡ Transição Automática de Turma
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: '#6b7280', lineHeight: 1.5 }}>
+                    {dadosRematricula.transicaoAutomatica ? (
+                      <>
+                        <strong style={{ color: '#059669' }}>✅ ATIVO:</strong> O aluno será movido automaticamente para a nova turma quando:
+                        <br />• O período letivo da turma atual encerrar
+                        <br />• Os pagamentos da rematrícula estiverem em dia
+                        <br />• Status será alterado para "Rematriculado - Aguardando Transição"
+                      </>
+                    ) : (
+                      <>
+                        <strong style={{ color: '#d97706' }}>⚠️ INATIVO:</strong> O aluno permanecerá na turma atual após a rematrícula.
+                        <br />• Será criado um alerta para efetivação manual da mudança
+                        <br />• A coordenação deverá aprovar a transição quando apropriado
+                      </>
+                    )}
+                  </Typography>
+                </Box>
+              </Box>
+            </Paper>
+          </Grid>
         </Grid>
       </Paper>
 
@@ -562,7 +776,7 @@ const RematriculaDialog = ({
         <Alert severity="warning" icon={<WarningIcon />}>
           <Typography variant="body2">
             <strong>Atenção!</strong> Este aluno possui {titulosAbertos.length} título(s) em aberto 
-            no valor total de <strong>R$ {calcularTotalAberto().toFixed(2)}</strong>.
+            no valor total de <strong>R$ {formatMoney(calcularTotalAberto())}</strong>.
             <br/>
             Você deverá escolher uma ação para esses títulos na próxima etapa.
           </Typography>
@@ -609,7 +823,7 @@ const RematriculaDialog = ({
                     <TableCell align="center">
                       {titulo?.vencimento ? dayjs(titulo.vencimento).format('DD/MM/YYYY') : 'N/A'}
                     </TableCell>
-                    <TableCell align="right">R$ {(titulo?.valor || 0).toFixed(2)}</TableCell>
+                    <TableCell align="right">R$ {formatMoney(titulo?.valor)}</TableCell>
                     <TableCell align="center">
                       <Chip 
                         label={titulo?.status || 'pendente'} 
@@ -623,7 +837,7 @@ const RematriculaDialog = ({
                   <TableCell colSpan={2}><strong>Total:</strong></TableCell>
                   <TableCell align="right">
                     <Typography variant="h6" color="error">
-                      R$ {calcularTotalAberto().toFixed(2)}
+                      R$ {formatMoney(calcularTotalAberto())}
                     </Typography>
                   </TableCell>
                   <TableCell />
@@ -692,7 +906,7 @@ const RematriculaDialog = ({
                     fullWidth
                     label="Valor Total"
                     type="number"
-                    value={(renegociacaoConfig.valorTotal || 0).toFixed(2)}
+                    value={formatMoney(renegociacaoConfig.valorTotal)}
                     onChange={(e) => handleRenegociacaoChange('valorTotal', parseFloat(e.target.value) || 0)}
                     InputProps={{ startAdornment: 'R$ ' }}
                     inputProps={{ step: '0.01', min: '0' }}
@@ -721,7 +935,7 @@ const RematriculaDialog = ({
                 <Grid item xs={12}>
                   <Alert severity="info">
                     <Typography variant="body2">
-                      <strong>Valor de cada parcela:</strong> R$ {(renegociacaoConfig.valorParcela || 0).toFixed(2).replace('.', ',')}
+                      <strong>Valor de cada parcela:</strong> R$ {formatMoney(renegociacaoConfig.valorParcela).replace('.', ',')}
                     </Typography>
                   </Alert>
                 </Grid>
@@ -781,7 +995,7 @@ const RematriculaDialog = ({
             <Grid item xs={12} sm={6}>
               <Typography variant="body2" color="text.secondary">Valor Mensalidade:</Typography>
               <Typography variant="body1" fontWeight={600}>
-                R$ {(dadosRematricula?.mensalidadeValor || 0).toFixed(2)}
+                R$ {formatMoney(dadosRematricula?.mensalidadeValor)}
               </Typography>
             </Grid>
             <Grid item xs={12} sm={6}>
@@ -867,18 +1081,21 @@ const RematriculaDialog = ({
           <Chip 
             label="1. Conferência" 
             color={etapa === 'conferencia' ? 'primary' : 'default'}
+            variant={etapa === 'conferencia' ? 'filled' : 'outlined'}
             sx={{ mx: 0.5 }}
           />
           {titulosAbertos.length > 0 && (
             <Chip 
-              label="2. Pendências" 
+              label="2. Renegociação" 
               color={etapa === 'pendencias' ? 'warning' : 'default'}
+              variant={etapa === 'pendencias' ? 'filled' : 'outlined'}
               sx={{ mx: 0.5 }}
             />
           )}
           <Chip 
             label={titulosAbertos.length > 0 ? '3. Confirmação' : '2. Confirmação'}
             color={etapa === 'confirmacao' ? 'success' : 'default'}
+            variant={etapa === 'confirmacao' ? 'filled' : 'outlined'}
             sx={{ mx: 0.5 }}
           />
         </Box>

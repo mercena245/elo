@@ -51,10 +51,13 @@ import {
   Security as SecurityIcon,
   QrCode as QrCodeIcon,
   SupervisorAccount as SupervisorIcon,
-  FamilyRestroom as FamilyIcon
+  FamilyRestroom as FamilyIcon,
+  Close as CloseIcon
 } from '@mui/icons-material';
 import ProtectedRoute from '../../components/ProtectedRoute';
+import SidebarMenu from '../../components/SidebarMenu';
 import secretariaDigitalService from '../../services/secretariaDigitalService';
+import '../../styles/Dashboard.css';
 
 import { useSecretariaAccess } from '../../hooks/useSecretariaAccess';
 import { useSchoolServices } from '../../hooks/useSchoolServices';
@@ -211,10 +214,15 @@ const SecretariaDigital = () => {
       const pdf = await secretariaDigitalService.gerarPDF(documento);
       pdf.save(`${documento.tipo}_${documento.dadosAluno.nome}_${documento.codigoVerificacao}.pdf`);
       
-      await auditService?.logAction('DIGITAL_SECRETARY_DOCUMENT_DOWNLOADED', {
-        documentoId: documento.id,
-        tipoDocumento: documento.tipo,
-        alunoNome: documento.dadosAluno.nome
+      await auditService?.logAction({
+        action: 'DIGITAL_SECRETARY_DOCUMENT_DOWNLOADED',
+        entityId: documento.id,
+        details: `Download do documento ${documento.tipo} do aluno ${documento.dadosAluno.nome}`,
+        changes: {
+          documentoId: documento.id,
+          tipoDocumento: documento.tipo,
+          alunoNome: documento.dadosAluno.nome
+        }
       });
       
     } catch (error) {
@@ -225,6 +233,21 @@ const SecretariaDigital = () => {
         severity: 'error' 
       });
     }
+  };
+
+  // 🆕 Estado para modal de visualização
+  const [documentoVisualizado, setDocumentoVisualizado] = useState(null);
+  const [modalVisualizacao, setModalVisualizacao] = useState(false);
+
+  // 🆕 Função para visualizar documento
+  const visualizarDocumento = (documento) => {
+    setDocumentoVisualizado(documento);
+    setModalVisualizacao(true);
+  };
+
+  const fecharVisualizacao = () => {
+    setModalVisualizacao(false);
+    setDocumentoVisualizado(null);
   };
 
   const menuCardsCoord = [
@@ -331,7 +354,10 @@ const SecretariaDigital = () => {
 
   return (
     <ProtectedRoute requiredRole={['coordenadora', 'pai']}>
-      <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
+      <div className="dashboard-container">
+        <SidebarMenu />
+        <main className="dashboard-main">
+          <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
         {loading && <LinearProgress sx={{ mb: 2 }} />}
         
         {/* Cabeçalho */}
@@ -548,8 +574,8 @@ const SecretariaDigital = () => {
                     </ListItemIcon>
                     <ListItemText
                       primary={
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Typography variant="subtitle1">
+                        <Box component="span" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Typography variant="subtitle1" component="span">
                             {getDocumentTypeLabel(doc.tipo)}
                           </Typography>
                           <Chip 
@@ -560,22 +586,32 @@ const SecretariaDigital = () => {
                         </Box>
                       }
                       secondary={
-                        <Box>
-                          <Typography variant="body2" component="span">
-                            <PersonIcon sx={{ fontSize: 14, mr: 0.5 }} />
-                            {doc.dadosAluno.nome}
-                          </Typography>
-                          <br />
-                          <Typography variant="caption" color="text.secondary">
-                            <QrCodeIcon sx={{ fontSize: 12, mr: 0.5 }} />
-                            {doc.codigoVerificacao} • {new Date(doc.dataEmissao).toLocaleDateString()}
+                        <Box component="span">
+                          <Typography variant="body2" component="span"
+                            sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}
+                          >
+                            <Box component="span" sx={{ display: 'flex', alignItems: 'center' }}>
+                              <PersonIcon sx={{ fontSize: 14, mr: 0.5 }} />
+                              {doc.dadosAluno.nome}
+                            </Box>
+                            <Box component="span" sx={{ display: 'flex', alignItems: 'center' }}>
+                              <QrCodeIcon sx={{ fontSize: 12, mr: 0.5 }} />
+                              {doc.codigoVerificacao} • {new Date(doc.dataEmissao).toLocaleDateString()}
+                            </Box>
                           </Typography>
                         </Box>
                       }
                     />
                     <ListItemSecondaryAction>
                       <Tooltip title="Visualizar">
-                        <IconButton size="small" sx={{ mr: 1 }}>
+                        <IconButton 
+                          size="small" 
+                          sx={{ mr: 1 }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            visualizarDocumento(doc);
+                          }}
+                        >
                           <ViewIcon />
                         </IconButton>
                       </Tooltip>
@@ -683,8 +719,173 @@ const SecretariaDigital = () => {
             {snackbar.message}
           </Alert>
         </Snackbar>
+
+        {/* 🆕 Modal de Visualização do Documento */}
+        <Dialog 
+          open={modalVisualizacao} 
+          onClose={fecharVisualizacao}
+          maxWidth="md"
+          fullWidth
+          PaperProps={{
+            sx: { minHeight: '80vh' }
+          }}
+        >
+          <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Box>
+              <Typography variant="h6">
+                Visualização do Documento
+              </Typography>
+              {documentoVisualizado && (
+                <Typography variant="body2" color="text.secondary">
+                  {getDocumentTypeLabel(documentoVisualizado.tipo)} - {documentoVisualizado.dadosAluno.nome}
+                </Typography>
+              )}
+            </Box>
+            <IconButton onClick={fecharVisualizacao}>
+              <CloseIcon />
+            </IconButton>
+          </DialogTitle>
+          
+          <DialogContent dividers>
+            {documentoVisualizado && (
+              <Box sx={{ p: 2 }}>
+                {/* Cabeçalho do Documento */}
+                <Paper elevation={1} sx={{ p: 3, mb: 3, textAlign: 'center' }}>
+                  <Typography variant="h5" gutterBottom color="primary">
+                    {documentoVisualizado.dadosInstituicao?.nome || 'ESCOLA ELO'}
+                  </Typography>
+                  <Typography variant="h6" gutterBottom>
+                    {getDocumentTypeLabel(documentoVisualizado.tipo).toUpperCase()}
+                  </Typography>
+                  <Chip 
+                    label={documentoVisualizado.status} 
+                    color={getStatusColor(documentoVisualizado.status)}
+                    sx={{ mt: 1 }}
+                  />
+                </Paper>
+
+                {/* Dados do Aluno */}
+                <Paper elevation={1} sx={{ p: 3, mb: 3 }}>
+                  <Typography variant="h6" gutterBottom color="primary">
+                    Dados do Aluno
+                  </Typography>
+                  <Grid container spacing={2}>
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="body2" color="text.secondary">Nome:</Typography>
+                      <Typography variant="body1">{documentoVisualizado.dadosAluno.nome}</Typography>
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="body2" color="text.secondary">CPF:</Typography>
+                      <Typography variant="body1">{documentoVisualizado.dadosAluno.cpf}</Typography>
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="body2" color="text.secondary">RG:</Typography>
+                      <Typography variant="body1">{documentoVisualizado.dadosAluno.rg}</Typography>
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="body2" color="text.secondary">Data de Nascimento:</Typography>
+                      <Typography variant="body1">{documentoVisualizado.dadosAluno.dataNascimento}</Typography>
+                    </Grid>
+                  </Grid>
+                </Paper>
+
+                {/* Histórico Acadêmico */}
+                {documentoVisualizado.historicoCompleto?.periodosAcademicos && (
+                  <Paper elevation={1} sx={{ p: 3, mb: 3 }}>
+                    <Typography variant="h6" gutterBottom color="primary">
+                      Histórico Acadêmico
+                    </Typography>
+                    {documentoVisualizado.historicoCompleto.periodosAcademicos.map((periodo, index) => (
+                      <Box key={index} sx={{ mb: 3 }}>
+                        <Typography variant="subtitle1" fontWeight="bold">
+                          {periodo.anoLetivo} - {periodo.periodoLetivo}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                          Situação: {periodo.resultadoFinal || 'Em andamento'}
+                        </Typography>
+                        
+                        {periodo.disciplinas && periodo.disciplinas.length > 0 && (
+                          <Box sx={{ mt: 2 }}>
+                            <Typography variant="body2" fontWeight="bold" gutterBottom>
+                              Disciplinas:
+                            </Typography>
+                            <Grid container spacing={1}>
+                              {periodo.disciplinas.map((disciplina, discIndex) => (
+                                <Grid item xs={12} sm={6} key={discIndex}>
+                                  <Box sx={{ p: 1, border: '1px solid #e0e0e0', borderRadius: 1 }}>
+                                    <Typography variant="body2" fontWeight="bold">
+                                      {disciplina.nome}
+                                    </Typography>
+                                    <Typography variant="caption" display="block">
+                                      Média: {disciplina.mediaFinal || 'N/A'} | 
+                                      Frequência: {disciplina.frequencia || 'N/A'}% | 
+                                      Situação: {disciplina.situacao || 'Pendente'}
+                                    </Typography>
+                                  </Box>
+                                </Grid>
+                              ))}
+                            </Grid>
+                          </Box>
+                        )}
+                      </Box>
+                    ))}
+                  </Paper>
+                )}
+
+                {/* Informações do Documento */}
+                <Paper elevation={1} sx={{ p: 3 }}>
+                  <Typography variant="h6" gutterBottom color="primary">
+                    Informações do Documento
+                  </Typography>
+                  <Grid container spacing={2}>
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="body2" color="text.secondary">Código de Verificação:</Typography>
+                      <Typography variant="body1" fontFamily="monospace">
+                        {documentoVisualizado.codigoVerificacao}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="body2" color="text.secondary">Data de Emissão:</Typography>
+                      <Typography variant="body1">
+                        {new Date(documentoVisualizado.dataEmissao).toLocaleDateString('pt-BR')}
+                      </Typography>
+                    </Grid>
+                    {documentoVisualizado.totalRematriculas > 0 && (
+                      <Grid item xs={12}>
+                        <Typography variant="body2" color="text.secondary">Rematrículas:</Typography>
+                        <Typography variant="body1">
+                          {documentoVisualizado.totalRematriculas} rematrícula(s) registrada(s)
+                        </Typography>
+                      </Grid>
+                    )}
+                  </Grid>
+                </Paper>
+              </Box>
+            )}
+          </DialogContent>
+          
+          <DialogActions>
+            <Button onClick={fecharVisualizacao}>
+              Fechar
+            </Button>
+            {documentoVisualizado && (
+              <Button 
+                variant="contained" 
+                startIcon={<DownloadIcon />}
+                onClick={() => {
+                  baixarDocumento(documentoVisualizado);
+                  fecharVisualizacao();
+                }}
+              >
+                Baixar PDF
+              </Button>
+            )}
+          </DialogActions>
+        </Dialog>
       </Container>
-    </ProtectedRoute>
+    </main>
+  </div>
+</ProtectedRoute>
   );
 };
 

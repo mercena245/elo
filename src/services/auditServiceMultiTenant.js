@@ -205,15 +205,17 @@ export const createAuditService = (database) => {
         changes = details.changes;
         
         // Se userId não foi passado ou é inválido, buscar do Firebase Auth
-        if (!userId || userId === 'unknown') {
+        if (!userId || userId === 'unknown' || typeof userId !== 'string') {
           try {
             const currentUser = auth?.currentUser;
             if (currentUser) {
               console.log('🔍 [AuditService] Buscando dados do usuário autenticado (formato novo):', currentUser.uid);
-              userId = currentUser.uid;
+              userId = String(currentUser.uid);
               
               // Buscar dados completos do banco
-              const userRef = ref(database, `usuarios/${userId}`);
+              // Garantir que userId seja uma string válida
+              const userIdString = String(userId).replace(/[\.\#\$\[\]]/g, '');
+              const userRef = ref(database, `usuarios/${userIdString}`);
               const userSnapshot = await get(userRef);
               
               if (userSnapshot.exists()) {

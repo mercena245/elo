@@ -1,0 +1,22 @@
+{
+  "rules": {
+    ".read": "true",
+    ".write": "true",
+    
+    "notas": {
+      ".indexOn": ["alunoId", "turmaId", "anoLetivo"]
+    },
+    
+    "frequencia": {
+      ".indexOn": ["alunoId", "turmaId", "anoLetivo"]
+    },
+    
+    "alunos": {
+      ".indexOn": ["turmaId", "matricula", "ativo"]
+    },
+    
+    "titulos": {
+      ".indexOn": ["alunoId", "status", "vencimento"]
+    }
+  }
+}

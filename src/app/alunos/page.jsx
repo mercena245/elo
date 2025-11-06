@@ -37,6 +37,7 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ContentCopy from '@mui/icons-material/ContentCopy';
 import InfoOutlined from '@mui/icons-material/InfoOutlined';
+import EditIcon from '@mui/icons-material/Edit';
 import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs from 'dayjs';
@@ -49,6 +50,8 @@ import ContratoAluno from '../../components/ContratoAlunoNovo';
 import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
 import { useSchoolServices } from '../../hooks/useSchoolServices';
 import RematriculaDialog from './components/RematriculaDialog';
+import HistoricoMatriculaDialog from './components/HistoricoMatriculaDialog';
+import HistoricoMatriculaService from '../../services/historicoMatriculaService';
 
 // Componente para indicador de pré-matrícula
 const PreMatriculaIndicator = ({ aluno, financeiroService }) => {
@@ -337,6 +340,9 @@ const Alunos = () => {
   // Hook para acessar banco da escola
   const { getData, setData, isReady, error: dbError, currentSchool, storage: schoolStorage, db } = useSchoolDatabase();
   
+  // Instância do serviço de histórico de matrículas
+  const historicoMatriculaService = new HistoricoMatriculaService(db, getData, null);
+  
   // Marcar/desmarcar anexo para exclusão (por nome)
   const handleMarcarParaExcluir = (nome) => {
     setAnexosParaExcluir(prev =>
@@ -374,6 +380,9 @@ const Alunos = () => {
   const [inadimplenciaDialogOpen, setInadimplenciaDialogOpen] = useState(false);
   const [titulosEmAberto, setTitulosEmAberto] = useState([]);
   const [carregandoTitulos, setCarregandoTitulos] = useState(false);
+  // Estados para histórico de matrícula
+  const [historicoDialogOpen, setHistoricoDialogOpen] = useState(false);
+  const [alunoHistorico, setAlunoHistorico] = useState(null);
   // Estado para controlar expansão dos cards
   const [cardsExpandidos, setCardsExpandidos] = useState({});
   // Estados para anexos temporários
@@ -1292,6 +1301,12 @@ const Alunos = () => {
     await carregarAlunos();
     setRematriculaDialogOpen(false);
     setAlunoRematricula(null);
+  };
+
+  // Abrir dialog de histórico de matrícula
+  const handleAbrirHistorico = (aluno) => {
+    setAlunoHistorico(aluno);
+    setHistoricoDialogOpen(true);
   };
 
   // Ativar aluno após pagamento da matrícula
@@ -2298,6 +2313,24 @@ const Alunos = () => {
                                     <Button
                                       variant="outlined"
                                       size="small"
+                                      onClick={() => handleAbrirHistorico(aluno)}
+                                      sx={{
+                                        minWidth: 'auto',
+                                        px: 1.5,
+                                        borderColor: '#7c3aed',
+                                        color: '#7c3aed',
+                                        '&:hover': {
+                                          bgcolor: '#faf5ff',
+                                          borderColor: '#6d28d9'
+                                        }
+                                      }}
+                                      title="Informações de Matrícula"
+                                    >
+                                      <EditIcon sx={{ fontSize: 16 }} />
+                                    </Button>
+                                    <Button
+                                      variant="outlined"
+                                      size="small"
                                       onClick={() => handleAbrirRematricula(aluno)}
                                       sx={{
                                         minWidth: 'auto',
@@ -2311,7 +2344,7 @@ const Alunos = () => {
                                       }}
                                       title="Rematrícula"
                                     >
-                                      🔄
+                                      REMATRÍCULA
                                     </Button>
                                     <IconButton
                                       onClick={(e) => toggleCardExpansao(aluno.id || `${aluno.matricula}_${idx}`, e)}
@@ -3925,6 +3958,26 @@ const Alunos = () => {
                       await setData(`alunos/${id}`, dados);
                     }}
                     onRematriculaSuccess={handleRematriculaSuccess}
+                  />
+
+                  {/* Dialog Histórico de Matrícula */}
+                  <HistoricoMatriculaDialog
+                    open={historicoDialogOpen}
+                    onClose={() => {
+                      setHistoricoDialogOpen(false);
+                      setAlunoHistorico(null);
+                    }}
+                    aluno={alunoHistorico}
+                    historicoService={historicoMatriculaService}
+                    turmas={Object.values(turmas || {})}
+                    getData={getData}
+                    onRematricula={(aluno) => {
+                      // Fechar o dialog do histórico
+                      setHistoricoDialogOpen(false);
+                      setAlunoHistorico(null);
+                      // Abrir o dialog de rematrícula
+                      handleAbrirRematricula(aluno);
+                    }}
                   />
                 </>
               )}

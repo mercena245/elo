@@ -117,17 +117,36 @@ export default function GaleriaFotos() {
       if (fotosData) {
         const lista = Object.entries(fotosData).map(([id, f]) => ({ id, ...f }));
         
-        // Ordenar por data de envio (mais novas primeiro)
-        lista.sort((a, b) => {
-          const dataA = new Date(a.dataEnvio || a.timestamp || 0);
-          const dataB = new Date(b.dataEnvio || b.timestamp || 0);
-          return dataB - dataA; // Ordem decrescente (mais novas primeiro)
-        });
-        
-        console.log('📅 Fotos ordenadas por data (mais recentes primeiro):', 
-          lista.slice(0, 5).map(f => ({
+        console.log('📸 Fotos ANTES da ordenação:', 
+          lista.map(f => ({
+            id: f.id,
             nome: f.nome,
             dataEnvio: f.dataEnvio,
+            createdAt: f.createdAt,
+            timestamp: f.timestamp
+          }))
+        );
+        
+        // Ordenar por data de envio (mais novas primeiro)
+        lista.sort((a, b) => {
+          // Tentar todos os campos de data possíveis
+          const dataA = new Date(a.dataEnvio || a.createdAt || a.timestamp || 0);
+          const dataB = new Date(b.dataEnvio || b.createdAt || b.timestamp || 0);
+          
+          console.log('Comparando:', {
+            a: { nome: a.nome, data: dataA.toISOString(), valor: dataA.getTime() },
+            b: { nome: b.nome, data: dataB.toISOString(), valor: dataB.getTime() },
+            resultado: dataB.getTime() - dataA.getTime()
+          });
+          
+          return dataB.getTime() - dataA.getTime(); // Ordem decrescente (mais novas primeiro)
+        });
+        
+        console.log('📅 Fotos DEPOIS da ordenação (primeiras 10):', 
+          lista.slice(0, 10).map(f => ({
+            nome: f.nome,
+            dataEnvio: f.dataEnvio,
+            createdAt: f.createdAt,
             timestamp: f.timestamp
           }))
         );
@@ -449,7 +468,9 @@ export default function GaleriaFotos() {
           turmas: turmasSelecionadas.length > 0 ? turmasSelecionadas : ['todos'],
           likes: [],
           likesCount: 0,
+          dataEnvio: new Date().toISOString(), // Campo usado para ordenação
           createdAt: new Date().toISOString(),
+          timestamp: Date.now(), // Timestamp numérico para fallback
           createdBy: userId
         };
         

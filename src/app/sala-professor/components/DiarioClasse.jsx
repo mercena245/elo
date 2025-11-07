@@ -329,6 +329,7 @@ const DiarioClasse = () => {
     
     // Se tem registro, verificar se faltou em TODAS as disciplinas
     const totalFaltas = frequenciasDoDia.filter(f => f.presente === false).length;
+    const totalPresencas = frequenciasDoDia.filter(f => f.presente === true).length;
     const totalRegistros = frequenciasDoDia.length;
     
     // Se faltou em TODAS as disciplinas que tem registro = falta no dia
@@ -336,7 +337,12 @@ const DiarioClasse = () => {
       return 'F';
     }
     
-    // Se tem pelo menos uma presença = presente no dia
+    // Se tem pelo menos uma presença = presente no dia (PONTO)
+    if (totalPresencas > 0) {
+      return '•';
+    }
+    
+    // Sem presença ou falta registrada
     return '';
   };
 
@@ -771,117 +777,58 @@ const DiarioClasse = () => {
                           {dayjs(plano.data).format('DD/MM/YYYY')}
                         </TableCell>
                         <TableCell>
-                          {/* Tema/Título - Múltiplas fontes */}
-                          {(plano.tema || plano.titulo || plano.assunto || plano.tituloAula) && (
-                            <Typography variant="body2" sx={{ fontWeight: 'bold', mb: 1, color: '#1976d2' }}>
-                              📋 {plano.tema || plano.titulo || plano.assunto || plano.tituloAula}
-                            </Typography>
-                          )}
-
                           {/* Conteúdo/Descrição principal */}
                           {(plano.conteudo || plano.descricao || plano.atividade || plano.resumo) && (
-                            <Typography variant="body2" sx={{ mb: 1 }}>
+                            <Typography variant="body2" sx={{ mb: 2 }}>
                               {plano.conteudo || plano.descricao || plano.atividade || plano.resumo}
                             </Typography>
                           )}
 
-                          {/* Metodologia - Sempre mostrar se existir */}
-                          {plano.metodologia && (
-                            <Typography variant="body2" sx={{ mb: 1, fontStyle: 'italic', color: '#666' }}>
-                              <strong>Metodologia:</strong> {plano.metodologia}
-                            </Typography>
-                          )}
-
-                          {/* Objetivos */}
-                          {plano.objetivos && (
-                            <Typography variant="body2" sx={{ mb: 1 }}>
-                              <strong>🎯 Objetivos:</strong> {plano.objetivos}
-                            </Typography>
-                          )}
-
-          {/* DISCIPLINAS - SEMPRE MOSTRAR SE EXISTIR */}
-          {plano.disciplinas && plano.disciplinas.length > 0 && (
-            <Box sx={{ mb: 1 }}>
-              {plano.disciplinas.map((disc, idx) => (
-                <Box key={idx} sx={{ mb: 2, p: 1, bgcolor: '#f0f7ff', borderRadius: 1, border: '1px solid #1976d2' }}>
-                  {/* Nome da Disciplina */}
-                  <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#1976d2', mb: 1 }}>
-                    📚 {disc.nome || disc.disciplina || `Disciplina ${idx + 1}`}
-                  </Typography>
-                  
-                  {/* BNCC da Disciplina */}
-                  {disc.habilidadesBNCC && disc.habilidadesBNCC.length > 0 && (
-                    <Box sx={{ mb: 1, p: 0.5, bgcolor: '#e8f5e8', borderRadius: 1 }}>
-                      <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#2e7d32' }}>
-                        📋 BNCC: {disc.habilidadesBNCC.map(h => 
-                          typeof h === 'object' ? (h.codigo || h.code || h.id) : h
-                        ).filter(Boolean).join(', ')}
-                      </Typography>
-                    </Box>
-                  )}
-                  
-                  {/* Conteúdo da Disciplina */}
-                  {disc.conteudo && (
-                    <Typography variant="body2" sx={{ color: 'text.primary', mb: 1 }}>
-                      {disc.conteudo}
-                    </Typography>
-                  )}
-
-                  {/* Objetivos da Disciplina */}
-                  {disc.objetivos && (
-                    <Typography variant="body2" sx={{ color: 'text.secondary', fontStyle: 'italic' }}>
-                      🎯 Objetivos: {disc.objetivos}
-                    </Typography>
-                  )}
-                </Box>
-              ))}
-            </Box>
-          )}                          {/* BNCC GERAL (se não tiver disciplinas específicas) */}
-                          {!plano.disciplinas?.length && plano.habilidadesBNCC && plano.habilidadesBNCC.length > 0 && (
-                            <Box sx={{ mb: 1, p: 1, bgcolor: '#e8f5e8', borderRadius: 1 }}>
-                              <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#2e7d32' }}>
-                                📋 BNCC: {plano.habilidadesBNCC.map(h => 
-                                  typeof h === 'string' ? h : (h.codigo || h.code || h.id || '')
-                                ).filter(Boolean).join(', ')}
-                              </Typography>
+                          {/* DISCIPLINAS - Mostrar apenas conteúdo e BNCC */}
+                          {plano.disciplinas && plano.disciplinas.length > 0 && (
+                            <Box sx={{ mb: 2 }}>
+                              {plano.disciplinas.map((disc, idx) => (
+                                <Box key={idx} sx={{ mb: 2 }}>
+                                  {/* Conteúdo da Disciplina */}
+                                  {disc.conteudo && (
+                                    <Typography variant="body2" sx={{ mb: 1 }}>
+                                      {disc.conteudo}
+                                    </Typography>
+                                  )}
+                                  
+                                  {/* BNCC da Disciplina */}
+                                  {disc.habilidadesBNCC && disc.habilidadesBNCC.length > 0 && (
+                                    <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#2e7d32' }}>
+                                      BNCC: {disc.habilidadesBNCC.map(h => 
+                                        typeof h === 'object' ? (h.codigo || h.code || h.id) : h
+                                      ).filter(Boolean).join(', ')}
+                                    </Typography>
+                                  )}
+                                </Box>
+                              ))}
                             </Box>
+                          )}
+
+                          {/* BNCC GERAL (se não tiver disciplinas específicas) */}
+                          {!plano.disciplinas?.length && plano.habilidadesBNCC && plano.habilidadesBNCC.length > 0 && (
+                            <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#2e7d32', mt: 1 }}>
+                              BNCC: {plano.habilidadesBNCC.map(h => 
+                                typeof h === 'string' ? h : (h.codigo || h.code || h.id || '')
+                              ).filter(Boolean).join(', ')}
+                            </Typography>
                           )}
 
                           {/* BNCC alternativo */}
                           {!plano.disciplinas?.length && plano.competenciasBNCC && plano.competenciasBNCC.length > 0 && (
-                            <Box sx={{ mb: 1, p: 1, bgcolor: '#e8f5e8', borderRadius: 1 }}>
-                              <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#2e7d32' }}>
-                                📋 BNCC: {plano.competenciasBNCC.map(c => 
-                                  typeof c === 'string' ? c : (c.codigo || c.code || c.id || '')
-                                ).filter(Boolean).join(', ')}
-                              </Typography>
-                            </Box>
-                          )}
-
-                          {/* Recursos */}
-                          {plano.recursos && (
-                            <Typography variant="caption" sx={{ display: 'block', mt: 1, color: 'text.secondary' }}>
-                              <strong>📦 Recursos:</strong> {Array.isArray(plano.recursos) ? plano.recursos.join(', ') : plano.recursos}
-                            </Typography>
-                          )}
-
-                          {/* Procedimentos/Atividades */}
-                          {(plano.atividades || plano.procedimentos) && (
-                            <Typography variant="body2" sx={{ mt: 1, fontStyle: 'italic', color: 'text.secondary' }}>
-                              <strong>📋 Procedimentos:</strong> {plano.atividades || plano.procedimentos}
-                            </Typography>
-                          )}
-
-                          {/* Avaliação */}
-                          {plano.avaliacao && (
-                            <Typography variant="body2" sx={{ mt: 1, color: 'text.secondary' }}>
-                              <strong>📊 Avaliação:</strong> {plano.avaliacao}
+                            <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#2e7d32', mt: 1 }}>
+                              BNCC: {plano.competenciasBNCC.map(c => 
+                                typeof c === 'string' ? c : (c.codigo || c.code || c.id || '')
+                              ).filter(Boolean).join(', ')}
                             </Typography>
                           )}
 
                           {/* Fallback APENAS se realmente não tem NENHUM conteúdo */}
-                          {!plano.tema && !plano.titulo && !plano.conteudo && !plano.descricao && 
-                           !plano.objetivos && !plano.atividades && !plano.metodologia && 
+                          {!plano.conteudo && !plano.descricao && !plano.atividade && !plano.resumo &&
                            !plano.habilidadesBNCC?.length && !plano.competenciasBNCC?.length &&
                            !(plano.disciplinas && plano.disciplinas.length > 0) && (
                             <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>

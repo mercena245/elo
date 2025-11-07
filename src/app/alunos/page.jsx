@@ -38,6 +38,7 @@ import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ContentCopy from '@mui/icons-material/ContentCopy';
 import InfoOutlined from '@mui/icons-material/InfoOutlined';
 import EditIcon from '@mui/icons-material/Edit';
+import Print from '@mui/icons-material/Print';
 import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs from 'dayjs';
@@ -409,6 +410,11 @@ const Alunos = () => {
   // Estados para rematrícula
   const [rematriculaDialogOpen, setRematriculaDialogOpen] = useState(false);
   const [alunoRematricula, setAlunoRematricula] = useState(null);
+  
+  // Estados para seleção de contrato de rematrícula
+  const [selecaoContratoOpen, setSelecaoContratoOpen] = useState(false);
+  const [matriculasDisponiveis, setMatriculasDisponiveis] = useState([]);
+  const [contratoSelecionado, setContratoSelecionado] = useState(null);
 
   // Remover anexo do Storage e do registro do aluno
   const handleRemoverAnexo = async (anexo, idx) => {
@@ -1482,6 +1488,188 @@ const Alunos = () => {
     setValidacaoCpf({});
   };
 
+  // Função para buscar histórico de matrículas do aluno
+  const buscarHistoricoMatriculas = async (alunoId, aluno = null) => {
+    console.group('📋 DEBUG - BuscarHistoricoMatriculas');
+    console.log('AlunoId:', alunoId);
+    console.log('Aluno completo:', aluno);
+    
+    try {
+      // Primeiro, verificar se o histórico está nos dados do próprio aluno
+      if (aluno?.historicoRematriculas && Array.isArray(aluno.historicoRematriculas)) {
+        console.log('✅ Encontrado historicoRematriculas no aluno:', aluno.historicoRematriculas);
+        const historico = aluno.historicoRematriculas.map((item, index) => ({
+          id: `historico-${index}`,
+          ...item
+        })).sort((a, b) => new Date(b.dataMatricula || b.data) - new Date(a.dataMatricula || a.data));
+        
+        console.log('✅ Histórico do aluno processado:', historico);
+        console.groupEnd();
+        return historico;
+      }
+
+      // Se não encontrou no aluno, buscar no path separado
+      const historicoData = await getData(`historicoMatricula/${alunoId}`);
+      console.log('Dados do histórico brutos (path separado):', historicoData);
+      
+      if (historicoData) {
+        const historico = Object.entries(historicoData).map(([id, dados]) => ({
+          id,
+          ...dados
+        })).sort((a, b) => new Date(b.dataMatricula) - new Date(a.dataMatricula));
+        
+        console.log('✅ Histórico do path separado processado:', historico);
+        console.groupEnd();
+        return historico;
+      }
+      
+      console.log('❌ Nenhum histórico encontrado');
+      console.groupEnd();
+      return [];
+    } catch (error) {
+      console.error('❌ Erro ao buscar histórico de matrículas:', error);
+      console.groupEnd();
+      return [];
+    }
+  };
+
+  // Função para verificar se aluno tem rematrícula
+  const verificarSeTemRematricula = async (aluno) => {
+    console.group('🔍 DEBUG - VerificarSeTemRematricula');
+    console.log('Aluno recebido:', aluno);
+    console.log('dataRematricula:', aluno?.dataRematricula);
+    console.log('historicoRematriculas:', aluno?.historicoRematriculas);
+    
+    if (!aluno?.dataRematricula) {
+      console.log('❌ Não tem dataRematricula');
+      console.groupEnd();
+      return false;
+    }
+    
+    console.log('✅ Tem dataRematricula, buscando histórico...');
+    const historico = await buscarHistoricoMatriculas(aluno.id, aluno);
+    console.log('📋 Histórico encontrado:', historico);
+    console.log('📊 Quantidade no histórico:', historico.length);
+    
+    const resultado = historico.length > 0;
+    console.log('🎯 Resultado final:', resultado);
+    console.groupEnd();
+    
+    return resultado;
+  };
+
+  // Função para buscar matrículas disponíveis (atual + histórico)
+  const buscarMatriculasDisponiveis = async (aluno) => {
+    console.group('📋 DEBUG - BuscarMatriculasDisponiveis');
+    console.log('Aluno completo:', aluno);
+    console.log('Turmas disponíveis:', turmas);
+    
+    const historico = await buscarHistoricoMatriculas(aluno.id, aluno);
+    
+    // Para rematrícula atual - verificar se tem turmaDestino
+    const turmaAtualId = aluno.transicaoPendente?.turmaDestino || aluno.turmaId;
+    const turmaAtualInfo = turmas[turmaAtualId];
+    console.log('Turma atual ID:', turmaAtualId);
+    console.log('Turma atual info:', turmaAtualInfo);
+    
+    const matriculas = [
+      // Matrícula atual (rematrícula)
+      {
+        ...aluno,
+        isCurrent: true,
+        dataMatricula: aluno.dataRematricula || aluno.dataMatricula,
+        nomeTurma: turmaAtualInfo?.nome || 'N/A',
+        turmaId: turmaAtualId,
+        turmaInfo: turmaAtualInfo,
+        ano: new Date(aluno.dataRematricula || aluno.dataMatricula).getFullYear()
+      },
+      // Matrículas do histórico
+      ...historico.map((h, index) => {
+        console.log(`Processando histórico ${index}:`, h);
+        const turmaHistoricoId = h.turmaId || h.turmaDestino || h.turmaAtual;
+        const turmaHistoricoInfo = turmas[turmaHistoricoId];
+        console.log(`Turma histórico ${index} ID:`, turmaHistoricoId);
+        console.log(`Turma histórico ${index} info:`, turmaHistoricoInfo);
+        
+        return {
+          ...h,
+          isCurrent: false,
+          nomeTurma: turmaHistoricoInfo?.nome || 'N/A',
+          turmaId: turmaHistoricoId,
+          turmaInfo: turmaHistoricoInfo,
+          ano: new Date(h.dataMatricula || h.data).getFullYear(),
+          dataMatricula: h.dataMatricula || h.data
+        };
+      })
+    ];
+    
+    console.log('Matrículas processadas:', matriculas);
+    console.groupEnd();
+    return matriculas;
+  };
+
+  // Função para buscar ou criar dados financeiros específicos da matrícula
+  const buscarDadosFinanceirosMatricula = async (matriculaData) => {
+    console.group('💰 DEBUG - BuscarDadosFinanceirosMatricula');
+    console.log('Dados da matrícula recebida:', matriculaData);
+    
+    try {
+      // Buscar dados do período letivo da turma selecionada
+      let periodoLetivo = null;
+      const periodoId = matriculaData.turmaInfo?.periodoLetivoId || matriculaData.turmaInfo?.periodoId;
+      if (periodoId) {
+        console.log('Buscando período letivo:', periodoId);
+        periodoLetivo = await getData(`periodosLetivos/${periodoId}`);
+        console.log('Período letivo encontrado:', periodoLetivo);
+      } else {
+        console.log('❌ Nenhum periodoId encontrado na turmaInfo:', matriculaData.turmaInfo);
+      }
+
+      const dadosCompletos = {
+        ...matriculaData,
+        periodoLetivo: periodoLetivo,
+        // Garantir que os dados da turma estejam corretos
+        turmaId: matriculaData.turmaId,
+        nomeTurma: matriculaData.nomeTurma,
+        turmaInfo: matriculaData.turmaInfo
+      };
+
+      // Se é a matrícula atual, usar os dados como estão (mas com período correto)
+      if (matriculaData.isCurrent) {
+        console.log('✅ Matrícula atual - usando dados com período da turma');
+        console.groupEnd();
+        return dadosCompletos;
+      }
+
+      // Para matrículas históricas, verificar se existem dados financeiros específicos
+      const dadosFinanceiros = await financeiroService.buscarTitulosAluno?.(matriculaData.id);
+      
+      if (!dadosFinanceiros?.success || !dadosFinanceiros.titulos?.length) {
+        // Se não tem dados financeiros, criar baseado na matrícula histórica
+        console.log('⚠️ Criando dados financeiros para matrícula histórica:', matriculaData.id);
+        
+        console.groupEnd();
+        return {
+          ...dadosCompletos,
+          dadosFinanceirosCriados: true // Flag para indicar que foram criados
+        };
+      }
+
+      // Se tem dados financeiros, incluir eles na matrícula
+      console.log('✅ Dados financeiros encontrados para matrícula histórica');
+      console.groupEnd();
+      return {
+        ...dadosCompletos,
+        dadosFinanceiros: dadosFinanceiros.titulos
+      };
+
+    } catch (error) {
+      console.error('❌ Erro ao buscar dados financeiros da matrícula:', error);
+      console.groupEnd();
+      return matriculaData; // Retorna os dados originais em caso de erro
+    }
+  };
+
   // Função para abrir dialog de seleção (Ficha ou Contrato)
   const handleAbrirSelecaoImpressao = (aluno) => {
     setAlunoSelecionadoFicha(aluno);
@@ -1500,13 +1688,63 @@ const Alunos = () => {
   };
 
   // Função para abrir contrato
-  const handleAbrirContrato = () => {
+  const handleAbrirContrato = async (dadosContrato = null) => {
+    console.group('🎯 DEBUG - HandleAbrirContrato');
+    console.log('dadosContrato recebido:', dadosContrato);
+    console.log('alunoSelecionadoFicha atual:', alunoSelecionadoFicha);
+    
     setDialogSelecaoOpen(false);
-    setContratoOpen(true);
+    
+    // Se foi passado dados específicos (vem do diálogo de seleção), usar eles
+    if (dadosContrato) {
+      console.log('✅ Usando dados específicos do contrato');
+      console.log('📋 Dados recebidos do diálogo:', dadosContrato);
+      setSelecaoContratoOpen(false);
+      
+      // Buscar dados financeiros específicos da matrícula selecionada
+      console.log('🔄 Chamando buscarDadosFinanceirosMatricula...');
+      const dadosCompletos = await buscarDadosFinanceirosMatricula(dadosContrato);
+      console.log('✅ Dados completos processados:', dadosCompletos);
+      setAlunoSelecionadoFicha(dadosCompletos);
+      setContratoOpen(true);
+      console.groupEnd();
+      return;
+    }
+    
+    // Se não foi passado dados, verificar se aluno tem rematrícula
+    const aluno = alunoSelecionadoFicha;
+    console.log('🔍 Verificando se aluno tem rematrícula:', aluno?.nome);
+    console.log('dataRematricula:', aluno?.dataRematricula);
+    
+    const temRematricula = await verificarSeTemRematricula(aluno);
+    console.log('🎯 Resultado verificação rematrícula:', temRematricula);
+    
+    if (temRematricula) {
+      console.log('✅ Tem rematrícula - abrindo diálogo de seleção');
+      // Tem rematrícula - abrir diálogo de seleção
+      const matriculas = await buscarMatriculasDisponiveis(aluno);
+      console.log('📋 Matrículas disponíveis:', matriculas);
+      setMatriculasDisponiveis(matriculas);
+      setSelecaoContratoOpen(true);
+    } else {
+      console.log('❌ Não tem rematrícula - abrindo contrato normal');
+      // Não tem rematrícula - abrir contrato normal
+      setContratoOpen(true);
+    }
+    
+    console.groupEnd();
   };
 
   const handleFecharContrato = () => {
     setContratoOpen(false);
+    setAlunoSelecionadoFicha(null);
+  };
+
+  // Função para fechar diálogo de seleção de contrato
+  const handleFecharSelecaoContrato = () => {
+    setSelecaoContratoOpen(false);
+    setMatriculasDisponiveis([]);
+    setContratoSelecionado(null);
     setAlunoSelecionadoFicha(null);
   };
 
@@ -2007,7 +2245,7 @@ const Alunos = () => {
     <div className="dashboard-container">
       <SidebarMenu />
       <main className="dashboard-main">
-        <Box sx={{ maxWidth: 700, mx: 'auto', mt: 4 }}>
+        <Box sx={{ width: '100%', px: 3, py: 2 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, p: 3, borderRadius: 3, background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)', color: 'white', boxShadow: '0 8px 32px rgba(99, 102, 241, 0.2)' }}>
             <Typography variant="h4" fontWeight="bold" gutterBottom={false}>👥 Gestão de Alunos</Typography>
             <Box sx={{ display: 'flex', gap: 1 }}>
@@ -3842,7 +4080,7 @@ const Alunos = () => {
                         <Button
                           variant="outlined"
                           fullWidth
-                          onClick={handleAbrirContrato}
+                          onClick={() => handleAbrirContrato()}
                           sx={{
                             py: 2,
                             borderColor: '#6366f1',
@@ -3979,6 +4217,94 @@ const Alunos = () => {
                       handleAbrirRematricula(aluno);
                     }}
                   />
+
+                  {/* Dialog Seleção de Contrato */}
+                  <Dialog
+                    open={selecaoContratoOpen}
+                    onClose={() => {
+                      setSelecaoContratoOpen(false);
+                      setMatriculasDisponiveis([]);
+                      setContratoSelecionado(null);
+                    }}
+                    maxWidth="md"
+                    fullWidth
+                  >
+                    <DialogTitle>
+                      <Typography variant="h6" component="div" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Print /> Selecionar Contrato para Impressão
+                      </Typography>
+                    </DialogTitle>
+                    <DialogContent>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                        Este aluno possui múltiplas matrículas. Selecione qual contrato deseja imprimir:
+                      </Typography>
+                      
+                      <Box sx={{ mt: 2 }}>
+                        {matriculasDisponiveis.map((matricula, index) => (
+                          <Card 
+                            key={index}
+                            variant={contratoSelecionado === matricula ? "outlined" : "elevation"}
+                            sx={{ 
+                              mb: 2, 
+                              cursor: 'pointer',
+                              border: contratoSelecionado === matricula ? '2px solid #1976d2' : '1px solid #e0e0e0',
+                              backgroundColor: contratoSelecionado === matricula ? '#f3f8ff' : 'inherit',
+                              '&:hover': {
+                                backgroundColor: contratoSelecionado === matricula ? '#f3f8ff' : '#f5f5f5'
+                              }
+                            }}
+                            onClick={() => setContratoSelecionado(matricula)}
+                          >
+                            <CardContent>
+                              <Typography variant="h6" color="primary" sx={{ mb: 1 }}>
+                                {matricula.isCurrent ? 'REMATRÍCULA ATUAL' : `MATRÍCULA ${matricula.ano || new Date(matricula.dataMatricula).getFullYear()}`}
+                              </Typography>
+                              <Typography variant="body2" color="text.secondary">
+                                <strong>Data:</strong> {new Date(matricula.dataMatricula).toLocaleDateString('pt-BR')}
+                              </Typography>
+                              <Typography variant="body2" color="text.secondary">
+                                <strong>Turma:</strong> {matricula.nomeTurma || matricula.nometurma || 'Não informado'}
+                              </Typography>
+                              <Typography variant="body2" color="text.secondary">
+                                <strong>Status:</strong> {matricula.isCurrent ? 'Ativa (Rematrícula)' : 'Histórica'}
+                              </Typography>
+                              {matricula.valorMensalidade && (
+                                <Typography variant="body2" color="text.secondary">
+                                  <strong>Mensalidade:</strong> R$ {parseFloat(matricula.valorMensalidade).toFixed(2)}
+                                </Typography>
+                              )}
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </Box>
+                    </DialogContent>
+                    <DialogActions>
+                      <Button 
+                        onClick={() => {
+                          setSelecaoContratoOpen(false);
+                          setMatriculasDisponiveis([]);
+                          setContratoSelecionado(null);
+                        }}
+                      >
+                        Cancelar
+                      </Button>
+                      <Button 
+                        variant="contained"
+                        disabled={!contratoSelecionado}
+                        onClick={() => {
+                          if (contratoSelecionado) {
+                            handleAbrirContrato(contratoSelecionado);
+                            setSelecaoContratoOpen(false);
+                            setMatriculasDisponiveis([]);
+                            setContratoSelecionado(null);
+                          }
+                        }}
+                        startIcon={<Print />}
+                      >
+                        Imprimir Contrato Selecionado
+                      </Button>
+                    </DialogActions>
+                  </Dialog>
                 </>
               )}
             </CardContent>

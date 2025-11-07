@@ -313,7 +313,8 @@ const Dashboard = () => {
             id,
             titulo: aviso.titulo || 'Aviso',
             conteudo: aviso.conteudo || aviso.texto || '',
-            dataCreacao: aviso.dataCreacao
+            dataCreacao: aviso.dataCreacao,
+            anexo: aviso.anexo || null
           })).filter(aviso => aviso.ativo !== false); // Filtrar ativos apenas
           
           // Ordenar por data de criação (mais recentes primeiro)
@@ -912,26 +913,109 @@ const Dashboard = () => {
                                     {aviso.titulo}
                                   </Typography>
                                   
-                                  {/* Conteúdo do Aviso */}
-                                  <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
-                                    <Typography 
-                                      variant="body2" 
-                                      color="text.secondary"
-                                      sx={{ 
-                                        fontSize: { xs: '0.85rem', sm: '0.9rem', md: '0.95rem' },
-                                        lineHeight: 1.5,
-                                        flexGrow: 1,
-                                        display: '-webkit-box',
-                                        WebkitLineClamp: { xs: 4, sm: 5, md: 5 },
-                                        WebkitBoxOrient: 'vertical',
-                                        overflow: 'hidden',
-                                        textOverflow: 'ellipsis',
-                                        mb: 1.5
-                                      }}
-                                    >
-                                      {truncateText(aviso.conteudo, 180)}
-                                    </Typography>
-                                  </Box>
+                                  {/* Layout com conteúdo e miniatura lado a lado se houver imagem */}
+                                  {(() => {
+                                    const temAnexo = aviso.anexo && aviso.anexo.trim() !== '';
+                                    const anexoLower = temAnexo ? aviso.anexo.toLowerCase() : '';
+                                    const ehImagem = temAnexo && (
+                                      anexoLower.includes('.jpg') || 
+                                      anexoLower.includes('.jpeg') || 
+                                      anexoLower.includes('.png') || 
+                                      anexoLower.includes('.gif') ||
+                                      anexoLower.includes('.webp') ||
+                                      anexoLower.includes('image%2f') || // URL encoded do Firebase Storage
+                                      anexoLower.includes('image/')
+                                    );
+                                    
+                                    if (ehImagem) {
+                                      // Layout com imagem
+                                      return (
+                                        <Box sx={{ 
+                                          display: 'flex', 
+                                          gap: 1.5,
+                                          flexGrow: 1,
+                                          minHeight: 0
+                                        }}>
+                                          {/* Conteúdo do texto */}
+                                          <Box sx={{ 
+                                            flex: 1,
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            minWidth: 0
+                                          }}>
+                                            <Typography 
+                                              variant="body2" 
+                                              color="text.secondary"
+                                              sx={{ 
+                                                fontSize: { xs: '0.85rem', sm: '0.9rem', md: '0.95rem' },
+                                                lineHeight: 1.5,
+                                                flexGrow: 1,
+                                                display: '-webkit-box',
+                                                WebkitLineClamp: { xs: 4, sm: 5, md: 5 },
+                                                WebkitBoxOrient: 'vertical',
+                                                overflow: 'hidden',
+                                                textOverflow: 'ellipsis',
+                                                mb: 1.5
+                                              }}
+                                            >
+                                              {truncateText(aviso.conteudo, 180)}
+                                            </Typography>
+                                          </Box>
+                                          
+                                          {/* Miniatura da imagem em um quadro menor */}
+                                          <Box 
+                                            sx={{
+                                              width: { xs: 80, sm: 100, md: 110 },
+                                              height: { xs: 80, sm: 100, md: 110 },
+                                              flexShrink: 0,
+                                              borderRadius: 2,
+                                              overflow: 'hidden',
+                                              border: '2px solid #e2e8f0',
+                                              boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                                            }}
+                                          >
+                                            <Box 
+                                              component="img"
+                                              src={aviso.anexo}
+                                              alt="Miniatura do aviso"
+                                              onError={(e) => {
+                                                console.error('❌ Erro ao carregar imagem:', aviso.anexo);
+                                                e.target.parentElement.style.display = 'none';
+                                              }}
+                                              sx={{
+                                                width: '100%',
+                                                height: '100%',
+                                                objectFit: 'cover'
+                                              }}
+                                            />
+                                          </Box>
+                                        </Box>
+                                      );
+                                    } else {
+                                      // Layout sem imagem (apenas texto)
+                                      return (
+                                        <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
+                                          <Typography 
+                                            variant="body2" 
+                                            color="text.secondary"
+                                            sx={{ 
+                                              fontSize: { xs: '0.85rem', sm: '0.9rem', md: '0.95rem' },
+                                              lineHeight: 1.5,
+                                              flexGrow: 1,
+                                              display: '-webkit-box',
+                                              WebkitLineClamp: { xs: 4, sm: 5, md: 5 },
+                                              WebkitBoxOrient: 'vertical',
+                                              overflow: 'hidden',
+                                              textOverflow: 'ellipsis',
+                                              mb: 1.5
+                                            }}
+                                          >
+                                            {truncateText(aviso.conteudo, 180)}
+                                          </Typography>
+                                        </Box>
+                                      );
+                                    }
+                                  })()}
                                   
                                   {/* Footer do card - com mais espaço */}
                                   <Box sx={{ 

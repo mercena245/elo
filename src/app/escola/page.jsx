@@ -1311,29 +1311,57 @@ const Escola = () => {
                               {aviso.conteudo || aviso.texto}
                             </Typography>
 
-                            {/* Anexo se existir */}
+                            {/* Pré-visualização do anexo */}
                             {aviso.anexo && (
-                              <Box sx={{ mb: 2, p: 1, bgcolor: '#f0f9ff', borderRadius: 1, border: '1px solid #bfdbfe' }}>
-                                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                  <AttachFile sx={{ fontSize: 16, color: '#3b82f6', mr: 1 }} />
-                                  <Typography 
-                                    variant="body2" 
-                                    color="primary"
-                                    component="a"
-                                    href={aviso.anexo}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    sx={{ 
-                                      textDecoration: 'none',
-                                      '&:hover': { textDecoration: 'underline' }
+                              <Box sx={{ mb: 2 }}>
+                                {/* Verifica se é uma imagem */}
+                                {(aviso.anexo.toLowerCase().includes('.jpg') || 
+                                  aviso.anexo.toLowerCase().includes('.jpeg') || 
+                                  aviso.anexo.toLowerCase().includes('.png') || 
+                                  aviso.anexo.toLowerCase().includes('.gif') ||
+                                  aviso.anexo.toLowerCase().includes('.webp')) ? (
+                                  <Box 
+                                    component="img"
+                                    src={aviso.anexo}
+                                    alt="Anexo do aviso"
+                                    sx={{
+                                      width: '100%',
+                                      maxHeight: 300,
+                                      objectFit: 'cover',
+                                      borderRadius: 2,
+                                      border: '1px solid #e2e8f0',
+                                      cursor: 'pointer',
+                                      '&:hover': {
+                                        opacity: 0.9
+                                      }
                                     }}
-                                  >
-                                    {aviso.anexo.includes('http') 
-                                      ? 'Link do anexo' 
-                                      : aviso.anexo.split('/').pop()?.split('_').slice(1).join('_') || 'Arquivo anexado'
-                                    }
-                                  </Typography>
-                                </Box>
+                                    onClick={() => window.open(aviso.anexo, '_blank')}
+                                  />
+                                ) : (
+                                  /* Se não é imagem, mostra link do anexo */
+                                  <Box sx={{ p: 1, bgcolor: '#f0f9ff', borderRadius: 1, border: '1px solid #bfdbfe' }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                      <AttachFile sx={{ fontSize: 16, color: '#3b82f6', mr: 1 }} />
+                                      <Typography 
+                                        variant="body2" 
+                                        color="primary"
+                                        component="a"
+                                        href={aviso.anexo}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        sx={{ 
+                                          textDecoration: 'none',
+                                          '&:hover': { textDecoration: 'underline' }
+                                        }}
+                                      >
+                                        {aviso.anexo.includes('http') 
+                                          ? 'Link do anexo' 
+                                          : aviso.anexo.split('/').pop()?.split('_').slice(1).join('_') || 'Arquivo anexado'
+                                        }
+                                      </Typography>
+                                    </Box>
+                                  </Box>
+                                )}
                               </Box>
                             )}                            {/* Informações do aviso */}
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 2, pt: 2, borderTop: '1px solid #e2e8f0' }}>

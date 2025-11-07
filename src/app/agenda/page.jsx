@@ -30,7 +30,8 @@ import {
   Message,
   Warning,
   CheckCircle,
-  Schedule
+  Schedule,
+  CalendarToday
 } from '@mui/icons-material';
 import { auth, onAuthStateChanged } from '../../firebase';
 
@@ -41,6 +42,7 @@ import ComportamentosSection from './components/ComportamentosSection';
 import AvisosEspecificosSection from './components/AvisosEspecificosSection';
 import AutorizacoesSection from './components/AutorizacoesSection';
 import DiarioSection from './components/DiarioSection';
+import CalendarioAcademicoSection from './components/CalendarioAcademicoSection';
 import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
 
 const Agenda = () => {
@@ -115,6 +117,13 @@ const Agenda = () => {
       icon: <MenuBook />,
       badge: resumoNotificacoes.diariosPendentes,
       color: '#06B6D4',
+      roles: ['coordenadora', 'professora', 'pai']
+    },
+    {
+      label: 'Calendário',
+      icon: <CalendarToday />,
+      badge: 0,
+      color: '#8B5CF6',
       roles: ['coordenadora', 'professora', 'pai']
     },
     {
@@ -252,22 +261,25 @@ const Agenda = () => {
               <DiarioSection userRole={userRole} userData={userData} />
             </TabPanel>
             <TabPanel value={activeTab} index={1}>
+              <CalendarioAcademicoSection userRole={userRole} userData={userData} />
+            </TabPanel>
+            <TabPanel value={activeTab} index={2}>
               {userData ? (
                 <MensagensSection userRole={userRole} userData={userData} />
               ) : (
                 <Typography>Carregando dados do usuário...</Typography>
               )}
             </TabPanel>
-            <TabPanel value={activeTab} index={2}>
+            <TabPanel value={activeTab} index={3}>
               <AgendaMedicaSection userRole={userRole} userData={userData} />
             </TabPanel>
-            <TabPanel value={activeTab} index={3}>
+            <TabPanel value={activeTab} index={4}>
               <ComportamentosSection userRole={userRole} userData={userData} />
             </TabPanel>
-            <TabPanel value={activeTab} index={4}>
+            <TabPanel value={activeTab} index={5}>
               <AvisosEspecificosSection userRole={userRole} userData={userData} />
             </TabPanel>
-            <TabPanel value={activeTab} index={5}>
+            <TabPanel value={activeTab} index={6}>
               <AutorizacoesSection userRole={userRole} userData={userData} />
             </TabPanel>
           </Box>

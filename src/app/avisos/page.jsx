@@ -298,6 +298,53 @@ const AvisosPage = () => {
                         {truncateText(aviso.conteudo, 200)}
                       </Typography>
                       
+                      {/* Pré-visualização do anexo (imagem) */}
+                      {aviso.anexo && aviso.anexo.trim() !== '' && (
+                        <Box sx={{ mt: 2 }}>
+                          {/* Verifica se é uma imagem */}
+                          {(aviso.anexo.toLowerCase().includes('.jpg') || 
+                            aviso.anexo.toLowerCase().includes('.jpeg') || 
+                            aviso.anexo.toLowerCase().includes('.png') || 
+                            aviso.anexo.toLowerCase().includes('.gif') ||
+                            aviso.anexo.toLowerCase().includes('.webp')) ? (
+                            <Box 
+                              component="img"
+                              src={aviso.anexo}
+                              alt="Anexo do aviso"
+                              sx={{
+                                width: '100%',
+                                maxHeight: 300,
+                                objectFit: 'cover',
+                                borderRadius: 2,
+                                cursor: 'pointer'
+                              }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenModal(aviso);
+                              }}
+                            />
+                          ) : (
+                            /* Se não é imagem, mostra apenas ícone */
+                            <Box 
+                              sx={{ 
+                                display: 'flex', 
+                                alignItems: 'center',
+                                gap: 1,
+                                p: 1.5,
+                                bgcolor: '#f0f2f5',
+                                borderRadius: 1,
+                                border: '1px solid #e4e6ea'
+                              }}
+                            >
+                              <AttachFile sx={{ color: '#65676b', fontSize: 18 }} />
+                              <Typography variant="body2" sx={{ color: '#65676b' }}>
+                                Documento anexado
+                              </Typography>
+                            </Box>
+                          )}
+                        </Box>
+                      )}
+                      
                       {/* Botão Ver mais */}
                       {aviso.conteudo && aviso.conteudo.length > 200 && (
                         <Typography 
@@ -420,35 +467,76 @@ const AvisosPage = () => {
                   {selectedAviso.conteudo}
                 </Typography>
 
-                {/* Anexo discreto */}
+                {/* Pré-visualização do anexo no modal */}
                 {selectedAviso.anexo && selectedAviso.anexo.trim() !== '' && (
-                  <Box sx={{ 
-                    mt: 3,
-                    pt: 2,
-                    borderTop: '1px solid #e4e6ea',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 1
-                  }}>
-                    <AttachFile sx={{ color: '#1877f2', fontSize: 18 }} />
-                    <Typography variant="body2" sx={{ color: '#65676b', flexGrow: 1 }}>
-                      Anexo disponível
-                    </Typography>
-                    <Button
-                      variant="text"
-                      size="small"
-                      onClick={() => handleDownloadAnexo(selectedAviso.anexo, `anexo_${selectedAviso.titulo}`)}
-                      sx={{
-                        textTransform: 'none',
-                        color: '#1877f2',
-                        fontWeight: 500,
-                        '&:hover': {
-                          backgroundColor: 'rgba(24, 119, 242, 0.05)'
-                        }
-                      }}
-                    >
-                      Visualizar anexo
-                    </Button>
+                  <Box sx={{ mt: 3 }}>
+                    {/* Verifica se é uma imagem */}
+                    {(selectedAviso.anexo.toLowerCase().includes('.jpg') || 
+                      selectedAviso.anexo.toLowerCase().includes('.jpeg') || 
+                      selectedAviso.anexo.toLowerCase().includes('.png') || 
+                      selectedAviso.anexo.toLowerCase().includes('.gif') ||
+                      selectedAviso.anexo.toLowerCase().includes('.webp')) ? (
+                      <Box>
+                        <Box 
+                          component="img"
+                          src={selectedAviso.anexo}
+                          alt="Anexo do aviso"
+                          sx={{
+                            width: '100%',
+                            maxHeight: 500,
+                            objectFit: 'contain',
+                            borderRadius: 2,
+                            border: '1px solid #e4e6ea'
+                          }}
+                        />
+                        <Button
+                          variant="text"
+                          size="small"
+                          onClick={() => handleDownloadAnexo(selectedAviso.anexo, `anexo_${selectedAviso.titulo}`)}
+                          sx={{
+                            mt: 2,
+                            textTransform: 'none',
+                            color: '#1877f2',
+                            fontWeight: 500,
+                            '&:hover': {
+                              backgroundColor: 'rgba(24, 119, 242, 0.05)'
+                            }
+                          }}
+                        >
+                          <Download sx={{ fontSize: 18, mr: 0.5 }} />
+                          Baixar imagem
+                        </Button>
+                      </Box>
+                    ) : (
+                      /* Se não é imagem, mostra o link discreto */
+                      <Box sx={{ 
+                        pt: 2,
+                        borderTop: '1px solid #e4e6ea',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1
+                      }}>
+                        <AttachFile sx={{ color: '#1877f2', fontSize: 18 }} />
+                        <Typography variant="body2" sx={{ color: '#65676b', flexGrow: 1 }}>
+                          Anexo disponível
+                        </Typography>
+                        <Button
+                          variant="text"
+                          size="small"
+                          onClick={() => handleDownloadAnexo(selectedAviso.anexo, `anexo_${selectedAviso.titulo}`)}
+                          sx={{
+                            textTransform: 'none',
+                            color: '#1877f2',
+                            fontWeight: 500,
+                            '&:hover': {
+                              backgroundColor: 'rgba(24, 119, 242, 0.05)'
+                            }
+                          }}
+                        >
+                          Visualizar anexo
+                        </Button>
+                      </Box>
+                    )}
                   </Box>
                 )}
               </DialogContent>

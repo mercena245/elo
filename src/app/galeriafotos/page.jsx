@@ -116,6 +116,22 @@ export default function GaleriaFotos() {
       const fotosData = await getData('fotos');
       if (fotosData) {
         const lista = Object.entries(fotosData).map(([id, f]) => ({ id, ...f }));
+        
+        // Ordenar por data de envio (mais novas primeiro)
+        lista.sort((a, b) => {
+          const dataA = new Date(a.dataEnvio || a.timestamp || 0);
+          const dataB = new Date(b.dataEnvio || b.timestamp || 0);
+          return dataB - dataA; // Ordem decrescente (mais novas primeiro)
+        });
+        
+        console.log('📅 Fotos ordenadas por data (mais recentes primeiro):', 
+          lista.slice(0, 5).map(f => ({
+            nome: f.nome,
+            dataEnvio: f.dataEnvio,
+            timestamp: f.timestamp
+          }))
+        );
+        
         setFotos(lista);
       } else {
         setFotos([]);

@@ -71,10 +71,13 @@ import {
   School,
   PhotoCamera,
   CheckCircleOutlined,
-  CancelOutlined
+  CancelOutlined,
+  AttachFile,
+  CloudUpload,
+  Delete as DeleteIcon
 } from '@mui/icons-material';
 import { auth, onAuthStateChanged } from '../../firebase';
-import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 
 
 import GeradorMensalidadesDialog from '../../components/GeradorMensalidadesDialog';
@@ -159,6 +162,12 @@ const FinanceiroPage = () => {
   const [comprovanteDialog, setComprovanteDialog] = useState(false);
   const [tituloSelecionado, setTituloSelecionado] = useState(null);
   const [calculoJurosMultaPai, setCalculoJurosMultaPai] = useState(null);
+  
+  // Estados para anexo de boleto/PIX
+  const [anexoBoletoDialog, setAnexoBoletoDialog] = useState(false);
+  const [arquivoSelecionado, setArquivoSelecionado] = useState(null);
+  const [uploadandoAnexo, setUploadandoAnexo] = useState(false);
+  const [tituloParaAnexo, setTituloParaAnexo] = useState(null);
   
   // Estados dos formulários
   const [novoTitulo, setNovoTitulo] = useState({
@@ -1026,6 +1035,129 @@ const FinanceiroPage = () => {
     } catch (error) {
       console.error('Erro ao aprovar pagamento:', error);
       showFeedback('error', 'Erro na Aprovação', 'Erro ao aprovar pagamento. Tente novamente.');
+    }
+  };
+
+  // Funções para anexo de boleto/PIX
+  const handleAbrirAnexoBoleto = (titulo) => {
+    setTituloParaAnexo(titulo);
+    setArquivoSelecionado(null);
+    setAnexoBoletoDialog(true);
+  };
+
+  const handleArquivoSelecionado = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      // Validar tipo de arquivo
+      const tiposPermitidos = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
+      if (!tiposPermitidos.includes(file.type)) {
+        showFeedback('error', 'Arquivo Inválido', 'Tipo de arquivo não permitido. Use apenas JPG, PNG ou PDF.');
+        event.target.value = '';
+        return;
+      }
+
+      // Validar tamanho (máximo 5MB)
+      const tamanhoMaximo = 5 * 1024 * 1024; // 5MB
+      if (file.size > tamanhoMaximo) {
+        showFeedback('error', 'Arquivo Muito Grande', 'Arquivo muito grande. O tamanho máximo é 5MB.');
+        event.target.value = '';
+        return;
+      }
+
+      setArquivoSelecionado(file);
+    }
+  };
+
+  const handleUploadAnexoBoleto = async () => {
+    if (!arquivoSelecionado || !tituloParaAnexo) {
+      showFeedback('error', 'Arquivo Necessário', 'Por favor, selecione um arquivo.');
+      return;
+    }
+
+    setUploadandoAnexo(true);
+
+    try {
+      // Upload do arquivo para Firebase Storage
+      const timestamp = Date.now();
+      const fileName = `${timestamp}_${arquivoSelecionado.name}`;
+      const boletoRef = storageRef(schoolStorage._storage, `boletos_pix/${tituloParaAnexo.id}/${fileName}`);
+      
+      console.log('📤 Iniciando upload do boleto/PIX...');
+      await uploadBytes(boletoRef, arquivoSelecionado);
+      
+      // Obter URL de download
+      const boletoUrl = await getDownloadURL(boletoRef);
+      console.log('✅ Boleto/PIX enviado com sucesso:', boletoUrl);
+
+      // Atualizar título com o anexo
+      const tituloAtualizado = {
+        ...tituloParaAnexo,
+        anexoBoleto: {
+          url: boletoUrl,
+          nome: arquivoSelecionado.name,
+          dataUpload: new Date().toISOString(),
+          uploadPor: userId
+        },
+        updatedAt: new Date().toISOString()
+      };
+
+      await setData(`titulos_financeiros/${tituloParaAnexo.id}`, tituloAtualizado);
+
+      // Log da ação
+      await auditService.auditService?.logAction('boleto_anexado', userId, {
+        entityId: tituloParaAnexo.id,
+        description: `Boleto/PIX anexado ao título: ${tituloParaAnexo.descricao}`,
+        changes: { anexoBoleto: true }
+      });
+
+      setAnexoBoletoDialog(false);
+      setArquivoSelecionado(null);
+      setTituloParaAnexo(null);
+      fetchTitulos();
+      showFeedback('success', 'Boleto/PIX Anexado', 'Boleto/PIX anexado com sucesso!');
+      
+    } catch (error) {
+      console.error('Erro ao anexar boleto/PIX:', error);
+      showFeedback('error', 'Erro no Upload', 'Erro ao anexar boleto/PIX. Tente novamente.');
+    } finally {
+      setUploadandoAnexo(false);
+    }
+  };
+
+  const handleRemoverAnexoBoleto = async (titulo) => {
+    if (!confirm('Deseja realmente remover este boleto/PIX?')) {
+      return;
+    }
+
+    try {
+      // Remover arquivo do Storage
+      if (titulo.anexoBoleto?.url) {
+        const fileRef = storageRef(schoolStorage._storage, titulo.anexoBoleto.url);
+        await deleteObject(fileRef).catch(err => console.log('Arquivo já removido:', err));
+      }
+
+      // Atualizar título removendo o anexo
+      const tituloAtualizado = {
+        ...titulo,
+        anexoBoleto: null,
+        updatedAt: new Date().toISOString()
+      };
+
+      await setData(`titulos_financeiros/${titulo.id}`, tituloAtualizado);
+
+      // Log da ação
+      await auditService.auditService?.logAction('boleto_removido', userId, {
+        entityId: titulo.id,
+        description: `Boleto/PIX removido do título: ${titulo.descricao}`,
+        changes: { anexoBoleto: null }
+      });
+
+      fetchTitulos();
+      showFeedback('success', 'Boleto/PIX Removido', 'Boleto/PIX removido com sucesso!');
+      
+    } catch (error) {
+      console.error('Erro ao remover boleto/PIX:', error);
+      showFeedback('error', 'Erro na Remoção', 'Erro ao remover boleto/PIX. Tente novamente.');
     }
   };
 
@@ -2735,18 +2867,69 @@ const FinanceiroPage = () => {
                                             <Visibility />
                                           </IconButton>
                                         </Tooltip>
+                                        
+                                        {/* Botão para anexar boleto/PIX */}
+                                        {!titulo.anexoBoleto ? (
+                                          <Tooltip title="Anexar Boleto/PIX">
+                                            <IconButton 
+                                              size="small"
+                                              onClick={() => handleAbrirAnexoBoleto(titulo)}
+                                              color="secondary"
+                                            >
+                                              <CloudUpload />
+                                            </IconButton>
+                                          </Tooltip>
+                                        ) : (
+                                          <Box sx={{ display: 'flex', gap: 0.5 }}>
+                                            <Tooltip title="Ver Boleto/PIX">
+                                              <IconButton 
+                                                size="small"
+                                                onClick={() => window.open(titulo.anexoBoleto.url, '_blank')}
+                                                color="success"
+                                              >
+                                                <AttachFile />
+                                              </IconButton>
+                                            </Tooltip>
+                                            <Tooltip title="Remover Boleto/PIX">
+                                              <IconButton 
+                                                size="small"
+                                                onClick={() => handleRemoverAnexoBoleto(titulo)}
+                                                color="error"
+                                              >
+                                                <DeleteIcon />
+                                              </IconButton>
+                                            </Tooltip>
+                                          </Box>
+                                        )}
                                       </>
                                     )}
-                                    {isPai() && titulo.status === 'pendente' && (
-                                      <Tooltip title="Pagar">
-                                        <IconButton
-                                          onClick={() => abrirDialogPagamento(titulo)}
-                                          color="primary"
-                                          size="small"
-                                        >
-                                          <Payment />
-                                        </IconButton>
-                                      </Tooltip>
+                                    {isPai() && (
+                                      <>
+                                        {titulo.status === 'pendente' && (
+                                          <Tooltip title="Pagar">
+                                            <IconButton
+                                              onClick={() => abrirDialogPagamento(titulo)}
+                                              color="primary"
+                                              size="small"
+                                            >
+                                              <Payment />
+                                            </IconButton>
+                                          </Tooltip>
+                                        )}
+                                        
+                                        {/* Mostrar boleto/PIX para o pai se existir */}
+                                        {titulo.anexoBoleto && (
+                                          <Tooltip title="Ver Boleto/PIX">
+                                            <IconButton 
+                                              size="small"
+                                              onClick={() => window.open(titulo.anexoBoleto.url, '_blank')}
+                                              color="success"
+                                            >
+                                              <AttachFile />
+                                            </IconButton>
+                                          </Tooltip>
+                                        )}
+                                      </>
                                     )}
                                   </Box>
                                 </TableCell>
@@ -4909,6 +5092,100 @@ const FinanceiroPage = () => {
                 </Button>
               </>
             )}
+          </DialogActions>
+        </Dialog>
+
+        {/* Dialog Anexar Boleto/PIX */}
+        <Dialog 
+          open={anexoBoletoDialog} 
+          onClose={() => {
+            setAnexoBoletoDialog(false);
+            setArquivoSelecionado(null);
+            setTituloParaAnexo(null);
+          }} 
+          maxWidth="sm" 
+          fullWidth
+        >
+          <DialogTitle>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <CloudUpload color="primary" />
+              <Typography variant="h6">Anexar Boleto/PIX</Typography>
+            </Box>
+          </DialogTitle>
+          <DialogContent>
+            <Box sx={{ mt: 2 }}>
+              <Alert severity="info" sx={{ mb: 3 }}>
+                Anexe o boleto ou QR Code PIX para este título. O arquivo ficará visível para o responsável financeiro do aluno.
+              </Alert>
+
+              {tituloParaAnexo && (
+                <Box sx={{ mb: 3, p: 2, bgcolor: 'grey.50', borderRadius: 2 }}>
+                  <Typography variant="subtitle2" color="text.secondary">
+                    Título:
+                  </Typography>
+                  <Typography variant="body1" fontWeight="bold">
+                    {tituloParaAnexo.descricao}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Aluno: {alunos.find(a => a.id === tituloParaAnexo.alunoId)?.nome}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Valor: {formatCurrency(tituloParaAnexo.valor)}
+                  </Typography>
+                </Box>
+              )}
+
+              <Button
+                variant="outlined"
+                component="label"
+                fullWidth
+                startIcon={<AttachFile />}
+                sx={{ mb: 2 }}
+              >
+                Selecionar Arquivo
+                <input
+                  type="file"
+                  hidden
+                  accept="image/*,.pdf"
+                  onChange={handleArquivoSelecionado}
+                />
+              </Button>
+
+              {arquivoSelecionado && (
+                <Alert severity="success" sx={{ mb: 2 }}>
+                  <Typography variant="body2">
+                    <strong>Arquivo selecionado:</strong> {arquivoSelecionado.name}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    Tamanho: {(arquivoSelecionado.size / 1024).toFixed(2)} KB
+                  </Typography>
+                </Alert>
+              )}
+
+              <Typography variant="caption" color="text.secondary">
+                Formatos aceitos: JPG, PNG, PDF (máx. 5MB)
+              </Typography>
+            </Box>
+          </DialogContent>
+          <DialogActions>
+            <Button 
+              onClick={() => {
+                setAnexoBoletoDialog(false);
+                setArquivoSelecionado(null);
+                setTituloParaAnexo(null);
+              }}
+              disabled={uploadandoAnexo}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleUploadAnexoBoleto}
+              variant="contained"
+              disabled={!arquivoSelecionado || uploadandoAnexo}
+              startIcon={uploadandoAnexo ? <CircularProgress size={20} /> : <CloudUpload />}
+            >
+              {uploadandoAnexo ? 'Anexando...' : 'Anexar'}
+            </Button>
           </DialogActions>
         </Dialog>
 

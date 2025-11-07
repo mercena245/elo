@@ -47,7 +47,16 @@ const ContratoAlunoNovo = ({ aluno, database, getData, onClose }) => {
   // Gerar contrato quando dados estiverem disponíveis
   useEffect(() => {
     if (!carregando && aluno && (configEscola.nomeEscola || configEscola.nome)) {
-      console.log('🎨 [Contrato] Gerando contrato com dados:', { aluno, configEscola });
+      console.group('🎨 [Contrato] Gerando contrato');
+      console.log('Dados do aluno:', aluno);
+      console.log('Dados da escola:', configEscola);
+      console.log('Período letivo:', aluno.periodoLetivo);
+      console.log('Turma Info:', aluno.turmaInfo);
+      console.log('Data rematrícula:', aluno.dataRematricula);
+      console.log('Turma ID:', aluno.turmaId);
+      console.log('Nome turma:', aluno.nomeTurma);
+      console.groupEnd();
+      
       const html = gerarContratoHtml();
       setContratoHtml(html);
       console.log('✅ [Contrato] HTML gerado com sucesso');
@@ -180,13 +189,42 @@ const ContratoAlunoNovo = ({ aluno, database, getData, onClose }) => {
   };
 
   const obterAnoLetivo = () => {
+    // Primeira prioridade: período letivo da turma selecionada
+    if (aluno.periodoLetivo?.ano) {
+      console.log('📅 [Contrato] Usando ano do período letivo da turma:', aluno.periodoLetivo.ano);
+      return aluno.periodoLetivo.ano;
+    }
+
+    // Segunda prioridade: extrair ano do ID do período da turma
+    if (aluno.turmaInfo?.periodoId) {
+      const match = aluno.turmaInfo.periodoId.match(/^(\d{4})/);
+      if (match) {
+        const anoPeriodo = parseInt(match[1]);
+        console.log('📅 [Contrato] Usando ano extraído do periodoId:', anoPeriodo);
+        return anoPeriodo;
+      }
+    }
+
+    // Terceira prioridade: ano baseado na data da matrícula/rematrícula
+    if (aluno.dataRematricula) {
+      const anoRematricula = new Date(aluno.dataRematricula).getFullYear();
+      console.log('📅 [Contrato] Usando ano da rematrícula:', anoRematricula);
+      return anoRematricula;
+    }
+
+    // Quarta prioridade: dados financeiros
     if (aluno.financeiro?.dataInicioCompetencia) {
       const data = parseData(aluno.financeiro.dataInicioCompetencia);
       if (data && !isNaN(data.getTime())) {
+        console.log('📅 [Contrato] Usando ano dos dados financeiros:', data.getFullYear());
         return data.getFullYear();
       }
     }
-    return new Date().getFullYear();
+
+    // Última opção: ano atual
+    const anoAtual = new Date().getFullYear();
+    console.log('📅 [Contrato] Usando ano atual (fallback):', anoAtual);
+    return anoAtual;
   };
 
   const obterCidadeEscola = () => {
@@ -240,7 +278,7 @@ const ContratoAlunoNovo = ({ aluno, database, getData, onClose }) => {
   const gerarContratoHtml = () => {
     console.log('🎨 [gerarContratoHtml] Iniciando geração do contrato...');
     console.log('📋 [gerarContratoHtml] Aluno:', aluno?.nome);
-    console.log('🏫 [gerarContratoHtml] Escola:', configEscola?.nomeEscola);
+    console.log('🏫 [gerarContratoHtml] Escola:', configEscola?.nomeEscola || configEscola?.nome);
     
     const respFinanceiro = obterResponsavelFinanceiro();
     const dataHoje = new Date();

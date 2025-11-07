@@ -376,6 +376,31 @@ const MensagensSection = ({ userRole, userData }) => {
     );
   };
 
+  const responderMensagem = (mensagem) => {
+    // Preencher o modal de nova mensagem com dados da resposta
+    setNovaMensagem({
+      destinatario: mensagem.remetente?.id || '',
+      assunto: `Re: ${mensagem.assunto}`,
+      conteudo: '',
+      anexos: []
+    });
+    setDialogNovaMensagem(true);
+    
+    // Log da abertura de resposta
+    auditService.logAction(
+      LOG_ACTIONS.MESSAGE_REPLY_STARTED,
+      userData?.id,
+      {
+        mensagemOriginalId: mensagem.id,
+        remetente: {
+          id: mensagem.remetente?.id,
+          nome: mensagem.remetente?.nome
+        },
+        assuntoOriginal: mensagem.assunto
+      }
+    );
+  };
+
   const marcarComoLida = async (mensagemId) => {
     if (!isReady || !setData) return;
     
@@ -505,71 +530,78 @@ const MensagensSection = ({ userRole, userData }) => {
 
       <Grid container spacing={3} sx={{ minHeight: '600px' }}>
         {/* Lista de Conversas */}
-        <Grid item xs={12} md={conversaSelecionada ? 4 : 12} lg={conversaSelecionada ? 4 : 12}>
+        <Grid item xs={12}>
           <Card sx={{ 
             height: '600px', 
             display: 'flex', 
             flexDirection: 'column',
             width: '100%',
-            maxWidth: conversaSelecionada ? 'none' : '800px',
-            mx: conversaSelecionada ? 0 : 'auto'
+            maxWidth: '800px',
+            mx: 'auto'
           }}>
             <CardContent sx={{ p: 0, height: '100%', display: 'flex', flexDirection: 'column' }}>
-              {/* Header com Abas */}
-              <Box sx={{ bgcolor: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
-                <Typography variant="h6" sx={{ p: 2, pb: 1 }}>
-                  Conversas
-                </Typography>
-                <Tabs 
-                  value={abaConversas} 
-                  onChange={(e, newValue) => {
-                    const abaAnterior = abaConversas;
-                    setAbaConversas(newValue);
-                    
-                    // Log da mudança de aba
-                    const abas = ['Não Lidas', 'Lidas', 'Enviados'];
-                    auditService.logAction(
-                      LOG_ACTIONS.MESSAGE_FILTER_CHANGED,
-                      userData?.id,
-                      {
-                        filtroAnterior: abas[abaAnterior],
-                        novoFiltro: abas[newValue]
-                      }
-                    );
-                  }}
-                  variant="fullWidth"
-                  sx={{ 
-                    minHeight: 40,
-                    '& .MuiTab-root': { 
+              {/* Painel de Conversas */}
+              <Box sx={{ 
+                width: '100%', 
+                display: 'flex', 
+                flexDirection: 'column',
+                height: '100%'
+              }}>
+                {/* Header com Abas */}
+                <Box sx={{ bgcolor: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
+                  <Typography variant="h6" sx={{ p: 2, pb: 1 }}>
+                    Conversas
+                  </Typography>
+                  <Tabs 
+                    value={abaConversas} 
+                    onChange={(e, newValue) => {
+                      const abaAnterior = abaConversas;
+                      setAbaConversas(newValue);
+                      
+                      // Log da mudança de aba
+                      const abas = ['Não Lidas', 'Lidas', 'Enviados'];
+                      auditService.logAction(
+                        LOG_ACTIONS.MESSAGE_FILTER_CHANGED,
+                        userData?.id,
+                        {
+                          filtroAnterior: abas[abaAnterior],
+                          novoFiltro: abas[newValue]
+                        }
+                      );
+                    }}
+                    variant="fullWidth"
+                    sx={{ 
                       minHeight: 40,
-                      textTransform: 'none',
-                      fontSize: '0.875rem'
-                    }
-                  }}
-                >
-                  <Tab 
-                    icon={<Badge badgeContent={getContadorMensagens().naoLidas} color="error">
-                      <Drafts />
-                    </Badge>}
-                    label="Não Lidas" 
-                    iconPosition="start"
-                  />
-                  <Tab 
-                    icon={<Badge badgeContent={getContadorMensagens().lidas} color="primary">
-                      <Email />
-                    </Badge>}
-                    label="Lidas" 
-                    iconPosition="start"
-                  />
-                  <Tab 
-                    icon={<Badge badgeContent={getContadorMensagens().enviados} color="success">
-                      <Send />
-                    </Badge>}
-                    label="Enviados" 
-                    iconPosition="start"
-                  />
-                </Tabs>
-              </Box>
+                      '& .MuiTab-root': { 
+                        minHeight: 40,
+                        textTransform: 'none',
+                        fontSize: '0.875rem'
+                      }
+                    }}
+                  >
+                    <Tab 
+                      icon={<Badge badgeContent={getContadorMensagens().naoLidas} color="error">
+                        <Drafts />
+                      </Badge>}
+                      label="Não Lidas" 
+                      iconPosition="start"
+                    />
+                    <Tab 
+                      icon={<Badge badgeContent={getContadorMensagens().lidas} color="primary">
+                        <Email />
+                      </Badge>}
+                      label="Lidas" 
+                      iconPosition="start"
+                    />
+                    <Tab 
+                      icon={<Badge badgeContent={getContadorMensagens().enviados} color="success">
+                        <Send />
+                      </Badge>}
+                      label="Enviados" 
+                      iconPosition="start"
+                    />
+                  </Tabs>
+                </Box>
               
               {getConversasFiltradas().length === 0 ? (
                 <Box sx={{ 
@@ -614,7 +646,7 @@ const MensagensSection = ({ userRole, userData }) => {
                     return (
                       <ListItem 
                         key={conversa.id}
-                        button
+                        component="div"
                         selected={conversaSelecionada?.id === conversa.id}
                         onClick={() => {
                           setConversaSelecionada(conversa);
@@ -651,6 +683,7 @@ const MensagensSection = ({ userRole, userData }) => {
                             : 'transparent',
                           fontWeight: isNaoLida ? 600 : 400,
                           borderLeft: isEnviada ? '3px solid #3B82F6' : 'none',
+                          cursor: 'pointer',
                           '&:hover': {
                             backgroundColor: isNaoLida 
                               ? '#fde68a' 
@@ -677,179 +710,60 @@ const MensagensSection = ({ userRole, userData }) => {
                           </Avatar>
                         </Badge>
                       </ListItemAvatar>
-                      <ListItemText
-                        primary={
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <Typography variant="subtitle2" fontWeight={600}>
-                              {isEnviada 
-                                ? `Para: ${conversa.destinatario?.nome}` 
-                                : `De: ${conversa.remetente?.nome}`
-                              }
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary">
-                              {formatarData(conversa.dataEnvio).split(' às ')[0]}
-                            </Typography>
-                          </Box>
-                        }
-                        secondary={
-                          <Box>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <Typography variant="body2" fontWeight={500} color="primary">
-                                {conversa.assunto}
-                              </Typography>
-                              {conversa.anexos && conversa.anexos.length > 0 && (
-                                <Chip 
-                                  size="small" 
-                                  icon={<AttachFile />} 
-                                  label={conversa.anexos.length}
-                                  sx={{ height: 18, fontSize: '0.6rem' }}
-                                />
-                              )}
-                            </Box>
-                            <Typography 
-                              variant="body2" 
-                              color="text.secondary"
-                              sx={{
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                whiteSpace: 'nowrap'
-                              }}
-                            >
-                              {conversa.conteudo}
-                            </Typography>
-                          </Box>
-                        }
-                      />
+                      <Box sx={{ flex: 1, minWidth: 0, ml: 2 }}>
+                        {/* Header da conversa */}
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+                          <Typography variant="subtitle2" fontWeight={600} component="div">
+                            {isEnviada 
+                              ? `Para: ${conversa.destinatario?.nome}` 
+                              : `De: ${conversa.remetente?.nome}`
+                            }
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary" component="span">
+                            {formatarData(conversa.dataEnvio).split(' às ')[0]}
+                          </Typography>
+                        </Box>
+                        
+                        {/* Assunto e anexos */}
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                          <Typography variant="body2" fontWeight={500} color="primary" component="div">
+                            {conversa.assunto}
+                          </Typography>
+                          {conversa.anexos && conversa.anexos.length > 0 && (
+                            <Chip 
+                              size="small" 
+                              icon={<AttachFile />} 
+                              label={conversa.anexos.length}
+                              sx={{ height: 18, fontSize: '0.6rem' }}
+                            />
+                          )}
+                        </Box>
+                        
+                        {/* Conteúdo */}
+                        <Typography 
+                          variant="body2" 
+                          color="text.secondary"
+                          component="div"
+                          sx={{
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          {conversa.conteudo}
+                        </Typography>
+                      </Box>
                     </ListItem>
                     );
                   })}
                 </List>
               )}
+              </Box>
             </CardContent>
           </Card>
         </Grid>
 
-        {/* Visualizador de Conversa */}
-        {false && conversaSelecionada && (
-          <Grid item xs={12} md={8} lg={4}>
-          <Card sx={{ height: '600px', display: 'flex', flexDirection: 'column' }}>
-            {conversaSelecionada ? (
-              <>
-                {/* Header da Conversa */}
-                <Box sx={{ p: 2, bgcolor: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                      <Avatar sx={{ bgcolor: getRoleColor(conversaSelecionada.remetente?.role) }}>
-                        {getRoleIcon(conversaSelecionada.remetente?.role)}
-                      </Avatar>
-                      <Box>
-                        <Typography variant="h6" fontWeight={600}>
-                          {conversaSelecionada.assunto}
-                        </Typography>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Typography variant="body2" color="text.secondary">
-                            De: {conversaSelecionada.remetente?.nome}
-                          </Typography>
-                          <Chip 
-                            size="small" 
-                            label={conversaSelecionada.remetente?.role}
-                            sx={{ height: 20, fontSize: '0.7rem' }}
-                          />
-                        </Box>
-                      </Box>
-                    </Box>
-                    <Box sx={{ display: 'flex', gap: 1 }}>
-                      <IconButton size="small">
-                        <Reply />
-                      </IconButton>
-                      <IconButton size="small">
-                        <Forward />
-                      </IconButton>
-                    </Box>
-                  </Box>
-                </Box>
 
-                {/* Conteúdo da Mensagem */}
-                <Box sx={{ flex: 1, p: 3, overflow: 'auto' }}>
-                  <Typography variant="body1" sx={{ lineHeight: 1.8, mb: 2 }}>
-                    {conversaSelecionada.conteudo}
-                  </Typography>
-                  
-                  {conversaSelecionada.anexos && conversaSelecionada.anexos.length > 0 && (
-                    <Box sx={{ mt: 2 }}>
-                      <Typography variant="subtitle2" fontWeight={600} gutterBottom>
-                        Anexos ({conversaSelecionada.anexos.length}):
-                      </Typography>
-                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                        {conversaSelecionada.anexos.map((anexo, index) => (
-                          <Chip 
-                            key={index}
-                            label={`${anexo.nome} ${anexo.tamanho ? `(${Math.round(anexo.tamanho / 1024)}KB)` : ''}`}
-                            icon={<AttachFile />}
-                            onClick={() => {
-                              if (anexo.url) {
-                                // Log do download/visualização do anexo
-                                auditService.logAction(
-                                  LOG_ACTIONS.ATTACHMENT_DOWNLOADED,
-                                  userData?.id,
-                                  {
-                                    context: 'mensagem',
-                                    mensagemId: conversaSelecionada.id,
-                                    arquivo: {
-                                      nome: anexo.nome,
-                                      tipo: anexo.tipo,
-                                      tamanho: anexo.tamanho
-                                    },
-                                    remetente: conversaSelecionada.remetente?.nome
-                                  }
-                                );
-                                window.open(anexo.url, '_blank');
-                              } else {
-                                alert('URL do anexo não encontrada');
-                              }
-                            }}
-                            sx={{ 
-                              mr: 1, 
-                              mb: 1,
-                              cursor: 'pointer',
-                              '&:hover': {
-                                backgroundColor: '#e3f2fd'
-                              }
-                            }}
-                            variant="outlined"
-                            color="primary"
-                          />
-                        ))}
-                      </Box>
-                    </Box>
-                  )}
-                </Box>
-
-                {/* Footer com Data */}
-                <Box sx={{ p: 2, bgcolor: '#f8fafc', borderTop: '1px solid #e5e7eb' }}>
-                  <Typography variant="body2" color="text.secondary">
-                    📅 {formatarData(conversaSelecionada.dataEnvio)}
-                  </Typography>
-                </Box>
-              </>
-            ) : (
-              <Box sx={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'center',
-                height: '100%',
-                flexDirection: 'column',
-                color: 'text.secondary'
-              }}>
-                <Drafts sx={{ fontSize: 64, mb: 2 }} />
-                <Typography variant="h6">
-                  Selecione uma conversa para visualizar
-                </Typography>
-              </Box>
-            )}
-          </Card>
-        </Grid>
-        )}
       </Grid>
 
       {/* Dialog Nova Mensagem */}
@@ -859,9 +773,18 @@ const MensagensSection = ({ userRole, userData }) => {
         maxWidth="md"
         fullWidth
       >
-        <DialogTitle>✉️ Nova Mensagem</DialogTitle>
+        <DialogTitle>
+          {novaMensagem.assunto && novaMensagem.assunto.startsWith('Re: ') ? '↩️ Responder Mensagem' : '✉️ Nova Mensagem'}
+        </DialogTitle>
         <DialogContent>
           <Box sx={{ pt: 1 }}>
+            {novaMensagem.assunto && novaMensagem.assunto.startsWith('Re: ') && (
+              <Alert severity="info" sx={{ mb: 2 }}>
+                <Typography variant="body2">
+                  Você está respondendo à mensagem: <strong>{novaMensagem.assunto.replace('Re: ', '')}</strong>
+                </Typography>
+              </Alert>
+            )}
             <FormControl fullWidth sx={{ mb: 2 }}>
               <InputLabel>Destinatário</InputLabel>
               <Select
@@ -951,6 +874,165 @@ const MensagensSection = ({ userRole, userData }) => {
             Enviar
           </Button>
         </DialogActions>
+      </Dialog>
+
+      {/* Dialog Visualizar Mensagem */}
+      <Dialog 
+        open={Boolean(conversaSelecionada)} 
+        onClose={() => setConversaSelecionada(null)}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{
+          sx: {
+            maxHeight: '80vh',
+            height: '600px'
+          }
+        }}
+      >
+        {conversaSelecionada && (
+          <>
+            <DialogTitle sx={{ 
+              p: 0, 
+              background: 'linear-gradient(45deg, #3B82F6, #1D4ED8)',
+              color: 'white'
+            }}>
+              <Box sx={{ p: 3, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.3)' }}>
+                    {getRoleIcon(conversaSelecionada.remetente?.role)}
+                  </Avatar>
+                  <Box>
+                    <Typography variant="h6" fontWeight={600} color="white">
+                      {conversaSelecionada.assunto}
+                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.9)' }}>
+                        De: {conversaSelecionada.remetente?.nome}
+                      </Typography>
+                      <Chip 
+                        size="small" 
+                        label={conversaSelecionada.remetente?.role}
+                        sx={{ 
+                          height: 20, 
+                          fontSize: '0.7rem',
+                          bgcolor: 'rgba(255,255,255,0.2)',
+                          color: 'white'
+                        }}
+                      />
+                    </Box>
+                  </Box>
+                </Box>
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                  <IconButton 
+                    size="small"
+                    onClick={() => {
+                      responderMensagem(conversaSelecionada);
+                      setConversaSelecionada(null);
+                    }}
+                    title="Responder mensagem"
+                    sx={{ color: 'white' }}
+                  >
+                    <Reply />
+                  </IconButton>
+                </Box>
+              </Box>
+            </DialogTitle>
+            
+            <DialogContent sx={{ p: 0, display: 'flex', flexDirection: 'column', height: '100%' }}>
+              {/* Conteúdo da Mensagem */}
+              <Box sx={{ p: 3, flex: 1, overflow: 'auto' }}>
+                <Typography variant="body1" sx={{ lineHeight: 1.8, mb: 2, fontSize: '1rem' }}>
+                  {conversaSelecionada.conteudo}
+                </Typography>
+                
+                {conversaSelecionada.anexos && conversaSelecionada.anexos.length > 0 && (
+                  <Box sx={{ mt: 3, p: 2, bgcolor: '#f8fafc', borderRadius: 2 }}>
+                    <Typography variant="subtitle2" fontWeight={600} gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <AttachFile fontSize="small" />
+                      Anexos ({conversaSelecionada.anexos.length}):
+                    </Typography>
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                      {conversaSelecionada.anexos.map((anexo, index) => (
+                        <Chip 
+                          key={index}
+                          label={`${anexo.nome} ${anexo.tamanho ? `(${Math.round(anexo.tamanho / 1024)}KB)` : ''}`}
+                          icon={<AttachFile />}
+                          onClick={() => {
+                            if (anexo.url) {
+                              // Log do download/visualização do anexo
+                              auditService.logAction(
+                                LOG_ACTIONS.ATTACHMENT_DOWNLOADED,
+                                userData?.id,
+                                {
+                                  context: 'mensagem',
+                                  mensagemId: conversaSelecionada.id,
+                                  arquivo: {
+                                    nome: anexo.nome,
+                                    tipo: anexo.tipo,
+                                    tamanho: anexo.tamanho
+                                  },
+                                  remetente: conversaSelecionada.remetente?.nome
+                                }
+                              );
+                              window.open(anexo.url, '_blank');
+                            } else {
+                              alert('URL do anexo não encontrada');
+                            }
+                          }}
+                          sx={{ 
+                            mr: 1, 
+                            mb: 1,
+                            cursor: 'pointer',
+                            '&:hover': {
+                              backgroundColor: '#e3f2fd'
+                            }
+                          }}
+                          variant="outlined"
+                          color="primary"
+                        />
+                      ))}
+                    </Box>
+                  </Box>
+                )}
+              </Box>
+            </DialogContent>
+            
+            <DialogActions sx={{ 
+              p: 3, 
+              bgcolor: '#f8fafc', 
+              borderTop: '1px solid #e5e7eb',
+              justifyContent: 'space-between'
+            }}>
+              <Typography variant="body2" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Schedule fontSize="small" />
+                {formatarData(conversaSelecionada.dataEnvio)}
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <Button onClick={() => setConversaSelecionada(null)}>
+                  Fechar
+                </Button>
+                {conversaSelecionada.remetente?.id !== userData?.id && (
+                  <Button
+                    variant="contained"
+                    startIcon={<Reply />}
+                    onClick={() => {
+                      responderMensagem(conversaSelecionada);
+                      setConversaSelecionada(null);
+                    }}
+                    sx={{
+                      background: 'linear-gradient(45deg, #3B82F6, #1D4ED8)',
+                      '&:hover': {
+                        background: 'linear-gradient(45deg, #1D4ED8, #1E3A8A)'
+                      }
+                    }}
+                  >
+                    Responder
+                  </Button>
+                )}
+              </Box>
+            </DialogActions>
+          </>
+        )}
       </Dialog>
     </Box>
   );

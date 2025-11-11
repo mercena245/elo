@@ -46,6 +46,7 @@ import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage
 import { auth } from '../../../firebase';
 import { auditService, LOG_ACTIONS } from '../../../services/auditService';
 import { useSchoolDatabase } from '../../../hooks/useSchoolDatabase';
+import MensagensPendentes from './MensagensPendentes/MensagensPendentes';
 
 const MensagensSection = ({ userRole, userData }) => {
   // Hook para acessar banco da escola
@@ -495,12 +496,63 @@ const MensagensSection = ({ userRole, userData }) => {
     }
   };
 
+  const aprovarMensagem = async (mensagemId, mensagemAtual) => {
+    if (!isReady || !setData) return;
+
+    try {
+      await setData(`mensagens/${mensagemId}`, {
+        ...mensagemAtual,
+        statusAprovacao: 'aprovada',
+        aprovadoPor: userData.id,
+        dataAprovacao: new Date().toISOString()
+      });
+
+      await fetchConversas();
+      alert('Mensagem aprovada com sucesso!');
+    } catch (error) {
+      console.error('Erro ao aprovar mensagem:', error);
+      alert('Erro ao aprovar mensagem.');
+    }
+  };
+
+  const rejeitarMensagem = async (mensagemId, mensagemAtual, motivo = '') => {
+    if (!isReady || !setData) return;
+
+    try {
+      await setData(`mensagens/${mensagemId}`, {
+        ...mensagemAtual,
+        statusAprovacao: 'rejeitada',
+        aprovadoPor: userData.id,
+        dataAprovacao: new Date().toISOString(),
+        motivoRejeicao: motivo
+      });
+
+      await fetchConversas();
+      alert('Mensagem rejeitada com sucesso!');
+    } catch (error) {
+      console.error('Erro ao rejeitar mensagem:', error);
+      alert('Erro ao rejeitar mensagem.');
+    }
+  };
+
   if (loading) {
     return <Typography>Carregando mensagens...</Typography>;
   }
 
   return (
     <Box>
+      {userData?.role === 'coordenadora' && (
+        <Box sx={{ mb: 3 }}>
+          <MensagensPendentes
+            userData={userData}
+            conversas={conversas}
+            onAprovar={aprovarMensagem}
+            onRejeitar={rejeitarMensagem}
+            isReady={isReady}
+          />
+        </Box>
+      )}
+
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Typography variant="h5" fontWeight={600}>
           📧 Mensagens

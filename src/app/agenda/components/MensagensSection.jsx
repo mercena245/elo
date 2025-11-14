@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -49,61 +49,50 @@ import { useSchoolDatabase } from '../../../hooks/useSchoolDatabase';
 import MensagensPendentes from './MensagensPendentes/MensagensPendentes';
 
 const MensagensSection = ({ userRole, userData }) => {
-  // Hook para acessar banco da escola
-  const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, storage: schoolStorage } = useSchoolDatabase();
+  const { getData, setData, pushData, updateData, isReady, storage: schoolStorage } = useSchoolDatabase();
+
+  // Salva e lê direto do nó raiz
+  const mensagensPath = 'mensagens';
+  const myId = userData?.id || userData?.uid;
 
   const [conversas, setConversas] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [conversaSelecionada, setConversaSelecionada] = useState(null);
   const [dialogNovaMensagem, setDialogNovaMensagem] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [abaConversas, setAbaConversas] = useState(0); // 0: Não Lidas, 1: Lidas, 2: Enviados
-  const [novaMensagem, setNovaMensagem] = useState({
-    destinatario: '',
-    assunto: '',
-    conteudo: '',
-    anexos: []
-  });
+  const [abaConversas, setAbaConversas] = useState(0);
+  const [novaMensagem, setNovaMensagem] = useState({ destinatario: '', assunto: '', conteudo: '', anexos: [] });
   const [usuarios, setUsuarios] = useState([]);
+  const [feedbackDialog, setFeedbackDialog] = useState({ open: false, titulo: '', mensagem: '', severidade: 'info' });
+  const mounted = useRef(true);
 
   useEffect(() => {
     fetchConversas();
     fetchUsuarios();
   }, [userData, isReady]);
 
-  // Normalizar id do usuário usado nos filtros (evita bug id vs uid)
-  const myId = userData?.id || userData?.uid;
-
+  // ÚNICO fetchConversas (sem filtro; apenas carrega e ordena)
   const fetchConversas = async () => {
     if (!isReady) return;
-    
     try {
-      const dados = await getData('mensagens');
-      
-      if (dados) {
-        const conversasList = Object.entries(dados).map(([id, conversa]) => ({
-          id,
-          ...conversa
-        }));
-        
-        // Filtrar conversas baseado na role
-        const conversasFiltradas = conversasList.filter(conversa => {
-          if (userRole === 'coordenadora') {
-            // coordenadora vê conversas que participa ou que requerem sua aprovação
-            const precisaAprovacao = conversa.coordenadoresParaAprovar?.includes(myId);
-            const participa = conversa.participantes?.includes(myId);
-            return !!(precisaAprovacao || participa);
-          }
-          return conversa.participantes?.includes(myId);
-        });
-        
-        setConversas(conversasFiltradas);
+      const dados = await getData(mensagensPath);
+      if (!dados || typeof dados !== 'object') {
+        if (!conversas.length) setConversas([]);
+        return;
       }
-    } catch (error) {
-      console.error('Erro ao buscar conversas:', error);
+      const list = Object.entries(dados)
+        .map(([id, m]) => ({ id, ...m }))
+        .sort((a, b) => new Date(b?.dataEnvio || 0) - new Date(a?.dataEnvio || 0));
+      setConversas(list);
+    } catch (e) {
+      console.error('Erro ao carregar conversas:', e);
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchConversas();
+  }, [isReady]); // não limpar por mudanças rápidas em props
 
   const fetchUsuarios = async () => {
     if (!isReady) return;
@@ -140,43 +129,69 @@ const MensagensSection = ({ userRole, userData }) => {
     }
   };
 
+  const exibirDialogo = (mensagem, { titulo = 'Aviso', severidade = 'info' } = {}) => {
+    setFeedbackDialog({ open: true, titulo, mensagem, severidade });
+  };
+
+  const fecharDialogoFeedback = () => {
+    setFeedbackDialog(prev => ({ ...prev, open: false }));
+  };
+
   const enviarMensagem = async () => {
     try {
       // Validar se userData existe e tem ID
       if (!userData) {
         console.error('Dados do usuário não encontrados');
-        alert('Erro: Dados do usuário não carregados. Tente novamente.');
+        exibirDialogo('Erro: Dados do usuário não carregados. Tente novamente.', {
+          titulo: 'Erro ao enviar',
+          severidade: 'error'
+        });
         return;
       }
 
       if (!userData.id) {
         console.error('ID do usuário não encontrado:', userData);
-        alert('Erro: ID do usuário não encontrado. Faça login novamente.');
+        exibirDialogo('Erro: ID do usuário não encontrado. Faça login novamente.', {
+          titulo: 'Erro ao enviar',
+          severidade: 'error'
+        });
         return;
       }
 
       // Validar se destinatário foi selecionado
       if (!novaMensagem.destinatario) {
         console.error('Destinatário não selecionado');
-        alert('Por favor, selecione um destinatário.');
+        exibirDialogo('Por favor, selecione um destinatário.', {
+          titulo: 'Aviso',
+          severidade: 'warning'
+        });
         return;
       }
 
       // Validar se assunto e conteúdo foram preenchidos
       if (!novaMensagem.assunto?.trim()) {
-        alert('Por favor, digite um assunto para a mensagem.');
+        exibirDialogo('Por favor, digite um assunto para a mensagem.', {
+          titulo: 'Aviso',
+          severidade: 'warning'
+        });
         return;
       }
 
       if (!novaMensagem.conteudo?.trim()) {
-        alert('Por favor, digite o conteúdo da mensagem.');
+        exibirDialogo('Por favor, digite o conteúdo da mensagem.', {
+          titulo: 'Aviso',
+          severidade: 'warning'
+        });
         return;
       }
 
       // Validar banco de dados pronto
       if (!isReady || !pushData) {
         console.error('Banco de dados não está pronto', { isReady, pushData });
-        alert('Erro: Banco de dados não está pronto. Tente novamente.');
+        exibirDialogo('Erro: Banco de dados não está pronto. Tente novamente.', {
+          titulo: 'Erro ao enviar',
+          severidade: 'error'
+        });
         return;
       }
 
@@ -189,7 +204,10 @@ const MensagensSection = ({ userRole, userData }) => {
       
       if (!destinatarioData) {
         console.error('Dados do destinatário não encontrados');
-        alert('Erro ao encontrar destinatário. Tente novamente.');
+        exibirDialogo('Erro ao encontrar destinatário. Tente novamente.', {
+          titulo: 'Erro ao enviar',
+          severidade: 'error'
+        });
         return;
       }
 
@@ -230,20 +248,22 @@ const MensagensSection = ({ userRole, userData }) => {
       };
 
       console.log('📤 Preparando para enviar mensagem:', mensagemData);
+      console.log('📍 Path de salvamento:', mensagensPath);
 
       let mensagemId;
       try {
-        mensagemId = await pushData('mensagens', mensagemData);
+        mensagemId = await pushData(mensagensPath, mensagemData);
         console.log('✅ Mensagem salva com ID:', mensagemId);
+        console.log('✅ Path completo:', `${mensagensPath}/${mensagemId}`);
       } catch (pushError) {
-        console.error('❌ Erro ao fazer pushData:', pushError);
-        throw new Error(`Erro ao salvar mensagem: ${pushError.message}`);
+        console.error('❌ Erro ao salvar mensagem:', pushError);
+        exibirDialogo(`Erro ao salvar mensagem: ${pushError.message}`, {
+          titulo: 'Erro ao enviar',
+          severidade: 'error'
+        });
+        return;
       }
 
-      if (!mensagemId) {
-        throw new Error('pushData não retornou um ID válido');
-      }
-      
       // Log do envio de mensagem
       await auditService.logAction(
         LOG_ACTIONS.MESSAGE_SENT,
@@ -263,20 +283,27 @@ const MensagensSection = ({ userRole, userData }) => {
         }
       );
       
-      // ✅ Mostrar mensagem informativa
       if (precisaAprovacao) {
-        alert('Mensagem enviada! ⏳ Aguardando aprovação da coordenação antes de ser entregue.');
+        exibirDialogo('Mensagem aguardando aprovação da coordenação para ser entregue.', {
+          titulo: 'Mensagem pendente',
+          severidade: 'warning'
+        });
       } else {
-        alert('Mensagem enviada com sucesso!');
+        exibirDialogo('Mensagem enviada com sucesso!', {
+          titulo: 'Mensagem enviada',
+          severidade: 'success'
+        });
       }
       
-      console.log('🔄 Recarregando conversas...');
       fecharDialogNovaMensagem();
-      await fetchConversas();
-      console.log('✅ Conversas recarregadas');
+      
+      // Aguardar um pouco antes de recarregar para garantir persistência
+      setTimeout(() => {
+        fetchConversas();
+      }, 500);
+      
     } catch (error) {
-      console.error('❌ Erro ao enviar mensagem:', error);
-      alert(`Erro ao enviar mensagem: ${error.message}`);
+      console.error('Erro ao enviar mensagem:', error);
       
       // Log do erro
       await auditService.logAction(
@@ -284,7 +311,6 @@ const MensagensSection = ({ userRole, userData }) => {
         userData?.id,
         {
           erro: error.message,
-          stack: error.stack,
           destinatario: typeof novaMensagem.destinatario === 'string' ? novaMensagem.destinatario : novaMensagem.destinatario?.nome,
           assunto: novaMensagem.assunto
         }
@@ -322,12 +348,18 @@ const MensagensSection = ({ userRole, userData }) => {
     console.log('Auth currentUser:', auth.currentUser);
 
     if (!userData || !userData.id) {
-      alert('Erro: Dados do usuário não encontrados. Faça login novamente.');
+      exibirDialogo('Erro: Dados do usuário não encontrados. Faça login novamente.', {
+        titulo: 'Erro ao enviar',
+        severidade: 'error'
+      });
       return;
     }
 
     if (!auth.currentUser) {
-      alert('Erro: Usuário não está autenticado. Faça login novamente.');
+      exibirDialogo('Erro: Usuário não está autenticado. Faça login novamente.', {
+        titulo: 'Erro ao enviar',
+        severidade: 'error'
+      });
       return;
     }
 
@@ -393,7 +425,10 @@ const MensagensSection = ({ userRole, userData }) => {
       console.log('Anexos adicionados ao estado:', anexosUpload);
     } catch (error) {
       console.error('Erro detalhado ao fazer upload dos anexos:', error);
-      alert(`Erro ao anexar arquivo(s): ${error.message}`);
+      exibirDialogo(`Erro ao anexar arquivo(s): ${error.message}`, {
+        titulo: 'Erro ao enviar',
+        severidade: 'error'
+      });
       
       // Log do erro no upload
       await auditService.logAction(
@@ -464,7 +499,7 @@ const MensagensSection = ({ userRole, userData }) => {
     if (!isReady || !setData) return;
     
     try {
-      await setData(`mensagens/${mensagemId}`, { ...conversaSelecionada, lida: true });
+      await setData(`${mensagensPath}/${mensagemId}`, { ...conversaSelecionada, lida: true });
       
       // Atualizar o estado local
       setConversas(prev => prev.map(conv => 
@@ -591,7 +626,7 @@ const MensagensSection = ({ userRole, userData }) => {
     if (!isReady || !setData) return;
 
     try {
-      await setData(`mensagens/${mensagemId}`, {
+      await setData(`${mensagensPath}/${mensagemId}`, {
         ...mensagemAtual,
         statusAprovacao: 'aprovada',
         aprovadoPor: userData.id,
@@ -599,10 +634,16 @@ const MensagensSection = ({ userRole, userData }) => {
       });
 
       await fetchConversas();
-      alert('Mensagem aprovada com sucesso!');
+      exibirDialogo('Mensagem aprovada com sucesso!', {
+        titulo: 'Sucesso',
+        severidade: 'success'
+      });
     } catch (error) {
       console.error('Erro ao aprovar mensagem:', error);
-      alert('Erro ao aprovar mensagem.');
+      exibirDialogo('Erro ao aprovar mensagem.', {
+        titulo: 'Erro',
+        severidade: 'error'
+      });
     }
   };
 
@@ -610,7 +651,7 @@ const MensagensSection = ({ userRole, userData }) => {
     if (!isReady || !setData) return;
 
     try {
-      await setData(`mensagens/${mensagemId}`, {
+      await setData(`${mensagensPath}/${mensagemId}`, {
         ...mensagemAtual,
         statusAprovacao: 'rejeitada',
         aprovadoPor: userData.id,
@@ -619,10 +660,16 @@ const MensagensSection = ({ userRole, userData }) => {
       });
 
       await fetchConversas();
-      alert('Mensagem rejeitada com sucesso!');
+      exibirDialogo('Mensagem rejeitada com sucesso!', {
+        titulo: 'Sucesso',
+        severidade: 'success'
+      });
     } catch (error) {
       console.error('Erro ao rejeitar mensagem:', error);
-      alert('Erro ao rejeitar mensagem.');
+      exibirDialogo('Erro ao rejeitar mensagem.', {
+        titulo: 'Erro',
+        severidade: 'error'
+      });
     }
   };
 
@@ -1119,7 +1166,10 @@ const MensagensSection = ({ userRole, userData }) => {
                               );
                               window.open(anexo.url, '_blank');
                             } else {
-                              alert('URL do anexo não encontrada');
+                              exibirDialogo('URL do anexo não encontrada', {
+                                titulo: 'Erro',
+                                severidade: 'error'
+                              });
                             }
                           }}
                           sx={{ 
@@ -1176,6 +1226,19 @@ const MensagensSection = ({ userRole, userData }) => {
             </DialogActions>
           </>
         )}
+      </Dialog>
+
+      {/* Dialog de feedback (substitui alert) */}
+      <Dialog open={feedbackDialog.open} onClose={fecharDialogoFeedback} maxWidth="xs" fullWidth>
+        <DialogTitle>{feedbackDialog.titulo}</DialogTitle>
+        <DialogContent>
+          <Alert severity={feedbackDialog.severidade}>
+            {feedbackDialog.mensagem}
+          </Alert>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={fecharDialogoFeedback}>Fechar</Button>
+        </DialogActions>
       </Dialog>
     </Box>
   );

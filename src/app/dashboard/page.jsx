@@ -75,7 +75,9 @@ const Dashboard = () => {
   // Hooks para banco de dados da escola
   const { user: authUser, currentSchool } = useAuth();
   const { isReady, isLoading, error, getData, currentSchool: schoolData } = useSchoolDatabase();
-  
+  const currentSchoolId = typeof currentSchool === 'string' ? currentSchool : currentSchool?.id;
+  const mensagensPath = currentSchoolId ? `escolas/${currentSchoolId}/mensagens` : 'mensagens';
+
   const [qtdAlunos, setQtdAlunos] = useState(null);
   const [qtdColaboradores, setQtdColaboradores] = useState(null);
   const [avisos, setAvisos] = useState([]);
@@ -133,10 +135,10 @@ const Dashboard = () => {
   // Monitorar mensagens não lidas
   useEffect(() => {
     const fetchMensagensNaoLidas = async () => {
-      if (!isReady || !getData || !userId) return;
+      if (!isReady || !getData || !userId || !currentSchoolId) return;
 
       try {
-        const mensagensData = await getData('mensagens');
+        const mensagensData = await getData(mensagensPath);
         if (mensagensData) {
           const mensagens = Object.values(mensagensData);
           const naoLidas = mensagens.filter(msg => 
@@ -152,7 +154,7 @@ const Dashboard = () => {
     };
 
     fetchMensagensNaoLidas();
-  }, [isReady, getData, userId]);
+  }, [isReady, getData, userId, currentSchoolId, mensagensPath]);
 
   // Função para obter ações rápidas baseadas na role
   const getQuickActions = () => {
@@ -238,7 +240,8 @@ const Dashboard = () => {
           frequenciaData,
           planosData,
           relatoriosData,
-          titulosData
+          titulosData,
+          mensagensData
         ] = await Promise.all([
           getData('alunos'),
           getData('colaboradores'),
@@ -250,7 +253,8 @@ const Dashboard = () => {
           getData('frequencia'),
           getData('planos-aula'),
           getData('relatorios-pedagogicos'),
-          getData('titulos_financeiros')
+          getData('titulos_financeiros'),
+          getData(mensagensPath)
         ]);
 
         // Processar alunos
@@ -325,16 +329,18 @@ const Dashboard = () => {
         
         // Contar títulos em análise
         if (titulosData) {
-          console.log('🔍 [Dashboard] Dados de títulos:', titulosData);
           const titulosList = Object.values(titulosData);
-          console.log('📋 [Dashboard] Lista de títulos:', titulosList);
-          console.log('🔎 [Dashboard] Status dos títulos:', titulosList.map(t => ({ status: t.status, alunoId: t.alunoId })));
           const emAnalise = titulosList.filter(t => t.status === 'em_analise');
-          console.log('⚠️ [Dashboard] Títulos em análise:', emAnalise.length);
           totalPendenciasCount += emAnalise.length;
         }
         
-        console.log('🎯 [Dashboard] Total de pendências:', totalPendenciasCount);
+        if (mensagensData) {
+          const mensagensPendentes = Object.values(mensagensData).filter(
+            msg => msg.requerAprovacao && msg.statusAprovacao === 'pendente'
+          );
+          totalPendenciasCount += mensagensPendentes.length;
+        }
+
         setTotalPendencias(totalPendenciasCount);
 
         // Processar avisos

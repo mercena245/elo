@@ -34,7 +34,8 @@ import {
   ArrowBack as ArrowBackIcon,
   Description as DescriptionIcon,
   AttachMoney as AttachMoneyIcon,
-  Person as PersonIcon
+  Person as PersonIcon,
+  Mail as MailIcon
 } from '@mui/icons-material';
 import SidebarMenu from '../../components/SidebarMenu';
 import { useAuthUser } from '../../hooks/useAuthUser';
@@ -43,8 +44,10 @@ import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
 const PendenciasPage = () => {
   const router = useRouter();
   const { userRole } = useAuthUser();
-  const { getData, isReady } = useSchoolDatabase();
-  
+  const { getData, isReady, currentSchool } = useSchoolDatabase();
+  const currentSchoolId = typeof currentSchool === 'string' ? currentSchool : currentSchool?.id;
+  const mensagensPath = currentSchoolId ? `escolas/${currentSchoolId}/mensagens` : 'mensagens';
+
   const [loading, setLoading] = useState(true);
   const [planosPendentes, setPlanosPendentes] = useState([]);
   const [relatoriosPendentes, setRelatoriosPendentes] = useState([]);
@@ -55,6 +58,8 @@ const PendenciasPage = () => {
   const [totalPendencias, setTotalPendencias] = useState(0);
   const [totalRelatorios, setTotalRelatorios] = useState(0);
   const [totalTitulos, setTotalTitulos] = useState(0);
+  const [totalMensagensPendentes, setTotalMensagensPendentes] = useState(0);
+  const totalPendenciasPagina = totalPendencias + totalRelatorios + totalTitulos + totalMensagensPendentes;
 
   useEffect(() => {
     // Aguardar até que userRole esteja definido
@@ -65,22 +70,31 @@ const PendenciasPage = () => {
       return;
     }
 
-    if (isReady) {
+    if (isReady && currentSchoolId) {
       carregarPendencias();
     }
-  }, [isReady, userRole, router]);
+  }, [isReady, userRole, currentSchoolId, router]);
 
   const carregarPendencias = async () => {
     try {
       setLoading(true);
 
-      const [planosData, relatoriosData, titulosData, turmasData, disciplinasData, alunosData] = await Promise.all([
+      const [
+        planosData,
+        relatoriosData,
+        titulosData,
+        turmasData,
+        disciplinasData,
+        alunosData,
+        mensagensData
+      ] = await Promise.all([
         getData('planos-aula'),
         getData('relatorios-pedagogicos'),
         getData('titulos_financeiros'),
         getData('turmas'),
         getData('disciplinas'),
-        getData('alunos')
+        getData('alunos'),
+        getData(mensagensPath)
       ]);
 
       setTurmas(turmasData || {});
@@ -188,6 +202,22 @@ const PendenciasPage = () => {
         setTotalTitulos(titulosAnalise.length);
       }
 
+      // Mensagens aguardando aprovação
+      if (mensagensData) {
+        const mensagensList = Object.entries(mensagensData).map(([id, mensagem]) => ({
+          id,
+          ...mensagem
+        }));
+
+        const pendentes = mensagensList.filter(
+          msg => msg.requerAprovacao && msg.statusAprovacao === 'pendente'
+        );
+
+        setTotalMensagensPendentes(pendentes.length);
+      } else {
+        setTotalMensagensPendentes(0);
+      }
+
     } catch (error) {
       console.error('Erro ao carregar pendências:', error);
     } finally {
@@ -281,6 +311,25 @@ const PendenciasPage = () => {
               </Typography>
             </Box>
           </Box>
+
+          {totalPendenciasPagina > 0 && (
+            <Alert
+              severity="warning"
+              icon={<WarningIcon />}
+              sx={{
+                borderLeft: '4px solid #f97316',
+                bgcolor: '#FEF3C7',
+                color: '#92400E'
+              }}
+            >
+              <Typography variant="subtitle1" fontWeight={600}>
+                {totalPendenciasPagina} pendência(s) aguardando ação.
+              </Typography>
+              <Typography variant="body2">
+                Planos: {totalPendencias} · Relatórios: {totalRelatorios} · Pagamentos: {totalTitulos} · Mensagens: {totalMensagensPendentes}
+              </Typography>
+            </Alert>
+          )}
         </Box>
 
         {/* Resumo de Pendências */}
@@ -352,6 +401,32 @@ const PendenciasPage = () => {
           </Grid>
 
           <Grid item xs={12} md={3}>
+            <Card
+              sx={{
+                bgcolor: '#FFE4E6',
+                borderLeft: '4px solid #F97316',
+                boxShadow: 2,
+                cursor: 'pointer'
+              }}
+              onClick={() => router.push('/agenda?aba=mensagens')}
+            >
+              <CardContent>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <MailIcon sx={{ fontSize: 40, color: '#EA580C' }} />
+                  <Box>
+                    <Typography variant="h3" sx={{ fontWeight: 'bold', color: '#9A3412' }}>
+                      {totalMensagensPendentes}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Mensagens aguardando aprovação
+                    </Typography>
+                  </Box>
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          <Grid item xs={12} md={3}>
             <Card sx={{ 
               bgcolor: '#D1FAE5', 
               borderLeft: '4px solid #10B981',
@@ -362,7 +437,7 @@ const PendenciasPage = () => {
                   <CheckCircleIcon sx={{ fontSize: 40, color: '#10B981' }} />
                   <Box>
                     <Typography variant="h3" sx={{ fontWeight: 'bold', color: '#065F46' }}>
-                      {totalPendencias + totalRelatorios + totalTitulos}
+                      {totalPendencias + totalRelatorios + totalTitulos + totalMensagensPendentes}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
                       Total de Pendências

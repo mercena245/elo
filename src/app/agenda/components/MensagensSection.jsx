@@ -70,6 +70,9 @@ const MensagensSection = ({ userRole, userData }) => {
     fetchUsuarios();
   }, [userData, isReady]);
 
+  // Normalizar id do usuário usado nos filtros (evita bug id vs uid)
+  const myId = userData?.id || userData?.uid;
+
   const fetchConversas = async () => {
     if (!isReady) return;
     
@@ -84,8 +87,13 @@ const MensagensSection = ({ userRole, userData }) => {
         
         // Filtrar conversas baseado na role
         const conversasFiltradas = conversasList.filter(conversa => {
-          if (userRole === 'coordenadora') return true;
-          return conversa.participantes?.includes(userData?.id || userData?.uid);
+          if (userRole === 'coordenadora') {
+            // coordenadora vê conversas que participa ou que requerem sua aprovação
+            const precisaAprovacao = conversa.coordenadoresParaAprovar?.includes(myId);
+            const participa = conversa.participantes?.includes(myId);
+            return !!(precisaAprovacao || participa);
+          }
+          return conversa.participantes?.includes(myId);
         });
         
         setConversas(conversasFiltradas);
@@ -167,6 +175,7 @@ const MensagensSection = ({ userRole, userData }) => {
 
       const remetenteId = userData.id;
       const destinatarioId = novaMensagem.destinatario;
+      const remetenteRole = userData.role;
       
       // Buscar dados do destinatário
       const destinatarioData = usuarios.find(u => u.id === destinatarioId);
@@ -176,6 +185,17 @@ const MensagensSection = ({ userRole, userData }) => {
         alert('Erro ao encontrar destinatário. Tente novamente.');
         return;
       }
+
+      // ✅ NOVA LÓGICA: Verificar se a mensagem precisa de aprovação
+      // Regra: pai ↔ professor precisa de aprovação
+      const precisaAprovacao = 
+        (remetenteRole === 'pai' && destinatarioData.role === 'professora') ||
+        (remetenteRole === 'professora' && destinatarioData.role === 'pai');
+
+      // ✅ Buscar IDs dos coordenadores
+      const coordenadoresIds = usuarios
+        .filter(u => u.role === 'coordenadora')
+        .map(u => u.id);
 
       const mensagemData = {
         remetente: {
@@ -193,7 +213,14 @@ const MensagensSection = ({ userRole, userData }) => {
         dataEnvio: new Date().toISOString(),
         lida: false,
         anexos: novaMensagem.anexos || [],
-        participantes: [remetenteId, destinatarioId]
+        participantes: [remetenteId, destinatarioId],
+        // ✅ NOVOS CAMPOS PARA APROVAÇÃO
+        requerAprovacao: precisaAprovacao,
+        statusAprovacao: precisaAprovacao ? 'pendente' : 'aprovada',
+        aprovadoPor: precisaAprovacao ? null : remetenteId,
+        dataAprovacao: precisaAprovacao ? null : new Date().toISOString(),
+        coordenadoresParaAprovar: precisaAprovacao ? coordenadoresIds : [],
+        motivoRejeicao: null
       };
 
       // Usar pushData do hook ao invés de ref/push
@@ -212,9 +239,18 @@ const MensagensSection = ({ userRole, userData }) => {
           },
           assunto: novaMensagem.assunto,
           temAnexos: (novaMensagem.anexos || []).length > 0,
-          quantidadeAnexos: (novaMensagem.anexos || []).length
+          quantidadeAnexos: (novaMensagem.anexos || []).length,
+          requerAprovacao: precisaAprovacao,
+          statusAprovacao: precisaAprovacao ? 'pendente' : 'aprovada'
         }
       );
+      
+      // ✅ Mostrar mensagem informativa
+      if (precisaAprovacao) {
+        alert('Mensagem enviada! ⏳ Aguardando aprovação da coordenação antes de ser entregue.');
+      } else {
+        alert('Mensagem enviada com sucesso!');
+      }
       
       fecharDialogNovaMensagem();
       fetchConversas();
@@ -436,37 +472,70 @@ const MensagensSection = ({ userRole, userData }) => {
   };
 
   const getConversasFiltradas = () => {
-    const userId = userData?.id;
+    const userId = myId;
+    const euSouCoordenador = userData?.role === 'coordenadora';
     
     return conversas.filter(conversa => {
       const foiEnviadaPorMim = conversa.remetente?.id === userId;
       const foiEnviadaParaMim = conversa.destinatario?.id === userId;
+      const estaNoProcessoAprovacao = conversa.coordenadoresParaAprovar?.includes(userId);
+      const estaPendente = conversa.statusAprovacao === 'pendente';
       
-      if (abaConversas === 0) { // Não Lidas
-        return foiEnviadaParaMim && !conversa.lida;
-      } else if (abaConversas === 1) { // Lidas (recebidas e já lidas)
-        return foiEnviadaParaMim && conversa.lida;
-      } else { // Enviados (abaConversas === 2)
+      // Coordenadora: não duplicar pendentes aqui (ela tem componente próprio)
+      if (euSouCoordenador) {
+        if (abaConversas === 0) { // Não Lidas (painel normal)
+          return foiEnviadaParaMim && !conversa.lida && !estaPendente;
+        } else if (abaConversas === 1) { // Lidas
+          return foiEnviadaParaMim && conversa.lida && !estaPendente;
+        } else { // Enviados
+          return foiEnviadaPorMim;
+        }
+      }
+
+      // Para usuários normais:
+      // - Remetente deve ver todas as suas mensagens na aba "Enviados", inclusive pendentes
+      if (abaConversas === 2) {
         return foiEnviadaPorMim;
       }
+
+      // - Destinatário NÃO vê mensagens pendentes até aprovação
+      if (estaPendente) {
+        return false;
+      }
+
+      if (abaConversas === 0) { // Não Lidas
+        return foiEnviadaParaMim && !conversa.lida;
+      } else if (abaConversas === 1) { // Lidas
+        return foiEnviadaParaMim && conversa.lida;
+      }
+
+      return false;
     });
   };
 
   const getContadorMensagens = () => {
-    const userId = userData?.id;
-    
-    const naoLidas = conversas.filter(conversa => 
-      conversa.destinatario?.id === userId && !conversa.lida
+    const userId = myId;
+    const role = userData?.role;
+
+    // Não contar mensagens pendentes como "não lidas" para destinatários comuns.
+    const naoLidas = conversas.filter(conversa =>
+      conversa.destinatario?.id === userId &&
+      !conversa.lida &&
+      // Permitir contar pendentes apenas para coordenadora
+      (conversa.statusAprovacao !== 'pendente' || role === 'coordenadora')
     ).length;
-    
-    const lidas = conversas.filter(conversa => 
-      conversa.destinatario?.id === userId && conversa.lida
+
+    const lidas = conversas.filter(conversa =>
+      conversa.destinatario?.id === userId &&
+      conversa.lida &&
+      (conversa.statusAprovacao !== 'pendente' || role === 'coordenadora')
     ).length;
-    
-    const enviados = conversas.filter(conversa => 
+
+    // Enviados devem mostrar todas as mensagens que o usuário enviou (incl. pendentes)
+    const enviados = conversas.filter(conversa =>
       conversa.remetente?.id === userId
     ).length;
-    
+
     return { naoLidas, lidas, enviados };
   };
 

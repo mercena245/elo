@@ -65,7 +65,8 @@ import {
   LocalHospital,
   Chat,
   Store,
-  AttachMoney
+  AttachMoney,
+  Mail
 } from '@mui/icons-material';
 import '../../styles/Dashboard.css';
 import '../../styles/AvisosCarousel.css';
@@ -94,6 +95,7 @@ const Dashboard = () => {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [headerConfig, setHeaderConfig] = useState(null);
   const [totalPendencias, setTotalPendencias] = useState(0);
+  const [totalMensagensNaoLidas, setTotalMensagensNaoLidas] = useState(0);
   const router = useRouter();
 
   // Verificar autenticação
@@ -128,11 +130,36 @@ const Dashboard = () => {
     return 'Boa noite';
   };
 
+  // Monitorar mensagens não lidas
+  useEffect(() => {
+    const fetchMensagensNaoLidas = async () => {
+      if (!isReady || !getData || !userId) return;
+
+      try {
+        const mensagensData = await getData('mensagens');
+        if (mensagensData) {
+          const mensagens = Object.values(mensagensData);
+          const naoLidas = mensagens.filter(msg => 
+            msg.destinatario?.id === userId &&
+            !msg.lida &&
+            msg.statusAprovacao !== 'pendente'
+          ).length;
+          setTotalMensagensNaoLidas(naoLidas);
+        }
+      } catch (error) {
+        console.error('Erro ao buscar mensagens não lidas:', error);
+      }
+    };
+
+    fetchMensagensNaoLidas();
+  }, [isReady, getData, userId]);
+
   // Função para obter ações rápidas baseadas na role
   const getQuickActions = () => {
     const roleActions = {
       coordenadora: [
         { titulo: 'Pendências', icon: Notifications, rota: '/pendencias', cor: '#EF4444', badgeCount: totalPendencias },
+        { titulo: 'Mensagens', icon: Mail, rota: '/agenda', cor: '#3B82F6', badgeCount: totalMensagensNaoLidas },
         { titulo: 'Gerenciar Alunos', icon: PersonAdd, rota: '/alunos', cor: '#3B82F6' },
         { titulo: 'Colaboradores', icon: Group, rota: '/colaboradores', cor: '#8B5CF6' },
         { titulo: 'Relatórios & Notas', icon: Assessment, rota: '/notas-frequencia', cor: '#10B981' },
@@ -143,6 +170,7 @@ const Dashboard = () => {
         { titulo: 'Galeria de Fotos', icon: PhotoLibrary, rota: '/galeriafotos', cor: '#06B6D4' }
       ],
       professora: [
+        { titulo: 'Mensagens', icon: Mail, rota: '/agenda', cor: '#3B82F6', badgeCount: totalMensagensNaoLidas },
         { titulo: 'Agenda da Turma', icon: CalendarToday, rota: '/agenda', cor: '#3B82F6' },
         { titulo: 'Lançar Notas', icon: Grade, rota: '/notas-frequencia', cor: '#10B981' },
         { titulo: 'Controle Médico', icon: LocalHospital, rota: '/agenda', cor: '#EF4444' },
@@ -151,6 +179,7 @@ const Dashboard = () => {
         { titulo: 'Criar Aviso', icon: Announcement, rota: '/avisos', cor: '#06B6D4' }
       ],
       pai: [
+        { titulo: 'Mensagens', icon: Mail, rota: '/agenda', cor: '#3B82F6', badgeCount: totalMensagensNaoLidas },
         { titulo: 'Agenda Médica', icon: MedicalServices, rota: '/agenda', cor: '#EF4444' },
         { titulo: 'Boletim do Filho', icon: Assessment, rota: '/notas-frequencia', cor: '#10B981' },
         { titulo: 'Financeiro', icon: AttachMoney, rota: '/financeiro', cor: '#059669' },
@@ -161,6 +190,7 @@ const Dashboard = () => {
         { titulo: 'Contato Escola', icon: Chat, rota: '/escola', cor: '#06B6D4' }
       ],
       aluno: [
+        { titulo: 'Mensagens', icon: Mail, rota: '/agenda', cor: '#3B82F6', badgeCount: totalMensagensNaoLidas },
         { titulo: 'Minhas Notas', icon: Grade, rota: '/notas-frequencia', cor: '#10B981' },
         { titulo: 'Minha Agenda', icon: CalendarToday, rota: '/agenda', cor: '#3B82F6' },
         { titulo: 'Galeria de Fotos', icon: PhotoLibrary, rota: '/galeriafotos', cor: '#F59E0B' },

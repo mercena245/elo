@@ -173,6 +173,13 @@ const MensagensSection = ({ userRole, userData }) => {
         return;
       }
 
+      // Validar banco de dados pronto
+      if (!isReady || !pushData) {
+        console.error('Banco de dados não está pronto', { isReady, pushData });
+        alert('Erro: Banco de dados não está pronto. Tente novamente.');
+        return;
+      }
+
       const remetenteId = userData.id;
       const destinatarioId = novaMensagem.destinatario;
       const remetenteRole = userData.role;
@@ -208,13 +215,12 @@ const MensagensSection = ({ userRole, userData }) => {
           nome: destinatarioData.nome,
           role: destinatarioData.role
         },
-        assunto: novaMensagem.assunto,
-        conteudo: novaMensagem.conteudo,
+        assunto: novaMensagem.assunto.trim(),
+        conteudo: novaMensagem.conteudo.trim(),
         dataEnvio: new Date().toISOString(),
         lida: false,
         anexos: novaMensagem.anexos || [],
         participantes: [remetenteId, destinatarioId],
-        // ✅ NOVOS CAMPOS PARA APROVAÇÃO
         requerAprovacao: precisaAprovacao,
         statusAprovacao: precisaAprovacao ? 'pendente' : 'aprovada',
         aprovadoPor: precisaAprovacao ? null : remetenteId,
@@ -223,8 +229,20 @@ const MensagensSection = ({ userRole, userData }) => {
         motivoRejeicao: null
       };
 
-      // Usar pushData do hook ao invés de ref/push
-      const mensagemId = await pushData('mensagens', mensagemData);
+      console.log('📤 Preparando para enviar mensagem:', mensagemData);
+
+      let mensagemId;
+      try {
+        mensagemId = await pushData('mensagens', mensagemData);
+        console.log('✅ Mensagem salva com ID:', mensagemId);
+      } catch (pushError) {
+        console.error('❌ Erro ao fazer pushData:', pushError);
+        throw new Error(`Erro ao salvar mensagem: ${pushError.message}`);
+      }
+
+      if (!mensagemId) {
+        throw new Error('pushData não retornou um ID válido');
+      }
       
       // Log do envio de mensagem
       await auditService.logAction(
@@ -252,10 +270,13 @@ const MensagensSection = ({ userRole, userData }) => {
         alert('Mensagem enviada com sucesso!');
       }
       
+      console.log('🔄 Recarregando conversas...');
       fecharDialogNovaMensagem();
-      fetchConversas();
+      await fetchConversas();
+      console.log('✅ Conversas recarregadas');
     } catch (error) {
-      console.error('Erro ao enviar mensagem:', error);
+      console.error('❌ Erro ao enviar mensagem:', error);
+      alert(`Erro ao enviar mensagem: ${error.message}`);
       
       // Log do erro
       await auditService.logAction(
@@ -263,6 +284,7 @@ const MensagensSection = ({ userRole, userData }) => {
         userData?.id,
         {
           erro: error.message,
+          stack: error.stack,
           destinatario: typeof novaMensagem.destinatario === 'string' ? novaMensagem.destinatario : novaMensagem.destinatario?.nome,
           assunto: novaMensagem.assunto
         }

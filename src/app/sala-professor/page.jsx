@@ -191,7 +191,7 @@ const SalaProfessor = () => {
                   }}
                 />
                 <Tab 
-                  icon="�" 
+                  icon="📓" 
                   label="Diário de Classe" 
                   sx={{ 
                     flexDirection: { xs: 'column', sm: 'row' }, 
@@ -200,7 +200,7 @@ const SalaProfessor = () => {
                   }}
                 />
                 <Tab 
-                  icon="�📊" 
+                  icon="📊" 
                   label="Relatórios Pedagógicos" 
                   sx={{ 
                     flexDirection: { xs: 'column', sm: 'row' }, 

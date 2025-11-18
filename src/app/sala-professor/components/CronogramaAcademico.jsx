@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import {
   Box,
   Typography,
@@ -21,7 +22,13 @@ import {
   Stack,
   CircularProgress,
   Tooltip,
-  Menu
+  Menu,
+  Chip,
+  Badge,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemButton
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -34,28 +41,51 @@ import {
   Visibility as VisibilityIcon,
   CalendarMonth as CalendarMonthIcon,
   AccessTime as AccessTimeIcon,
-  School as SchoolIcon,
-  PriorityHigh as PriorityHighIcon
+  School as SchoolIcon
 } from '@mui/icons-material';
+import { Calendar, dateFnsLocalizer } from 'react-big-calendar';
+import { format, parse, startOfWeek, getDay, addMonths, subMonths } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import 'react-big-calendar/lib/css/react-big-calendar.css';
 import { useAuthUser } from '../../../hooks/useAuthUser';
 import { auditService } from '../../../services/auditService';
 import { useSchoolDatabase } from '../../../hooks/useSchoolDatabase';
+import { isCoordinator } from '../../../config/constants';
+
+// Configuração do localizador para pt-BR
+const locales = {
+  'pt-BR': ptBR,
+};
+
+const localizer = dateFnsLocalizer({
+  format,
+  parse,
+  startOfWeek: () => startOfWeek(new Date(), { locale: ptBR }),
+  getDay,
+  locales,
+});
 
 const CronogramaAcademico = () => {
   const { getData, pushData, updateData, removeData, isReady } = useSchoolDatabase();
-  const { user } = useAuthUser();
+  const { user, userRole } = useAuthUser();
+  const searchParams = useSearchParams();
+  const isCoordenador = isCoordinator(userRole);
   
   const [loading, setLoading] = useState(true);
   const [eventos, setEventos] = useState({});
   const [turmas, setTurmas] = useState({});
-  const [mesAtual, setMesAtual] = useState(new Date());
+  const [eventosCalendario, setEventosCalendario] = useState([]);
+  const [currentDate, setCurrentDate] = useState(new Date());
   const [modalOpen, setModalOpen] = useState(false);
   const [modalVisualizarOpen, setModalVisualizarOpen] = useState(false);
+  const [modalAprovarOpen, setModalAprovarOpen] = useState(false);
+  const [modalListaPendentesOpen, setModalListaPendentesOpen] = useState(false);
+  const [acaoAprovacao, setAcaoAprovacao] = useState('aprovar'); // 'aprovar' ou 'rejeitar'
   const [eventoEditando, setEventoEditando] = useState(null);
-  const [anchorEl, setAnchorEl] = useState(null);
   const [eventoSelecionado, setEventoSelecionado] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogMessage, setDialogMessage] = useState({ title: '', message: '', type: 'error' });
+  const [observacaoAprovacao, setObservacaoAprovacao] = useState('');
   
   const [formData, setFormData] = useState({
     titulo: '',
@@ -89,6 +119,75 @@ const CronogramaAcademico = () => {
     }
   }, [user, isReady]);
 
+  // Converter eventos do Firebase para formato do react-big-calendar
+  useEffect(() => {
+    console.log('🔄 [CronogramaAcademico] Filtrando eventos...');
+    console.log('👤 User:', user?.uid);
+    console.log('👔 UserRole:', userRole);
+    console.log('⭐ isCoordenador:', isCoordenador);
+    console.log('📅 Total de eventos:', Object.keys(eventos).length);
+    
+    if (eventos) {
+      const eventosFormatados = Object.entries(eventos)
+        .filter(([id, evento]) => {
+          console.log(`📋 Evento: ${evento.titulo} - Status: ${evento.status} - CriadoPor: ${evento.criadoPor}`);
+          // Coordenadores veem todos os eventos
+          if (isCoordenador) {
+            console.log('✅ Coordenador vê todos');
+            return true;
+          }
+          // Professores só veem eventos aprovados ou criados por eles
+          const deveExibir = evento.status === 'aprovado' || evento.criadoPor === user?.uid;
+          console.log(`${deveExibir ? '✅' : '❌'} Professor vê: ${deveExibir}`);
+          return deveExibir;
+        })
+        .map(([id, evento]) => {
+          const start = evento.dataInicio?.includes('T') 
+            ? new Date(evento.dataInicio) 
+            : new Date(evento.dataInicio + 'T00:00:00');
+          
+          const end = evento.dataFim && evento.dataFim !== evento.dataInicio
+            ? (evento.dataFim?.includes('T') 
+                ? new Date(evento.dataFim) 
+                : new Date(evento.dataFim + 'T23:59:59'))
+            : new Date(start.getTime() + (23 * 60 * 60 * 1000 + 59 * 60 * 1000));
+          
+          return {
+            id,
+            title: evento.titulo + (evento.status === 'pendente' ? ' 🕐' : ''),
+            start,
+            end,
+            allDay: true,
+            resource: evento
+          };
+        });
+      console.log('📊 Eventos após filtragem:', eventosFormatados.length);
+      setEventosCalendario(eventosFormatados);
+    }
+  }, [eventos, isCoordenador, user, userRole]);
+
+  // Verificar se há parâmetro de evento na URL para abrir modal de aprovação
+  useEffect(() => {
+    const eventoId = searchParams.get('evento');
+    
+    if (eventoId && eventos[eventoId] && isCoordenador) {
+      console.log('🔔 [CronogramaAcademico] Parâmetro de evento detectado:', eventoId);
+      const evento = eventos[eventoId];
+      console.log('📋 [CronogramaAcademico] Evento:', evento);
+      console.log('⚠️ [CronogramaAcademico] Status do evento:', evento.status);
+      
+      // Se o evento está pendente, abrir modal de visualização
+      if (evento.status === 'pendente') {
+        console.log('✅ [CronogramaAcademico] Abrindo modal de visualização');
+        setEventoSelecionado({
+          id: eventoId,
+          ...evento
+        });
+        setModalVisualizarOpen(true);
+      }
+    }
+  }, [searchParams, eventos, isCoordenador]);
+
   const carregarDados = async () => {
     try {
       setLoading(true);
@@ -105,45 +204,27 @@ const CronogramaAcademico = () => {
     }
   };
 
-  const navegarMes = (direcao) => {
-    const novoMes = new Date(mesAtual);
-    novoMes.setMonth(mesAtual.getMonth() + direcao);
-    setMesAtual(novoMes);
+  const handleNavigate = (newDate) => {
+    setCurrentDate(newDate);
   };
 
-  const irParaHoje = () => setMesAtual(new Date());
-
-  const getDiasDoMes = () => {
-    const ano = mesAtual.getFullYear();
-    const mes = mesAtual.getMonth();
-    const primeiroDia = new Date(ano, mes, 1);
-    const ultimoDia = new Date(ano, mes + 1, 0);
-    const dias = [];
-    const diasVaziosInicio = primeiroDia.getDay();
-    for (let i = 0; i < diasVaziosInicio; i++) dias.push(null);
-    for (let dia = 1; dia <= ultimoDia.getDate(); dia++) {
-      dias.push(new Date(ano, mes, dia));
-    }
-    return dias;
+  const handleSelectSlot = ({ start }) => {
+    abrirModalNovoEvento(start);
   };
 
-  const getEventosNoDia = (data) => {
-    const dateKey = data.toISOString().split('T')[0];
-    return Object.entries(eventos)
-      .map(([id, evento]) => ({ id, ...evento }))
-      .filter(evento => {
-        const eventoInicio = evento.dataInicio?.split('T')[0];
-        const eventoFim = evento.dataFim?.split('T')[0] || eventoInicio;
-        return dateKey >= eventoInicio && dateKey <= eventoFim;
-      });
+  const handleSelectEvent = (event) => {
+    const eventoCompleto = { id: event.id, ...event.resource };
+    setEventoSelecionado(eventoCompleto);
+    visualizarEvento(eventoCompleto);
   };
 
   const abrirModalNovoEvento = (data = null) => {
     setEventoEditando(null);
+    const dataFormatada = data ? format(data, 'yyyy-MM-dd') : '';
     setFormData({
       titulo: '',
       descricao: '',
-      dataInicio: data ? data.toISOString().split('T')[0] : '',
+      dataInicio: dataFormatada,
       dataFim: '',
       tipo: 'aula',
       prioridade: 'media',
@@ -153,6 +234,31 @@ const CronogramaAcademico = () => {
   };
 
   const editarEvento = (evento) => {
+    // Validação de permissão
+    const podeEditar = isCoordenador || 
+                      (evento.status === 'pendente' && evento.criadoPor === user?.uid);
+    
+    if (!podeEditar) {
+      setDialogMessage({
+        title: 'Sem permissão',
+        message: 'Você não tem permissão para editar este evento. Apenas eventos pendentes criados por você podem ser editados.',
+        type: 'error'
+      });
+      setDialogOpen(true);
+      return;
+    }
+    
+    // Coordenadores não podem editar eventos rejeitados
+    if (evento.status === 'rejeitado' && !isCoordenador) {
+      setDialogMessage({
+        title: 'Evento rejeitado',
+        message: 'Eventos rejeitados não podem ser editados. Entre em contato com a coordenação.',
+        type: 'error'
+      });
+      setDialogOpen(true);
+      return;
+    }
+    
     setEventoEditando(evento);
     setFormData({
       titulo: evento.titulo,
@@ -164,13 +270,17 @@ const CronogramaAcademico = () => {
       turmaId: evento.turmaId || ''
     });
     setModalOpen(true);
-    setAnchorEl(null);
+    setModalVisualizarOpen(false);
   };
 
   const visualizarEvento = (evento) => {
+    console.log('📋 Visualizando evento:', evento);
+    console.log('👤 User:', user?.uid);
+    console.log('👔 UserRole:', userRole);
+    console.log('⭐ isCoordenador:', isCoordenador);
+    console.log('📊 Status do evento:', evento.status);
     setEventoSelecionado(evento);
     setModalVisualizarOpen(true);
-    setAnchorEl(null);
   };
 
   const salvarEvento = async () => {
@@ -185,32 +295,38 @@ const CronogramaAcademico = () => {
     }
     
     try {
-      // Se dataFim for igual a dataInicio ou vazia, remove do objeto
       const eventoData = { 
         ...formData, 
         dataFim: formData.dataFim && formData.dataFim !== formData.dataInicio ? formData.dataFim : null,
-        criadoPor: user?.uid, 
-        criadoEm: new Date().toISOString() 
+        criadoPor: user?.uid,
+        criadoPorNome: user?.displayName || user?.email,
+        criadoEm: new Date().toISOString(),
+        status: isCoordenador ? 'aprovado' : 'pendente',
+        aprovadoPor: isCoordenador ? user?.uid : null,
+        aprovadoEm: isCoordenador ? new Date().toISOString() : null
       };
       
       if (eventoEditando) {
-        await updateData(`cronograma-academico/${eventoEditando.id}`, eventoData);
+        await updateData(`cronograma-academico/${eventoEditando.id}`, {
+          ...eventoData,
+          status: eventoEditando.status,
+          aprovadoPor: eventoEditando.aprovadoPor,
+          aprovadoEm: eventoEditando.aprovadoEm
+        });
       } else {
         await pushData('cronograma-academico', eventoData);
       }
       
-      // Tenta fazer o log de auditoria (não bloqueia se falhar)
       try {
         if (eventoEditando) {
           await auditService.log({ acao: 'editar_evento_cronograma', detalhes: `Evento editado: ${formData.titulo}`, usuarioEmail: user?.email });
         } else {
-          await auditService.log({ acao: 'criar_evento_cronograma', detalhes: `Novo evento: ${formData.titulo}`, usuarioEmail: user?.email });
+          await auditService.log({ acao: 'criar_evento_cronograma', detalhes: `Novo evento: ${formData.titulo} (${eventoData.status})`, usuarioEmail: user?.email });
         }
       } catch (auditError) {
         console.warn('Erro ao registrar auditoria:', auditError);
       }
       
-      // Fecha o modal e recarrega os dados
       setModalOpen(false);
       setEventoEditando(null);
       setFormData({
@@ -223,13 +339,15 @@ const CronogramaAcademico = () => {
         turmaId: ''
       });
       
-      // Recarrega os dados de forma assíncrona
       carregarDados();
       
-      // Mostra mensagem de sucesso
+      const mensagemSucesso = isCoordenador 
+        ? (eventoEditando ? 'Evento atualizado com sucesso!' : 'Evento criado e aprovado com sucesso!')
+        : (eventoEditando ? 'Evento atualizado com sucesso!' : 'Evento criado! Aguardando aprovação da coordenação.');
+      
       setDialogMessage({
         title: 'Sucesso!',
-        message: eventoEditando ? 'Evento atualizado com sucesso!' : 'Evento criado com sucesso!',
+        message: mensagemSucesso,
         type: 'success'
       });
       setDialogOpen(true);
@@ -248,27 +366,41 @@ const CronogramaAcademico = () => {
   const excluirEvento = async () => {
     if (!eventoSelecionado) return;
     
-    // Confirma exclusão
+    // Validação de permissão
+    const podeExcluir = isCoordenador || 
+                       (eventoSelecionado.status === 'pendente' && eventoSelecionado.criadoPor === user?.uid);
+    
+    if (!podeExcluir) {
+      setDialogMessage({
+        title: 'Sem permissão',
+        message: 'Você não tem permissão para excluir este evento. Apenas eventos pendentes criados por você podem ser excluídos.',
+        type: 'error'
+      });
+      setDialogOpen(true);
+      return;
+    }
+    
     const confirmacao = window.confirm(`Deseja excluir "${eventoSelecionado.titulo}"?`);
     if (!confirmacao) return;
     
     try {
       await removeData(`cronograma-academico/${eventoSelecionado.id}`);
       
-      // Tenta fazer o log de auditoria (não bloqueia se falhar)
       try {
-        await auditService.log({ acao: 'excluir_evento_cronograma', detalhes: `Evento excluído: ${eventoSelecionado.titulo}`, usuarioEmail: user?.email });
+        await auditService.log({ 
+          acao: 'excluir_evento_cronograma', 
+          detalhes: `Evento excluído: ${eventoSelecionado.titulo} (Status: ${eventoSelecionado.status})`, 
+          usuarioEmail: user?.email 
+        });
       } catch (auditError) {
         console.warn('Erro ao registrar auditoria:', auditError);
       }
       
-      setAnchorEl(null);
       setEventoSelecionado(null);
+      setModalVisualizarOpen(false);
       
-      // Recarrega os dados de forma assíncrona
       carregarDados();
       
-      // Mostra mensagem de sucesso
       setDialogMessage({
         title: 'Sucesso!',
         message: 'Evento excluído com sucesso!',
@@ -287,6 +419,156 @@ const CronogramaAcademico = () => {
     }
   };
 
+  const aprovarEvento = async () => {
+    if (!eventoSelecionado) return;
+    
+    try {
+      await updateData(`cronograma-academico/${eventoSelecionado.id}`, {
+        status: 'aprovado',
+        aprovadoPor: user?.uid,
+        aprovadoPorNome: user?.displayName || user?.email,
+        aprovadoEm: new Date().toISOString(),
+        observacaoAprovacao: observacaoAprovacao || null
+      });
+      
+      try {
+        await auditService.log({ 
+          acao: 'aprovar_evento_cronograma', 
+          detalhes: `Evento aprovado: ${eventoSelecionado.titulo}`, 
+          usuarioEmail: user?.email 
+        });
+      } catch (auditError) {
+        console.warn('Erro ao registrar auditoria:', auditError);
+      }
+      
+      setModalAprovarOpen(false);
+      setModalVisualizarOpen(false);
+      setEventoSelecionado(null);
+      setObservacaoAprovacao('');
+      
+      carregarDados();
+      
+      setDialogMessage({
+        title: 'Sucesso!',
+        message: 'Evento aprovado com sucesso!',
+        type: 'success'
+      });
+      setDialogOpen(true);
+      
+    } catch (error) {
+      console.error('Erro ao aprovar evento:', error);
+      setDialogMessage({
+        title: 'Erro',
+        message: 'Ocorreu um erro ao aprovar o evento. Tente novamente.',
+        type: 'error'
+      });
+      setDialogOpen(true);
+    }
+  };
+
+  const rejeitarEvento = async () => {
+    if (!eventoSelecionado) return;
+    
+    if (!observacaoAprovacao.trim()) {
+      setDialogMessage({
+        title: 'Observação obrigatória',
+        message: 'Por favor, informe o motivo da rejeição.',
+        type: 'error'
+      });
+      setDialogOpen(true);
+      return;
+    }
+    
+    try {
+      await updateData(`cronograma-academico/${eventoSelecionado.id}`, {
+        status: 'rejeitado',
+        rejeitadoPor: user?.uid,
+        rejeitadoPorNome: user?.displayName || user?.email,
+        rejeitadoEm: new Date().toISOString(),
+        motivoRejeicao: observacaoAprovacao
+      });
+      
+      try {
+        await auditService.log({ 
+          acao: 'rejeitar_evento_cronograma', 
+          detalhes: `Evento rejeitado: ${eventoSelecionado.titulo}. Motivo: ${observacaoAprovacao}`, 
+          usuarioEmail: user?.email 
+        });
+      } catch (auditError) {
+        console.warn('Erro ao registrar auditoria:', auditError);
+      }
+      
+      setModalAprovarOpen(false);
+      setModalVisualizarOpen(false);
+      setEventoSelecionado(null);
+      setObservacaoAprovacao('');
+      
+      carregarDados();
+      
+      setDialogMessage({
+        title: 'Evento rejeitado',
+        message: 'O evento foi rejeitado. O professor será notificado.',
+        type: 'success'
+      });
+      setDialogOpen(true);
+      
+    } catch (error) {
+      console.error('Erro ao rejeitar evento:', error);
+      setDialogMessage({
+        title: 'Erro',
+        message: 'Ocorreu um erro ao rejeitar o evento. Tente novamente.',
+        type: 'error'
+      });
+      setDialogOpen(true);
+    }
+  };
+
+  // Customização do estilo dos eventos
+  const eventStyleGetter = (event) => {
+    const tipo = event.resource?.tipo || 'aula';
+    const status = event.resource?.status || 'aprovado';
+    let cor = tiposEventos[tipo]?.cor || '#039BE5';
+    
+    // Eventos pendentes ficam com opacidade reduzida
+    const opacity = status === 'pendente' ? 0.6 : 0.9;
+    
+    // Eventos rejeitados ficam em cinza com texto tachado
+    if (status === 'rejeitado') {
+      cor = '#9e9e9e';
+    }
+    
+    return {
+      style: {
+        backgroundColor: cor,
+        borderRadius: '4px',
+        opacity: opacity,
+        color: 'white',
+        border: status === 'pendente' ? '2px dashed rgba(255,255,255,0.5)' : '0px',
+        display: 'block',
+        fontWeight: 500,
+        fontSize: '0.85rem',
+        textDecoration: status === 'rejeitado' ? 'line-through' : 'none'
+      }
+    };
+  };
+
+  // Mensagens customizadas em português
+  const messages = {
+    allDay: 'Dia inteiro',
+    previous: 'Anterior',
+    next: 'Próximo',
+    today: 'Hoje',
+    month: 'Mês',
+    week: 'Semana',
+    day: 'Dia',
+    agenda: 'Agenda',
+    date: 'Data',
+    time: 'Hora',
+    event: 'Evento',
+    noEventsInRange: 'Não há eventos neste período.',
+    showMore: (total) => `+ (${total}) eventos`
+  };
+
   const isHoje = (data) => {
     const hoje = new Date();
     return data.getDate() === hoje.getDate() && data.getMonth() === hoje.getMonth() && data.getFullYear() === hoje.getFullYear();
@@ -296,69 +578,175 @@ const CronogramaAcademico = () => {
 
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 2 }}>
+      {/* Toolbar customizada */}
       <Paper elevation={0} sx={{ p: 2, borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Button variant="outlined" startIcon={<TodayIcon />} onClick={irParaHoje} sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 500 }}>Hoje</Button>
+            <Button 
+              variant="outlined" 
+              startIcon={<TodayIcon />} 
+              onClick={() => setCurrentDate(new Date())} 
+              sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 500 }}
+            >
+              Hoje
+            </Button>
             <Box sx={{ display: 'flex', gap: 0.5 }}>
-              <IconButton onClick={() => navegarMes(-1)}><ChevronLeft /></IconButton>
-              <IconButton onClick={() => navegarMes(1)}><ChevronRight /></IconButton>
+              <IconButton onClick={() => setCurrentDate(subMonths(currentDate, 1))}>
+                <ChevronLeft />
+              </IconButton>
+              <IconButton onClick={() => setCurrentDate(addMonths(currentDate, 1))}>
+                <ChevronRight />
+              </IconButton>
             </Box>
             <Typography variant="h5" sx={{ fontWeight: 500, minWidth: 220, textTransform: 'capitalize' }}>
-              {mesAtual.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
+              {format(currentDate, 'MMMM yyyy', { locale: ptBR })}
             </Typography>
           </Box>
-          <Button variant="contained" startIcon={<AddIcon />} onClick={() => abrirModalNovoEvento()} sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 500, px: 3 }}>Criar evento</Button>
+          <Box sx={{ display: 'flex', gap: 1.5 }}>
+            {isCoordenador && Object.values(eventos).filter(e => e.status === 'pendente').length > 0 && (
+              <Button 
+                variant="outlined"
+                color="warning"
+                startIcon={<Badge badgeContent={Object.values(eventos).filter(e => e.status === 'pendente').length} color="error">⏳</Badge>}
+                onClick={() => setModalListaPendentesOpen(true)}
+                sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 500, px: 3 }}
+              >
+                Eventos Pendentes
+              </Button>
+            )}
+            <Button 
+              variant="contained" 
+              startIcon={<AddIcon />} 
+              onClick={() => abrirModalNovoEvento()} 
+              sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 500, px: 3 }}
+            >
+              Criar evento
+            </Button>
+          </Box>
         </Box>
       </Paper>
 
-      <Card sx={{ flex: 1, borderRadius: 3, boxShadow: 'none', border: '1px solid', borderColor: 'divider' }}>
-        <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', height: '100%' }}>
-          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 1, mb: 1, pb: 1.5, borderBottom: '2px solid', borderColor: 'divider' }}>
-            {['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'].map(dia => (
-              <Typography key={dia} variant="overline" sx={{ textAlign: 'center', fontWeight: 600, color: 'text.secondary', fontSize: '0.75rem' }}>{dia}</Typography>
-            ))}
+      {/* Legenda de tipos de eventos */}
+      <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+          <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.secondary', mr: 1 }}>
+            Tipos de eventos:
+          </Typography>
+          {Object.entries(tiposEventos).map(([key, tipo]) => (
+            <Chip
+              key={key}
+              label={tipo.nome}
+              size="small"
+              sx={{
+                backgroundColor: tipo.cor,
+                color: 'white',
+                fontWeight: 500,
+                fontSize: '0.75rem'
+              }}
+            />
+          ))}
+        </Box>
+      </Paper>
+
+      {/* Alerta de eventos pendentes para coordenadores */}
+      {isCoordenador && Object.values(eventos).filter(e => e.status === 'pendente').length > 0 && (
+        <Paper 
+          elevation={0} 
+          sx={{ 
+            p: 2, 
+            borderRadius: 2, 
+            border: '2px solid', 
+            borderColor: '#F59E0B',
+            backgroundColor: '#FFF3E0'
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <Box sx={{ 
+              width: 40, 
+              height: 40, 
+              borderRadius: '50%', 
+              backgroundColor: '#F59E0B', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center',
+              fontSize: '1.25rem'
+            }}>
+              ⏳
+            </Box>
+            <Box sx={{ flex: 1 }}>
+              <Typography variant="body1" sx={{ fontWeight: 600, color: '#E65100' }}>
+                {Object.values(eventos).filter(e => e.status === 'pendente').length} evento(s) aguardando aprovação
+              </Typography>
+              <Typography variant="body2" sx={{ color: '#F57C00' }}>
+                Clique nos eventos com ícone 🕐 para aprovar ou rejeitar
+              </Typography>
+            </Box>
           </Box>
-          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gridAutoRows: '1fr', gap: 1, flex: 1, minHeight: 0 }}>
-            {getDiasDoMes().map((dia, index) => {
-              if (!dia) return <Box key={`empty-${index}`} sx={{ minHeight: 100 }} />;
-              const eventosNoDia = getEventosNoDia(dia);
-              const ehHoje = isHoje(dia);
-              return (
-                <Paper key={dia.toISOString()} onClick={() => abrirModalNovoEvento(dia)} elevation={0} sx={{ minHeight: 100, p: 1, cursor: 'pointer', border: '1px solid', borderColor: ehHoje ? 'primary.main' : 'divider', borderWidth: ehHoje ? 2 : 1, borderRadius: 1, transition: 'all 0.2s', '&:hover': { backgroundColor: 'grey.50', boxShadow: 1 } }}>
-                  <Box sx={{ mb: 0.5 }}>
-                    <Box sx={{ width: ehHoje ? 32 : 'auto', height: ehHoje ? 32 : 'auto', borderRadius: '50%', backgroundColor: ehHoje ? 'primary.main' : 'transparent', color: ehHoje ? 'white' : 'text.primary', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontWeight: ehHoje ? 600 : 500, fontSize: '0.875rem', px: ehHoje ? 0 : 0.5 }}>{dia.getDate()}</Box>
-                  </Box>
-                  <Stack spacing={0.4}>
-                    {eventosNoDia.slice(0, 3).map(evento => (
-                      <Tooltip key={evento.id} title={<Box><Typography variant="body2" sx={{ fontWeight: 600 }}>{evento.titulo}</Typography>{evento.descricao && <Typography variant="caption">{evento.descricao}</Typography>}</Box>} arrow>
-                        <Box onClick={(e) => { e.stopPropagation(); setEventoSelecionado(evento); setAnchorEl(e.currentTarget); }} sx={{ backgroundColor: tiposEventos[evento.tipo]?.cor || '#039BE5', color: 'white', px: 0.8, py: 0.3, borderRadius: 1, fontSize: '0.7rem', fontWeight: 500, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', cursor: 'pointer', '&:hover': { opacity: 0.9 } }}>{evento.titulo}</Box>
-                      </Tooltip>
-                    ))}
-                    {eventosNoDia.length > 3 && <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 500, fontSize: '0.7rem', pl: 0.5 }}>+{eventosNoDia.length - 3} mais</Typography>}
-                  </Stack>
-                </Paper>
-              );
-            })}
+        </Paper>
+      )}
+
+      {/* Alerta informativo para professoras */}
+      {!isCoordenador && (
+        <Paper 
+          elevation={0} 
+          sx={{ 
+            p: 2, 
+            borderRadius: 2, 
+            border: '1px solid', 
+            borderColor: '#3B82F6',
+            backgroundColor: '#EFF6FF'
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <Box sx={{ 
+              width: 40, 
+              height: 40, 
+              borderRadius: '50%', 
+              backgroundColor: '#3B82F6', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center',
+              fontSize: '1.25rem',
+              color: 'white'
+            }}>
+              ℹ️
+            </Box>
+            <Box sx={{ flex: 1 }}>
+              <Typography variant="body2" sx={{ color: '#1E40AF' }}>
+                Eventos criados por você precisam ser aprovados pela coordenação antes de aparecerem no calendário público.
+                Eventos com 🕐 estão aguardando aprovação.
+              </Typography>
+            </Box>
           </Box>
+        </Paper>
+      )}
+
+      {/* Calendário */}
+      <Card sx={{ flex: 1, borderRadius: 3, boxShadow: 'none', border: '1px solid', borderColor: 'divider', overflow: 'hidden' }}>
+        <Box sx={{ p: 2, height: 700 }}>
+          <Calendar
+            localizer={localizer}
+            events={eventosCalendario}
+            startAccessor="start"
+            endAccessor="end"
+            style={{ height: '100%' }}
+            onSelectSlot={handleSelectSlot}
+            onSelectEvent={handleSelectEvent}
+            selectable
+            popup
+            messages={messages}
+            culture="pt-BR"
+            eventPropGetter={eventStyleGetter}
+            date={currentDate}
+            onNavigate={handleNavigate}
+            views={['month']}
+            defaultView="month"
+            components={{
+              toolbar: () => null
+            }}
+          />
         </Box>
       </Card>
-
-      <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => setAnchorEl(null)} PaperProps={{ sx: { borderRadius: 2, minWidth: 180 } }}>
-        <MenuItem onClick={() => visualizarEvento(eventoSelecionado)} sx={{ gap: 1.5, py: 1.5 }}>
-          <VisibilityIcon fontSize="small" />
-          <Typography variant="body2">Ver detalhes</Typography>
-        </MenuItem>
-        <MenuItem onClick={() => editarEvento(eventoSelecionado)} sx={{ gap: 1.5, py: 1.5 }}>
-          <EditIcon fontSize="small" />
-          <Typography variant="body2">Editar</Typography>
-        </MenuItem>
-        <Divider />
-        <MenuItem onClick={excluirEvento} sx={{ gap: 1.5, py: 1.5, color: 'error.main' }}>
-          <DeleteIcon fontSize="small" />
-          <Typography variant="body2">Excluir</Typography>
-        </MenuItem>
-      </Menu>
 
       <Dialog open={modalOpen} onClose={() => setModalOpen(false)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
         <DialogTitle sx={{ pb: 2, display: 'flex', alignItems: 'center', gap: 1.5, borderBottom: '1px solid', borderColor: 'divider' }}>
@@ -489,6 +877,42 @@ const CronogramaAcademico = () => {
                     >
                       {prioridades[eventoSelecionado.prioridade]?.nome || 'Prioridade'}
                     </Box>
+                    {eventoSelecionado.status === 'pendente' && (
+                      <Chip
+                        label="⏳ Aguardando Aprovação"
+                        size="small"
+                        sx={{
+                          backgroundColor: '#FFF3E0',
+                          color: '#E65100',
+                          fontWeight: 600,
+                          fontSize: '0.7rem'
+                        }}
+                      />
+                    )}
+                    {eventoSelecionado.status === 'rejeitado' && (
+                      <Chip
+                        label="❌ Rejeitado"
+                        size="small"
+                        sx={{
+                          backgroundColor: '#FFEBEE',
+                          color: '#C62828',
+                          fontWeight: 600,
+                          fontSize: '0.7rem'
+                        }}
+                      />
+                    )}
+                    {eventoSelecionado.status === 'aprovado' && (
+                      <Chip
+                        label="✓ Aprovado"
+                        size="small"
+                        sx={{
+                          backgroundColor: '#E8F5E9',
+                          color: '#2E7D32',
+                          fontWeight: 600,
+                          fontSize: '0.7rem'
+                        }}
+                      />
+                    )}
                   </Box>
                 </Box>
               </Box>
@@ -510,11 +934,7 @@ const CronogramaAcademico = () => {
                         const dataInicio = eventoSelecionado.dataInicio?.includes('T') 
                           ? new Date(eventoSelecionado.dataInicio) 
                           : new Date(eventoSelecionado.dataInicio + 'T00:00:00');
-                        return dataInicio.toLocaleDateString('pt-BR', { 
-                          day: '2-digit',
-                          month: 'long',
-                          year: 'numeric'
-                        });
+                        return format(dataInicio, "dd 'de' MMMM 'de' yyyy", { locale: ptBR });
                       })()}
                       {eventoSelecionado.dataFim && eventoSelecionado.dataFim !== eventoSelecionado.dataInicio && (
                         <>
@@ -523,11 +943,7 @@ const CronogramaAcademico = () => {
                             const dataFim = eventoSelecionado.dataFim?.includes('T') 
                               ? new Date(eventoSelecionado.dataFim) 
                               : new Date(eventoSelecionado.dataFim + 'T00:00:00');
-                            return dataFim.toLocaleDateString('pt-BR', { 
-                              day: '2-digit',
-                              month: 'long',
-                              year: 'numeric'
-                            });
+                            return format(dataFim, "dd 'de' MMMM 'de' yyyy", { locale: ptBR });
                           })()}
                         </>
                       )}
@@ -584,6 +1000,73 @@ const CronogramaAcademico = () => {
                   </Box>
                 )}
 
+                {/* Informações de aprovação/rejeição */}
+                {eventoSelecionado.status === 'aprovado' && eventoSelecionado.aprovadoPorNome && (
+                  <Box sx={{ backgroundColor: '#E8F5E9', p: 2, borderRadius: 2, border: '1px solid #81C784' }}>
+                    <Typography variant="caption" sx={{ color: '#2E7D32', display: 'block', mb: 0.5, fontWeight: 600 }}>
+                      ✓ Aprovado por
+                    </Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 500, color: '#1B5E20' }}>
+                      {eventoSelecionado.aprovadoPorNome}
+                    </Typography>
+                    {eventoSelecionado.aprovadoEm && (
+                      <Typography variant="caption" sx={{ color: '#2E7D32', display: 'block', mt: 0.5 }}>
+                        {format(new Date(eventoSelecionado.aprovadoEm), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                      </Typography>
+                    )}
+                    {eventoSelecionado.observacaoAprovacao && (
+                      <Typography variant="body2" sx={{ mt: 1, fontStyle: 'italic', color: '#1B5E20' }}>
+                        "{eventoSelecionado.observacaoAprovacao}"
+                      </Typography>
+                    )}
+                  </Box>
+                )}
+
+                {eventoSelecionado.status === 'rejeitado' && eventoSelecionado.rejeitadoPorNome && (
+                  <Box sx={{ backgroundColor: '#FFEBEE', p: 2, borderRadius: 2, border: '1px solid #E57373' }}>
+                    <Typography variant="caption" sx={{ color: '#C62828', display: 'block', mb: 0.5, fontWeight: 600 }}>
+                      ❌ Rejeitado por
+                    </Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 500, color: '#B71C1C' }}>
+                      {eventoSelecionado.rejeitadoPorNome}
+                    </Typography>
+                    {eventoSelecionado.rejeitadoEm && (
+                      <Typography variant="caption" sx={{ color: '#C62828', display: 'block', mt: 0.5 }}>
+                        {format(new Date(eventoSelecionado.rejeitadoEm), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                      </Typography>
+                    )}
+                    {eventoSelecionado.motivoRejeicao && (
+                      <>
+                        <Typography variant="caption" sx={{ color: '#C62828', display: 'block', mt: 1, fontWeight: 600 }}>
+                          Motivo:
+                        </Typography>
+                        <Typography variant="body2" sx={{ fontStyle: 'italic', color: '#B71C1C' }}>
+                          "{eventoSelecionado.motivoRejeicao}"
+                        </Typography>
+                      </>
+                    )}
+                  </Box>
+                )}
+
+                {/* Alerta informativo para professores sobre eventos aprovados/rejeitados */}
+                {!isCoordenador && eventoSelecionado.status === 'aprovado' && (
+                  <Box sx={{ backgroundColor: '#E3F2FD', p: 2, borderRadius: 2, border: '1px solid #90CAF9' }}>
+                    <Typography variant="body2" sx={{ color: '#1565C0', display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <span>ℹ️</span>
+                      <span><strong>Evento aprovado:</strong> Não pode ser editado ou excluído por professores. Entre em contato com a coordenação se necessário.</span>
+                    </Typography>
+                  </Box>
+                )}
+
+                {!isCoordenador && eventoSelecionado.status === 'rejeitado' && (
+                  <Box sx={{ backgroundColor: '#FFF3E0', p: 2, borderRadius: 2, border: '1px solid #FFB74D' }}>
+                    <Typography variant="body2" sx={{ color: '#E65100', display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <span>⚠️</span>
+                      <span><strong>Evento rejeitado:</strong> Não pode ser editado ou excluído. Verifique o motivo da rejeição acima e crie um novo evento se necessário.</span>
+                    </Typography>
+                  </Box>
+                )}
+
                 <Divider />
 
                 {/* Informações adicionais */}
@@ -593,13 +1076,8 @@ const CronogramaAcademico = () => {
                   </Typography>
                   <Typography variant="body2" sx={{ fontWeight: 500 }}>
                     {eventoSelecionado.criadoEm ? 
-                      new Date(eventoSelecionado.criadoEm).toLocaleDateString('pt-BR', { 
-                        day: '2-digit',
-                        month: 'long',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      }) : 'Data não disponível'}
+                      format(new Date(eventoSelecionado.criadoEm), "dd 'de' MMMM 'de' yyyy 'às' HH:mm", { locale: ptBR })
+                      : 'Data não disponível'}
                   </Typography>
                 </Box>
               </Stack>
@@ -609,8 +1087,67 @@ const CronogramaAcademico = () => {
               px: 3,
               py: 2.5,
               backgroundColor: 'grey.50',
-              gap: 1.5
+              gap: 1.5,
+              flexWrap: 'wrap'
             }}>
+              {/* Botão Excluir - Regras:
+                  - Coordenador: pode excluir qualquer evento
+                  - Professor: pode excluir APENAS eventos pendentes que criou
+              */}
+              {(isCoordenador || 
+                (eventoSelecionado.status === 'pendente' && eventoSelecionado.criadoPor === user?.uid)
+              ) && (
+                <Button 
+                  onClick={excluirEvento}
+                  variant="text"
+                  color="error"
+                  startIcon={<DeleteIcon />}
+                  sx={{ 
+                    textTransform: 'none',
+                    fontWeight: 500,
+                    mr: 'auto'
+                  }}
+                >
+                  Excluir
+                </Button>
+              )}
+
+              {/* Botões de aprovação para coordenadores */}
+              {isCoordenador && eventoSelecionado.status === 'pendente' && (
+                <>
+                  <Button 
+                    onClick={() => {
+                      setAcaoAprovacao('aprovar');
+                      setModalVisualizarOpen(false);
+                      setModalAprovarOpen(true);
+                    }}
+                    variant="contained"
+                    color="success"
+                    sx={{ 
+                      textTransform: 'none',
+                      fontWeight: 500
+                    }}
+                  >
+                    ✓ Aprovar
+                  </Button>
+                  <Button 
+                    onClick={() => {
+                      setAcaoAprovacao('rejeitar');
+                      setModalVisualizarOpen(false);
+                      setModalAprovarOpen(true);
+                    }}
+                    variant="outlined"
+                    color="error"
+                    sx={{ 
+                      textTransform: 'none',
+                      fontWeight: 500
+                    }}
+                  >
+                    ✕ Rejeitar
+                  </Button>
+                </>
+              )}
+
               <Button 
                 onClick={() => setModalVisualizarOpen(false)}
                 variant="text"
@@ -622,23 +1159,360 @@ const CronogramaAcademico = () => {
               >
                 Fechar
               </Button>
-              <Button 
-                onClick={() => {
-                  setModalVisualizarOpen(false);
-                  editarEvento(eventoSelecionado);
-                }}
-                variant="outlined"
-                startIcon={<EditIcon />}
-                sx={{ 
-                  textTransform: 'none',
-                  fontWeight: 500
-                }}
-              >
-                Editar evento
-              </Button>
+
+              {/* Botão Editar - Regras:
+                  - Coordenador: pode editar qualquer evento (exceto rejeitados)
+                  - Professor: pode editar APENAS eventos pendentes que criou
+              */}
+              {eventoSelecionado.status !== 'rejeitado' && 
+               (isCoordenador || 
+                (eventoSelecionado.status === 'pendente' && eventoSelecionado.criadoPor === user?.uid)
+               ) && (
+                <Button 
+                  onClick={() => {
+                    setModalVisualizarOpen(false);
+                    editarEvento(eventoSelecionado);
+                  }}
+                  variant="outlined"
+                  startIcon={<EditIcon />}
+                  sx={{ 
+                    textTransform: 'none',
+                    fontWeight: 500
+                  }}
+                >
+                  Editar evento
+                </Button>
+              )}
             </DialogActions>
           </>
         )}
+      </Dialog>
+
+      {/* Modal de Lista de Eventos Pendentes */}
+      <Dialog
+        open={modalListaPendentesOpen}
+        onClose={() => setModalListaPendentesOpen(false)}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{
+          sx: { borderRadius: 3 }
+        }}
+      >
+        <DialogTitle sx={{ 
+          pb: 2,
+          borderBottom: '1px solid',
+          borderColor: 'divider',
+          backgroundColor: '#FFF3E0'
+        }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Box sx={{ 
+              width: 48, 
+              height: 48, 
+              borderRadius: '50%', 
+              backgroundColor: '#F59E0B', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center',
+              fontSize: '1.5rem'
+            }}>
+              ⏳
+            </Box>
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: 600, color: '#E65100' }}>
+                Eventos Aguardando Aprovação
+              </Typography>
+              <Typography variant="body2" sx={{ color: '#F57C00' }}>
+                {Object.values(eventos).filter(e => e.status === 'pendente').length} evento(s) pendente(s)
+              </Typography>
+            </Box>
+          </Box>
+        </DialogTitle>
+        
+        <DialogContent sx={{ p: 0 }}>
+          <List sx={{ py: 0 }}>
+            {Object.entries(eventos)
+              .filter(([id, evento]) => evento.status === 'pendente')
+              .map(([id, evento], index, array) => (
+                <React.Fragment key={id}>
+                  <ListItem
+                    sx={{
+                      py: 2,
+                      px: 3,
+                      '&:hover': {
+                        backgroundColor: 'grey.50'
+                      }
+                    }}
+                  >
+                    <ListItemButton
+                      onClick={() => {
+                        setEventoSelecionado({ id, ...evento });
+                        setModalListaPendentesOpen(false);
+                        visualizarEvento({ id, ...evento });
+                      }}
+                      sx={{ 
+                        borderRadius: 2,
+                        display: 'flex',
+                        gap: 2,
+                        alignItems: 'flex-start'
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          width: 48,
+                          height: 48,
+                          borderRadius: 2,
+                          backgroundColor: tiposEventos[evento.tipo]?.cor || '#039BE5',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0
+                        }}
+                      >
+                        <EventIcon sx={{ color: 'white', fontSize: 24 }} />
+                      </Box>
+                      
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Typography variant="h6" sx={{ fontWeight: 600, mb: 0.5 }}>
+                          {evento.titulo}
+                        </Typography>
+                        
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, flexWrap: 'wrap' }}>
+                          <Chip
+                            label={tiposEventos[evento.tipo]?.nome}
+                            size="small"
+                            sx={{
+                              backgroundColor: tiposEventos[evento.tipo]?.cor || '#039BE5',
+                              color: 'white',
+                              fontWeight: 500,
+                              fontSize: '0.7rem'
+                            }}
+                          />
+                          <Chip
+                            label={format(new Date(evento.dataInicio + 'T00:00:00'), "dd/MM/yyyy", { locale: ptBR })}
+                            size="small"
+                            variant="outlined"
+                            sx={{ fontSize: '0.7rem' }}
+                          />
+                          {evento.turmaId && turmas[evento.turmaId] && (
+                            <Chip
+                              label={turmas[evento.turmaId].nome}
+                              size="small"
+                              variant="outlined"
+                              color="primary"
+                              sx={{ fontSize: '0.7rem' }}
+                            />
+                          )}
+                        </Box>
+                        
+                        {evento.descricao && (
+                          <Typography 
+                            variant="body2" 
+                            sx={{ 
+                              color: 'text.secondary',
+                              mb: 1,
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              display: '-webkit-box',
+                              WebkitLineClamp: 2,
+                              WebkitBoxOrient: 'vertical'
+                            }}
+                          >
+                            {evento.descricao}
+                          </Typography>
+                        )}
+                        
+                        <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
+                          Criado por: <strong>{evento.criadoPorNome}</strong> em {format(new Date(evento.criadoEm), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                        </Typography>
+                      </Box>
+                      
+                      <Box sx={{ display: 'flex', gap: 1, flexShrink: 0 }}>
+                        <Button
+                          variant="contained"
+                          color="success"
+                          size="small"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEventoSelecionado({ id, ...evento });
+                            setAcaoAprovacao('aprovar');
+                            setModalListaPendentesOpen(false);
+                            setModalAprovarOpen(true);
+                          }}
+                          sx={{ 
+                            textTransform: 'none',
+                            minWidth: 90
+                          }}
+                        >
+                          ✓ Aprovar
+                        </Button>
+                        <Button
+                          variant="outlined"
+                          color="error"
+                          size="small"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEventoSelecionado({ id, ...evento });
+                            setAcaoAprovacao('rejeitar');
+                            setModalListaPendentesOpen(false);
+                            setModalAprovarOpen(true);
+                          }}
+                          sx={{ 
+                            textTransform: 'none',
+                            minWidth: 90
+                          }}
+                        >
+                          ✕ Rejeitar
+                        </Button>
+                      </Box>
+                    </ListItemButton>
+                  </ListItem>
+                  {index < array.length - 1 && <Divider />}
+                </React.Fragment>
+              ))}
+          </List>
+          
+          {Object.values(eventos).filter(e => e.status === 'pendente').length === 0 && (
+            <Box sx={{ py: 8, textAlign: 'center' }}>
+              <Typography variant="h6" sx={{ color: 'text.secondary', mb: 1 }}>
+                🎉 Nenhum evento pendente
+              </Typography>
+              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                Todos os eventos foram aprovados ou rejeitados
+              </Typography>
+            </Box>
+          )}
+        </DialogContent>
+        
+        <DialogActions sx={{ 
+          px: 3,
+          py: 2.5,
+          borderTop: '1px solid',
+          borderColor: 'divider'
+        }}>
+          <Button 
+            onClick={() => setModalListaPendentesOpen(false)}
+            variant="contained"
+            sx={{ 
+              textTransform: 'none',
+              fontWeight: 500
+            }}
+          >
+            Fechar
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Modal de Aprovação/Rejeição */}
+      <Dialog
+        open={modalAprovarOpen}
+        onClose={() => {
+          setModalAprovarOpen(false);
+          setObservacaoAprovacao('');
+        }}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: { borderRadius: 3 }
+        }}
+      >
+        <DialogTitle sx={{ 
+          pb: 2,
+          borderBottom: '1px solid',
+          borderColor: 'divider',
+          backgroundColor: acaoAprovacao === 'aprovar' ? '#E8F5E9' : '#FFEBEE'
+        }}>
+          <Typography variant="h6" sx={{ fontWeight: 600, color: acaoAprovacao === 'aprovar' ? '#2E7D32' : '#C62828' }}>
+            {acaoAprovacao === 'aprovar' ? '✓ Aprovar Evento' : '✕ Rejeitar Evento'}
+          </Typography>
+          <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
+            {eventoSelecionado?.titulo}
+          </Typography>
+        </DialogTitle>
+        
+        <DialogContent sx={{ pt: 3 }}>
+          <Stack spacing={3}>
+            <TextField
+              fullWidth
+              multiline
+              rows={4}
+              label={acaoAprovacao === 'rejeitar' ? 'Motivo da Rejeição (obrigatório)' : 'Observação (opcional)'}
+              placeholder={acaoAprovacao === 'rejeitar' ? 'Informe o motivo da rejeição...' : 'Adicione comentários sobre este evento...'}
+              value={observacaoAprovacao}
+              onChange={(e) => setObservacaoAprovacao(e.target.value)}
+              required={acaoAprovacao === 'rejeitar'}
+              error={acaoAprovacao === 'rejeitar' && !observacaoAprovacao.trim()}
+              helperText={acaoAprovacao === 'rejeitar' && !observacaoAprovacao.trim() ? 'O motivo da rejeição é obrigatório' : ''}
+            />
+            
+            {eventoSelecionado && (
+              <Box sx={{ backgroundColor: 'grey.50', p: 2, borderRadius: 2 }}>
+                <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 1 }}>
+                  Detalhes do Evento
+                </Typography>
+                <Typography variant="body2" sx={{ mb: 0.5 }}>
+                  <strong>Tipo:</strong> {tiposEventos[eventoSelecionado.tipo]?.nome}
+                </Typography>
+                <Typography variant="body2" sx={{ mb: 0.5 }}>
+                  <strong>Data:</strong> {format(new Date(eventoSelecionado.dataInicio + 'T00:00:00'), "dd/MM/yyyy", { locale: ptBR })}
+                </Typography>
+                <Typography variant="body2">
+                  <strong>Criado por:</strong> {eventoSelecionado.criadoPorNome}
+                </Typography>
+              </Box>
+            )}
+          </Stack>
+        </DialogContent>
+        
+        <DialogActions sx={{ 
+          px: 3,
+          py: 2.5,
+          borderTop: '1px solid',
+          borderColor: 'divider',
+          gap: 1.5
+        }}>
+          <Button 
+            onClick={() => {
+              setModalAprovarOpen(false);
+              setObservacaoAprovacao('');
+              setModalVisualizarOpen(true);
+            }}
+            variant="text"
+            sx={{ 
+              textTransform: 'none',
+              fontWeight: 500,
+              color: 'text.secondary',
+              mr: 'auto'
+            }}
+          >
+            Voltar
+          </Button>
+          
+          {acaoAprovacao === 'rejeitar' ? (
+            <Button 
+              onClick={rejeitarEvento}
+              variant="contained"
+              color="error"
+              sx={{ 
+                textTransform: 'none',
+                fontWeight: 500
+              }}
+            >
+              ✕ Confirmar Rejeição
+            </Button>
+          ) : (
+            <Button 
+              onClick={aprovarEvento}
+              variant="contained"
+              color="success"
+              sx={{ 
+                textTransform: 'none',
+                fontWeight: 500
+              }}
+            >
+              ✓ Confirmar Aprovação
+            </Button>
+          )}
+        </DialogActions>
       </Dialog>
 
       {/* Dialog de Mensagens */}
@@ -697,6 +1571,89 @@ const CronogramaAcademico = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* CSS customizado para melhorar a aparência do calendário */}
+      <style jsx global>{`
+        .rbc-calendar {
+          font-family: 'Roboto', sans-serif;
+        }
+        
+        .rbc-header {
+          padding: 12px 4px;
+          font-weight: 600;
+          font-size: 0.875rem;
+          color: #666;
+          text-transform: uppercase;
+          border-bottom: 2px solid #e0e0e0 !important;
+        }
+        
+        .rbc-month-view {
+          border: none;
+          border-radius: 8px;
+          overflow: hidden;
+        }
+        
+        .rbc-month-row {
+          border: none;
+          min-height: 100px;
+        }
+        
+        .rbc-day-bg {
+          border: 1px solid #f0f0f0 !important;
+        }
+        
+        .rbc-today {
+          background-color: #f0f4ff !important;
+        }
+        
+        .rbc-off-range-bg {
+          background-color: #fafafa;
+        }
+        
+        .rbc-date-cell {
+          padding: 8px;
+          text-align: right;
+        }
+        
+        .rbc-now {
+          font-weight: 700;
+          color: #667eea;
+        }
+        
+        .rbc-event {
+          padding: 3px 6px;
+          border-radius: 4px;
+          border: none !important;
+          cursor: pointer;
+          margin: 1px 2px;
+        }
+        
+        .rbc-event:hover {
+          opacity: 1 !important;
+        }
+        
+        .rbc-show-more {
+          background-color: transparent;
+          color: #667eea;
+          font-weight: 500;
+          font-size: 0.75rem;
+          padding: 2px 4px;
+          margin: 2px;
+        }
+        
+        .rbc-overlay {
+          border-radius: 8px;
+          box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+          border: 1px solid #e0e0e0;
+        }
+        
+        .rbc-overlay-header {
+          padding: 12px;
+          border-bottom: 2px solid #e0e0e0;
+          font-weight: 600;
+          background-color: #f5f5f5;
+        }
+      `}</style>
     </Box>
   );
 };

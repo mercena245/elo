@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useEffect, useState, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import SidebarMenu from '../../components/SidebarMenu';
 import { 
   Card, 
@@ -207,6 +208,192 @@ const RematriculaIndicator = ({ aluno, financeiroService }) => {
   );
 };
 
+// Componente para botão de atalho de inadimplência
+const InadimplenciaBotaoAtalho = ({ aluno }) => {
+  const router = useRouter();
+  const { financeiroService } = useSchoolServices();
+  const [titulosEmAtraso, setTitulosEmAtraso] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [modalOpen, setModalOpen] = useState(false);
+
+  useEffect(() => {
+    const buscarTitulosEmAtraso = async () => {
+      try {
+        if (!financeiroService?.buscarTitulosAluno) {
+          setLoading(false);
+          return;
+        }
+
+        const resultado = await financeiroService.buscarTitulosAluno(aluno.id, { status: 'pendente' });
+        
+        if (resultado.success && resultado.titulos) {
+          const hoje = new Date().toISOString().split('T')[0];
+          const titulosVencidos = resultado.titulos.filter(titulo => titulo.vencimento < hoje);
+          setTitulosEmAtraso(titulosVencidos);
+        }
+      } catch (error) {
+        console.error('Erro ao buscar títulos em atraso:', error);
+      }
+      setLoading(false);
+    };
+
+    buscarTitulosEmAtraso();
+  }, [aluno.id, financeiroService]);
+
+  const handleClickTitulo = (titulo) => {
+    // Fechar modal
+    setModalOpen(false);
+    
+    // Redirecionar para financeiro com filtros específicos do título
+    const params = new URLSearchParams({
+      tab: 'titulos',
+      aluno: aluno.nome, // Usar nome em vez de ID para o filtro
+      status: 'vencido', // Usar 'vencido' (singular) conforme getStatusVisual
+      vencidos: 'true'
+    });
+    
+    router.push(`/financeiro?${params.toString()}`);
+  };
+
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+        <CircularProgress size={16} />
+      </Box>
+    );
+  }
+
+  if (titulosEmAtraso.length === 0) {
+    return null;
+  }
+
+  return (
+    <>
+      <Button
+        variant="outlined"
+        size="small"
+        onClick={() => setModalOpen(true)}
+        sx={{
+          minWidth: 'auto',
+          px: 1.5,
+          py: 0.5,
+          borderColor: '#dc2626',
+          color: '#dc2626',
+          fontSize: '0.75rem',
+          fontWeight: 'bold',
+          '&:hover': {
+            bgcolor: '#fef2f2',
+            borderColor: '#b91c1c'
+          }
+        }}
+        title={`${titulosEmAtraso.length} título(s) em atraso`}
+      >
+        ⚠️ {titulosEmAtraso.length} Em Atraso
+      </Button>
+
+      {/* Modal com lista de títulos em atraso */}
+      <Dialog
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ 
+          bgcolor: '#fef2f2', 
+          color: '#dc2626',
+          borderBottom: '1px solid #fecaca'
+        }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <span>⚠️</span>
+            <span>Títulos em Atraso - {aluno.nome}</span>
+          </Box>
+        </DialogTitle>
+        
+        <DialogContent sx={{ p: 0 }}>
+          <List>
+            {titulosEmAtraso.map((titulo, index) => {
+              const diasAtraso = Math.floor((new Date() - new Date(titulo.vencimento)) / (1000 * 60 * 60 * 24));
+              
+              return (
+                <ListItem
+                  key={titulo.id || index}
+                  sx={{
+                    borderBottom: index < titulosEmAtraso.length - 1 ? '1px solid #f1f5f9' : 'none',
+                    cursor: 'pointer',
+                    '&:hover': {
+                      bgcolor: '#fef2f2'
+                    }
+                  }}
+                  onClick={() => handleClickTitulo(titulo)}
+                >
+                  <ListItemText
+                    primary={
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                          {titulo.descricao}
+                        </Typography>
+                        <Typography variant="h6" sx={{ color: '#dc2626', fontWeight: 'bold' }}>
+                          R$ {(titulo.valor || 0).toFixed(2)}
+                        </Typography>
+                      </Box>
+                    }
+                    secondary={
+                      <Box sx={{ mt: 0.5 }}>
+                        <Typography variant="body2" sx={{ color: '#dc2626', fontWeight: 500 }}>
+                          Venceu em: {new Date(titulo.vencimento).toLocaleDateString('pt-BR')} 
+                          ({diasAtraso} dia{diasAtraso !== 1 ? 's' : ''} de atraso)
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: '#6b7280' }}>
+                          Tipo: {titulo.tipo} | Clique para ver no financeiro
+                        </Typography>
+                      </Box>
+                    }
+                  />
+                </ListItem>
+              );
+            })}
+          </List>
+        </DialogContent>
+        
+        <DialogActions sx={{ 
+          px: 3, 
+          py: 2, 
+          bgcolor: '#f9fafb',
+          borderTop: '1px solid #e5e7eb'
+        }}>
+          <Button 
+            onClick={() => setModalOpen(false)}
+            sx={{ color: '#6b7280' }}
+          >
+            Fechar
+          </Button>
+          <Button
+            variant="contained"
+            onClick={() => {
+              setModalOpen(false);
+              const params = new URLSearchParams({
+                tab: 'titulos',
+                aluno: aluno.nome, // Usar nome em vez de ID
+                status: 'pendente',
+                vencidos: 'true'
+              });
+              router.push(`/financeiro?${params.toString()}`);
+            }}
+            sx={{
+              bgcolor: '#dc2626',
+              '&:hover': {
+                bgcolor: '#b91c1c'
+              }
+            }}
+          >
+            Ir para Financeiro
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </>
+  );
+};
+
 // Componente para detalhes de pré-matrícula
 const PreMatriculaDetalhes = ({ aluno }) => {
   const [detalhes, setDetalhes] = useState(null);
@@ -335,6 +522,9 @@ const PreMatriculaDetalhes = ({ aluno }) => {
 };
 
 const Alunos = () => {
+  // Router para navegação
+  const router = useRouter();
+  
   // Services multi-tenant
   const { auditService, financeiroService, LOG_ACTIONS, isReady: servicesReady } = useSchoolServices();
 
@@ -708,6 +898,20 @@ const Alunos = () => {
       console.error('💥 Erro ao buscar títulos vencidos:', error);
       return [];
     }
+  };
+
+  // Função para redirecionar para financeiro com filtros de inadimplência
+  const redirecionarParaFinanceiroInadimplencia = (aluno, titulosEmAtraso) => {
+    // Criar parâmetros de busca para filtrar os títulos em atraso do aluno
+    const params = new URLSearchParams({
+      tab: 'titulos',
+      aluno: aluno.id,
+      status: 'pendente',
+      vencidos: 'true'
+    });
+    
+    // Navegar para a tela do financeiro com os filtros aplicados
+    router.push(`/financeiro?${params.toString()}`);
   };
 
   // Função para buscar títulos em aberto (mantida para compatibilidade)
@@ -2703,9 +2907,17 @@ const Alunos = () => {
                               {/* Status Financeiro */}
                               {aluno.financeiro && (
                                 <Box sx={{ mt: 2, p: 2, bgcolor: 'white', borderRadius: 1, border: '1px solid #e2e8f0' }}>
-                                  <Typography component="div" variant="body2" sx={{ fontWeight: 'bold', color: '#1e293b', mb: 1 }}>
-                                    💰 Informações Financeiras
-                                  </Typography>
+                                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                                    <Typography component="div" variant="body2" sx={{ fontWeight: 'bold', color: '#1e293b' }}>
+                                      💰 Informações Financeiras
+                                    </Typography>
+                                    
+                                    {/* Botão de atalho para inadimplência */}
+                                    {(aluno.financeiro.status === 'inadimplente' || (isInativo && aluno.inativacaoPorInadimplencia)) && (
+                                      <InadimplenciaBotaoAtalho aluno={aluno} />
+                                    )}
+                                  </Box>
+                                  
                                   <Typography component="span" variant="body2" sx={{ 
                                     color: aluno.financeiro.status === 'ativo' ? '#059669' : aluno.financeiro.status === 'inadimplente' ? '#d97706' : '#dc2626',
                                     fontWeight: 500,

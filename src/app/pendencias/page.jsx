@@ -35,7 +35,8 @@ import {
   Description as DescriptionIcon,
   AttachMoney as AttachMoneyIcon,
   Person as PersonIcon,
-  Mail as MailIcon
+  Mail as MailIcon,
+  Event as EventIcon
 } from '@mui/icons-material';
 import SidebarMenu from '../../components/SidebarMenu';
 import { useAuthUser } from '../../hooks/useAuthUser';
@@ -52,6 +53,7 @@ const PendenciasPage = () => {
   const [planosPendentes, setPlanosPendentes] = useState([]);
   const [relatoriosPendentes, setRelatoriosPendentes] = useState([]);
   const [titulosEmAnalise, setTitulosEmAnalise] = useState([]);
+  const [eventosPendentes, setEventosPendentes] = useState([]);
   const [turmas, setTurmas] = useState({});
   const [disciplinas, setDisciplinas] = useState({});
   const [alunos, setAlunos] = useState({});
@@ -59,7 +61,8 @@ const PendenciasPage = () => {
   const [totalRelatorios, setTotalRelatorios] = useState(0);
   const [totalTitulos, setTotalTitulos] = useState(0);
   const [totalMensagensPendentes, setTotalMensagensPendentes] = useState(0);
-  const totalPendenciasPagina = totalPendencias + totalRelatorios + totalTitulos + totalMensagensPendentes;
+  const [totalEventos, setTotalEventos] = useState(0);
+  const totalPendenciasPagina = totalPendencias + totalRelatorios + totalTitulos + totalMensagensPendentes + totalEventos;
 
   useEffect(() => {
     // Aguardar até que userRole esteja definido
@@ -86,7 +89,8 @@ const PendenciasPage = () => {
         turmasData,
         disciplinasData,
         alunosData,
-        mensagensData
+        mensagensData,
+        cronogramaData
       ] = await Promise.all([
         getData('planos-aula'),
         getData('relatorios-pedagogicos'),
@@ -94,7 +98,8 @@ const PendenciasPage = () => {
         getData('turmas'),
         getData('disciplinas'),
         getData('alunos'),
-        getData(mensagensPath)
+        getData(mensagensPath),
+        getData('cronograma-academico')
       ]);
 
       setTurmas(turmasData || {});
@@ -218,6 +223,30 @@ const PendenciasPage = () => {
         setTotalMensagensPendentes(0);
       }
 
+      // Processar eventos do cronograma acadêmico pendentes
+      if (cronogramaData) {
+        console.log('📅 [Pendências] Dados do cronograma:', cronogramaData);
+        const eventosList = Object.entries(cronogramaData).map(([id, evento]) => ({
+          id,
+          ...evento
+        }));
+
+        console.log('📋 [Pendências] Lista de eventos:', eventosList);
+        const eventosPendentesLista = eventosList.filter(e => e.status === 'pendente');
+        console.log('⚠️ [Pendências] Eventos pendentes encontrados:', eventosPendentesLista.length);
+        console.log('📊 [Pendências] Eventos filtrados:', eventosPendentesLista);
+        
+        // Ordenar por data de início (mais próximos primeiro)
+        eventosPendentesLista.sort((a, b) => new Date(a.dataInicio) - new Date(b.dataInicio));
+
+        setEventosPendentes(eventosPendentesLista);
+        setTotalEventos(eventosPendentesLista.length);
+      } else {
+        console.log('❌ [Pendências] Nenhum dado de cronograma encontrado');
+        setEventosPendentes([]);
+        setTotalEventos(0);
+      }
+
     } catch (error) {
       console.error('Erro ao carregar pendências:', error);
     } finally {
@@ -326,7 +355,7 @@ const PendenciasPage = () => {
                 {totalPendenciasPagina} pendência(s) aguardando ação.
               </Typography>
               <Typography variant="body2">
-                Planos: {totalPendencias} · Relatórios: {totalRelatorios} · Pagamentos: {totalTitulos} · Mensagens: {totalMensagensPendentes}
+                Planos: {totalPendencias} · Relatórios: {totalRelatorios} · Pagamentos: {totalTitulos} · Mensagens: {totalMensagensPendentes} · Eventos: {totalEventos}
               </Typography>
             </Alert>
           )}
@@ -428,6 +457,28 @@ const PendenciasPage = () => {
 
           <Grid item xs={12} md={3}>
             <Card sx={{ 
+              bgcolor: '#FCE7F3', 
+              borderLeft: '4px solid #EC4899',
+              boxShadow: 2
+            }}>
+              <CardContent>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <EventIcon sx={{ fontSize: 40, color: '#EC4899' }} />
+                  <Box>
+                    <Typography variant="h3" sx={{ fontWeight: 'bold', color: '#831843' }}>
+                      {totalEventos}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Eventos do Cronograma
+                    </Typography>
+                  </Box>
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          <Grid item xs={12} md={3}>
+            <Card sx={{ 
               bgcolor: '#D1FAE5', 
               borderLeft: '4px solid #10B981',
               boxShadow: 2
@@ -437,7 +488,7 @@ const PendenciasPage = () => {
                   <CheckCircleIcon sx={{ fontSize: 40, color: '#10B981' }} />
                   <Box>
                     <Typography variant="h3" sx={{ fontWeight: 'bold', color: '#065F46' }}>
-                      {totalPendencias + totalRelatorios + totalTitulos + totalMensagensPendentes}
+                      {totalPendencias + totalRelatorios + totalTitulos + totalMensagensPendentes + totalEventos}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
                       Total de Pendências
@@ -770,6 +821,98 @@ const PendenciasPage = () => {
                   </AccordionDetails>
                 </Accordion>
               ))
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Eventos do Cronograma Acadêmico */}
+        <Card sx={{ mt: 3 }}>
+          <CardContent>
+            <Typography variant="h6" sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 1 }}>
+              <EventIcon sx={{ color: '#EC4899' }} />
+              Eventos do Cronograma Aguardando Aprovação
+            </Typography>
+
+            {totalEventos === 0 ? (
+              <Alert severity="info" sx={{ mt: 2 }}>
+                <Typography variant="h6">✅ Tudo certo!</Typography>
+                <Typography>Não há eventos do cronograma aguardando aprovação no momento.</Typography>
+              </Alert>
+            ) : (
+              <List>
+                {eventosPendentes.map((evento, index) => (
+                  <React.Fragment key={evento.id}>
+                    {index > 0 && <Divider />}
+                    <ListItem
+                      sx={{ 
+                        py: 2,
+                        '&:hover': { 
+                          bgcolor: '#fdf2f8',
+                          cursor: 'pointer'
+                        },
+                        transition: 'background-color 0.2s'
+                      }}
+                      onClick={() => router.push(`/sala-professor?tab=cronograma&evento=${evento.id}`)}
+                    >
+                      <ListItemAvatar>
+                        <Avatar sx={{ 
+                          bgcolor: '#FCE7F3',
+                          color: '#EC4899'
+                        }}>
+                          <EventIcon />
+                        </Avatar>
+                      </ListItemAvatar>
+                      
+                      <ListItemText
+                        primary={
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                            <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
+                              {evento.titulo}
+                            </Typography>
+                            <Chip 
+                              label="Pendente" 
+                              color="warning"
+                              size="small"
+                            />
+                          </Box>
+                        }
+                        secondary={
+                          <Box sx={{ mt: 1 }}>
+                            <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                              📅 <strong>Data de Início:</strong> {new Date(evento.dataInicio).toLocaleDateString('pt-BR', { 
+                                day: '2-digit', 
+                                month: 'long', 
+                                year: 'numeric'
+                              })}
+                            </Typography>
+                            {evento.dataFim && evento.dataFim !== evento.dataInicio && (
+                              <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                                📅 <strong>Data de Término:</strong> {new Date(evento.dataFim).toLocaleDateString('pt-BR', { 
+                                  day: '2-digit', 
+                                  month: 'long', 
+                                  year: 'numeric'
+                                })}
+                              </Typography>
+                            )}
+                            {evento.descricao && (
+                              <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                                📝 <strong>Descrição:</strong> {evento.descricao}
+                              </Typography>
+                            )}
+                            <Typography variant="body2" color="text.secondary">
+                              👤 <strong>Criado por:</strong> {evento.criadoPorNome || 'Não informado'}
+                            </Typography>
+                          </Box>
+                        }
+                      />
+                      
+                      <IconButton edge="end" sx={{ color: '#EC4899' }}>
+                        <ChevronRightIcon />
+                      </IconButton>
+                    </ListItem>
+                  </React.Fragment>
+                ))}
+              </List>
             )}
           </CardContent>
         </Card>

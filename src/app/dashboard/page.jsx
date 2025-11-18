@@ -241,7 +241,8 @@ const Dashboard = () => {
           planosData,
           relatoriosData,
           titulosData,
-          mensagensData
+          mensagensData,
+          cronogramaData
         ] = await Promise.all([
           getData('alunos'),
           getData('colaboradores'),
@@ -254,7 +255,8 @@ const Dashboard = () => {
           getData('planos-aula'),
           getData('relatorios-pedagogicos'),
           getData('titulos_financeiros'),
-          getData(mensagensPath)
+          getData(mensagensPath),
+          getData('cronograma-academico')
         ]);
 
         // Processar alunos
@@ -339,6 +341,19 @@ const Dashboard = () => {
             msg => msg.requerAprovacao && msg.statusAprovacao === 'pendente'
           );
           totalPendenciasCount += mensagensPendentes.length;
+        }
+
+        // Contar eventos do cronograma acadêmico pendentes
+        if (cronogramaData) {
+          console.log('📅 [Dashboard] Dados do cronograma:', cronogramaData);
+          const eventosList = Object.values(cronogramaData);
+          console.log('📋 [Dashboard] Lista de eventos:', eventosList);
+          const eventosPendentes = eventosList.filter(e => e.status === 'pendente');
+          totalPendenciasCount += eventosPendentes.length;
+          console.log('⚠️ [Dashboard] Eventos pendentes encontrados:', eventosPendentes.length);
+          console.log('📊 [Dashboard] Eventos filtrados:', eventosPendentes);
+        } else {
+          console.log('❌ [Dashboard] Nenhum dado de cronograma encontrado');
         }
 
         setTotalPendencias(totalPendenciasCount);

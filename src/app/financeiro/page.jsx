@@ -93,6 +93,8 @@ const FinanceiroPage = () => {
   // Hook para acessar banco da escola
   const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, storage: schoolStorage } = useSchoolDatabase();
 
+  console.log('🏦 [FinanceiroPage] Componente carregado');
+
   // 🔍 Debug inicial
   useEffect(() => {
     console.log('🔍 [FinanceiroPage] Estado Inicial:', {
@@ -409,11 +411,14 @@ const FinanceiroPage = () => {
     if (roleChecked && userRole && isReady && servicesReady) {
       console.log('✅ Sistema pronto, carregando dados financeiros...');
       fetchData();
-      // Definir tab inicial baseada no perfil
-      if (isPai()) {
-        setTabValue(1); // Tab de títulos para pais
-      } else {
-        setTabValue(0); // Tab de dashboard para coordenadores/professores
+      // Definir tab inicial baseada no perfil APENAS se não houver parâmetro de tab na URL
+      const tabParam = searchParams.get('tab');
+      if (!tabParam) {
+        if (isPai()) {
+          setTabValue(1); // Tab de títulos para pais
+        } else {
+          setTabValue(0); // Tab de dashboard para coordenadores/professores
+        }
       }
     } else {
       console.log('⏳ Aguardando sistema estar pronto:', {
@@ -453,6 +458,52 @@ const FinanceiroPage = () => {
       fetchContasPagar();
     }
   }, [exibirPorPeriodo, periodoSelecionado, userId, isReady]);
+
+  // Aplicar filtros da URL aos filtros de títulos
+  useEffect(() => {
+    // Só aplicar se os dados estiverem carregados e houver parâmetros na URL
+    if (alunos.length === 0) return;
+    
+    const alunoParam = searchParams.get('aluno');
+    const statusParam = searchParams.get('status');
+    const vencidosParam = searchParams.get('vencidos');
+    const tipoParam = searchParams.get('tipo');
+    
+    // Aplicar filtros apenas se houver parâmetros na URL
+    if (alunoParam || statusParam || vencidosParam || tipoParam) {
+      console.log('🔍 [Financeiro] Aplicando filtros da URL:', {
+        aluno: alunoParam,
+        status: statusParam,
+        vencidos: vencidosParam,
+        tipo: tipoParam
+      });
+      
+      // Determinar se alunoParam é um ID ou nome
+      let alunoFiltro = alunoParam;
+      if (alunoParam && alunos.length > 0) {
+        // Verificar se é um ID válido
+        const alunoEncontrado = alunos.find(a => a.id === alunoParam);
+        if (alunoEncontrado) {
+          // É um ID válido, usar o ID para o filtro
+          alunoFiltro = alunoParam;
+        } else {
+          // Não é um ID, usar como nome
+          alunoFiltro = alunoParam;
+        }
+      }
+      
+      setFiltrosTitulos(prev => ({
+        ...prev,
+        aluno: alunoFiltro || prev.aluno,
+        status: statusParam || prev.status,
+        tipo: tipoParam || prev.tipo,
+        // Se vencidos=true, definir data fim como hoje para mostrar apenas vencidos
+        ...(vencidosParam === 'true' && {
+          dataFim: new Date().toISOString().split('T')[0]
+        })
+      }));
+    }
+  }, [searchParams, alunos]);
 
   // Função para carregar dados do mês atual
   const carregarDadosMesAtual = async () => {
@@ -1198,14 +1249,25 @@ const FinanceiroPage = () => {
 
   // Função para filtrar títulos
   const filtrarTitulos = () => {
-    return titulos.filter(titulo => {
+    console.log('🔍 [filtrarTitulos] Filtros ativos:', filtrosTitulos);
+    console.log('📋 [filtrarTitulos] Total de títulos:', titulos.length);
+    
+    const resultado = titulos.filter(titulo => {
       const aluno = alunos.find(a => a.id === titulo.alunoId);
       const alunoNome = aluno?.nome?.toLowerCase() || '';
       const alunoTurma = aluno?.turmaId || '';
       
-      // Filtro por aluno
-      if (filtrosTitulos.aluno && !alunoNome.includes(filtrosTitulos.aluno.toLowerCase())) {
-        return false;
+      // Filtro por aluno (por nome ou ID)
+      if (filtrosTitulos.aluno) {
+        const filtroAluno = filtrosTitulos.aluno.toLowerCase();
+        const matchNome = alunoNome.includes(filtroAluno);
+        const matchId = titulo.alunoId === filtrosTitulos.aluno;
+        
+        console.log(`📊 [filtrarTitulos] Título: ${titulo.descricao} - Aluno: ${alunoNome} - Match: ${matchNome || matchId}`);
+        
+        if (!matchNome && !matchId) {
+          return false;
+        }
       }
       
       // Filtro por turma
@@ -1243,6 +1305,9 @@ const FinanceiroPage = () => {
       
       return true;
     });
+    
+    console.log('✅ [filtrarTitulos] Títulos após filtros:', resultado.length);
+    return resultado;
   };
 
   // Funções de paginação

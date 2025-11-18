@@ -398,6 +398,54 @@ const Dashboard = () => {
     }
   };
 
+  // Função para alternar e salvar estado de expansão dos avisos
+  const handleToggleAvisos = async () => {
+    if (!isReady || !userId || !currentSchoolId) {
+      console.error('❌ Não pode alterar estado de avisos');
+      return;
+    }
+
+    try {
+      const novoEstado = !avisosExpanded;
+      console.log('📋 Alterando estado de avisos para:', novoEstado);
+      setAvisosExpanded(novoEstado);
+      
+      const caminho = `usuarios/${userId}/dashboard-config/avisos-expanded`;
+      await setData(caminho, {
+        expanded: novoEstado,
+        atualizadoEm: new Date().toISOString()
+      });
+      
+      console.log('✅ Estado de avisos salvo com sucesso!');
+    } catch (error) {
+      console.error('❌ Erro ao salvar estado de avisos:', error);
+    }
+  };
+
+  // Função para alternar e salvar estado de expansão da galeria
+  const handleToggleGaleria = async () => {
+    if (!isReady || !userId || !currentSchoolId) {
+      console.error('❌ Não pode alterar estado de galeria');
+      return;
+    }
+
+    try {
+      const novoEstado = !galeriaExpanded;
+      console.log('📸 Alterando estado de galeria para:', novoEstado);
+      setGaleriaExpanded(novoEstado);
+      
+      const caminho = `usuarios/${userId}/dashboard-config/galeria-expanded`;
+      await setData(caminho, {
+        expanded: novoEstado,
+        atualizadoEm: new Date().toISOString()
+      });
+      
+      console.log('✅ Estado de galeria salvo com sucesso!');
+    } catch (error) {
+      console.error('❌ Erro ao salvar estado de galeria:', error);
+    }
+  };
+
   useEffect(() => {
     const fetchAllData = async () => {
       // Aguardar banco de dados estar pronto
@@ -439,7 +487,9 @@ const Dashboard = () => {
           mensagensData,
           cronogramaData,
           personalizacaoData,
-          viewModeData
+          viewModeData,
+          avisosExpandedData,
+          galeriaExpandedData
         ] = await Promise.all([
           getData('alunos'),
           getData('colaboradores'),
@@ -455,7 +505,9 @@ const Dashboard = () => {
           getData(mensagensPath),
           getData('cronograma-academico'),
           userId ? getData(`usuarios/${userId}/dashboard-config/acoes-rapidas`) : Promise.resolve(null),
-          userId ? getData(`usuarios/${userId}/dashboard-config/view-mode`) : Promise.resolve(null)
+          userId ? getData(`usuarios/${userId}/dashboard-config/view-mode`) : Promise.resolve(null),
+          userId ? getData(`usuarios/${userId}/dashboard-config/avisos-expanded`) : Promise.resolve(null),
+          userId ? getData(`usuarios/${userId}/dashboard-config/galeria-expanded`) : Promise.resolve(null)
         ]);
 
         // Carregar personalização das ações rápidas
@@ -478,6 +530,24 @@ const Dashboard = () => {
         } else {
           console.log('ℹ️ Usando view mode padrão: full');
           setViewMode('full');
+        }
+
+        // Carregar estado de expansão dos avisos
+        if (avisosExpandedData && typeof avisosExpandedData.expanded === 'boolean') {
+          console.log('✅ Estado de avisos carregado:', avisosExpandedData.expanded);
+          setAvisosExpanded(avisosExpandedData.expanded);
+        } else {
+          console.log('ℹ️ Usando estado padrão de avisos: true');
+          setAvisosExpanded(true);
+        }
+
+        // Carregar estado de expansão da galeria
+        if (galeriaExpandedData && typeof galeriaExpandedData.expanded === 'boolean') {
+          console.log('✅ Estado de galeria carregado:', galeriaExpandedData.expanded);
+          setGaleriaExpanded(galeriaExpandedData.expanded);
+        } else {
+          console.log('ℹ️ Usando estado padrão de galeria: true');
+          setGaleriaExpanded(true);
         }
 
         // Processar alunos
@@ -1281,16 +1351,31 @@ const Dashboard = () => {
                       mb: avisosExpanded ? 2 : 0
                     }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                        <Avatar
+                        <Badge 
+                          badgeContent={!avisosExpanded && avisos.length > 0 ? avisos.length : 0}
+                          color="error"
                           sx={{
-                            background: 'linear-gradient(135deg, #667eea, #764ba2)',
-                            width: 40,
-                            height: 40,
-                            boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)'
+                            '& .MuiBadge-badge': {
+                              fontSize: '0.75rem',
+                              fontWeight: 700,
+                              minWidth: '22px',
+                              height: '22px',
+                              borderRadius: '11px',
+                              boxShadow: '0 2px 8px rgba(239, 68, 68, 0.3)'
+                            }
                           }}
                         >
-                          <Campaign />
-                        </Avatar>
+                          <Avatar
+                            sx={{
+                              background: 'linear-gradient(135deg, #667eea, #764ba2)',
+                              width: 40,
+                              height: 40,
+                              boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)'
+                            }}
+                          >
+                            <Campaign />
+                          </Avatar>
+                        </Badge>
                         <Box>
                           <Typography 
                             variant="h6" 
@@ -1314,7 +1399,7 @@ const Dashboard = () => {
                       </Box>
                       
                       <IconButton 
-                        onClick={() => setAvisosExpanded(!avisosExpanded)}
+                        onClick={handleToggleAvisos}
                         sx={{ 
                           bgcolor: 'rgba(102, 126, 234, 0.1)',
                           '&:hover': {
@@ -1635,16 +1720,31 @@ const Dashboard = () => {
                           mb: galeriaExpanded ? 2 : 0
                         }}>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                            <Avatar
+                            <Badge 
+                              badgeContent={!galeriaExpanded && fotosVisiveis.length > 0 ? fotosVisiveis.length : 0}
+                              color="warning"
                               sx={{
-                                background: 'linear-gradient(135deg, #F59E0B, #F97316)',
-                                width: 40,
-                                height: 40,
-                                boxShadow: '0 4px 12px rgba(245, 158, 11, 0.3)'
+                                '& .MuiBadge-badge': {
+                                  fontSize: '0.75rem',
+                                  fontWeight: 700,
+                                  minWidth: '22px',
+                                  height: '22px',
+                                  borderRadius: '11px',
+                                  boxShadow: '0 2px 8px rgba(245, 158, 11, 0.3)'
+                                }
                               }}
                             >
-                              <Image />
-                            </Avatar>
+                              <Avatar
+                                sx={{
+                                  background: 'linear-gradient(135deg, #F59E0B, #F97316)',
+                                  width: 40,
+                                  height: 40,
+                                  boxShadow: '0 4px 12px rgba(245, 158, 11, 0.3)'
+                                }}
+                              >
+                                <Image />
+                              </Avatar>
+                            </Badge>
                             <Box>
                               <Typography 
                                 variant="h6" 
@@ -1668,7 +1768,7 @@ const Dashboard = () => {
                           </Box>
                           
                           <IconButton 
-                            onClick={() => setGaleriaExpanded(!galeriaExpanded)}
+                            onClick={handleToggleGaleria}
                             sx={{ 
                               bgcolor: 'rgba(245, 158, 11, 0.1)',
                               '&:hover': {

@@ -272,10 +272,19 @@ const Dashboard = () => {
     }
   };
 
-  // Handlers de drag and drop
+  // Handlers de drag and drop (desktop e mobile)
   const handleDragStart = (e, index) => {
     setDraggedIndex(index);
-    e.dataTransfer.effectAllowed = 'move';
+    if (e.dataTransfer) {
+      e.dataTransfer.effectAllowed = 'move';
+    }
+  };
+
+  const handleTouchStart = (e, index) => {
+    setDraggedIndex(index);
+    // Adiciona feedback visual imediato no mobile
+    e.currentTarget.style.opacity = '0.5';
+    e.currentTarget.style.transform = 'scale(0.95)';
   };
 
   const handleDragOver = (e, index) => {
@@ -292,8 +301,45 @@ const Dashboard = () => {
     setDraggedIndex(index);
   };
 
-  const handleDragEnd = () => {
+  const handleTouchMove = (e, currentIndex) => {
+    if (draggedIndex === null) return;
+
+    const touch = e.touches[0];
+    const elementAtPoint = document.elementFromPoint(touch.clientX, touch.clientY);
+    
+    // Encontrar o card mais próximo
+    const cardElement = elementAtPoint?.closest('[data-card-index]');
+    if (cardElement) {
+      const newIndex = parseInt(cardElement.getAttribute('data-card-index'));
+      
+      if (newIndex !== draggedIndex && !isNaN(newIndex)) {
+        const acoes = getAcoesOrdenadas();
+        const novaOrdem = [...acoes];
+        const [removed] = novaOrdem.splice(draggedIndex, 1);
+        novaOrdem.splice(newIndex, 0, removed);
+
+        const novaOrdemIds = novaOrdem.map(a => a.id);
+        setAcoesPersonalizadas(novaOrdemIds);
+        setDraggedIndex(newIndex);
+      }
+    }
+  };
+
+  const handleDragEnd = (e) => {
     // Não salva automaticamente aqui, apenas ao clicar em Salvar
+    if (e.currentTarget) {
+      e.currentTarget.style.opacity = '1';
+      e.currentTarget.style.transform = 'scale(1)';
+    }
+    setDraggedIndex(null);
+  };
+
+  const handleTouchEnd = (e) => {
+    // Remove feedback visual
+    if (e.currentTarget) {
+      e.currentTarget.style.opacity = '1';
+      e.currentTarget.style.transform = 'scale(1)';
+    }
     setDraggedIndex(null);
   };
 
@@ -778,7 +824,10 @@ const Dashboard = () => {
                     <Box sx={{ mb: 2, p: 2, background: '#eff6ff', borderRadius: 2, border: '1px solid #3b82f6' }}>
                       <Typography variant="body2" color="primary" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         <DragIndicator fontSize="small" />
-                        Arraste os cards para reorganizar a ordem das ações rápidas
+                        {window.innerWidth < 768 
+                          ? 'Toque e segure para arrastar os cards'
+                          : 'Arraste os cards para reorganizar a ordem das ações rápidas'
+                        }
                       </Typography>
                       <Button 
                         startIcon={<CloseIcon />}
@@ -800,11 +849,21 @@ const Dashboard = () => {
                           <Grid item xs={6} sm={4} md={3} lg={2} key={acao.id}>
                             <Zoom in timeout={800 + (idx * 100)}>
                               <Box
+                                data-card-index={idx}
                                 draggable
                                 onDragStart={(e) => handleDragStart(e, idx)}
                                 onDragOver={(e) => handleDragOver(e, idx)}
                                 onDragEnd={handleDragEnd}
-                                sx={{ cursor: 'move' }}
+                                onTouchStart={(e) => handleTouchStart(e, idx)}
+                                onTouchMove={(e) => handleTouchMove(e, idx)}
+                                onTouchEnd={handleTouchEnd}
+                                sx={{ 
+                                  cursor: 'move',
+                                  touchAction: 'none',
+                                  userSelect: 'none',
+                                  WebkitUserSelect: 'none',
+                                  transition: 'opacity 0.2s ease, transform 0.2s ease'
+                                }}
                               >
                                 <Badge 
                                   badgeContent={acao.badgeCount || 0}

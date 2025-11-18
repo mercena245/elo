@@ -109,6 +109,7 @@ const Dashboard = () => {
   const [totalMensagensNaoLidas, setTotalMensagensNaoLidas] = useState(0);
   const [editandoAcoes, setEditandoAcoes] = useState(false);
   const [acoesPersonalizadas, setAcoesPersonalizadas] = useState([]);
+  const [loadingAcoes, setLoadingAcoes] = useState(true);
   const [draggedIndex, setDraggedIndex] = useState(null);
   const router = useRouter();
 
@@ -218,15 +219,24 @@ const Dashboard = () => {
   // Carregar personalização das ações rápidas
   useEffect(() => {
     const carregarPersonalizacao = async () => {
-      if (!isReady || !userId || !currentSchoolId) return;
+      if (!isReady || !userId || !currentSchoolId) {
+        setLoadingAcoes(false);
+        return;
+      }
       
+      setLoadingAcoes(true);
       try {
         const personalizacao = await getData(`usuarios/${userId}/dashboard-config/acoes-rapidas`);
         if (personalizacao && personalizacao.ordem) {
+          console.log('✅ Personalização carregada:', personalizacao.ordem);
           setAcoesPersonalizadas(personalizacao.ordem);
+        } else {
+          console.log('ℹ️ Nenhuma personalização encontrada, usando ordem padrão');
         }
       } catch (error) {
-        console.error('Erro ao carregar personalização:', error);
+        console.error('❌ Erro ao carregar personalização:', error);
+      } finally {
+        setLoadingAcoes(false);
       }
     };
 
@@ -261,13 +271,15 @@ const Dashboard = () => {
     if (!isReady || !userId || !currentSchoolId) return;
     
     try {
+      console.log('💾 Salvando personalização:', novaOrdem);
       await setData(`usuarios/${userId}/dashboard-config/acoes-rapidas`, {
         ordem: novaOrdem,
         atualizadoEm: new Date().toISOString()
       });
       setAcoesPersonalizadas(novaOrdem);
+      console.log('✅ Personalização salva com sucesso!');
     } catch (error) {
-      console.error('Erro ao salvar personalização:', error);
+      console.error('❌ Erro ao salvar personalização:', error);
     }
   };
 
@@ -736,30 +748,31 @@ const Dashboard = () => {
             )}
 
             {/* Ações Rápidas - Logo abaixo do header */}
-            <Fade in timeout={1000}>
-              <Grid container spacing={{ xs: 2, sm: 3 }} sx={{ mb: 3 }}>
-                <Grid item xs={12}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-                    <Typography variant="h6" fontWeight={600} sx={{ color: '#374151', fontSize: { xs: '1.1rem', md: '1.25rem' } }}>
-                      ⚡ Ações Rápidas
-                    </Typography>
-                    <Tooltip title={editandoAcoes ? "Salvar ordem" : "Personalizar ordem"}>
-                      <IconButton 
-                        onClick={() => editandoAcoes ? handleSalvarEdicao() : setEditandoAcoes(true)}
-                        sx={{ 
-                          background: editandoAcoes ? 'linear-gradient(135deg, #10b981, #059669)' : 'linear-gradient(135deg, #667eea, #764ba2)',
-                          color: 'white',
-                          '&:hover': {
-                            background: editandoAcoes ? 'linear-gradient(135deg, #059669, #047857)' : 'linear-gradient(135deg, #764ba2, #667eea)',
-                            transform: 'scale(1.05)'
-                          },
-                          transition: 'all 0.3s ease'
-                        }}
-                      >
-                        {editandoAcoes ? <SaveIcon /> : <EditIcon />}
-                      </IconButton>
-                    </Tooltip>
-                  </Box>
+            {!loadingAcoes && (
+              <Fade in timeout={1000}>
+                <Grid container spacing={{ xs: 2, sm: 3 }} sx={{ mb: 3 }}>
+                  <Grid item xs={12}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                      <Typography variant="h6" fontWeight={600} sx={{ color: '#374151', fontSize: { xs: '1.1rem', md: '1.25rem' } }}>
+                        ⚡ Ações Rápidas
+                      </Typography>
+                      <Tooltip title={editandoAcoes ? "Salvar ordem" : "Personalizar ordem"}>
+                        <IconButton 
+                          onClick={() => editandoAcoes ? handleSalvarEdicao() : setEditandoAcoes(true)}
+                          sx={{ 
+                            background: editandoAcoes ? 'linear-gradient(135deg, #10b981, #059669)' : 'linear-gradient(135deg, #667eea, #764ba2)',
+                            color: 'white',
+                            '&:hover': {
+                              background: editandoAcoes ? 'linear-gradient(135deg, #059669, #047857)' : 'linear-gradient(135deg, #764ba2, #667eea)',
+                              transform: 'scale(1.05)'
+                            },
+                            transition: 'all 0.3s ease'
+                          }}
+                        >
+                          {editandoAcoes ? <SaveIcon /> : <EditIcon />}
+                        </IconButton>
+                      </Tooltip>
+                    </Box>
                   
                   {editandoAcoes && (
                     <Box sx={{ mb: 2, p: 2, background: '#eff6ff', borderRadius: 2, border: '1px solid #3b82f6' }}>
@@ -1124,6 +1137,7 @@ const Dashboard = () => {
                 </Grid>
               </Grid>
             </Fade>
+            )}
 
             <Grid container spacing={{ xs: 2, sm: 3 }}>
               {/* Quadro de Avisos - Primeiro lugar com largura completa */}

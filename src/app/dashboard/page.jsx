@@ -110,6 +110,7 @@ const Dashboard = () => {
   const [editandoAcoes, setEditandoAcoes] = useState(false);
   const [acoesPersonalizadas, setAcoesPersonalizadas] = useState([]);
   const [draggedIndex, setDraggedIndex] = useState(null);
+  const [viewMode, setViewMode] = useState('full'); // 'full' ou 'slim'
   const router = useRouter();
 
   // Verificar autenticação
@@ -367,6 +368,29 @@ const Dashboard = () => {
     setEditandoAcoes(false);
   };
 
+  // Função para alterar e salvar o view mode
+  const handleViewModeChange = async (newMode) => {
+    if (!isReady || !userId || !currentSchoolId) {
+      console.error('❌ Não pode alterar view mode - isReady:', isReady, 'userId:', userId, 'schoolId:', currentSchoolId);
+      return;
+    }
+
+    try {
+      console.log('🎨 Alterando view mode para:', newMode);
+      setViewMode(newMode);
+      
+      const caminho = `usuarios/${userId}/dashboard-config/view-mode`;
+      await setData(caminho, {
+        mode: newMode,
+        atualizadoEm: new Date().toISOString()
+      });
+      
+      console.log('✅ View mode salvo com sucesso!');
+    } catch (error) {
+      console.error('❌ Erro ao salvar view mode:', error);
+    }
+  };
+
   useEffect(() => {
     const fetchAllData = async () => {
       // Aguardar banco de dados estar pronto
@@ -407,7 +431,8 @@ const Dashboard = () => {
           titulosData,
           mensagensData,
           cronogramaData,
-          personalizacaoData
+          personalizacaoData,
+          viewModeData
         ] = await Promise.all([
           getData('alunos'),
           getData('colaboradores'),
@@ -422,7 +447,8 @@ const Dashboard = () => {
           getData('titulos_financeiros'),
           getData(mensagensPath),
           getData('cronograma-academico'),
-          userId ? getData(`usuarios/${userId}/dashboard-config/acoes-rapidas`) : Promise.resolve(null)
+          userId ? getData(`usuarios/${userId}/dashboard-config/acoes-rapidas`) : Promise.resolve(null),
+          userId ? getData(`usuarios/${userId}/dashboard-config/view-mode`) : Promise.resolve(null)
         ]);
 
         // Carregar personalização das ações rápidas
@@ -436,6 +462,15 @@ const Dashboard = () => {
         } else {
           console.log('ℹ️ Nenhuma personalização encontrada, usando ordem padrão');
           setAcoesPersonalizadas([]);
+        }
+
+        // Carregar modo de visualização
+        if (viewModeData && viewModeData.mode) {
+          console.log('✅ View mode carregado:', viewModeData.mode);
+          setViewMode(viewModeData.mode);
+        } else {
+          console.log('ℹ️ Usando view mode padrão: full');
+          setViewMode('full');
         }
 
         // Processar alunos
@@ -770,6 +805,8 @@ const Dashboard = () => {
                   <SchoolHeader 
                     userName={userName}
                     userRole={userRole}
+                    viewMode={viewMode}
+                    onViewModeChange={handleViewModeChange}
                     onOpenSettings={() => {
                       console.log('🔧 [Dashboard] Abrindo settings modal...');
                       console.log('🔧 [Dashboard] userRole no momento:', userRole);

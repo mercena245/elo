@@ -171,10 +171,7 @@ const SalaProfessor = () => {
                     fontSize: { xs: '0.75rem', sm: '0.875rem', md: '1rem' },
                     fontWeight: 500,
                     py: { xs: 1.5, md: 2 },
-                    minWidth: { xs: 120, md: 160 },
-                    '& .MuiTab-iconWrapper': {
-                      fontSize: { xs: '1rem', md: '1.25rem' }
-                    }
+                    minWidth: { xs: 120, md: 160 }
                   },
                   '& .MuiTabs-scrollButtons': {
                     display: { xs: 'flex', md: 'none' }
@@ -182,47 +179,32 @@ const SalaProfessor = () => {
                 }}
               >
                 <Tab 
-                  icon="📚" 
-                  label="Planejamento de Aulas" 
+                  label="📚 Planejamento de Aulas" 
                   sx={{ 
-                    flexDirection: { xs: 'column', sm: 'row' }, 
-                    gap: { xs: 0.5, sm: 1 },
                     minHeight: { xs: 64, md: 72 }
                   }}
                 />
                 <Tab 
-                  icon="📓" 
-                  label="Diário de Classe" 
+                  label="🎓 Diário de Classe" 
                   sx={{ 
-                    flexDirection: { xs: 'column', sm: 'row' }, 
-                    gap: { xs: 0.5, sm: 1 },
                     minHeight: { xs: 64, md: 72 }
                   }}
                 />
                 <Tab 
-                  icon="📊" 
-                  label="Relatórios Pedagógicos" 
+                  label="📊 Relatórios Pedagógicos" 
                   sx={{ 
-                    flexDirection: { xs: 'column', sm: 'row' }, 
-                    gap: { xs: 0.5, sm: 1 },
                     minHeight: { xs: 64, md: 72 }
                   }}
                 />
                 <Tab 
-                  icon="📅" 
-                  label="Cronograma Acadêmico" 
+                  label="📅 Cronograma Acadêmico" 
                   sx={{ 
-                    flexDirection: { xs: 'column', sm: 'row' }, 
-                    gap: { xs: 0.5, sm: 1 },
                     minHeight: { xs: 64, md: 72 }
                   }}
                 />
                 <Tab 
-                  icon="📖" 
-                  label="Biblioteca de Materiais" 
+                  label="📖 Biblioteca de Materiais" 
                   sx={{ 
-                    flexDirection: { xs: 'column', sm: 'row' }, 
-                    gap: { xs: 0.5, sm: 1 },
                     minHeight: { xs: 64, md: 72 }
                   }}
                 />

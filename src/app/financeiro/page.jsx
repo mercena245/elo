@@ -83,6 +83,8 @@ import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from 'fi
 import GeradorMensalidadesDialog from '../../components/GeradorMensalidadesDialog';
 import DashboardFinanceiro from '../../components/DashboardFinanceiro';
 import BaixaTituloDialog from '../../components/BaixaTituloDialog';
+import ContasAPagar from '../components/financeiro/ContasAPagar';
+import ContasPagas from '../components/financeiro/ContasPagas';
 import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
 import { useSchoolServices } from '../../hooks/useSchoolServices';
 
@@ -1739,6 +1741,43 @@ const FinanceiroPage = () => {
     }
   };
 
+  // Função para pagar conta a partir do componente novo
+  const handlePagarConta = async (conta, dadosPagamento) => {
+    // 🔒 Verificar se serviço está disponível
+    if (!financeiroService) {
+      showFeedback('error', 'Erro', 'Serviço financeiro não está disponível. Tente novamente.');
+      return;
+    }
+
+    setProcessingOperation(true);
+    try {
+      // Usar o serviço para pagar a conta
+      const result = await financeiroService.pagarConta(conta, dadosPagamento, userId, false);
+      
+      if (result.success) {
+        // Recarregar dados
+        await fetchContasPagar();
+        await fetchContasPagas();
+        await fetchSaldoEscola();
+        
+        // Verificar se o saldo ficou negativo após o pagamento
+        const novoSaldo = await financeiroService.obterSaldoEscola();
+        if (novoSaldo < 0) {
+          showFeedback('success', 'Pagamento Realizado', `Conta paga com sucesso! ⚠️ Saldo atual: ${formatCurrency(novoSaldo)}`);
+        } else {
+          showFeedback('success', 'Pagamento Realizado', 'Conta paga com sucesso!');
+        }
+      } else {
+        showFeedback('error', 'Erro no Pagamento', 'Erro ao pagar conta: ' + result.error);
+      }
+    } catch (error) {
+      console.error('Erro ao pagar conta:', error);
+      showFeedback('error', 'Erro no Pagamento', 'Erro ao pagar conta. Tente novamente.');
+    } finally {
+      setProcessingOperation(false);
+    }
+  };
+
   // Funções de relatórios
   const gerarRelatorioReceitas = () => {
     const hoje = new Date();
@@ -3116,442 +3155,46 @@ const FinanceiroPage = () => {
 
               {/* Tab Contas a Pagar */}
               {tabValue === 3 && isCoordenador() && (
-                <Card>
-                  <CardContent>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-                      <Box>
-                        <Typography variant="h6" color="primary">
-                          🔴 Contas a Pagar - {exibirPorPeriodo 
-                            ? `${(periodoSelecionado.getMonth() + 1).toString().padStart(2, '0')}/${periodoSelecionado.getFullYear()}`
-                            : `${mesAtual.mes.toString().padStart(2, '0')}/${mesAtual.ano}`}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          Mês atual - {mesAtual.fechado ? 'Fechado' : 'Em andamento'}
-                        </Typography>
-                      </Box>
-                      <Box sx={{ display: 'flex', gap: 1 }}>
-                        <Button
-                          variant="outlined"
-                          color="warning"
-                          onClick={() => {
-                            const estatisticas = calcularEstatisticasPendentes();
-                            if (estatisticas.quantidade === 0) {
-                              showFeedback('success', 'Mês sem Pendências', 'Não há contas pendentes neste mês. O mês pode ser considerado como finalizado.');
-                            } else {
-                              setDialogFecharMes(true);
-                            }
-                          }}
-                          disabled={mesAtual.fechado}
-                        >
-                          {calcularEstatisticasPendentes().quantidade === 0 ? 'Mês Finalizado' : 'Fechar Mês'}
-                        </Button>
-                        <Button
-                          variant="contained"
-                          startIcon={<Add />}
-                          onClick={() => setNovaContaDialog(true)}
-                        >
-                          Nova Conta
-                        </Button>
-                      </Box>
-                    </Box>
-
-                    {/* Filtros */}
-                    <Card sx={{ mb: 3, bgcolor: '#f8fafc' }}>
-                      <CardContent>
-                        <Typography variant="subtitle2" gutterBottom color="primary" fontWeight="bold">
-                          🔍 Filtros de Contas a Pagar
-                        </Typography>
-                        <Grid container spacing={2} alignItems="center">
-                          <Grid item xs={12} sm={6} md={3}>
-                            <FormControl fullWidth size="small" sx={{ minWidth: '200px' }}>
-                              <InputLabel>Categoria</InputLabel>
-                              <Select
-                                value={filtrosContasPagar.categoria || ''}
-                                label="Categoria"
-                                onChange={(e) => setFiltrosContasPagar(prev => ({ ...prev, categoria: e.target.value }))}
-                              >
-                                <MenuItem value="">Todas</MenuItem>
-                                <MenuItem value="aluguel">Aluguel</MenuItem>
-                                <MenuItem value="energia">Energia Elétrica</MenuItem>
-                                <MenuItem value="agua">Água</MenuItem>
-                                <MenuItem value="internet">Internet</MenuItem>
-                                <MenuItem value="telefone">Telefone</MenuItem>
-                                <MenuItem value="material">Material Escolar</MenuItem>
-                                <MenuItem value="manutencao">Manutenção</MenuItem>
-                                <MenuItem value="limpeza">Limpeza</MenuItem>
-                                <MenuItem value="salarios">Salários</MenuItem>
-                                <MenuItem value="impostos">Impostos</MenuItem>
-                                <MenuItem value="outros">Outros</MenuItem>
-                              </Select>
-                            </FormControl>
-                          </Grid>
-                          <Grid item xs={12} sm={6} md={3}>
-                            <TextField
-                              label="Fornecedor"
-                              size="small"
-                              fullWidth
-                              value={filtrosContasPagar.fornecedor || ''}
-                              onChange={(e) => setFiltrosContasPagar(prev => ({ ...prev, fornecedor: e.target.value }))}
-                            />
-                          </Grid>
-                          <Grid item xs={12} sm={6} md={3}>
-                            <FormControl fullWidth size="small" sx={{ minWidth: '150px' }}>
-                              <InputLabel>Status</InputLabel>
-                              <Select
-                                value={filtrosContasPagar.status || ''}
-                                label="Status"
-                                onChange={(e) => setFiltrosContasPagar(prev => ({ ...prev, status: e.target.value }))}
-                              >
-                                <MenuItem value="">Todos</MenuItem>
-                                <MenuItem value="pendente">Pendente</MenuItem>
-                                <MenuItem value="vencida">Vencida</MenuItem>
-                              </Select>
-                            </FormControl>
-                          </Grid>
-                          <Grid item xs={12} sm={6} md={3}>
-                            <FormControl fullWidth size="small">
-                              <FormControlLabel
-                                control={
-                                  <Checkbox
-                                    checked={exibirPorPeriodo}
-                                    onChange={(e) => {
-                                      setExibirPorPeriodo(e.target.checked);
-                                      if (!e.target.checked) {
-                                        // Quando desmarcar, volta para o mês atual
-                                        fetchContasPagar();
-                                      }
-                                    }}
-                                    color="primary"
-                                  />
-                                }
-                                label="Filtrar por período"
-                              />
-                            </FormControl>
-                          </Grid>
-                          {exibirPorPeriodo && (
-                            <Grid item xs={12} sm={6} md={3}>
-                              <FormControl fullWidth size="small">
-                                <InputLabel>Período</InputLabel>
-                                <Select
-                                  value={periodoSelecionado.getTime()}
-                                  label="Período"
-                                  onChange={(e) => setPeriodoSelecionado(new Date(e.target.value))}
-                                >
-                                  {obterPeriodosDisponiveis().map((periodo) => (
-                                    <MenuItem key={periodo.getTime()} value={periodo.getTime()}>
-                                      {periodo.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
-                                    </MenuItem>
-                                  ))}
-                                </Select>
-                              </FormControl>
-                            </Grid>
-                          )}
-                          <Grid item xs={12} sm={6} md={3}>
-                            <Button
-                              variant="contained"
-                              fullWidth
-                              size="small"
-                              onClick={() => {
-                                setFiltrosContasPagar({ categoria: '', fornecedor: '', status: '' });
-                              }}
-                            >
-                              Limpar Filtros
-                            </Button>
-                          </Grid>
-                        </Grid>
-                      </CardContent>
-                    </Card>
-
-                    {/* Resumo */}
-                    <Grid container spacing={3} sx={{ mb: 3 }}>
-                      <Grid item xs={12} md={4}>
-                        <Card sx={{ bgcolor: '#fef2f2', border: '1px solid #fca5a5' }}>
-                          <CardContent>
-                            <Typography variant="h6" color="#dc2626">
-                              Saldo Disponível
-                            </Typography>
-                            <Typography variant="h4" color="#dc2626" fontWeight="bold">
-                              {formatCurrency(saldoEscola)}
-                            </Typography>
-                          </CardContent>
-                        </Card>
-                      </Grid>
-                      <Grid item xs={12} md={4}>
-                        <Card sx={{ bgcolor: '#fff7ed', border: '1px solid #fb923c' }}>
-                          <CardContent>
-                            <Typography variant="h6" color="#ea580c">
-                              Contas Pendentes
-                            </Typography>
-                            <Typography variant="h4" color="#ea580c" fontWeight="bold">
-                              {calcularEstatisticasPendentes().quantidade}
-                            </Typography>
-                          </CardContent>
-                        </Card>
-                      </Grid>
-                      <Grid item xs={12} md={4}>
-                        <Card sx={{ bgcolor: '#fef2f2', border: '1px solid #f87171' }}>
-                          <CardContent>
-                            <Typography variant="h6" color="#dc2626">
-                              Valor Total Pendente
-                            </Typography>
-                            <Typography variant="h4" color="#dc2626" fontWeight="bold">
-                              {formatCurrency(calcularEstatisticasPendentes().valorTotal)}
-                            </Typography>
-                          </CardContent>
-                        </Card>
-                      </Grid>
-                    </Grid>
-
-                    {/* Lista de Contas */}
-                    <TableContainer component={Paper}>
-                      <Table>
-                        <TableHead>
-                          <TableRow>
-                            <TableCell>Descrição</TableCell>
-                            <TableCell>Categoria</TableCell>
-                            <TableCell>Fornecedor</TableCell>
-                            <TableCell>Valor</TableCell>
-                            <TableCell>Vencimento/Pagamento</TableCell>
-                            <TableCell>Status</TableCell>
-                            <TableCell>Ação/Forma Pgto</TableCell>
-                          </TableRow>
-                        </TableHead>
-                        <TableBody>
-                          {filtrarContasPagar().map((conta) => (
-                            <TableRow 
-                              key={conta.id}
-                              sx={{ 
-                                bgcolor: conta.status === 'paga' ? '#f0fdf4' : 'inherit',
-                                opacity: conta.status === 'paga' ? 0.8 : 1
-                              }}
-                            >
-                              <TableCell>{conta.descricao}</TableCell>
-                              <TableCell>{conta.categoria}</TableCell>
-                              <TableCell>{conta.fornecedor}</TableCell>
-                              <TableCell>{formatCurrency(conta.valor)}</TableCell>
-                              <TableCell>
-                                {conta.status === 'paga' 
-                                  ? formatDate(conta.dataPagamento) 
-                                  : formatDate(conta.vencimento)
-                                }
-                              </TableCell>
-                              <TableCell>
-                                {conta.status === 'paga' ? (
-                                  <Chip
-                                    label="✅ Paga"
-                                    color="success"
-                                    size="small"
-                                  />
-                                ) : (
-                                  <Chip
-                                    label={new Date(conta.vencimento) < new Date() ? 'Vencida' : 'Pendente'}
-                                    color={new Date(conta.vencimento) < new Date() ? 'error' : 'warning'}
-                                    size="small"
-                                  />
-                                )}
-                              </TableCell>
-                              <TableCell>
-                                {conta.status === 'paga' ? (
-                                  <Chip
-                                    label={`💳 ${conta.formaPagamento || 'N/A'}`}
-                                    variant="outlined"
-                                    size="small"
-                                  />
-                                ) : (
-                                  <Button
-                                    size="small"
-                                    variant="contained"
-                                    color="success"
-                                    onClick={() => {
-                                      // Obter data local no formato YYYY-MM-DD
-                                      const hoje = new Date();
-                                      const ano = hoje.getFullYear();
-                                      const mes = String(hoje.getMonth() + 1).padStart(2, '0');
-                                      const dia = String(hoje.getDate()).padStart(2, '0');
-                                      const dataLocal = `${ano}-${mes}-${dia}`;
-                                      
-                                      setDialogPagamentoConta({ open: true, conta });
-                                      setPagamentoConta({
-                                        dataPagamento: dataLocal,
-                                        formaPagamento: '',
-                                        observacoes: ''
-                                      });
-                                    }}
-                                    disabled={false}
-                                  >
-                                    Pagar
-                                  </Button>
-                                )}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </TableContainer>
-
-                    {filtrarContasPagar().length === 0 && (
-                      <Box sx={{ textAlign: 'center', py: 4 }}>
-                        <Typography variant="body1" color="text.secondary">
-                          {contasPagar.length === 0 ? 'Nenhuma conta a pagar encontrada' : 'Nenhuma conta encontrada com os filtros aplicados'}
-                        </Typography>
-                      </Box>
-                    )}
-                  </CardContent>
-                </Card>
+                <ContasAPagar
+                  contas={contasPagar}
+                  loading={loading}
+                  onAdicionar={() => setNovaContaDialog(true)}
+                  onEditar={(conta) => {
+                    // Implementar edição
+                    console.log('Editar conta:', conta);
+                  }}
+                  onExcluir={async (conta) => {
+                    try {
+                      await removeData(`contas_pagar/${conta.id}`);
+                      await fetchContasPagar();
+                      showFeedback('success', 'Conta Excluída', 'Conta excluída com sucesso!');
+                    } catch (error) {
+                      showFeedback('error', 'Erro', 'Erro ao excluir conta: ' + error.message);
+                    }
+                  }}
+                  onPagar={async (conta, dadosPagamento) => {
+                    await handlePagarConta(conta, dadosPagamento);
+                  }}
+                  onExportar={() => {
+                    showFeedback('info', 'Em Desenvolvimento', 'Funcionalidade de exportação em breve!');
+                  }}
+                  saldoDisponivel={saldoEscola}
+                />
               )}
 
               {/* Tab Contas Pagas */}
               {tabValue === 4 && isCoordenador() && (
-                <Card>
-                  <CardContent>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-                      <Box>
-                        <Typography variant="h6" color="primary">
-                          🟢 Contas Pagas - {mesAtual.mes.toString().padStart(2, '0')}/{mesAtual.ano}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          Visualizando contas pagas do mês atual
-                        </Typography>
-                      </Box>
-                      <Box sx={{ display: 'flex', gap: 1 }}>
-                        <Button
-                          variant="outlined"
-                          onClick={() => {
-                            const inicio = `${mesAtual.ano}-${mesAtual.mes.toString().padStart(2, '0')}-01`;
-                            const fim = new Date(mesAtual.ano, mesAtual.mes, 0).toISOString().split('T')[0];
-                            setFiltrosContasPagas(prev => ({ ...prev, dataInicio: inicio, dataFim: fim }));
-                          }}
-                        >
-                          Mês Atual
-                        </Button>
-                        <Button
-                          variant="contained"
-                          color="secondary"
-                          startIcon={<Receipt />}
-                          onClick={() => imprimirDemonstrativo()}
-                        >
-                          Imprimir Demonstrativo
-                        </Button>
-                      </Box>
-                    </Box>
-
-                    {/* Filtros por período */}
-                    <Card sx={{ mb: 3, bgcolor: '#f8fafc' }}>
-                      <CardContent>
-                        <Typography variant="subtitle2" gutterBottom color="primary" fontWeight="bold">
-                          📅 Filtros de Período
-                        </Typography>
-                        <Grid container spacing={2} alignItems="center">
-                          <Grid item xs={12} md={4}>
-                            <TextField
-                              label="Data Início"
-                              type="date"
-                              value={filtrosContasPagas.dataInicio}
-                              onChange={(e) => setFiltrosContasPagas(prev => ({ ...prev, dataInicio: e.target.value }))}
-                              fullWidth
-                              InputLabelProps={{ shrink: true }}
-                            />
-                          </Grid>
-                          <Grid item xs={12} md={4}>
-                            <TextField
-                              label="Data Fim"
-                              type="date"
-                              value={filtrosContasPagas.dataFim}
-                              onChange={(e) => setFiltrosContasPagas(prev => ({ ...prev, dataFim: e.target.value }))}
-                              fullWidth
-                              InputLabelProps={{ shrink: true }}
-                            />
-                          </Grid>
-                          <Grid item xs={12} md={4}>
-                            <Button
-                              variant="contained"
-                              fullWidth
-                              onClick={() => {
-                                // Filtrar contas pagas por período
-                                const contasFiltradas = contasPagas.filter(conta => {
-                                  const dataPagamento = new Date(conta.dataPagamento);
-                                  const inicio = filtrosContasPagas.dataInicio ? new Date(filtrosContasPagas.dataInicio) : null;
-                                  const fim = filtrosContasPagas.dataFim ? new Date(filtrosContasPagas.dataFim) : null;
-                                  
-                                  if (inicio && dataPagamento < inicio) return false;
-                                  if (fim && dataPagamento > fim) return false;
-                                  return true;
-                                });
-                                setContasPagas(contasFiltradas);
-                              }}
-                            >
-                              Filtrar
-                            </Button>
-                          </Grid>
-                        </Grid>
-                      </CardContent>
-                    </Card>
-
-                    {/* Resumo das Contas Pagas */}
-                    <Grid container spacing={3} sx={{ mb: 3 }}>
-                      <Grid item xs={12} md={6}>
-                        <Card sx={{ bgcolor: '#f0fdf4', border: '1px solid #22c55e' }}>
-                          <CardContent>
-                            <Typography variant="h6" color="#16a34a">
-                              Total de Contas Pagas
-                            </Typography>
-                            <Typography variant="h4" color="#16a34a" fontWeight="bold">
-                              {contasPagas.length}
-                            </Typography>
-                          </CardContent>
-                        </Card>
-                      </Grid>
-                      <Grid item xs={12} md={6}>
-                        <Card sx={{ bgcolor: '#f0fdf4', border: '1px solid #22c55e' }}>
-                          <CardContent>
-                            <Typography variant="h6" color="#16a34a">
-                              Valor Total Pago
-                            </Typography>
-                            <Typography variant="h4" color="#16a34a" fontWeight="bold">
-                              {formatCurrency(contasPagas.reduce((sum, conta) => sum + conta.valor, 0))}
-                            </Typography>
-                          </CardContent>
-                        </Card>
-                      </Grid>
-                    </Grid>
-
-                    {/* Lista de Contas Pagas */}
-                    <TableContainer component={Paper}>
-                      <Table>
-                        <TableHead>
-                          <TableRow>
-                            <TableCell>Descrição</TableCell>
-                            <TableCell>Categoria</TableCell>
-                            <TableCell>Valor</TableCell>
-                            <TableCell>Data Pagamento</TableCell>
-                            <TableCell>Pago Por</TableCell>
-                          </TableRow>
-                        </TableHead>
-                        <TableBody>
-                          {contasPagas.map((conta) => (
-                            <TableRow key={conta.id}>
-                              <TableCell>{conta.descricao}</TableCell>
-                              <TableCell>{conta.categoria}</TableCell>
-                              <TableCell>{formatCurrency(conta.valor)}</TableCell>
-                              <TableCell>{formatDate(conta.dataPagamento)}</TableCell>
-                              <TableCell>
-                                {alunos.find(u => u.id === conta.pagoPor)?.nome || 'Sistema'}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </TableContainer>
-
-                    {contasPagas.length === 0 && (
-                      <Box sx={{ textAlign: 'center', py: 4 }}>
-                        <Typography variant="body1" color="text.secondary">
-                          Nenhuma conta paga encontrada no período
-                        </Typography>
-                      </Box>
-                    )}
-                  </CardContent>
-                </Card>
+                <ContasPagas
+                  contas={contasPagas}
+                  loading={loading}
+                  onExportar={(formato) => {
+                    if (formato === 'pdf') {
+                      imprimirDemonstrativo();
+                    } else {
+                      showFeedback('info', 'Em Desenvolvimento', 'Exportação para Excel em breve!');
+                    }
+                  }}
+                />
               )}
 
               {/* Tab Relatórios */}

@@ -1,6 +1,19 @@
 import React, { useState } from "react";
-import { Box, Button, Typography, List, ListItem, ListItemText, IconButton, Dialog, DialogTitle, DialogContent, DialogActions, TextField } from "@mui/material";
-import { Delete } from "@mui/icons-material";
+import { 
+  Box, 
+  Button, 
+  Typography, 
+  IconButton, 
+  Dialog, 
+  DialogTitle, 
+  DialogContent, 
+  DialogActions, 
+  TextField,
+  List,
+  ListItem,
+  ListItemText
+} from "@mui/material";
+import { Delete, Edit } from "@mui/icons-material";
 import { getProfessoresPorDisciplina } from "./useProfessoresPorDisciplina";
 
 export default function DisciplinaCard({
@@ -12,6 +25,11 @@ export default function DisciplinaCard({
   const [professoresVinculados, setProfessoresVinculados] = useState([]);
   const [abrindoConfirm, setAbrindoConfirm] = useState(false);
   const [loadingProfs, setLoadingProfs] = useState(false);
+  
+  // Estados para edição
+  const [editDisciplina, setEditDisciplina] = useState(null);
+  const [editNome, setEditNome] = useState("");
+  const [openEditModal, setOpenEditModal] = useState(false);
 
   const handleClickExcluir = async (disc) => {
     setAbrindoConfirm(true);
@@ -30,24 +48,54 @@ export default function DisciplinaCard({
     if (confirmDisciplina && professoresVinculados.length === 0) {
       handleExcluirDisciplina(confirmDisciplina);
     }
-    // Sempre fecha o modal customizado e não chama mais nada
     setConfirmDisciplina(null);
     setProfessoresVinculados([]);
     setAbrindoConfirm(false);
   };
 
   const handleFecharConfirm = () => {
-    // Apenas fecha o modal customizado, sem chamar handleExcluirDisciplina
     setConfirmDisciplina(null);
     setProfessoresVinculados([]);
     setAbrindoConfirm(false);
   };
 
+  // Funções de edição
+  const handleClickEditar = (disc) => {
+    setEditDisciplina(disc);
+    setEditNome(disc.nome);
+    setOpenEditModal(true);
+  };
+
+  const handleSaveEdit = () => {
+    if (editNome.trim() && editDisciplina) {
+      // Aqui você deve implementar a função para atualizar no banco
+      // Por enquanto, vou apenas fechar o modal
+      // Você precisará adicionar essa função no componente pai
+      console.log("Editando disciplina:", editDisciplina.id, "para:", editNome);
+      setOpenEditModal(false);
+      setEditDisciplina(null);
+      setEditNome("");
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setOpenEditModal(false);
+    setEditDisciplina(null);
+    setEditNome("");
+  };
+
   return (
     <Box>
-      <Button variant="contained" color="primary" size="small" sx={{ mb: 2 }} onClick={() => setOpenDisciplinaModal(true)}>
+      <Button 
+        variant="contained" 
+        color="primary" 
+        size="small" 
+        sx={{ mb: 2 }} 
+        onClick={() => setOpenDisciplinaModal(true)}
+      >
         Nova Disciplina
       </Button>
+
       {loadingDisciplinas ? (
         <Typography variant="body2" color="text.secondary">Carregando...</Typography>
       ) : disciplinas.length === 0 ? (
@@ -55,9 +103,42 @@ export default function DisciplinaCard({
       ) : (
         <List>
           {disciplinas.map(disc => (
-            <ListItem key={disc.id} secondaryAction={
-              <IconButton edge="end" color="error" onClick={e => { e.stopPropagation(); if (!abrindoConfirm) handleClickExcluir(disc); }}>
-  <Dialog open={abrindoConfirm} onClose={() => handleFecharConfirm()} maxWidth="xs" fullWidth>
+            <ListItem 
+              key={disc.id}
+              sx={{ mb: 1, bgcolor: '#f8f8f8', borderRadius: 2, display: 'flex', alignItems: 'center' }}
+              secondaryAction={
+                <Box>
+                  <IconButton 
+                    color="primary" 
+                    size="small" 
+                    onClick={(e) => { 
+                      e.stopPropagation(); 
+                      handleClickEditar(disc); 
+                    }}
+                  >
+                    <Edit />
+                  </IconButton>
+                  <IconButton 
+                    color="error" 
+                    size="small" 
+                    onClick={(e) => { 
+                      e.stopPropagation(); 
+                      if (!abrindoConfirm) handleClickExcluir(disc); 
+                    }}
+                  >
+                    <Delete />
+                  </IconButton>
+                </Box>
+              }
+            >
+              <ListItemText primary={<b>{disc.nome}</b>} />
+            </ListItem>
+          ))}
+        </List>
+      )}
+
+      {/* Modal de confirmação de exclusão */}
+      <Dialog open={abrindoConfirm} onClose={handleFecharConfirm} maxWidth="xs" fullWidth>
         <DialogTitle>Excluir disciplina</DialogTitle>
         <DialogContent>
           {loadingProfs ? (
@@ -78,18 +159,31 @@ export default function DisciplinaCard({
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => handleFecharConfirm()} color="secondary">Cancelar</Button>
+          <Button onClick={handleFecharConfirm} color="secondary">Cancelar</Button>
           <Button onClick={handleConfirmExclusao} color="error" disabled={professoresVinculados.length > 0 || loadingProfs}>Excluir</Button>
         </DialogActions>
       </Dialog>
-                <Delete />
-              </IconButton>
-            }>
-              <ListItemText primary={disc.nome} />
-            </ListItem>
-          ))}
-        </List>
-      )}
+
+      {/* Modal de edição */}
+      <Dialog open={openEditModal} onClose={handleCancelEdit} maxWidth="xs" fullWidth>
+        <DialogTitle>Editar Disciplina</DialogTitle>
+        <DialogContent>
+          <TextField
+            label="Nome da disciplina"
+            value={editNome}
+            onChange={e => setEditNome(e.target.value)}
+            fullWidth
+            autoFocus
+            sx={{ mt: 2 }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCancelEdit} color="secondary">Cancelar</Button>
+          <Button onClick={handleSaveEdit} color="primary" disabled={!editNome.trim()}>Salvar</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Modal de adicionar nova disciplina */}
       <Dialog open={openDisciplinaModal} onClose={() => setOpenDisciplinaModal(false)} maxWidth="xs" fullWidth>
         <DialogTitle>Nova Disciplina</DialogTitle>
         <DialogContent>

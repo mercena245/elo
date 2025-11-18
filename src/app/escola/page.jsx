@@ -28,7 +28,10 @@ import {
   Divider,
   Chip,
   Alert,
-  TextareaAutosize
+  TextareaAutosize,
+  Tabs,
+  Tab,
+  Paper
 } from '@mui/material';
 import { ExpandMore, ExpandLess, Edit, Delete, Add, Notifications, AttachFile, PriorityHigh, Visibility, CheckCircle, CloudUpload } from '@mui/icons-material';
 import { FaTrash } from 'react-icons/fa';
@@ -39,7 +42,6 @@ import { auditService } from '../../services/auditService';
 
 const { logAction, LOG_ACTIONS } = auditService;
 import DisciplinaCard from "../components/escola/DisciplinaCard";
-import GestaoEscolarCard from "../components/escola/GestaoEscolarCard";
 import NotasFrequenciaCard from "../components/escola/NotasFrequenciaCard";
 import TurmaCard from "../components/escola/TurmaCard";
 import PeriodoCard from "../components/escola/PeriodoCard";
@@ -62,6 +64,9 @@ const Escola = () => {
   
   // Hook para acessar banco da escola
   const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, storage: schoolStorage } = useSchoolDatabase();
+
+  // ESTADO DAS ABAS DE GESTÃO ESCOLAR
+  const [tabGestaoValue, setTabGestaoValue] = useState(0);
 
   // TURMAS
   const [turmas, setTurmas] = useState([]);
@@ -1149,63 +1154,249 @@ const Escola = () => {
     <div className="dashboard-container">
       <SidebarMenu />
       <main className="dashboard-main">
-        <Box sx={{ maxWidth: 900, mx: 'auto', mt: 4 }}>
-          <Typography
-            variant="h4"
-            color="primary"
-            fontWeight={700}
-            gutterBottom
-            align="center"
+        <Box sx={{ maxWidth: 1200, mx: 'auto', mt: { xs: 2, md: 4 }, px: { xs: 2, sm: 3 } }}>
+          
+          {/* Header Moderno com Gradiente */}
+          <Box
+            sx={{
+              mb: 4,
+              p: { xs: 3, sm: 4, md: 5 },
+              borderRadius: 4,
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              color: 'white',
+              position: 'relative',
+              overflow: 'hidden',
+              boxShadow: '0 10px 30px rgba(102, 126, 234, 0.3)'
+            }}
           >
-            Informações da Escola
-          </Typography>
-          {/* Gerenciador de avisos */}
-          <Card sx={{ mb: 4 }}>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
-                <Box 
-                  sx={{ 
-                    display: 'flex', 
-                    alignItems: 'center',
-                    cursor: 'pointer',
-                    borderRadius: 1,
-                    p: 1,
-                    '&:hover': {
-                      bgcolor: 'rgba(33, 150, 243, 0.04)'
-                    }
-                  }}
-                  onClick={() => setAvisosExpanded(!avisosExpanded)}
-                >
-                  <Notifications sx={{ color: 'primary.main', mr: 2, fontSize: 28 }} />
-                  <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-                    <Typography variant="h6" color="primary" fontWeight={600} sx={{ lineHeight: 1.2 }}>
-                      Quadro de Avisos
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1 }}>
-                      {avisos.length} {avisos.length === 1 ? 'aviso' : 'avisos'} disponível{avisos.length === 1 ? '' : 'eis'}
-                    </Typography>
-                  </Box>
-                  {avisosExpanded ? (
-                    <ExpandLess sx={{ color: 'primary.main', ml: 2 }} />
-                  ) : (
-                    <ExpandMore sx={{ color: 'primary.main', ml: 2 }} />
-                  )}
-                </Box>
-                <Button
-                  variant="contained"
-                  startIcon={<Add />}
-                  onClick={handleOpenAvisoModal}
+            {/* Elementos decorativos de fundo */}
+            <Box
+              sx={{
+                position: 'absolute',
+                top: -50,
+                right: -50,
+                width: 200,
+                height: 200,
+                borderRadius: '50%',
+                background: 'rgba(255, 255, 255, 0.1)',
+                opacity: 0.5
+              }}
+            />
+            <Box
+              sx={{
+                position: 'absolute',
+                bottom: -30,
+                left: -30,
+                width: 150,
+                height: 150,
+                borderRadius: '50%',
+                background: 'rgba(255, 255, 255, 0.1)',
+                opacity: 0.5
+              }}
+            />
+
+            {/* Conteúdo do Header */}
+            <Box sx={{ position: 'relative', zIndex: 1 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                <Box
                   sx={{
-                    background: 'linear-gradient(45deg, #2196F3, #21CBF3)',
-                    '&:hover': {
-                      background: 'linear-gradient(45deg, #1976D2, #0288D1)',
-                    }
+                    width: { xs: 50, md: 70 },
+                    height: { xs: 50, md: 70 },
+                    borderRadius: 3,
+                    background: 'rgba(255, 255, 255, 0.2)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    mr: 3,
+                    backdropFilter: 'blur(10px)',
+                    fontSize: { xs: '28px', md: '40px' }
                   }}
                 >
-                  Novo Aviso
-                </Button>
+                  🏫
+                </Box>
+                <Box>
+                  <Typography
+                    variant="h3"
+                    fontWeight={800}
+                    sx={{
+                      fontSize: { xs: '1.75rem', sm: '2.25rem', md: '3rem' },
+                      textShadow: '0 2px 10px rgba(0,0,0,0.2)',
+                      lineHeight: 1.2
+                    }}
+                  >
+                    Gestão Escolar
+                  </Typography>
+                  <Typography
+                    variant="h6"
+                    sx={{
+                      opacity: 0.9,
+                      fontSize: { xs: '0.875rem', sm: '1rem', md: '1.125rem' },
+                      fontWeight: 400,
+                      mt: 0.5
+                    }}
+                  >
+                    Configurações e Administração da Escola
+                  </Typography>
+                </Box>
               </Box>
 
+              {/* Stats Cards */}
+              <Grid container spacing={2} sx={{ mt: 3 }}>
+                <Grid item xs={6} sm={4}>
+                  <Box
+                    sx={{
+                      p: 2,
+                      borderRadius: 2,
+                      background: 'rgba(255, 255, 255, 0.15)',
+                      backdropFilter: 'blur(10px)',
+                      border: '1px solid rgba(255, 255, 255, 0.2)'
+                    }}
+                  >
+                    <Typography variant="h4" fontWeight={700}>
+                      {turmas.length}
+                    </Typography>
+                    <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                      Turmas Ativas
+                    </Typography>
+                  </Box>
+                </Grid>
+                <Grid item xs={6} sm={4}>
+                  <Box
+                    sx={{
+                      p: 2,
+                      borderRadius: 2,
+                      background: 'rgba(255, 255, 255, 0.15)',
+                      backdropFilter: 'blur(10px)',
+                      border: '1px solid rgba(255, 255, 255, 0.2)'
+                    }}
+                  >
+                    <Typography variant="h4" fontWeight={700}>
+                      {avisos.length}
+                    </Typography>
+                    <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                      Avisos Ativos
+                    </Typography>
+                  </Box>
+                </Grid>
+                <Grid item xs={6} sm={4}>
+                  <Box
+                    sx={{
+                      p: 2,
+                      borderRadius: 2,
+                      background: 'rgba(255, 255, 255, 0.15)',
+                      backdropFilter: 'blur(10px)',
+                      border: '1px solid rgba(255, 255, 255, 0.2)'
+                    }}
+                  >
+                    <Typography variant="h4" fontWeight={700}>
+                      {disciplinas.length}
+                    </Typography>
+                    <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                      Disciplinas
+                    </Typography>
+                  </Box>
+                </Grid>
+              </Grid>
+            </Box>
+          </Box>
+          {/* Gerenciador de avisos - Visual Modernizado */}
+          <Card 
+            sx={{ 
+              mb: 4,
+              borderRadius: 3,
+              boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+              border: '1px solid rgba(102, 126, 234, 0.1)',
+              overflow: 'hidden'
+            }}
+          >
+            <Box
+              sx={{
+                background: 'linear-gradient(135deg, #667eea15 0%, #764ba215 100%)',
+                borderBottom: '1px solid rgba(102, 126, 234, 0.1)'
+              }}
+            >
+              <CardContent>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
+                  <Box 
+                    sx={{ 
+                      display: 'flex', 
+                      alignItems: 'center',
+                      cursor: 'pointer',
+                      borderRadius: 2,
+                      p: 1.5,
+                      transition: 'all 0.3s ease',
+                      '&:hover': {
+                        bgcolor: 'rgba(102, 126, 234, 0.08)',
+                        transform: 'translateX(5px)'
+                      }
+                    }}
+                    onClick={() => setAvisosExpanded(!avisosExpanded)}
+                  >
+                    <Box
+                      sx={{
+                        width: 48,
+                        height: 48,
+                        borderRadius: 2,
+                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        mr: 2,
+                        boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)'
+                      }}
+                    >
+                      <Notifications sx={{ color: 'white', fontSize: 26 }} />
+                    </Box>
+                    <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                      <Typography variant="h5" fontWeight={700} sx={{ 
+                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                        backgroundClip: 'text',
+                        WebkitBackgroundClip: 'text',
+                        WebkitTextFillColor: 'transparent',
+                        lineHeight: 1.2 
+                      }}>
+                        Quadro de Avisos
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1, mt: 0.5 }}>
+                        {avisos.length} {avisos.length === 1 ? 'aviso disponível' : 'avisos disponíveis'}
+                      </Typography>
+                    </Box>
+                    <Box sx={{ ml: 2 }}>
+                      {avisosExpanded ? (
+                        <ExpandLess sx={{ color: '#667eea', fontSize: 28 }} />
+                      ) : (
+                        <ExpandMore sx={{ color: '#667eea', fontSize: 28 }} />
+                      )}
+                    </Box>
+                  </Box>
+                  <Button
+                    variant="contained"
+                    startIcon={<Add />}
+                    onClick={handleOpenAvisoModal}
+                    sx={{
+                      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                      borderRadius: 2,
+                      px: 3,
+                      py: 1.5,
+                      fontWeight: 600,
+                      textTransform: 'none',
+                      fontSize: '1rem',
+                      boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)',
+                      '&:hover': {
+                        background: 'linear-gradient(135deg, #5568d3 0%, #6a3f8f 100%)',
+                        boxShadow: '0 6px 16px rgba(102, 126, 234, 0.4)',
+                        transform: 'translateY(-2px)'
+                      },
+                      transition: 'all 0.3s ease'
+                    }}
+                  >
+                    Novo Aviso
+                  </Button>
+                </Box>
+              </CardContent>
+            </Box>
+
+            <CardContent>
               {/* Prévia compacta quando retraído */}
               {!avisosExpanded && avisos.length > 0 && (
                 <Box 
@@ -1248,54 +1439,84 @@ const Escola = () => {
                     </Typography>
                   </Box>
                 ) : (
-                  <Box>
+                  <Box sx={{ p: 2 }}>
                   {avisos.map((aviso, index) => (
                     <Card 
                       key={aviso.id} 
                       sx={{ 
                         mb: 2, 
-                        border: '1px solid #e2e8f0',
+                        borderRadius: 2,
+                        border: '2px solid',
+                        borderColor: aviso.prioridade === 'alta' ? '#ff5252' : 
+                                     aviso.prioridade === 'media' ? '#ffa726' : '#e0e0e0',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
                         '&:hover': {
-                          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                          transform: 'translateY(-2px)'
+                          boxShadow: '0 6px 20px rgba(0,0,0,0.12)',
+                          transform: 'translateY(-2px)',
+                          borderColor: aviso.prioridade === 'alta' ? '#d32f2f' : 
+                                       aviso.prioridade === 'media' ? '#f57c00' : '#bdbdbd'
                         },
-                        transition: 'all 0.3s ease'
+                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                        overflow: 'hidden',
+                        position: 'relative'
                       }}
                     >
-                      <CardContent>
+                      {/* Barra lateral colorida de prioridade */}
+                      <Box
+                        sx={{
+                          position: 'absolute',
+                          left: 0,
+                          top: 0,
+                          bottom: 0,
+                          width: 6,
+                          background: aviso.prioridade === 'alta' 
+                            ? 'linear-gradient(180deg, #ff5252 0%, #d32f2f 100%)'
+                            : aviso.prioridade === 'media'
+                            ? 'linear-gradient(180deg, #ffa726 0%, #f57c00 100%)'
+                            : 'linear-gradient(180deg, #9e9e9e 0%, #757575 100%)'
+                        }}
+                      />
+                      
+                      <CardContent sx={{ pl: 3 }}>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                           <Box sx={{ flex: 1 }}>
                             {/* Cabeçalho do aviso */}
-                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                              <Typography variant="h6" fontWeight={600} sx={{ mr: 2 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 1 }}>
+                              <Typography variant="h6" fontWeight={700} sx={{ mr: 2 }}>
                                 {aviso.titulo || 'Aviso'}
                               </Typography>
                               <Chip 
                                 size="small"
                                 label={aviso.prioridade || 'média'}
-                                color={
-                                  aviso.prioridade === 'alta' ? 'error' : 
-                                  aviso.prioridade === 'media' ? 'warning' : 'default'
-                                }
-                                sx={{ mr: 1 }}
+                                sx={{
+                                  bgcolor: aviso.prioridade === 'alta' ? '#ffebee' : 
+                                          aviso.prioridade === 'media' ? '#fff3e0' : '#f5f5f5',
+                                  color: aviso.prioridade === 'alta' ? '#d32f2f' : 
+                                         aviso.prioridade === 'media' ? '#f57c00' : '#616161',
+                                  fontWeight: 600,
+                                  borderRadius: 1
+                                }}
                               />
                               <Chip 
                                 size="small"
                                 label={aviso.categoria || 'geral'}
                                 variant="outlined"
-                                sx={{ mr: 1 }}
+                                sx={{ 
+                                  borderRadius: 1,
+                                  borderWidth: 2,
+                                  fontWeight: 600
+                                }}
                               />
                               {/* Indicador de vencimento próximo */}
                               {isAvisoProximoVencimento(aviso) && (
                                 <Chip 
                                   size="small"
                                   label="⏰ Expira em breve"
-                                  color="warning"
-                                  variant="filled"
                                   sx={{ 
-                                    animation: 'pulse 2s infinite',
                                     bgcolor: '#ff9800',
                                     color: 'white',
+                                    fontWeight: 600,
+                                    animation: 'pulse 2s infinite',
                                     '@keyframes pulse': {
                                       '0%': { opacity: 1 },
                                       '50%': { opacity: 0.7 },
@@ -1413,12 +1634,49 @@ const Escola = () => {
             </CardContent>
           </Card>
 
-          {/* Modal para criar/editar aviso */}
-          <Dialog open={openAvisoModal} onClose={() => setOpenAvisoModal(false)} maxWidth="md" fullWidth>
-            <DialogTitle sx={{ pb: 1 }}>
+          {/* Modal para criar/editar aviso - Visual Modernizado */}
+          <Dialog 
+            open={openAvisoModal} 
+            onClose={() => setOpenAvisoModal(false)} 
+            maxWidth="md" 
+            fullWidth
+            PaperProps={{
+              sx: {
+                borderRadius: 3,
+                boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
+              }
+            }}
+          >
+            <DialogTitle 
+              sx={{ 
+                pb: 2,
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                color: 'white'
+              }}
+            >
               <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <Notifications sx={{ color: 'primary.main', mr: 1 }} />
-                Criar Novo Aviso
+                <Box
+                  sx={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 2,
+                    background: 'rgba(255, 255, 255, 0.2)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    mr: 2
+                  }}
+                >
+                  <Notifications sx={{ fontSize: 24 }} />
+                </Box>
+                <Box>
+                  <Typography variant="h6" fontWeight={700}>
+                    Criar Novo Aviso
+                  </Typography>
+                  <Typography variant="caption" sx={{ opacity: 0.9 }}>
+                    Preencha as informações do aviso escolar
+                  </Typography>
+                </Box>
               </Box>
             </DialogTitle>
             <DialogContent>
@@ -1535,13 +1793,19 @@ const Escola = () => {
 
                   {/* Campo de Upload */}
                   <Box sx={{ 
-                    border: '2px dashed #ddd', 
-                    borderRadius: 2, 
-                    p: 2, 
+                    border: '3px dashed',
+                    borderColor: selectedFile ? '#667eea' : '#e0e0e0',
+                    borderRadius: 3, 
+                    p: 3, 
                     textAlign: 'center',
-                    backgroundColor: selectedFile ? '#f0f9ff' : '#fafafa',
-                    borderColor: selectedFile ? '#3b82f6' : '#ddd',
-                    transition: 'all 0.3s ease'
+                    backgroundColor: selectedFile ? '#f5f7ff' : '#fafafa',
+                    transition: 'all 0.3s ease',
+                    cursor: 'pointer',
+                    '&:hover': {
+                      borderColor: '#667eea',
+                      backgroundColor: '#f5f7ff',
+                      transform: 'scale(1.01)'
+                    }
                   }}>
                     <input
                       type="file"
@@ -1550,21 +1814,39 @@ const Escola = () => {
                       style={{ display: 'none' }}
                       accept="image/*,application/pdf,.doc,.docx,.txt"
                     />
-                    <label htmlFor="file-upload" style={{ cursor: 'pointer' }}>
-                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+                    <label htmlFor="file-upload" style={{ cursor: 'pointer', display: 'block' }}>
+                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.5 }}>
                         {selectedFile ? (
                           <>
-                            <CheckCircle sx={{ color: 'success.main', fontSize: 32 }} />
-                            <Typography variant="body1" color="success.main" fontWeight={600}>
+                            <Box
+                              sx={{
+                                width: 60,
+                                height: 60,
+                                borderRadius: 3,
+                                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)'
+                              }}
+                            >
+                              <CheckCircle sx={{ color: 'white', fontSize: 32 }} />
+                            </Box>
+                            <Typography variant="h6" color="success.main" fontWeight={700}>
                               {selectedFile.name}
                             </Typography>
-                            <Typography variant="caption" color="text.secondary">
+                            <Typography variant="body2" color="text.secondary">
                               {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
                             </Typography>
                             <Button
                               size="small"
-                              variant="outlined"
-                              color="primary"
+                              variant="contained"
+                              sx={{
+                                mt: 1,
+                                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                                textTransform: 'none',
+                                fontWeight: 600
+                              }}
                               onClick={(e) => {
                                 e.preventDefault();
                                 document.getElementById('file-upload').click();
@@ -1575,14 +1857,26 @@ const Escola = () => {
                           </>
                         ) : (
                           <>
-                            <CloudUpload sx={{ color: 'text.secondary', fontSize: 32 }} />
-                            <Typography variant="body1" color="text.primary">
-                              Clique aqui para selecionar um arquivo
+                            <Box
+                              sx={{
+                                width: 60,
+                                height: 60,
+                                borderRadius: 3,
+                                background: 'linear-gradient(135deg, #e0e0e0 0%, #bdbdbd 100%)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                              }}
+                            >
+                              <CloudUpload sx={{ color: 'white', fontSize: 32 }} />
+                            </Box>
+                            <Typography variant="h6" color="text.primary" fontWeight={600}>
+                              Clique para selecionar um arquivo
                             </Typography>
-                            <Typography variant="caption" color="text.secondary">
+                            <Typography variant="body2" color="text.secondary">
                               Ou arraste e solte o arquivo aqui
                             </Typography>
-                            <Typography variant="caption" color="text.secondary">
+                            <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
                               Máximo: 10MB • Formatos: PDF, DOC, IMG, TXT
                             </Typography>
                           </>
@@ -1602,19 +1896,48 @@ const Escola = () => {
                 </Box>
               </Box>
             </DialogContent>
-            <DialogActions sx={{ p: 3, pt: 2 }}>
-              <Button onClick={() => setOpenAvisoModal(false)} color="secondary" variant="outlined">
+            <DialogActions sx={{ p: 3, pt: 2, bgcolor: '#f8f9fa', borderTop: '1px solid #e0e0e0' }}>
+              <Button 
+                onClick={() => setOpenAvisoModal(false)} 
+                variant="outlined"
+                sx={{
+                  borderRadius: 2,
+                  px: 3,
+                  py: 1,
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  borderWidth: 2,
+                  color: '#666',
+                  borderColor: '#ddd',
+                  '&:hover': {
+                    borderWidth: 2,
+                    borderColor: '#999',
+                    bgcolor: '#f5f5f5'
+                  }
+                }}
+              >
                 Cancelar
               </Button>
               <Button 
                 onClick={handleAddAviso} 
-                color="primary" 
                 variant="contained"
                 disabled={salvandoAviso || uploading || !avisoForm.titulo.trim() || !avisoForm.conteudo.trim()}
                 sx={{
-                  background: 'linear-gradient(45deg, #2196F3, #21CBF3)',
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  borderRadius: 2,
+                  px: 4,
+                  py: 1,
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  fontSize: '1rem',
+                  boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)',
                   '&:hover': {
-                    background: 'linear-gradient(45deg, #1976D2, #0288D1)',
+                    background: 'linear-gradient(135deg, #5568d3 0%, #6a3f8f 100%)',
+                    boxShadow: '0 6px 16px rgba(102, 126, 234, 0.4)',
+                  },
+                  '&:disabled': {
+                    background: '#e0e0e0',
+                    color: '#9e9e9e'
                   }
                 }}
               >
@@ -1634,91 +1957,174 @@ const Escola = () => {
               </Button>
             </DialogActions>
           </Dialog>
-          <GestaoEscolarCard
-            turmasContent={
-              <TurmaCard
-                turmas={turmas}
-                loading={loading}
-                filtroTurno={filtroTurno}
-                setFiltroTurno={setFiltroTurno}
-                filtroNomeTurma={filtroNomeTurma}
-                setFiltroNomeTurma={setFiltroNomeTurma}
-                handleAddTurma={handleAddTurma}
-                handleEditTurma={handleEditTurma}
-                handleExcluirTurma={handleExcluirTurma}
-                periodosAtivos={periodosAtivos}
-                openTurmaModal={openTurmaModal}
-                setOpenTurmaModal={setOpenTurmaModal}
-                editTurma={editTurma}
-                editTurmaForm={editTurmaForm}
-                setEditTurmaForm={setEditTurmaForm}
-                isNewTurma={isNewTurma}
-                savingTurma={savingTurma}
-                handleTurmaFormChange={handleTurmaFormChange}
-                handleSaveTurma={handleSaveTurma}
-                gestaoTurmaOpen={gestaoTurmaOpen}
-                gestaoTurma={gestaoTurma}
-                handleOpenGestaoTurma={handleOpenGestaoTurma}
-                handleCloseGestaoTurma={handleCloseGestaoTurma}
-                alunosTurma={alunosTurma}
-                calcularIdade={calcularIdade}
-                modalVinculosOpen={modalVinculosOpen}
-                setModalVinculosOpen={setModalVinculosOpen}
-                vinculosTurma={vinculosTurma}
-                modalConfirmExcluirOpen={modalConfirmExcluirOpen}
-                setModalConfirmExcluirOpen={setModalConfirmExcluirOpen}
-                turmaExcluir={turmaExcluir}
-                handleConfirmExcluirTurma={handleConfirmExcluirTurma}
-                excluindoTurma={excluindoTurma}
-                loadingPeriodosAtivos={loadingPeriodosAtivos}
-              />
-            }
-            periodosContent={
-              <PeriodoCard
-                periodoForm={periodoForm}
-                salvandoPeriodo={salvandoPeriodo}
-                msgPeriodo={msgPeriodo}
-                abaPeriodo={abaPeriodo}
-                setAbaPeriodo={setAbaPeriodo}
-                modalCadastroPeriodoOpen={modalCadastroPeriodoOpen}
-                setModalCadastroPeriodoOpen={setModalCadastroPeriodoOpen}
-                handlePeriodoFormChange={handlePeriodoFormChange}
-                handleSalvarPeriodo={handleSalvarPeriodo}
-                loadingConsulta={loadingConsulta}
-                periodosCadastrados={periodosCadastrados}
-                carregarPeriodosCadastrados={carregarPeriodosCadastrados}
-                handleTrocarAbaPeriodo={handleTrocarAbaPeriodo}
-                editDialogOpen={editDialogOpen}
-                setEditDialogOpen={setEditDialogOpen}
-                editPeriodoForm={editPeriodoForm}
-                handleEditPeriodoFormChange={handleEditPeriodoFormChange}
-                handleSalvarEdicaoPeriodo={handleSalvarEdicaoPeriodo}
-                editMsg={editMsg}
-                editLoading={editLoading}
-                handleEditarPeriodoClick={handleEditarPeriodoClick}
-                handleExcluirPeriodo={handleExcluirPeriodo}
-                formatDateBR={formatDateBR}
-              />
-            }
-            disciplinasContent={
-              <DisciplinaCard
-                disciplinas={disciplinas}
-                loadingDisciplinas={loadingDisciplinas}
-                openDisciplinaModal={openDisciplinaModal}
-                novaDisciplina={novaDisciplina}
-                setOpenDisciplinaModal={setOpenDisciplinaModal}
-                setNovaDisciplina={setNovaDisciplina}
-                handleAddDisciplina={handleAddDisciplina}
-                handleExcluirDisciplina={handleExcluirDisciplina}
-              />
-            }
-            gradeHorariaContent={
-              <GradeHorariaCard />
-            }
-            notasFrequenciaContent={
-              <NotasFrequenciaCard />
-            }
-          />
+
+          {/* Gestão Escolar com Abas */}
+          <Box sx={{ mt: 4 }}>
+            <Paper 
+              sx={{ 
+                mb: 3,
+                borderRadius: 3,
+                overflow: 'hidden',
+                boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+                border: '1px solid rgba(102, 126, 234, 0.1)'
+              }}
+            >
+              <Tabs
+                value={tabGestaoValue}
+                onChange={(e, newValue) => setTabGestaoValue(newValue)}
+                aria-label="Abas de Gestão Escolar"
+                variant="scrollable"
+                scrollButtons="auto"
+                allowScrollButtonsMobile
+                sx={{
+                  background: 'linear-gradient(135deg, #667eea15 0%, #764ba215 100%)',
+                  borderBottom: '2px solid rgba(102, 126, 234, 0.2)',
+                  '& .MuiTab-root': {
+                    textTransform: 'none',
+                    fontSize: { xs: '0.875rem', sm: '0.95rem', md: '1rem' },
+                    fontWeight: 600,
+                    py: { xs: 2, md: 2.5 },
+                    px: { xs: 2, md: 3 },
+                    minHeight: { xs: 64, md: 72 },
+                    color: '#666',
+                    transition: 'all 0.3s ease',
+                    '&:hover': {
+                      background: 'rgba(102, 126, 234, 0.08)',
+                      color: '#667eea'
+                    },
+                    '&.Mui-selected': {
+                      color: '#667eea',
+                      fontWeight: 700,
+                      background: 'rgba(102, 126, 234, 0.1)'
+                    }
+                  },
+                  '& .MuiTabs-indicator': {
+                    height: 3,
+                    borderRadius: '3px 3px 0 0',
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                  },
+                  '& .MuiTabs-scrollButtons': {
+                    color: '#667eea',
+                    '&.Mui-disabled': {
+                      opacity: 0.3
+                    }
+                  }
+                }}
+              >
+                <Tab label="📚 Turmas" />
+                <Tab label="📅 Períodos Acadêmicos" />
+                <Tab label="📖 Disciplinas" />
+                <Tab label="🕐 Grade Horária" />
+                <Tab label="📊 Notas e Frequência" />
+              </Tabs>
+            </Paper>
+
+            {/* Conteúdo das Abas */}
+            <Box sx={{ mt: 3 }}>
+              {/* Aba 0: Turmas */}
+              {tabGestaoValue === 0 && (
+                <Box>
+                  <TurmaCard
+                    turmas={turmas}
+                    loading={loading}
+                    filtroTurno={filtroTurno}
+                    setFiltroTurno={setFiltroTurno}
+                    filtroNomeTurma={filtroNomeTurma}
+                    setFiltroNomeTurma={setFiltroNomeTurma}
+                    handleAddTurma={handleAddTurma}
+                    handleEditTurma={handleEditTurma}
+                    handleExcluirTurma={handleExcluirTurma}
+                    periodosAtivos={periodosAtivos}
+                    openTurmaModal={openTurmaModal}
+                    setOpenTurmaModal={setOpenTurmaModal}
+                    editTurma={editTurma}
+                    editTurmaForm={editTurmaForm}
+                    setEditTurmaForm={setEditTurmaForm}
+                    isNewTurma={isNewTurma}
+                    savingTurma={savingTurma}
+                    handleTurmaFormChange={handleTurmaFormChange}
+                    handleSaveTurma={handleSaveTurma}
+                    gestaoTurmaOpen={gestaoTurmaOpen}
+                    gestaoTurma={gestaoTurma}
+                    handleOpenGestaoTurma={handleOpenGestaoTurma}
+                    handleCloseGestaoTurma={handleCloseGestaoTurma}
+                    alunosTurma={alunosTurma}
+                    calcularIdade={calcularIdade}
+                    modalVinculosOpen={modalVinculosOpen}
+                    setModalVinculosOpen={setModalVinculosOpen}
+                    vinculosTurma={vinculosTurma}
+                    modalConfirmExcluirOpen={modalConfirmExcluirOpen}
+                    setModalConfirmExcluirOpen={setModalConfirmExcluirOpen}
+                    turmaExcluir={turmaExcluir}
+                    handleConfirmExcluirTurma={handleConfirmExcluirTurma}
+                    excluindoTurma={excluindoTurma}
+                    loadingPeriodosAtivos={loadingPeriodosAtivos}
+                  />
+                </Box>
+              )}
+
+              {/* Aba 1: Períodos */}
+              {tabGestaoValue === 1 && (
+                <Box>
+                  <PeriodoCard
+                    periodoForm={periodoForm}
+                    salvandoPeriodo={salvandoPeriodo}
+                    msgPeriodo={msgPeriodo}
+                    abaPeriodo={abaPeriodo}
+                    setAbaPeriodo={setAbaPeriodo}
+                    modalCadastroPeriodoOpen={modalCadastroPeriodoOpen}
+                    setModalCadastroPeriodoOpen={setModalCadastroPeriodoOpen}
+                    handlePeriodoFormChange={handlePeriodoFormChange}
+                    handleSalvarPeriodo={handleSalvarPeriodo}
+                    loadingConsulta={loadingConsulta}
+                    periodosCadastrados={periodosCadastrados}
+                    carregarPeriodosCadastrados={carregarPeriodosCadastrados}
+                    handleTrocarAbaPeriodo={handleTrocarAbaPeriodo}
+                    editDialogOpen={editDialogOpen}
+                    setEditDialogOpen={setEditDialogOpen}
+                    editPeriodoForm={editPeriodoForm}
+                    handleEditPeriodoFormChange={handleEditPeriodoFormChange}
+                    handleSalvarEdicaoPeriodo={handleSalvarEdicaoPeriodo}
+                    editMsg={editMsg}
+                    editLoading={editLoading}
+                    handleEditarPeriodoClick={handleEditarPeriodoClick}
+                    handleExcluirPeriodo={handleExcluirPeriodo}
+                    formatDateBR={formatDateBR}
+                  />
+                </Box>
+              )}
+
+              {/* Aba 2: Disciplinas */}
+              {tabGestaoValue === 2 && (
+                <Box>
+                  <DisciplinaCard
+                    disciplinas={disciplinas}
+                    loadingDisciplinas={loadingDisciplinas}
+                    openDisciplinaModal={openDisciplinaModal}
+                    novaDisciplina={novaDisciplina}
+                    setOpenDisciplinaModal={setOpenDisciplinaModal}
+                    setNovaDisciplina={setNovaDisciplina}
+                    handleAddDisciplina={handleAddDisciplina}
+                    handleExcluirDisciplina={handleExcluirDisciplina}
+                  />
+                </Box>
+              )}
+
+              {/* Aba 3: Grade Horária */}
+              {tabGestaoValue === 3 && (
+                <Box>
+                  <GradeHorariaCard />
+                </Box>
+              )}
+
+              {/* Aba 4: Notas e Frequência */}
+              {tabGestaoValue === 4 && (
+                <Box>
+                  <NotasFrequenciaCard />
+                </Box>
+              )}
+            </Box>
+          </Box>
         </Box>
       </main>
     </div>

@@ -83,7 +83,7 @@ import '../../styles/AvisosCarousel.css';
 const Dashboard = () => {
   // Hooks para banco de dados da escola
   const { user: authUser, currentSchool } = useAuth();
-  const { isReady, isLoading, error, getData, currentSchool: schoolData } = useSchoolDatabase();
+  const { isReady, isLoading, error, getData, setData, currentSchool: schoolData } = useSchoolDatabase();
   const currentSchoolId = typeof currentSchool === 'string' ? currentSchool : currentSchool?.id;
   const mensagensPath = currentSchoolId ? `escolas/${currentSchoolId}/mensagens` : 'mensagens';
 
@@ -240,16 +240,33 @@ const Dashboard = () => {
 
   // Salvar personalização
   const salvarPersonalizacao = async (novaOrdem) => {
-    if (!isReady || !userId || !currentSchoolId) return;
+    if (!isReady || !userId || !currentSchoolId) {
+      console.error('❌ Não pode salvar - isReady:', isReady, 'userId:', userId, 'schoolId:', currentSchoolId);
+      return;
+    }
     
     try {
-      console.log('💾 Salvando personalização:', novaOrdem);
-      await setData(`usuarios/${userId}/dashboard-config/acoes-rapidas`, {
+      console.log('💾 Salvando personalização...');
+      console.log('   userId:', userId);
+      console.log('   schoolId:', currentSchoolId);
+      console.log('   ordem:', novaOrdem);
+      
+      const caminho = `usuarios/${userId}/dashboard-config/acoes-rapidas`;
+      console.log('   caminho:', caminho);
+      
+      await setData(caminho, {
         ordem: novaOrdem,
-        atualizadoEm: new Date().toISOString()
+        atualizadoEm: new Date().toISOString(),
+        usuarioId: userId,
+        escolaId: currentSchoolId
       });
+      
       setAcoesPersonalizadas(novaOrdem);
       console.log('✅ Personalização salva com sucesso!');
+      
+      // Verificar se salvou
+      const verificacao = await getData(caminho);
+      console.log('🔍 Verificação após salvar:', verificacao);
     } catch (error) {
       console.error('❌ Erro ao salvar personalização:', error);
     }
@@ -276,11 +293,7 @@ const Dashboard = () => {
   };
 
   const handleDragEnd = () => {
-    if (draggedIndex !== null) {
-      const acoes = getAcoesOrdenadas();
-      const novaOrdemIds = acoes.map(a => a.id);
-      salvarPersonalizacao(novaOrdemIds);
-    }
+    // Não salva automaticamente aqui, apenas ao clicar em Salvar
     setDraggedIndex(null);
   };
 
@@ -303,6 +316,7 @@ const Dashboard = () => {
   const handleSalvarEdicao = () => {
     const acoes = getAcoesOrdenadas();
     const novaOrdemIds = acoes.map(a => a.id);
+    console.log('🎯 Salvando ordem ao clicar no botão:', novaOrdemIds);
     salvarPersonalizacao(novaOrdemIds);
     setEditandoAcoes(false);
   };
@@ -366,8 +380,12 @@ const Dashboard = () => {
         ]);
 
         // Carregar personalização das ações rápidas
+        console.log('📦 Carregando personalização...');
+        console.log('   userId:', userId);
+        console.log('   personalizacaoData:', personalizacaoData);
+        
         if (personalizacaoData && personalizacaoData.ordem) {
-          console.log('✅ Personalização carregada:', personalizacaoData.ordem);
+          console.log('✅ Personalização carregada do Firebase:', personalizacaoData.ordem);
           setAcoesPersonalizadas(personalizacaoData.ordem);
         } else {
           console.log('ℹ️ Nenhuma personalização encontrada, usando ordem padrão');

@@ -34,7 +34,12 @@ import {
   Badge,
   Fade,
   Zoom,
-  Button
+  Button,
+  Tooltip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions
 } from '@mui/material';
 import { auth, onAuthStateChanged } from '../../firebase';
 import { 
@@ -66,7 +71,11 @@ import {
   Chat,
   Store,
   AttachMoney,
-  Mail
+  Mail,
+  Edit as EditIcon,
+  Save as SaveIcon,
+  Close as CloseIcon,
+  DragIndicator
 } from '@mui/icons-material';
 import '../../styles/Dashboard.css';
 import '../../styles/AvisosCarousel.css';
@@ -98,6 +107,9 @@ const Dashboard = () => {
   const [headerConfig, setHeaderConfig] = useState(null);
   const [totalPendencias, setTotalPendencias] = useState(0);
   const [totalMensagensNaoLidas, setTotalMensagensNaoLidas] = useState(0);
+  const [editandoAcoes, setEditandoAcoes] = useState(false);
+  const [acoesPersonalizadas, setAcoesPersonalizadas] = useState([]);
+  const [draggedIndex, setDraggedIndex] = useState(null);
   const router = useRouter();
 
   // Verificar autenticação
@@ -160,47 +172,155 @@ const Dashboard = () => {
   const getQuickActions = () => {
     const roleActions = {
       coordenadora: [
-        { titulo: 'Pendências', icon: Notifications, rota: '/pendencias', cor: '#EF4444', badgeCount: totalPendencias },
-        { titulo: 'Mensagens', icon: Mail, rota: '/agenda', cor: '#3B82F6', badgeCount: totalMensagensNaoLidas },
-        { titulo: 'Gerenciar Alunos', icon: PersonAdd, rota: '/alunos', cor: '#3B82F6' },
-        { titulo: 'Colaboradores', icon: Group, rota: '/colaboradores', cor: '#8B5CF6' },
-        { titulo: 'Relatórios & Notas', icon: Assessment, rota: '/notas-frequencia', cor: '#10B981' },
-        { titulo: 'Financeiro', icon: Assessment, rota: '/financeiro', cor: '#059669' },
-        { titulo: 'Loja ELO', icon: Store, rota: '/loja', cor: '#DC2626' },
-        { titulo: 'Configurações', icon: Settings, rota: '/configuracoes', cor: '#EF4444' },
-        { titulo: 'Grade Horária', icon: Schedule, rota: '/grade-horaria', cor: '#F59E0B' },
-        { titulo: 'Galeria de Fotos', icon: PhotoLibrary, rota: '/galeriafotos', cor: '#06B6D4' }
+        { id: 'pendencias', titulo: 'Pendências', icon: Notifications, rota: '/pendencias', cor: '#EF4444', badgeCount: totalPendencias },
+        { id: 'mensagens', titulo: 'Mensagens', icon: Mail, rota: '/agenda', cor: '#3B82F6', badgeCount: totalMensagensNaoLidas },
+        { id: 'gerenciar-alunos', titulo: 'Gerenciar Alunos', icon: PersonAdd, rota: '/alunos', cor: '#3B82F6' },
+        { id: 'colaboradores', titulo: 'Colaboradores', icon: Group, rota: '/colaboradores', cor: '#8B5CF6' },
+        { id: 'relatorios-notas', titulo: 'Relatórios & Notas', icon: Assessment, rota: '/notas-frequencia', cor: '#10B981' },
+        { id: 'financeiro', titulo: 'Financeiro', icon: Assessment, rota: '/financeiro', cor: '#059669' },
+        { id: 'loja-elo', titulo: 'Loja ELO', icon: Store, rota: '/loja', cor: '#DC2626' },
+        { id: 'configuracoes', titulo: 'Configurações', icon: Settings, rota: '/configuracoes', cor: '#EF4444' },
+        { id: 'grade-horaria', titulo: 'Grade Horária', icon: Schedule, rota: '/grade-horaria', cor: '#F59E0B' },
+        { id: 'galeria-fotos', titulo: 'Galeria de Fotos', icon: PhotoLibrary, rota: '/galeriafotos', cor: '#06B6D4' }
       ],
       professora: [
-        { titulo: 'Mensagens', icon: Mail, rota: '/agenda', cor: '#3B82F6', badgeCount: totalMensagensNaoLidas },
-        { titulo: 'Agenda da Turma', icon: CalendarToday, rota: '/agenda', cor: '#3B82F6' },
-        { titulo: 'Lançar Notas', icon: Grade, rota: '/notas-frequencia', cor: '#10B981' },
-        { titulo: 'Controle Médico', icon: LocalHospital, rota: '/agenda', cor: '#EF4444' },
-        { titulo: 'Frequência', icon: EventBusy, rota: '/notas-frequencia', cor: '#F59E0B' },
-        { titulo: 'Meus Alunos', icon: People, rota: '/alunos', cor: '#8B5CF6' },
-        { titulo: 'Criar Aviso', icon: Announcement, rota: '/avisos', cor: '#06B6D4' }
+        { id: 'mensagens', titulo: 'Mensagens', icon: Mail, rota: '/agenda', cor: '#3B82F6', badgeCount: totalMensagensNaoLidas },
+        { id: 'agenda-turma', titulo: 'Agenda da Turma', icon: CalendarToday, rota: '/agenda', cor: '#3B82F6' },
+        { id: 'lancar-notas', titulo: 'Lançar Notas', icon: Grade, rota: '/notas-frequencia', cor: '#10B981' },
+        { id: 'controle-medico', titulo: 'Controle Médico', icon: LocalHospital, rota: '/agenda', cor: '#EF4444' },
+        { id: 'frequencia', titulo: 'Frequência', icon: EventBusy, rota: '/notas-frequencia', cor: '#F59E0B' },
+        { id: 'meus-alunos', titulo: 'Meus Alunos', icon: People, rota: '/alunos', cor: '#8B5CF6' },
+        { id: 'criar-aviso', titulo: 'Criar Aviso', icon: Announcement, rota: '/avisos', cor: '#06B6D4' }
       ],
       pai: [
-        { titulo: 'Mensagens', icon: Mail, rota: '/agenda', cor: '#3B82F6', badgeCount: totalMensagensNaoLidas },
-        { titulo: 'Agenda Médica', icon: MedicalServices, rota: '/agenda', cor: '#EF4444' },
-        { titulo: 'Boletim do Filho', icon: Assessment, rota: '/notas-frequencia', cor: '#10B981' },
-        { titulo: 'Financeiro', icon: AttachMoney, rota: '/financeiro', cor: '#059669' },
-        { titulo: 'Loja ELO', icon: Store, rota: '/loja', cor: '#DC2626' },
-        { titulo: 'Galeria de Fotos', icon: PhotoLibrary, rota: '/galeriafotos', cor: '#F59E0B' },
-        { titulo: 'Avisos da Escola', icon: Notifications, rota: '/avisos', cor: '#3B82F6' },
-        { titulo: 'Cardápio', icon: MenuBook, rota: '/escola', cor: '#8B5CF6' },
-        { titulo: 'Contato Escola', icon: Chat, rota: '/escola', cor: '#06B6D4' }
+        { id: 'mensagens', titulo: 'Mensagens', icon: Mail, rota: '/agenda', cor: '#3B82F6', badgeCount: totalMensagensNaoLidas },
+        { id: 'agenda-medica', titulo: 'Agenda Médica', icon: MedicalServices, rota: '/agenda', cor: '#EF4444' },
+        { id: 'boletim-filho', titulo: 'Boletim do Filho', icon: Assessment, rota: '/notas-frequencia', cor: '#10B981' },
+        { id: 'financeiro', titulo: 'Financeiro', icon: AttachMoney, rota: '/financeiro', cor: '#059669' },
+        { id: 'loja-elo', titulo: 'Loja ELO', icon: Store, rota: '/loja', cor: '#DC2626' },
+        { id: 'galeria-fotos', titulo: 'Galeria de Fotos', icon: PhotoLibrary, rota: '/galeriafotos', cor: '#F59E0B' },
+        { id: 'avisos-escola', titulo: 'Avisos da Escola', icon: Notifications, rota: '/avisos', cor: '#3B82F6' },
+        { id: 'cardapio', titulo: 'Cardápio', icon: MenuBook, rota: '/escola', cor: '#8B5CF6' },
+        { id: 'contato-escola', titulo: 'Contato Escola', icon: Chat, rota: '/escola', cor: '#06B6D4' }
       ],
       aluno: [
-        { titulo: 'Mensagens', icon: Mail, rota: '/agenda', cor: '#3B82F6', badgeCount: totalMensagensNaoLidas },
-        { titulo: 'Minhas Notas', icon: Grade, rota: '/notas-frequencia', cor: '#10B981' },
-        { titulo: 'Minha Agenda', icon: CalendarToday, rota: '/agenda', cor: '#3B82F6' },
-        { titulo: 'Galeria de Fotos', icon: PhotoLibrary, rota: '/galeriafotos', cor: '#F59E0B' },
-        { titulo: 'Avisos', icon: Notifications, rota: '/avisos', cor: '#8B5CF6' },
-        { titulo: 'Meu Perfil', icon: AccountCircle, rota: '/profile', cor: '#06B6D4' }
+        { id: 'mensagens', titulo: 'Mensagens', icon: Mail, rota: '/agenda', cor: '#3B82F6', badgeCount: totalMensagensNaoLidas },
+        { id: 'minhas-notas', titulo: 'Minhas Notas', icon: Grade, rota: '/notas-frequencia', cor: '#10B981' },
+        { id: 'minha-agenda', titulo: 'Minha Agenda', icon: CalendarToday, rota: '/agenda', cor: '#3B82F6' },
+        { id: 'galeria-fotos', titulo: 'Galeria de Fotos', icon: PhotoLibrary, rota: '/galeriafotos', cor: '#F59E0B' },
+        { id: 'avisos', titulo: 'Avisos', icon: Notifications, rota: '/avisos', cor: '#8B5CF6' },
+        { id: 'meu-perfil', titulo: 'Meu Perfil', icon: AccountCircle, rota: '/profile', cor: '#06B6D4' }
       ]
     };
     return roleActions[userRole] || [];
+  };
+
+  // Carregar personalização das ações rápidas
+  useEffect(() => {
+    const carregarPersonalizacao = async () => {
+      if (!isReady || !userId || !currentSchoolId) return;
+      
+      try {
+        const personalizacao = await getData(`usuarios/${userId}/dashboard-config/acoes-rapidas`);
+        if (personalizacao && personalizacao.ordem) {
+          setAcoesPersonalizadas(personalizacao.ordem);
+        }
+      } catch (error) {
+        console.error('Erro ao carregar personalização:', error);
+      }
+    };
+
+    carregarPersonalizacao();
+  }, [isReady, userId, currentSchoolId, getData]);
+
+  // Obter ações ordenadas
+  const getAcoesOrdenadas = () => {
+    const acoes = getQuickActions();
+    if (acoesPersonalizadas.length === 0) return acoes;
+
+    // Ordenar baseado na personalização salva
+    const acoesMap = new Map(acoes.map(acao => [acao.id, acao]));
+    const ordenadas = [];
+    
+    // Primeiro, adicionar as ações na ordem personalizada
+    acoesPersonalizadas.forEach(id => {
+      if (acoesMap.has(id)) {
+        ordenadas.push(acoesMap.get(id));
+        acoesMap.delete(id);
+      }
+    });
+    
+    // Adicionar ações restantes (novas que não estavam na personalização)
+    acoesMap.forEach(acao => ordenadas.push(acao));
+    
+    return ordenadas;
+  };
+
+  // Salvar personalização
+  const salvarPersonalizacao = async (novaOrdem) => {
+    if (!isReady || !userId || !currentSchoolId) return;
+    
+    try {
+      await setData(`usuarios/${userId}/dashboard-config/acoes-rapidas`, {
+        ordem: novaOrdem,
+        atualizadoEm: new Date().toISOString()
+      });
+      setAcoesPersonalizadas(novaOrdem);
+    } catch (error) {
+      console.error('Erro ao salvar personalização:', error);
+    }
+  };
+
+  // Handlers de drag and drop
+  const handleDragStart = (e, index) => {
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e, index) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === index) return;
+
+    const acoes = getAcoesOrdenadas();
+    const novaOrdem = [...acoes];
+    const [removed] = novaOrdem.splice(draggedIndex, 1);
+    novaOrdem.splice(index, 0, removed);
+
+    const novaOrdemIds = novaOrdem.map(a => a.id);
+    setAcoesPersonalizadas(novaOrdemIds);
+    setDraggedIndex(index);
+  };
+
+  const handleDragEnd = () => {
+    if (draggedIndex !== null) {
+      const acoes = getAcoesOrdenadas();
+      const novaOrdemIds = acoes.map(a => a.id);
+      salvarPersonalizacao(novaOrdemIds);
+    }
+    setDraggedIndex(null);
+  };
+
+  const handleCancelarEdicao = () => {
+    setEditandoAcoes(false);
+    // Recarregar a ordem original
+    const carregarPersonalizacao = async () => {
+      try {
+        const personalizacao = await getData(`usuarios/${userId}/dashboard-config/acoes-rapidas`);
+        if (personalizacao && personalizacao.ordem) {
+          setAcoesPersonalizadas(personalizacao.ordem);
+        }
+      } catch (error) {
+        console.error('Erro ao recarregar personalização:', error);
+      }
+    };
+    carregarPersonalizacao();
+  };
+
+  const handleSalvarEdicao = () => {
+    const acoes = getAcoesOrdenadas();
+    const novaOrdemIds = acoes.map(a => a.id);
+    salvarPersonalizacao(novaOrdemIds);
+    setEditandoAcoes(false);
   };
 
   useEffect(() => {
@@ -619,110 +739,260 @@ const Dashboard = () => {
             <Fade in timeout={1000}>
               <Grid container spacing={{ xs: 2, sm: 3 }} sx={{ mb: 3 }}>
                 <Grid item xs={12}>
-                  <Typography variant="h6" fontWeight={600} gutterBottom sx={{ mb: 2, color: '#374151', fontSize: { xs: '1.1rem', md: '1.25rem' } }}>
-                    ⚡ Ações Rápidas
-                  </Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                    <Typography variant="h6" fontWeight={600} sx={{ color: '#374151', fontSize: { xs: '1.1rem', md: '1.25rem' } }}>
+                      ⚡ Ações Rápidas
+                    </Typography>
+                    <Tooltip title={editandoAcoes ? "Salvar ordem" : "Personalizar ordem"}>
+                      <IconButton 
+                        onClick={() => editandoAcoes ? handleSalvarEdicao() : setEditandoAcoes(true)}
+                        sx={{ 
+                          background: editandoAcoes ? 'linear-gradient(135deg, #10b981, #059669)' : 'linear-gradient(135deg, #667eea, #764ba2)',
+                          color: 'white',
+                          '&:hover': {
+                            background: editandoAcoes ? 'linear-gradient(135deg, #059669, #047857)' : 'linear-gradient(135deg, #764ba2, #667eea)',
+                            transform: 'scale(1.05)'
+                          },
+                          transition: 'all 0.3s ease'
+                        }}
+                      >
+                        {editandoAcoes ? <SaveIcon /> : <EditIcon />}
+                      </IconButton>
+                    </Tooltip>
+                  </Box>
+                  
+                  {editandoAcoes && (
+                    <Box sx={{ mb: 2, p: 2, background: '#eff6ff', borderRadius: 2, border: '1px solid #3b82f6' }}>
+                      <Typography variant="body2" color="primary" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <DragIndicator fontSize="small" />
+                        Arraste os cards para reorganizar a ordem das ações rápidas
+                      </Typography>
+                      <Button 
+                        startIcon={<CloseIcon />}
+                        onClick={handleCancelarEdicao}
+                        size="small"
+                        sx={{ mt: 1 }}
+                      >
+                        Cancelar
+                      </Button>
+                    </Box>
+                  )}
                   
                   {/* Carrossel de Ações Rápidas */}
                   <Box sx={{ position: 'relative', px: { xs: 0, sm: 1 } }}>
-                    <Swiper
-                      modules={[Navigation, Pagination]}
-                      spaceBetween={16}
-                      navigation={{
-                        enabled: getQuickActions().length > 4,
-                        nextEl: '.swiper-button-next-actions',
-                        prevEl: '.swiper-button-prev-actions'
-                      }}
-                      pagination={{
-                        clickable: true,
-                        dynamicBullets: true,
-                        enabled: getQuickActions().length > 4
-                      }}
-                      breakpoints={{
-                        320: {
-                          slidesPerView: 2.2,
-                          spaceBetween: 12
-                        },
-                        480: {
-                          slidesPerView: 3,
-                          spaceBetween: 14
-                        },
-                        768: {
-                          slidesPerView: 4,
-                          spaceBetween: 16
-                        },
-                        1024: {
-                          slidesPerView: Math.min(5, getQuickActions().length),
-                          spaceBetween: 18
-                        },
-                        1280: {
-                          slidesPerView: Math.min(getQuickActions().length, 7),
-                          spaceBetween: 20
-                        }
-                      }}
-                      style={{
-                        paddingLeft: '6px',
-                        paddingRight: '6px',
-                        paddingBottom: getQuickActions().length > 4 ? '35px' : '8px'
-                      }}
-                    >
-                      {getQuickActions().map((acao, idx) => (
-                        <SwiperSlide key={idx} style={{ width: 'auto' }}>
-                          <Zoom in timeout={1200 + (idx * 150)}>
-                            <Badge 
-                              badgeContent={acao.badgeCount || 0}
-                              color="error"
-                              overlap="circular"
-                              sx={{
-                                '& .MuiBadge-badge': {
-                                  fontSize: '0.75rem',
-                                  fontWeight: 'bold',
-                                  height: 22,
-                                  minWidth: 22,
-                                  borderRadius: '50%'
-                                }
-                              }}
-                            >
-                              <Card 
-                                sx={{ 
-                                  cursor: 'pointer',
-                                  background: `linear-gradient(135deg, ${acao.cor}15, ${acao.cor}08)`,
-                                  border: `2px solid ${acao.cor}25`,
-                                  borderRadius: 3,
-                                  transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-                                  width: { xs: 130, sm: 140, md: 150 },
-                                  height: { xs: 90, sm: 100, md: 110 },
-                                  position: 'relative',
-                                  overflow: 'hidden',
-                                  '&:hover': {
-                                    transform: 'translateY(-6px) scale(1.02)',
-                                    boxShadow: `0 15px 30px ${acao.cor}30`,
-                                    '& .action-icon': {
-                                      transform: 'scale(1.2) rotate(5deg)'
-                                    },
-                                    '& .action-bg': {
-                                      transform: 'scale(1.1)',
-                                      opacity: 0.3
+                    {editandoAcoes ? (
+                      // Modo de edição - Grid com drag and drop
+                      <Grid container spacing={2}>
+                        {getAcoesOrdenadas().map((acao, idx) => (
+                          <Grid item xs={6} sm={4} md={3} lg={2} key={acao.id}>
+                            <Zoom in timeout={800 + (idx * 100)}>
+                              <Box
+                                draggable
+                                onDragStart={(e) => handleDragStart(e, idx)}
+                                onDragOver={(e) => handleDragOver(e, idx)}
+                                onDragEnd={handleDragEnd}
+                                sx={{ cursor: 'move' }}
+                              >
+                                <Badge 
+                                  badgeContent={acao.badgeCount || 0}
+                                  color="error"
+                                  overlap="circular"
+                                  sx={{
+                                    width: '100%',
+                                    '& .MuiBadge-badge': {
+                                      fontSize: '0.75rem',
+                                      fontWeight: 'bold',
+                                      height: 22,
+                                      minWidth: 22,
+                                      borderRadius: '50%'
                                     }
+                                  }}
+                                >
+                                  <Card 
+                                    sx={{ 
+                                      background: `linear-gradient(135deg, ${acao.cor}15, ${acao.cor}08)`,
+                                      border: draggedIndex === idx ? `3px dashed ${acao.cor}` : `2px solid ${acao.cor}25`,
+                                      borderRadius: 3,
+                                      transition: 'all 0.3s ease',
+                                      width: '100%',
+                                      height: 110,
+                                      position: 'relative',
+                                      overflow: 'hidden',
+                                      opacity: draggedIndex === idx ? 0.5 : 1,
+                                      transform: draggedIndex === idx ? 'scale(0.95)' : 'scale(1)',
+                                      '&:hover': {
+                                        transform: 'scale(1.02)',
+                                        boxShadow: `0 8px 16px ${acao.cor}30`
+                                      }
+                                    }}
+                                  >
+                                    <Box 
+                                      sx={{
+                                        position: 'absolute',
+                                        top: 4,
+                                        left: 4,
+                                        zIndex: 1,
+                                        background: 'rgba(255,255,255,0.9)',
+                                        borderRadius: 1,
+                                        p: 0.5,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 0.5
+                                      }}
+                                    >
+                                      <DragIndicator fontSize="small" sx={{ color: acao.cor }} />
+                                      <Typography variant="caption" fontWeight={600} sx={{ color: acao.cor }}>
+                                        {idx + 1}
+                                      </Typography>
+                                    </Box>
+                                    
+                                    <CardContent sx={{ 
+                                      textAlign: 'center', 
+                                      p: 2,
+                                      height: '100%',
+                                      display: 'flex',
+                                      flexDirection: 'column',
+                                      justifyContent: 'center',
+                                      alignItems: 'center',
+                                      gap: 1
+                                    }}>
+                                      <Avatar 
+                                        className="action-icon"
+                                        sx={{ 
+                                          width: 40,
+                                          height: 40,
+                                          background: `linear-gradient(135deg, ${acao.cor}, ${acao.cor}CC)`,
+                                          boxShadow: `0 4px 12px ${acao.cor}40`,
+                                          transition: 'all 0.3s ease'
+                                        }}
+                                      >
+                                        {React.createElement(acao.icon, { sx: { fontSize: 24 } })}
+                                      </Avatar>
+                                      
+                                      <Typography 
+                                        variant="body2" 
+                                        fontWeight={600}
+                                        sx={{ 
+                                          fontSize: { xs: '0.7rem', sm: '0.75rem' },
+                                          color: '#1f2937',
+                                          lineHeight: 1.2,
+                                          overflow: 'hidden',
+                                          textOverflow: 'ellipsis',
+                                          display: '-webkit-box',
+                                          WebkitLineClamp: 2,
+                                          WebkitBoxOrient: 'vertical'
+                                        }}
+                                      >
+                                        {acao.titulo}
+                                      </Typography>
+                                    </CardContent>
+                                  </Card>
+                                </Badge>
+                              </Box>
+                            </Zoom>
+                          </Grid>
+                        ))}
+                      </Grid>
+                    ) : (
+                      // Modo normal - Swiper
+                      <Swiper
+                        modules={[Navigation, Pagination]}
+                        spaceBetween={16}
+                        navigation={{
+                          enabled: getAcoesOrdenadas().length > 4,
+                          nextEl: '.swiper-button-next-actions',
+                          prevEl: '.swiper-button-prev-actions'
+                        }}
+                        pagination={{
+                          clickable: true,
+                          dynamicBullets: true,
+                          enabled: getAcoesOrdenadas().length > 4
+                        }}
+                        breakpoints={{
+                          320: {
+                            slidesPerView: 2.2,
+                            spaceBetween: 12
+                          },
+                          480: {
+                            slidesPerView: 3,
+                            spaceBetween: 14
+                          },
+                          768: {
+                            slidesPerView: 4,
+                            spaceBetween: 16
+                          },
+                          1024: {
+                            slidesPerView: Math.min(5, getAcoesOrdenadas().length),
+                            spaceBetween: 18
+                          },
+                          1280: {
+                            slidesPerView: Math.min(getAcoesOrdenadas().length, 7),
+                            spaceBetween: 20
+                          }
+                        }}
+                        style={{
+                          paddingLeft: '6px',
+                          paddingRight: '6px',
+                          paddingBottom: getAcoesOrdenadas().length > 4 ? '35px' : '8px'
+                        }}
+                      >
+                        {getAcoesOrdenadas().map((acao, idx) => (
+                          <SwiperSlide key={acao.id} style={{ width: 'auto' }}>
+                            <Zoom in timeout={1200 + (idx * 150)}>
+                              <Badge 
+                                badgeContent={acao.badgeCount || 0}
+                                color="error"
+                                overlap="circular"
+                                sx={{
+                                  '& .MuiBadge-badge': {
+                                    fontSize: '0.75rem',
+                                    fontWeight: 'bold',
+                                    height: 22,
+                                    minWidth: 22,
+                                    borderRadius: '50%'
                                   }
                                 }}
-                                onClick={() => router.push(acao.rota)}
                               >
-                              {/* Background decorativo */}
-                              <Box 
-                                className="action-bg"
-                                sx={{
-                                  position: 'absolute',
-                                  top: -15,
-                                  right: -15,
-                                  width: 60,
-                                  height: 60,
-                                  borderRadius: '50%',
-                                  background: `linear-gradient(135deg, ${acao.cor}20, ${acao.cor}10)`,
-                                  transition: 'all 0.4s ease',
-                                  opacity: 0.2
-                                }}
-                              />
+                                <Card 
+                                  sx={{ 
+                                    cursor: 'pointer',
+                                    background: `linear-gradient(135deg, ${acao.cor}15, ${acao.cor}08)`,
+                                    border: `2px solid ${acao.cor}25`,
+                                    borderRadius: 3,
+                                    transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                                    width: { xs: 130, sm: 140, md: 150 },
+                                    height: { xs: 90, sm: 100, md: 110 },
+                                    position: 'relative',
+                                    overflow: 'hidden',
+                                    '&:hover': {
+                                      transform: 'translateY(-6px) scale(1.02)',
+                                      boxShadow: `0 15px 30px ${acao.cor}30`,
+                                      '& .action-icon': {
+                                        transform: 'scale(1.2) rotate(5deg)'
+                                      },
+                                      '& .action-bg': {
+                                        transform: 'scale(1.1)',
+                                        opacity: 0.3
+                                      }
+                                    }
+                                  }}
+                                  onClick={() => router.push(acao.rota)}
+                                >
+                                  {/* Background decorativo */}
+                                  <Box 
+                                    className="action-bg"
+                                    sx={{
+                                      position: 'absolute',
+                                      top: -15,
+                                      right: -15,
+                                      width: 60,
+                                      height: 60,
+                                      borderRadius: '50%',
+                                      background: `linear-gradient(135deg, ${acao.cor}20, ${acao.cor}10)`,
+                                      transition: 'all 0.4s ease',
+                                      opacity: 0.2
+                                    }}
+                                  />
                               
                               <CardActionArea sx={{ height: '100%' }}>
                                 <CardContent sx={{ 
@@ -777,6 +1047,7 @@ const Dashboard = () => {
                         </SwiperSlide>
                       ))}
                     </Swiper>
+                    )}
                     
                     {/* Botões de navegação customizados */}
                     <Box

@@ -39,7 +39,8 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
-  DialogActions
+  DialogActions,
+  Collapse
 } from '@mui/material';
 import { auth, onAuthStateChanged } from '../../firebase';
 import { 
@@ -75,7 +76,11 @@ import {
   Edit as EditIcon,
   Save as SaveIcon,
   Close as CloseIcon,
-  DragIndicator
+  DragIndicator,
+  ExpandMore,
+  ExpandLess,
+  Campaign,
+  Image
 } from '@mui/icons-material';
 import '../../styles/Dashboard.css';
 import '../../styles/AvisosCarousel.css';
@@ -111,6 +116,8 @@ const Dashboard = () => {
   const [acoesPersonalizadas, setAcoesPersonalizadas] = useState([]);
   const [draggedIndex, setDraggedIndex] = useState(null);
   const [viewMode, setViewMode] = useState('full'); // 'full' ou 'slim'
+  const [avisosExpanded, setAvisosExpanded] = useState(true);
+  const [galeriaExpanded, setGaleriaExpanded] = useState(true);
   const router = useRouter();
 
   // Verificar autenticação
@@ -1237,26 +1244,92 @@ const Dashboard = () => {
             <Grid container spacing={{ xs: 2, sm: 3 }}>
               {/* Quadro de Avisos - Primeiro lugar com largura completa */}
               <Grid item xs={12}>
-                <Card sx={{ position: 'relative', overflow: 'hidden', mb: 2 }}>
+                <Card 
+                  sx={{ 
+                    position: 'relative', 
+                    overflow: 'hidden', 
+                    mb: 2,
+                    background: 'linear-gradient(135deg, #667eea15 0%, #764ba215 100%)',
+                    border: '1px solid #667eea30',
+                    borderRadius: 3,
+                    transition: 'all 0.3s ease',
+                    '&:hover': {
+                      boxShadow: '0 8px 24px rgba(102, 126, 234, 0.15)',
+                      transform: 'translateY(-2px)'
+                    }
+                  }}
+                >
+                  {/* Decoração de fundo */}
                   <Box 
                     sx={{ 
                       position: 'absolute', 
-                      top: 0, 
-                      right: 0, 
-                      width: { xs: 40, md: 60 }, 
-                      height: { xs: 40, md: 60 }, 
-                      background: 'linear-gradient(135deg, #FF6B6B, #4ECDC4)', 
-                      borderRadius: '0 0 0 100%' 
+                      top: -30, 
+                      right: -30, 
+                      width: 150, 
+                      height: 150, 
+                      background: 'radial-gradient(circle, rgba(102, 126, 234, 0.1) 0%, transparent 70%)',
+                      borderRadius: '50%'
                     }} 
                   />
+                  
                   <CardContent sx={{ position: 'relative', zIndex: 1, p: { xs: 2, sm: 3 } }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                      <Notifications sx={{ color: '#FF6B6B', mr: 1, fontSize: { xs: 20, md: 24 } }} />
-                      <Typography variant="h6" fontWeight={600} sx={{ fontSize: { xs: '1rem', md: '1.25rem' } }}>
-                        📢 Quadro de Avisos
-                      </Typography>
+                    {/* Header do Card com botão de expandir */}
+                    <Box sx={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'space-between',
+                      mb: avisosExpanded ? 2 : 0
+                    }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                        <Avatar
+                          sx={{
+                            background: 'linear-gradient(135deg, #667eea, #764ba2)',
+                            width: 40,
+                            height: 40,
+                            boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)'
+                          }}
+                        >
+                          <Campaign />
+                        </Avatar>
+                        <Box>
+                          <Typography 
+                            variant="h6" 
+                            fontWeight={700} 
+                            sx={{ 
+                              fontSize: { xs: '1.1rem', md: '1.25rem' },
+                              background: 'linear-gradient(135deg, #667eea, #764ba2)',
+                              WebkitBackgroundClip: 'text',
+                              WebkitTextFillColor: 'transparent',
+                              backgroundClip: 'text'
+                            }}
+                          >
+                            Quadro de Avisos
+                          </Typography>
+                          {!avisosExpanded && avisos.length > 0 && (
+                            <Typography variant="caption" color="text.secondary">
+                              {avisos.length} {avisos.length === 1 ? 'aviso' : 'avisos'}
+                            </Typography>
+                          )}
+                        </Box>
+                      </Box>
+                      
+                      <IconButton 
+                        onClick={() => setAvisosExpanded(!avisosExpanded)}
+                        sx={{ 
+                          bgcolor: 'rgba(102, 126, 234, 0.1)',
+                          '&:hover': {
+                            bgcolor: 'rgba(102, 126, 234, 0.2)',
+                            transform: 'scale(1.1)'
+                          },
+                          transition: 'all 0.3s ease'
+                        }}
+                      >
+                        {avisosExpanded ? <ExpandLess /> : <ExpandMore />}
+                      </IconButton>
                     </Box>
-                    <Divider sx={{ mb: 3 }} />
+                    
+                    <Collapse in={avisosExpanded} timeout="auto">
+                      <Divider sx={{ mb: 3, opacity: 0.6 }} />
                     
                     {avisos.length > 0 ? (
                       <Box className="avisos-carousel">
@@ -1513,6 +1586,7 @@ const Dashboard = () => {
                         </Typography>
                       </Box>
                     )}
+                    </Collapse>
                   </CardContent>
                 </Card>
               </Grid>
@@ -1749,26 +1823,92 @@ const Dashboard = () => {
                 <Grid container spacing={{ xs: 2, sm: 3 }}>
                   {/* Carrossel da Galeria de Fotos */}
                   <Grid item xs={12}>
-                    <Card sx={{ height: '100%', position: 'relative', overflow: 'hidden' }}>
+                    <Card 
+                      sx={{ 
+                        height: '100%', 
+                        position: 'relative', 
+                        overflow: 'hidden',
+                        background: 'linear-gradient(135deg, #f59e0b15 0%, #f9731615 100%)',
+                        border: '1px solid #f59e0b30',
+                        borderRadius: 3,
+                        transition: 'all 0.3s ease',
+                        '&:hover': {
+                          boxShadow: '0 8px 24px rgba(245, 158, 11, 0.15)',
+                          transform: 'translateY(-2px)'
+                        }
+                      }}
+                    >
+                      {/* Decoração de fundo */}
                       <Box 
                         sx={{ 
                           position: 'absolute', 
-                          top: 0, 
-                          right: 0, 
-                          width: { xs: 40, md: 60 }, 
-                          height: { xs: 40, md: 60 }, 
-                          background: 'linear-gradient(135deg, #F59E0B, #F97316)', 
-                          borderRadius: '0 0 0 100%' 
+                          top: -30, 
+                          right: -30, 
+                          width: 150, 
+                          height: 150, 
+                          background: 'radial-gradient(circle, rgba(245, 158, 11, 0.1) 0%, transparent 70%)',
+                          borderRadius: '50%'
                         }} 
                       />
+                      
                       <CardContent sx={{ position: 'relative', zIndex: 1, p: { xs: 2, sm: 3 } }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                          <PhotoLibrary sx={{ color: '#F59E0B', mr: 1, fontSize: { xs: 20, md: 24 } }} />
-                          <Typography variant="h6" fontWeight={600} sx={{ fontSize: { xs: '1rem', md: '1.25rem' } }}>
-                            📸 Galeria de Fotos
-                          </Typography>
+                        {/* Header do Card com botão de expandir */}
+                        <Box sx={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'space-between',
+                          mb: galeriaExpanded ? 2 : 0
+                        }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                            <Avatar
+                              sx={{
+                                background: 'linear-gradient(135deg, #F59E0B, #F97316)',
+                                width: 40,
+                                height: 40,
+                                boxShadow: '0 4px 12px rgba(245, 158, 11, 0.3)'
+                              }}
+                            >
+                              <Image />
+                            </Avatar>
+                            <Box>
+                              <Typography 
+                                variant="h6" 
+                                fontWeight={700} 
+                                sx={{ 
+                                  fontSize: { xs: '1.1rem', md: '1.25rem' },
+                                  background: 'linear-gradient(135deg, #F59E0B, #F97316)',
+                                  WebkitBackgroundClip: 'text',
+                                  WebkitTextFillColor: 'transparent',
+                                  backgroundClip: 'text'
+                                }}
+                              >
+                                Galeria de Fotos
+                              </Typography>
+                              {!galeriaExpanded && fotosVisiveis.length > 0 && (
+                                <Typography variant="caption" color="text.secondary">
+                                  {fotosVisiveis.length} {fotosVisiveis.length === 1 ? 'foto' : 'fotos'}
+                                </Typography>
+                              )}
+                            </Box>
+                          </Box>
+                          
+                          <IconButton 
+                            onClick={() => setGaleriaExpanded(!galeriaExpanded)}
+                            sx={{ 
+                              bgcolor: 'rgba(245, 158, 11, 0.1)',
+                              '&:hover': {
+                                bgcolor: 'rgba(245, 158, 11, 0.2)',
+                                transform: 'scale(1.1)'
+                              },
+                              transition: 'all 0.3s ease'
+                            }}
+                          >
+                            {galeriaExpanded ? <ExpandLess /> : <ExpandMore />}
+                          </IconButton>
                         </Box>
-                        <Divider sx={{ mb: 3 }} />
+                        
+                        <Collapse in={galeriaExpanded} timeout="auto">
+                          <Divider sx={{ mb: 3, opacity: 0.6 }} />
                         
                         {fotosVisiveis.length > 0 ? (
                           <Box sx={{ position: 'relative', px: { xs: 0, sm: 1 } }}>
@@ -2070,6 +2210,7 @@ const Dashboard = () => {
                             </Button>
                           </Box>
                         )}
+                        </Collapse>
                       </CardContent>
                     </Card>
                   </Grid>

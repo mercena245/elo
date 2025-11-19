@@ -1943,7 +1943,7 @@ const Alunos = () => {
     setSelecaoFichaOpen(false);
     setMatriculasDisponiveisFicha([]);
     setFichaSelecionada(null);
-    setAlunoSelecionadoFicha(null);
+    // Não limpar alunoSelecionadoFicha aqui para manter o contexto
   };
 
   // Função para abrir contrato
@@ -4326,7 +4326,11 @@ const Alunos = () => {
                         <Button
                           variant="outlined"
                           fullWidth
-                          onClick={handleAbrirFichaMatricula}
+                          onClick={async () => {
+                            console.log('🔘 Botão Ficha clicado!');
+                            console.log('Aluno selecionado:', alunoSelecionadoFicha);
+                            await handleAbrirFichaMatricula();
+                          }}
                           sx={{
                             py: 2,
                             borderColor: '#059669',

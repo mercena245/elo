@@ -606,6 +606,11 @@ const Alunos = () => {
   const [matriculasDisponiveis, setMatriculasDisponiveis] = useState([]);
   const [contratoSelecionado, setContratoSelecionado] = useState(null);
 
+  // Estados para seleção de ficha de matrícula de rematrícula
+  const [selecaoFichaOpen, setSelecaoFichaOpen] = useState(false);
+  const [matriculasDisponiveisFicha, setMatriculasDisponiveisFicha] = useState([]);
+  const [fichaSelecionada, setFichaSelecionada] = useState(null);
+
   // Remover anexo do Storage e do registro do aluno
   const handleRemoverAnexo = async (anexo, idx) => {
     if (!editForm.anexos || !editForm.anexos.length) return;
@@ -1881,13 +1886,63 @@ const Alunos = () => {
   };
 
   // Função para abrir ficha de matrícula
-  const handleAbrirFichaMatricula = () => {
+  const handleAbrirFichaMatricula = async (dadosFicha = null) => {
+    console.group('🎯 DEBUG - HandleAbrirFichaMatricula');
+    console.log('dadosFicha recebido:', dadosFicha);
+    console.log('alunoSelecionadoFicha atual:', alunoSelecionadoFicha);
+    
     setDialogSelecaoOpen(false);
-    setFichaMatriculaOpen(true);
+    
+    // Se foi passado dados específicos (vem do diálogo de seleção), usar eles
+    if (dadosFicha) {
+      console.log('✅ Usando dados específicos da ficha');
+      console.log('📋 Dados recebidos do diálogo:', dadosFicha);
+      setSelecaoFichaOpen(false);
+      
+      // Buscar dados financeiros específicos da matrícula selecionada
+      console.log('🔄 Chamando buscarDadosFinanceirosMatricula...');
+      const dadosCompletos = await buscarDadosFinanceirosMatricula(dadosFicha);
+      console.log('✅ Dados completos processados:', dadosCompletos);
+      setAlunoSelecionadoFicha(dadosCompletos);
+      setFichaMatriculaOpen(true);
+      console.groupEnd();
+      return;
+    }
+    
+    // Se não foi passado dados, verificar se aluno tem rematrícula
+    const aluno = alunoSelecionadoFicha;
+    console.log('🔍 Verificando se aluno tem rematrícula:', aluno?.nome);
+    console.log('dataRematricula:', aluno?.dataRematricula);
+    
+    const temRematricula = await verificarSeTemRematricula(aluno);
+    console.log('🎯 Resultado verificação rematrícula:', temRematricula);
+    
+    if (temRematricula) {
+      console.log('✅ Tem rematrícula - abrindo diálogo de seleção');
+      // Tem rematrícula - abrir diálogo de seleção
+      const matriculas = await buscarMatriculasDisponiveis(aluno);
+      console.log('📋 Matrículas disponíveis:', matriculas);
+      setMatriculasDisponiveisFicha(matriculas);
+      setSelecaoFichaOpen(true);
+    } else {
+      console.log('❌ Não tem rematrícula - abrindo ficha normal');
+      // Não tem rematrícula - abrir ficha normal
+      setFichaMatriculaOpen(true);
+    }
+    
+    console.groupEnd();
   };
 
   const handleFecharFichaMatricula = () => {
     setFichaMatriculaOpen(false);
+    setAlunoSelecionadoFicha(null);
+  };
+
+  // Função para fechar diálogo de seleção de ficha
+  const handleFecharSelecaoFicha = () => {
+    setSelecaoFichaOpen(false);
+    setMatriculasDisponiveisFicha([]);
+    setFichaSelecionada(null);
     setAlunoSelecionadoFicha(null);
   };
 
@@ -4514,6 +4569,94 @@ const Alunos = () => {
                         startIcon={<Print />}
                       >
                         Imprimir Contrato Selecionado
+                      </Button>
+                    </DialogActions>
+                  </Dialog>
+
+                  {/* Dialog Seleção de Ficha de Matrícula */}
+                  <Dialog
+                    open={selecaoFichaOpen}
+                    onClose={() => {
+                      setSelecaoFichaOpen(false);
+                      setMatriculasDisponiveisFicha([]);
+                      setFichaSelecionada(null);
+                    }}
+                    maxWidth="md"
+                    fullWidth
+                  >
+                    <DialogTitle>
+                      <Typography variant="h6" component="div" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Print /> Selecionar Ficha de Matrícula para Impressão
+                      </Typography>
+                    </DialogTitle>
+                    <DialogContent>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                        Este aluno possui múltiplas matrículas. Selecione qual ficha de matrícula deseja imprimir:
+                      </Typography>
+                      
+                      <Box sx={{ mt: 2 }}>
+                        {matriculasDisponiveisFicha.map((matricula, index) => (
+                          <Card 
+                            key={index}
+                            variant={fichaSelecionada === matricula ? "outlined" : "elevation"}
+                            sx={{ 
+                              mb: 2, 
+                              cursor: 'pointer',
+                              border: fichaSelecionada === matricula ? '2px solid #1976d2' : '1px solid #e0e0e0',
+                              backgroundColor: fichaSelecionada === matricula ? '#f3f8ff' : 'inherit',
+                              '&:hover': {
+                                backgroundColor: fichaSelecionada === matricula ? '#f3f8ff' : '#f5f5f5'
+                              }
+                            }}
+                            onClick={() => setFichaSelecionada(matricula)}
+                          >
+                            <CardContent>
+                              <Typography variant="h6" color="primary" sx={{ mb: 1 }}>
+                                {matricula.isCurrent ? 'REMATRÍCULA ATUAL' : `MATRÍCULA ${matricula.ano || new Date(matricula.dataMatricula).getFullYear()}`}
+                              </Typography>
+                              <Typography variant="body2" color="text.secondary">
+                                <strong>Data:</strong> {new Date(matricula.dataMatricula).toLocaleDateString('pt-BR')}
+                              </Typography>
+                              <Typography variant="body2" color="text.secondary">
+                                <strong>Turma:</strong> {matricula.nomeTurma || matricula.nometurma || 'Não informado'}
+                              </Typography>
+                              <Typography variant="body2" color="text.secondary">
+                                <strong>Status:</strong> {matricula.isCurrent ? 'Ativa (Rematrícula)' : 'Histórica'}
+                              </Typography>
+                              {matricula.valorMensalidade && (
+                                <Typography variant="body2" color="text.secondary">
+                                  <strong>Mensalidade:</strong> R$ {parseFloat(matricula.valorMensalidade).toFixed(2)}
+                                </Typography>
+                              )}
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </Box>
+                    </DialogContent>
+                    <DialogActions>
+                      <Button 
+                        onClick={() => {
+                          setSelecaoFichaOpen(false);
+                          setMatriculasDisponiveisFicha([]);
+                          setFichaSelecionada(null);
+                        }}
+                      >
+                        Cancelar
+                      </Button>
+                      <Button 
+                        variant="contained"
+                        disabled={!fichaSelecionada}
+                        onClick={() => {
+                          if (fichaSelecionada) {
+                            handleAbrirFichaMatricula(fichaSelecionada);
+                            setSelecaoFichaOpen(false);
+                            setMatriculasDisponiveisFicha([]);
+                            setFichaSelecionada(null);
+                          }
+                        }}
+                        startIcon={<Print />}
+                      >
+                        Imprimir Ficha Selecionada
                       </Button>
                     </DialogActions>
                   </Dialog>

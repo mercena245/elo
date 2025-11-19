@@ -1845,6 +1845,17 @@ const Alunos = () => {
         console.log('✅ Buscando período letivo:', periodoId);
         periodoLetivo = await getData(`periodosLetivos/${periodoId}`);
         console.log('📅 Período letivo encontrado:', periodoLetivo);
+        
+        // Se não encontrou no banco, tentar extrair ano do ID
+        if (!periodoLetivo) {
+          console.log('⚠️ Período não existe no banco, tentando extrair ano do ID:', periodoId);
+          const match = periodoId.match(/^(\d{4})/);
+          if (match) {
+            const anoExtraido = parseInt(match[1]);
+            console.log('✅ Ano extraído do ID:', anoExtraido);
+            periodoLetivo = { ano: anoExtraido, id: periodoId };
+          }
+        }
       } else {
         console.log('❌ Nenhum periodoId encontrado!');
         console.log('   Estrutura completa da turmaInfo:', JSON.stringify(matriculaData.turmaInfo, null, 2));
@@ -1941,8 +1952,47 @@ const Alunos = () => {
       setMatriculasDisponiveisFicha(matriculas);
       setSelecaoFichaOpen(true);
     } else {
-      console.log('❌ Não tem rematrícula - abrindo ficha normal');
-      // Não tem rematrícula - abrir ficha normal
+      console.log('❌ Não tem rematrícula - buscando período letivo da turma');
+      // Não tem rematrícula - buscar período letivo da turma e abrir ficha
+      try {
+        const turmaId = aluno.turmaId;
+        let periodoLetivo = null;
+        
+        if (turmaId && turmas[turmaId]) {
+          const turma = turmas[turmaId];
+          const periodoId = turma.periodoLetivoId || turma.periodoId;
+          
+          if (periodoId) {
+            console.log('🔍 Buscando período letivo:', periodoId);
+            periodoLetivo = await getData(`periodosLetivos/${periodoId}`);
+            console.log('📅 Período letivo encontrado:', periodoLetivo);
+            
+            // Se não encontrou no banco, tentar extrair ano do ID
+            if (!periodoLetivo) {
+              console.log('⚠️ Período não existe no banco, tentando extrair ano do ID:', periodoId);
+              const match = periodoId.match(/^(\d{4})/);
+              if (match) {
+                const anoExtraido = parseInt(match[1]);
+                console.log('✅ Ano extraído do ID:', anoExtraido);
+                periodoLetivo = { ano: anoExtraido, id: periodoId };
+              }
+            }
+          }
+        }
+        
+        // Adicionar período letivo ao aluno
+        const alunoComPeriodo = {
+          ...aluno,
+          periodoLetivo: periodoLetivo,
+          turmaInfo: turmas[turmaId]
+        };
+        
+        console.log('✅ Abrindo ficha com período letivo:', alunoComPeriodo);
+        setAlunoSelecionadoFicha(alunoComPeriodo);
+      } catch (error) {
+        console.error('❌ Erro ao buscar período letivo:', error);
+      }
+      
       setFichaMatriculaOpen(true);
     }
     
@@ -2002,8 +2052,47 @@ const Alunos = () => {
       setMatriculasDisponiveis(matriculas);
       setSelecaoContratoOpen(true);
     } else {
-      console.log('❌ Não tem rematrícula - abrindo contrato normal');
-      // Não tem rematrícula - abrir contrato normal
+      console.log('❌ Não tem rematrícula - buscando período letivo da turma');
+      // Não tem rematrícula - buscar período letivo da turma e abrir contrato
+      try {
+        const turmaId = aluno.turmaId;
+        let periodoLetivo = null;
+        
+        if (turmaId && turmas[turmaId]) {
+          const turma = turmas[turmaId];
+          const periodoId = turma.periodoLetivoId || turma.periodoId;
+          
+          if (periodoId) {
+            console.log('🔍 Buscando período letivo:', periodoId);
+            periodoLetivo = await getData(`periodosLetivos/${periodoId}`);
+            console.log('📅 Período letivo encontrado:', periodoLetivo);
+            
+            // Se não encontrou no banco, tentar extrair ano do ID
+            if (!periodoLetivo) {
+              console.log('⚠️ Período não existe no banco, tentando extrair ano do ID:', periodoId);
+              const match = periodoId.match(/^(\d{4})/);
+              if (match) {
+                const anoExtraido = parseInt(match[1]);
+                console.log('✅ Ano extraído do ID:', anoExtraido);
+                periodoLetivo = { ano: anoExtraido, id: periodoId };
+              }
+            }
+          }
+        }
+        
+        // Adicionar período letivo ao aluno
+        const alunoComPeriodo = {
+          ...aluno,
+          periodoLetivo: periodoLetivo,
+          turmaInfo: turmas[turmaId]
+        };
+        
+        console.log('✅ Abrindo contrato com período letivo:', alunoComPeriodo);
+        setAlunoSelecionadoFicha(alunoComPeriodo);
+      } catch (error) {
+        console.error('❌ Erro ao buscar período letivo:', error);
+      }
+      
       setContratoOpen(true);
     }
     

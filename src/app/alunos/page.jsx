@@ -1821,17 +1821,33 @@ const Alunos = () => {
   const buscarDadosFinanceirosMatricula = async (matriculaData) => {
     console.group('💰 DEBUG - BuscarDadosFinanceirosMatricula');
     console.log('Dados da matrícula recebida:', matriculaData);
+    console.log('TurmaInfo da matrícula:', matriculaData.turmaInfo);
     
     try {
       // Buscar dados do período letivo da turma selecionada
       let periodoLetivo = null;
-      const periodoId = matriculaData.turmaInfo?.periodoLetivoId || matriculaData.turmaInfo?.periodoId;
+      
+      // Tentar múltiplas formas de obter o periodoId
+      const periodoId = matriculaData.turmaInfo?.periodoLetivoId || 
+                        matriculaData.turmaInfo?.periodoId ||
+                        matriculaData.turmaInfo?.periodo_letivo_id ||
+                        matriculaData.periodoLetivoId ||
+                        matriculaData.periodoId;
+      
+      console.log('🔍 Tentando buscar periodoId:', periodoId);
+      console.log('   - turmaInfo.periodoLetivoId:', matriculaData.turmaInfo?.periodoLetivoId);
+      console.log('   - turmaInfo.periodoId:', matriculaData.turmaInfo?.periodoId);
+      console.log('   - turmaInfo.periodo_letivo_id:', matriculaData.turmaInfo?.periodo_letivo_id);
+      console.log('   - matriculaData.periodoLetivoId:', matriculaData.periodoLetivoId);
+      console.log('   - matriculaData.periodoId:', matriculaData.periodoId);
+      
       if (periodoId) {
-        console.log('Buscando período letivo:', periodoId);
+        console.log('✅ Buscando período letivo:', periodoId);
         periodoLetivo = await getData(`periodosLetivos/${periodoId}`);
-        console.log('Período letivo encontrado:', periodoLetivo);
+        console.log('📅 Período letivo encontrado:', periodoLetivo);
       } else {
-        console.log('❌ Nenhum periodoId encontrado na turmaInfo:', matriculaData.turmaInfo);
+        console.log('❌ Nenhum periodoId encontrado!');
+        console.log('   Estrutura completa da turmaInfo:', JSON.stringify(matriculaData.turmaInfo, null, 2));
       }
 
       const dadosCompletos = {

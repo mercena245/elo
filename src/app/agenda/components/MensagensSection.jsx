@@ -49,9 +49,8 @@ import { useSchoolDatabase } from '../../../hooks/useSchoolDatabase';
 import MensagensPendentes from './MensagensPendentes/MensagensPendentes';
 
 const MensagensSection = ({ userRole, userData }) => {
-  const { getData, setData, pushData, updateData, isReady, storage: schoolStorage } = useSchoolDatabase();
+  const { getData, setData, pushData, updateData, isReady, storage: schoolStorage, listen } = useSchoolDatabase();
 
-  // Salva e lê direto do nó raiz
   const mensagensPath = 'mensagens';
   const myId = userData?.id || userData?.uid;
 
@@ -66,33 +65,88 @@ const MensagensSection = ({ userRole, userData }) => {
   const mounted = useRef(true);
 
   useEffect(() => {
-    fetchConversas();
-    fetchUsuarios();
-  }, [userData, isReady]);
+    console.log('🔄 [MensagensSection] useEffect disparado');
+    console.log('📊 [MensagensSection] Estado atual:', {
+      isReady,
+      userDataId: userData?.id,
+      userName: userData?.nome,
+      userRole: userData?.role
+    });
 
-  // ÚNICO fetchConversas (sem filtro; apenas carrega e ordena)
-  const fetchConversas = async () => {
-    if (!isReady) return;
+    if (!isReady || !userData?.id) {
+      console.log('⏸️ [MensagensSection] Aguardando isReady ou userData');
+      return;
+    }
+
+    console.log('✅ [MensagensSection] Configurando listener para path:', mensagensPath);
+    console.log('✅ [MensagensSection] Função listen disponível:', typeof listen);
+
     try {
-      const dados = await getData(mensagensPath);
-      if (!dados || typeof dados !== 'object') {
-        if (!conversas.length) setConversas([]);
-        return;
-      }
-      const list = Object.entries(dados)
-        .map(([id, m]) => ({ id, ...m }))
-        .sort((a, b) => new Date(b?.dataEnvio || 0) - new Date(a?.dataEnvio || 0));
-      setConversas(list);
-    } catch (e) {
-      console.error('Erro ao carregar conversas:', e);
-    } finally {
+      const unsubscribe = listen(mensagensPath, (dados) => {
+        console.log('🔥 [MensagensSection] Callback do listener chamado!');
+        console.log('📦 [MensagensSection] Tipo de dados recebido:', typeof dados);
+
+        if (!dados || typeof dados !== 'object') {
+          console.log('⚠️ [MensagensSection] Dados inválidos - limpando conversas');
+          setConversas([]);
+          setLoading(false);
+          return;
+        }
+
+        console.log('✅ [MensagensSection] Dados válidos - processando...');
+
+        // ✅ FILTRAR APENAS MENSAGENS VÁLIDAS
+        const list = Object.entries(dados)
+          .map(([id, m]) => ({ id, ...m }))
+          .filter(m => {
+            const temAssunto = m.assunto && m.assunto.trim();
+            const temRemetente = m.remetente?.id;
+            const temDestinatario = m.destinatario?.id;
+            
+            if (!temAssunto || !temRemetente || !temDestinatario) {
+              console.warn('⚠️ [MensagensSection] Mensagem inválida ignorada:', {
+                id: m.id,
+                temAssunto,
+                temRemetente,
+                temDestinatario
+              });
+              return false;
+            }
+            
+            return true;
+          })
+          .sort((a, b) => new Date(b?.dataEnvio || 0) - new Date(a?.dataEnvio || 0));
+        
+        console.log('✅ [MensagensSection] Lista processada:', {
+          total: list.length,
+          primeiros3IDs: list.slice(0, 3).map(m => m.id),
+          primeiros3Assuntos: list.slice(0, 3).map(m => m.assunto)
+        });
+
+        setConversas(list);
+        console.log('🔥 [MensagensSection] setConversas() chamado com', list.length, 'mensagens');
+        setLoading(false);
+      });
+
+      console.log('✅ [MensagensSection] Listener configurado com sucesso');
+      
+      return () => {
+        console.log('🛑 [MensagensSection] Limpando listener');
+        if (unsubscribe && typeof unsubscribe === 'function') {
+          unsubscribe();
+        }
+      };
+    } catch (error) {
+      console.error('❌ [MensagensSection] Erro ao configurar listener:', error);
       setLoading(false);
     }
-  };
+  }, [isReady, userData?.id, listen]);
 
   useEffect(() => {
-    fetchConversas();
-  }, [isReady]); // não limpar por mudanças rápidas em props
+    if (isReady && userData?.id) {
+      fetchUsuarios();
+    }
+  }, [isReady, userData?.id]);
 
   const fetchUsuarios = async () => {
     if (!isReady) return;
@@ -106,16 +160,13 @@ const MensagensSection = ({ userRole, userData }) => {
           ...usuario
         }));
         
-        // Filtrar usuários baseado na role
         let usuariosFiltrados = usuariosList;
         
         if (userRole === 'pai') {
-          // Pais só podem mandar mensagem para professoras e coordenação
           usuariosFiltrados = usuariosList.filter(u => 
             u.role === 'professora' || u.role === 'coordenadora'
           );
         } else if (userRole === 'professora') {
-          // Professoras podem mandar para pais dos seus alunos e coordenação
           usuariosFiltrados = usuariosList.filter(u => 
             u.role === 'pai' || u.role === 'coordenadora' || 
             (u.role === 'professora' && u.id !== userData?.id)
@@ -139,9 +190,7 @@ const MensagensSection = ({ userRole, userData }) => {
 
   const enviarMensagem = async () => {
     try {
-      // Validar se userData existe e tem ID
-      if (!userData) {
-        console.error('Dados do usuário não encontrados');
+      if (!userData || !userData.id) {
         exibirDialogo('Erro: Dados do usuário não carregados. Tente novamente.', {
           titulo: 'Erro ao enviar',
           severidade: 'error'
@@ -149,18 +198,7 @@ const MensagensSection = ({ userRole, userData }) => {
         return;
       }
 
-      if (!userData.id) {
-        console.error('ID do usuário não encontrado:', userData);
-        exibirDialogo('Erro: ID do usuário não encontrado. Faça login novamente.', {
-          titulo: 'Erro ao enviar',
-          severidade: 'error'
-        });
-        return;
-      }
-
-      // Validar se destinatário foi selecionado
       if (!novaMensagem.destinatario) {
-        console.error('Destinatário não selecionado');
         exibirDialogo('Por favor, selecione um destinatário.', {
           titulo: 'Aviso',
           severidade: 'warning'
@@ -168,7 +206,6 @@ const MensagensSection = ({ userRole, userData }) => {
         return;
       }
 
-      // Validar se assunto e conteúdo foram preenchidos
       if (!novaMensagem.assunto?.trim()) {
         exibirDialogo('Por favor, digite um assunto para a mensagem.', {
           titulo: 'Aviso',
@@ -185,9 +222,7 @@ const MensagensSection = ({ userRole, userData }) => {
         return;
       }
 
-      // Validar banco de dados pronto
       if (!isReady || !pushData) {
-        console.error('Banco de dados não está pronto', { isReady, pushData });
         exibirDialogo('Erro: Banco de dados não está pronto. Tente novamente.', {
           titulo: 'Erro ao enviar',
           severidade: 'error'
@@ -199,11 +234,9 @@ const MensagensSection = ({ userRole, userData }) => {
       const destinatarioId = novaMensagem.destinatario;
       const remetenteRole = userData.role;
       
-      // Buscar dados do destinatário
       const destinatarioData = usuarios.find(u => u.id === destinatarioId);
       
       if (!destinatarioData) {
-        console.error('Dados do destinatário não encontrados');
         exibirDialogo('Erro ao encontrar destinatário. Tente novamente.', {
           titulo: 'Erro ao enviar',
           severidade: 'error'
@@ -211,13 +244,10 @@ const MensagensSection = ({ userRole, userData }) => {
         return;
       }
 
-      // ✅ NOVA LÓGICA: Verificar se a mensagem precisa de aprovação
-      // Regra: pai ↔ professor precisa de aprovação
       const precisaAprovacao = 
         (remetenteRole === 'pai' && destinatarioData.role === 'professora') ||
         (remetenteRole === 'professora' && destinatarioData.role === 'pai');
 
-      // ✅ Buscar IDs dos coordenadores
       const coordenadoresIds = usuarios
         .filter(u => u.role === 'coordenadora')
         .map(u => u.id);
@@ -247,16 +277,10 @@ const MensagensSection = ({ userRole, userData }) => {
         motivoRejeicao: null
       };
 
-      console.log('📤 Preparando para enviar mensagem:', mensagemData);
-      console.log('📍 Path de salvamento:', mensagensPath);
-
       let mensagemId;
       try {
         mensagemId = await pushData(mensagensPath, mensagemData);
-        console.log('✅ Mensagem salva com ID:', mensagemId);
-        console.log('✅ Path completo:', `${mensagensPath}/${mensagemId}`);
       } catch (pushError) {
-        console.error('❌ Erro ao salvar mensagem:', pushError);
         exibirDialogo(`Erro ao salvar mensagem: ${pushError.message}`, {
           titulo: 'Erro ao enviar',
           severidade: 'error'
@@ -264,7 +288,6 @@ const MensagensSection = ({ userRole, userData }) => {
         return;
       }
 
-      // Log do envio de mensagem
       await auditService.logAction(
         LOG_ACTIONS.MESSAGE_SENT,
         userData?.id,
@@ -296,16 +319,11 @@ const MensagensSection = ({ userRole, userData }) => {
       }
       
       fecharDialogNovaMensagem();
-      
-      // Aguardar um pouco antes de recarregar para garantir persistência
-      setTimeout(() => {
-        fetchConversas();
-      }, 500);
+      // ✅ Não precisa mais chamar fetchConversas() - listener atualiza automaticamente!
       
     } catch (error) {
       console.error('Erro ao enviar mensagem:', error);
       
-      // Log do erro
       await auditService.logAction(
         LOG_ACTIONS.MESSAGE_SEND_ERROR,
         userData?.id,
@@ -319,7 +337,6 @@ const MensagensSection = ({ userRole, userData }) => {
   };
 
   const fecharDialogNovaMensagem = () => {
-    // Log do cancelamento se havia conteúdo
     if (novaMensagem.destinatario || novaMensagem.assunto || novaMensagem.conteudo || (novaMensagem.anexos && novaMensagem.anexos.length > 0)) {
       auditService.logAction(
         LOG_ACTIONS.MESSAGE_COMPOSE_CANCELLED,
@@ -338,14 +355,7 @@ const MensagensSection = ({ userRole, userData }) => {
   };
 
   const handleUploadAnexo = async (files) => {
-    if (!files || files.length === 0) {
-      console.log('Nenhum arquivo selecionado');
-      return;
-    }
-
-    console.log('Iniciando upload de', files.length, 'arquivo(s)');
-    console.log('UserData:', userData);
-    console.log('Auth currentUser:', auth.currentUser);
+    if (!files || files.length === 0) return;
 
     if (!userData || !userData.id) {
       exibirDialogo('Erro: Dados do usuário não encontrados. Faça login novamente.', {
@@ -364,8 +374,6 @@ const MensagensSection = ({ userRole, userData }) => {
     }
 
     try {
-      console.log('Storage inicializado:', schoolStorage);
-      
       const anexosUpload = [];
 
       for (let i = 0; i < files.length; i++) {
@@ -373,25 +381,9 @@ const MensagensSection = ({ userRole, userData }) => {
         const timestamp = new Date().getTime();
         const fileName = `mensagens/${userData.id}/${timestamp}_${file.name}`;
         
-        console.log('Preparando upload do arquivo:', {
-          nome: file.name,
-          tamanho: file.size,
-          tipo: file.type,
-          caminho: fileName
-        });
-        
-        // Usar _storage (instância real do Firebase Storage)
         const fileRef = storageRef(schoolStorage._storage, fileName);
-        console.log('Referência do Storage criada:', fileRef);
-
-        // Upload do arquivo
-        console.log('Iniciando upload...');
         const snapshot = await uploadBytes(fileRef, file);
-        console.log('Upload concluído:', snapshot);
-        
-        console.log('Obtendo URL de download...');
         const downloadURL = await getDownloadURL(snapshot.ref);
-        console.log('URL obtida:', downloadURL);
 
         anexosUpload.push({
           nome: file.name,
@@ -401,13 +393,11 @@ const MensagensSection = ({ userRole, userData }) => {
         });
       }
 
-      // Atualizar estado com os novos anexos
       setNovaMensagem(prev => ({
         ...prev,
         anexos: [...(prev.anexos || []), ...anexosUpload]
       }));
 
-      // Log do upload de anexos
       await auditService.logAction(
         LOG_ACTIONS.ATTACHMENT_UPLOADED,
         userData?.id,
@@ -421,8 +411,6 @@ const MensagensSection = ({ userRole, userData }) => {
           quantidade: anexosUpload.length
         }
       );
-
-      console.log('Anexos adicionados ao estado:', anexosUpload);
     } catch (error) {
       console.error('Erro detalhado ao fazer upload dos anexos:', error);
       exibirDialogo(`Erro ao anexar arquivo(s): ${error.message}`, {
@@ -430,7 +418,6 @@ const MensagensSection = ({ userRole, userData }) => {
         severidade: 'error'
       });
       
-      // Log do erro no upload
       await auditService.logAction(
         LOG_ACTIONS.ATTACHMENT_UPLOAD_ERROR,
         userData?.id,
@@ -455,7 +442,6 @@ const MensagensSection = ({ userRole, userData }) => {
       anexos: prev.anexos.filter((_, i) => i !== index)
     }));
     
-    // Log da remoção do anexo
     auditService.logAction(
       LOG_ACTIONS.ATTACHMENT_REMOVED,
       userData?.id,
@@ -471,7 +457,6 @@ const MensagensSection = ({ userRole, userData }) => {
   };
 
   const responderMensagem = (mensagem) => {
-    // Preencher o modal de nova mensagem com dados da resposta
     setNovaMensagem({
       destinatario: mensagem.remetente?.id || '',
       assunto: `Re: ${mensagem.assunto}`,
@@ -480,7 +465,6 @@ const MensagensSection = ({ userRole, userData }) => {
     });
     setDialogNovaMensagem(true);
     
-    // Log da abertura de resposta
     auditService.logAction(
       LOG_ACTIONS.MESSAGE_REPLY_STARTED,
       userData?.id,
@@ -501,7 +485,6 @@ const MensagensSection = ({ userRole, userData }) => {
     try {
       await setData(`${mensagensPath}/${mensagemId}`, { ...conversaSelecionada, lida: true });
       
-      // Atualizar o estado local
       setConversas(prev => prev.map(conv => 
         conv.id === mensagemId ? { ...conv, lida: true } : conv
       ));
@@ -510,7 +493,6 @@ const MensagensSection = ({ userRole, userData }) => {
         setConversaSelecionada(prev => ({ ...prev, lida: true }));
       }
       
-      // Log da leitura da mensagem
       await auditService.logAction(
         LOG_ACTIONS.MESSAGE_READ,
         userData?.id,
@@ -529,56 +511,84 @@ const MensagensSection = ({ userRole, userData }) => {
   };
 
   const getConversasFiltradas = () => {
+    console.log('🔍 [getConversasFiltradas] Iniciando filtro');
+    console.log('📊 [getConversasFiltradas] Total de conversas:', conversas.length);
+    console.log('👤 [getConversasFiltradas] myId:', myId);
+    console.log('🎯 [getConversasFiltradas] Aba selecionada:', abaConversas);
+    console.log('👨 [getConversasFiltradas] userRole:', userData?.role);
+    
     const userId = myId;
     const euSouCoordenador = userData?.role === 'coordenadora';
     
-    return conversas.filter(conversa => {
+    const resultado = conversas.filter(conversa => {
       const foiEnviadaPorMim = conversa.remetente?.id === userId;
       const foiEnviadaParaMim = conversa.destinatario?.id === userId;
-      const estaNoProcessoAprovacao = conversa.coordenadoresParaAprovar?.includes(userId);
       const estaPendente = conversa.statusAprovacao === 'pendente';
       
-      // Coordenadora: não duplicar pendentes aqui (ela tem componente próprio)
+      console.log('🔎 [filtro] Mensagem:', {
+        id: conversa.id,
+        assunto: conversa.assunto?.substring(0, 30),
+        remetenteId: conversa.remetente?.id,
+        destinatarioId: conversa.destinatario?.id,
+        foiEnviadaPorMim,
+        foiEnviadaParaMim,
+        estaPendente,
+        lida: conversa.lida
+      });
+      
       if (euSouCoordenador) {
-        if (abaConversas === 0) { // Não Lidas (painel normal)
-          return foiEnviadaParaMim && !conversa.lida && !estaPendente;
-        } else if (abaConversas === 1) { // Lidas
-          return foiEnviadaParaMim && conversa.lida && !estaPendente;
-        } else { // Enviados
-          return foiEnviadaPorMim;
+        if (abaConversas === 0) {
+          const passou = foiEnviadaParaMim && !conversa.lida && !estaPendente;
+          console.log('✅ [filtro] Coordenadora/NãoLidas:', passou);
+          return passou;
+        } else if (abaConversas === 1) {
+          const passou = foiEnviadaParaMim && conversa.lida && !estaPendente;
+          console.log('✅ [filtro] Coordenadora/Lidas:', passou);
+          return passou;
+        } else {
+          const passou = foiEnviadaPorMim;
+          console.log('✅ [filtro] Coordenadora/Enviadas:', passou);
+          return passou;
         }
       }
 
-      // Para usuários normais:
-      // - Remetente deve ver todas as suas mensagens na aba "Enviados", inclusive pendentes
       if (abaConversas === 2) {
-        return foiEnviadaPorMim;
+        const passou = foiEnviadaPorMim;
+        console.log('✅ [filtro] User/Enviadas:', passou);
+        return passou;
       }
 
-      // - Destinatário NÃO vê mensagens pendentes até aprovação
       if (estaPendente) {
+        console.log('❌ [filtro] Pendente - ignorando');
         return false;
       }
 
-      if (abaConversas === 0) { // Não Lidas
-        return foiEnviadaParaMim && !conversa.lida;
-      } else if (abaConversas === 1) { // Lidas
-        return foiEnviadaParaMim && conversa.lida;
+      if (abaConversas === 0) {
+        const passou = foiEnviadaParaMim && !conversa.lida;
+        console.log('✅ [filtro] User/NãoLidas:', passou);
+        return passou;
+      } else if (abaConversas === 1) {
+        const passou = foiEnviadaParaMim && conversa.lida;
+        console.log('✅ [filtro] User/Lidas:', passou);
+        return passou;
       }
 
+      console.log('❌ [filtro] Não passou em nenhum filtro');
       return false;
     });
+    
+    console.log('✅ [getConversasFiltradas] Resultado final:', resultado.length, 'mensagens');
+    console.log('📋 [getConversasFiltradas] IDs das mensagens filtradas:', resultado.slice(0, 5).map(m => m.id));
+    return resultado;
   };
 
   const getContadorMensagens = () => {
     const userId = myId;
     const role = userData?.role;
 
-    // Não contar mensagens pendentes como "não lidas" para destinatários comuns.
     const naoLidas = conversas.filter(conversa =>
       conversa.destinatario?.id === userId &&
       !conversa.lida &&
-      // Permitir contar pendentes apenas para coordenadora
       (conversa.statusAprovacao !== 'pendente' || role === 'coordenadora')
     ).length;
 
@@ -588,7 +598,6 @@ const MensagensSection = ({ userRole, userData }) => {
       (conversa.statusAprovacao !== 'pendente' || role === 'coordenadora')
     ).length;
 
-    // Enviados devem mostrar todas as mensagens que o usuário enviou (incl. pendentes)
     const enviados = conversas.filter(conversa =>
       conversa.remetente?.id === userId
     ).length;
@@ -633,7 +642,6 @@ const MensagensSection = ({ userRole, userData }) => {
         dataAprovacao: new Date().toISOString()
       });
 
-      await fetchConversas();
       exibirDialogo('Mensagem aprovada com sucesso!', {
         titulo: 'Sucesso',
         severidade: 'success'
@@ -659,7 +667,6 @@ const MensagensSection = ({ userRole, userData }) => {
         motivoRejeicao: motivo
       });
 
-      await fetchConversas();
       exibirDialogo('Mensagem rejeitada com sucesso!', {
         titulo: 'Sucesso',
         severidade: 'success'
@@ -700,7 +707,6 @@ const MensagensSection = ({ userRole, userData }) => {
           color="primary"
           onClick={() => {
             setDialogNovaMensagem(true);
-            // Log da abertura do dialog de nova mensagem
             auditService.logAction(
               LOG_ACTIONS.MESSAGE_COMPOSE_STARTED,
               userData?.id,
@@ -719,7 +725,6 @@ const MensagensSection = ({ userRole, userData }) => {
       </Box>
 
       <Grid container spacing={3} sx={{ minHeight: '600px' }}>
-        {/* Lista de Conversas */}
         <Grid item xs={12}>
           <Card sx={{ 
             height: '600px', 
@@ -730,14 +735,12 @@ const MensagensSection = ({ userRole, userData }) => {
             mx: 'auto'
           }}>
             <CardContent sx={{ p: 0, height: '100%', display: 'flex', flexDirection: 'column' }}>
-              {/* Painel de Conversas */}
               <Box sx={{ 
                 width: '100%', 
                 display: 'flex', 
                 flexDirection: 'column',
                 height: '100%'
               }}>
-                {/* Header com Abas */}
                 <Box sx={{ bgcolor: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
                   <Typography variant="h6" sx={{ p: 2, pb: 1 }}>
                     Conversas
@@ -748,7 +751,6 @@ const MensagensSection = ({ userRole, userData }) => {
                       const abaAnterior = abaConversas;
                       setAbaConversas(newValue);
                       
-                      // Log da mudança de aba
                       const abas = ['Não Lidas', 'Lidas', 'Enviados'];
                       auditService.logAction(
                         LOG_ACTIONS.MESSAGE_FILTER_CHANGED,
@@ -827,7 +829,7 @@ const MensagensSection = ({ userRole, userData }) => {
                   p: 0, 
                   flex: 1, 
                   overflow: 'auto',
-                  maxHeight: 'calc(600px - 140px)' // Altura total menos header e abas
+                  maxHeight: 'calc(600px - 140px)'
                 }}>
                   {getConversasFiltradas().map((conversa) => {
                     const isNaoLida = conversa.destinatario?.id === userData?.id && !conversa.lida;
@@ -840,12 +842,10 @@ const MensagensSection = ({ userRole, userData }) => {
                         selected={conversaSelecionada?.id === conversa.id}
                         onClick={() => {
                           setConversaSelecionada(conversa);
-                          // Marcar como lida automaticamente quando clicar (somente mensagens recebidas)
                           if (isNaoLida && !isEnviada) {
                             marcarComoLida(conversa.id);
                           }
                           
-                          // Log da visualização da mensagem
                           auditService.logAction(
                             LOG_ACTIONS.MESSAGE_VIEWED,
                             userData?.id,
@@ -901,7 +901,6 @@ const MensagensSection = ({ userRole, userData }) => {
                         </Badge>
                       </ListItemAvatar>
                       <Box sx={{ flex: 1, minWidth: 0, ml: 2 }}>
-                        {/* Header da conversa */}
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
                           <Typography variant="subtitle2" fontWeight={600} component="div">
                             {isEnviada 
@@ -914,7 +913,6 @@ const MensagensSection = ({ userRole, userData }) => {
                           </Typography>
                         </Box>
                         
-                        {/* Assunto e anexos */}
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
                           <Typography variant="body2" fontWeight={500} color="primary" component="div">
                             {conversa.assunto}
@@ -929,7 +927,6 @@ const MensagensSection = ({ userRole, userData }) => {
                           )}
                         </Box>
                         
-                        {/* Conteúdo */}
                         <Typography 
                           variant="body2" 
                           color="text.secondary"
@@ -952,8 +949,6 @@ const MensagensSection = ({ userRole, userData }) => {
             </CardContent>
           </Card>
         </Grid>
-
-
       </Grid>
 
       {/* Dialog Nova Mensagem */}
@@ -1025,14 +1020,10 @@ const MensagensSection = ({ userRole, userData }) => {
                 hidden
                 multiple
                 accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.txt"
-                onChange={(e) => {
-                  console.log('Arquivos selecionados:', e.target.files);
-                  handleUploadAnexo(e.target.files);
-                }}
+                onChange={(e) => handleUploadAnexo(e.target.files)}
               />
             </Button>
 
-            {/* Lista de anexos selecionados */}
             {novaMensagem.anexos && novaMensagem.anexos.length > 0 && (
               <Box sx={{ mb: 2 }}>
                 <Typography variant="subtitle2" gutterBottom>
@@ -1129,7 +1120,6 @@ const MensagensSection = ({ userRole, userData }) => {
             </DialogTitle>
             
             <DialogContent sx={{ p: 0, display: 'flex', flexDirection: 'column', height: '100%' }}>
-              {/* Conteúdo da Mensagem */}
               <Box sx={{ p: 3, flex: 1, overflow: 'auto' }}>
                 <Typography variant="body1" sx={{ lineHeight: 1.8, mb: 2, fontSize: '1rem' }}>
                   {conversaSelecionada.conteudo}
@@ -1149,7 +1139,6 @@ const MensagensSection = ({ userRole, userData }) => {
                           icon={<AttachFile />}
                           onClick={() => {
                             if (anexo.url) {
-                              // Log do download/visualização do anexo
                               auditService.logAction(
                                 LOG_ACTIONS.ATTACHMENT_DOWNLOADED,
                                 userData?.id,
@@ -1228,7 +1217,7 @@ const MensagensSection = ({ userRole, userData }) => {
         )}
       </Dialog>
 
-      {/* Dialog de feedback (substitui alert) */}
+      {/* Dialog de feedback */}
       <Dialog open={feedbackDialog.open} onClose={fecharDialogoFeedback} maxWidth="xs" fullWidth>
         <DialogTitle>{feedbackDialog.titulo}</DialogTitle>
         <DialogContent>

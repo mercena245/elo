@@ -273,8 +273,21 @@ export const schoolDatabaseOperations = (schoolData) => {
      * Listener em tempo real
      */
     onValue: (path, callback) => {
+      console.log('👂 [schoolDatabaseOperations.onValue] Configurando listener:', path);
+      console.log('👂 [schoolDatabaseOperations.onValue] Database URL:', db.databaseURL);
+      
       const dbRef = ref(db, path);
-      return onValue(dbRef, callback);
+      const unsubscribe = onValue(dbRef, (snapshot) => {
+        console.log('🔔 [schoolDatabaseOperations.onValue] Dados atualizados:', path);
+        const data = snapshot.val();
+        console.log('🔔 [schoolDatabaseOperations.onValue] Dados recebidos:', data ? 'sim' : 'não');
+        callback(data);
+      });
+      
+      console.log('✅ [schoolDatabaseOperations.onValue] Listener configurado com sucesso');
+      
+      // Retorna função para cancelar o listener
+      return unsubscribe;
     }
   };
 };
@@ -290,18 +303,12 @@ export const schoolStorageOperations = (schoolData) => {
     _storage: storage,
     
     /**
-     * Cria uma referência para um arquivo no storage
-     */
-    ref: (path) => storageRef(storage, path),
-
-    /**
      * Faz upload de um arquivo
      */
-    upload: async (path, file, metadata = {}) => {
+    uploadFile: async (path, file) => {
       const fileRef = storageRef(storage, path);
-      const snapshot = await uploadBytes(fileRef, file, metadata);
-      const url = await getDownloadURL(snapshot.ref);
-      return { snapshot, url };
+      const snapshot = await uploadBytes(fileRef, file);
+      return await getDownloadURL(snapshot.ref);
     },
 
     /**
@@ -315,47 +322,58 @@ export const schoolStorageOperations = (schoolData) => {
     /**
      * Remove um arquivo
      */
-    delete: async (path) => {
+    deleteFile: async (path) => {
       const fileRef = storageRef(storage, path);
       await deleteObject(fileRef);
+    },
+
+    /**
+     * Cria referência para um arquivo
+     */
+    ref: (path) => {
+      return storageRef(storage, path);
     }
   };
 };
 
 /**
- * Limpa o cache de uma escola específica (útil para logout ou troca de escola)
- * @param {string} schoolId - ID da escola (não o projectId)
+ * Autentica usuário no contexto da escola específica
  */
-export const clearSchoolCache = (schoolId) => {
-  if (schoolId) {
-    const appName = `school-${schoolId}`;
-    const dbKey = `db-${schoolId}`;
-    const storageKey = `storage-${schoolId}`;
-    
-    schoolApps.delete(appName);
-    schoolDatabases.delete(dbKey);
-    schoolStorages.delete(storageKey);
-    
-    console.log(`🗑️ [clearSchoolCache] Cache limpo para escola: ${schoolId}`);
+export const authenticateSchoolUser = async (schoolData, customToken) => {
+  const app = getSchoolApp(schoolData);
+  const auth = getAuth(app);
+  
+  try {
+    const userCredential = await signInWithCustomToken(auth, customToken);
+    console.log(`✅ Usuário autenticado na escola: ${schoolData.nome || schoolData.id}`);
+    return userCredential.user;
+  } catch (error) {
+    console.error(`❌ Erro ao autenticar usuário na escola:`, error);
+    throw error;
   }
 };
 
 /**
- * Limpa todo o cache de escolas
+ * Limpa o cache de uma escola específica
+ */
+export const clearSchoolCache = (schoolId) => {
+  console.log(`🗑️ [clearSchoolCache] Cache limpo para escola: ${schoolId}`);
+  
+  const appName = `school-${schoolId}`;
+  schoolApps.delete(appName);
+  schoolDatabases.delete(`db-${schoolId}`);
+  schoolStorages.delete(`storage-${schoolId}`);
+  schoolAuths.delete(`auth-${schoolId}`);
+};
+
+/**
+ * Limpa todo o cache de todas as escolas
  */
 export const clearAllSchoolCaches = () => {
+  console.log('🗑️ [clearAllSchoolCaches] Limpando cache de todas as escolas');
+  
   schoolApps.clear();
   schoolDatabases.clear();
   schoolStorages.clear();
-  console.log('🗑️ Cache de todas as escolas limpo');
-};
-
-export default {
-  getSchoolApp,
-  getSchoolDatabase,
-  getSchoolStorage,
-  schoolDatabaseOperations,
-  schoolStorageOperations,
-  clearSchoolCache,
-  clearAllSchoolCaches
+  schoolAuths.clear();
 };

@@ -288,6 +288,10 @@ const EditorPlanoAula = ({
   };
 
   const handleInputChange = (field, value) => {
+    if (field === 'data') {
+      console.log('📅 [handleInputChange] Data alterada:', value);
+    }
+    
     setFormData(prev => ({
       ...prev,
       [field]: value
@@ -393,8 +397,11 @@ const EditorPlanoAula = ({
       console.log('💾 [handleSave] Salvando plano...', {
         statusAtual: formData.statusAprovacao,
         isCoordinator: isCoordinator(),
-        planoId: plano?.id
+        planoId: plano?.id,
+        data: formData.data
       });
+      
+      console.log('📅 [handleSave] Data que será salva:', formData.data);
       
       const dadosPlano = {
         ...formData,
@@ -402,6 +409,8 @@ const EditorPlanoAula = ({
         criadoEm: plano?.criadoEm || new Date().toISOString(),
         atualizadoEm: new Date().toISOString()
       };
+      
+      console.log('📦 [handleSave] dadosPlano.data:', dadosPlano.data);
       
       // NOVO: Se a coordenadora está editando um plano em revisão, salva e aprova automaticamente
       if (formData.statusAprovacao === 'em_revisao' && isCoordinator()) {

@@ -219,6 +219,14 @@ const CalendarioGrade = ({
     const dia = String(data.getDate()).padStart(2, '0');
     const dataFormatada = `${ano}-${mes}-${dia}`;
     
+    console.log('📅 [CalendarioGrade] Criando plano para data:', {
+      dataOriginal: data,
+      ano,
+      mes,
+      dia,
+      dataFormatada
+    });
+    
     // Dados que o EditorPlanoAula espera receber
     const dadosPlano = {
       turmaId: aula.turmaId,
@@ -232,6 +240,8 @@ const CalendarioGrade = ({
       horaInicio: horaInicio,
       horaFim: horaFim
     };
+    
+    console.log('📤 [CalendarioGrade] Dados do plano a serem enviados:', dadosPlano);
     
     if (onCriarPlano) {
       onCriarPlano(dadosPlano);

@@ -67,6 +67,32 @@ import RelatorioPlanoAula from './shared/RelatorioPlanoAula';
 import RecursosPreview from './shared/RecursosPreview';
 import { useSchoolDatabase } from '../../../hooks/useSchoolDatabase';
 
+/**
+ * Função helper para formatar data corretamente do formato YYYY-MM-DD
+ * Evita problemas de timezone ao criar Date object
+ */
+const formatarDataLocal = (dataString) => {
+  if (!dataString) return '';
+  
+  // Se a data já está no formato DD/MM/YYYY, retornar diretamente
+  if (dataString.includes('/')) return dataString;
+  
+  // Se está no formato YYYY-MM-DD, converter para DD/MM/YYYY sem criar Date object
+  const partes = dataString.split('-');
+  if (partes.length === 3) {
+    const [ano, mes, dia] = partes;
+    return `${dia}/${mes}/${ano}`;
+  }
+  
+  // Fallback: tentar usar toLocaleDateString
+  try {
+    // Adiciona 'T00:00:00' para forçar timezone local
+    return new Date(dataString + 'T00:00:00').toLocaleDateString('pt-BR');
+  } catch {
+    return dataString;
+  }
+};
+
 const PlanejamentoAulas = () => {
   // Hook para acessar banco da escola
   const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, storage: schoolStorage } = useSchoolDatabase();
@@ -816,7 +842,7 @@ const PlanejamentoAulas = () => {
                                     <Box sx={{ flex: 1 }}>
                                       <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 0.5 }}>
                                         {plano.tipo_plano === 'diario' 
-                                          ? `Plano Diário - ${new Date(plano.data).toLocaleDateString('pt-BR')}`
+                                          ? `Plano Diário - ${formatarDataLocal(plano.data)}`
                                           : (plano.titulo || 'Plano sem título')
                                         }
                                       </Typography>
@@ -868,7 +894,7 @@ const PlanejamentoAulas = () => {
                                         )}
                                       </Box>
                                       <Typography variant="body2" color="text.secondary">
-                                        📅 {plano.data ? new Date(plano.data).toLocaleDateString('pt-BR') : 'Sem data'}
+                                        📅 {plano.data ? formatarDataLocal(plano.data) : 'Sem data'}
                                         {plano.horaInicio && plano.horaFim && ` • ⏰ ${plano.horaInicio} às ${plano.horaFim}`}
                                       </Typography>
                                       <Typography variant="body2" color="text.secondary" sx={{ mt: 1, display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical', overflow: 'hidden', textOverflow: 'ellipsis', fontStyle: 'italic' }}>
@@ -1053,7 +1079,7 @@ const PlanejamentoAulas = () => {
                             <Box sx={{ flex: 1 }}>
                               <Typography variant="h6" sx={{ mb: 1 }}>
                                 {plano.tipo_plano === 'diario' 
-                                  ? `Plano Diário - ${new Date(plano.data).toLocaleDateString('pt-BR')}`
+                                  ? `Plano Diário - ${formatarDataLocal(plano.data)}`
                                   : (plano.titulo || 'Sem título')
                                 }
                               </Typography>
@@ -1089,7 +1115,7 @@ const PlanejamentoAulas = () => {
                                   />
                                 )}
                                 <Chip 
-                                  label={new Date(plano.data).toLocaleDateString('pt-BR')} 
+                                  label={formatarDataLocal(plano.data)} 
                                   size="small" 
                                   icon={<CalendarIcon />}
                                 />

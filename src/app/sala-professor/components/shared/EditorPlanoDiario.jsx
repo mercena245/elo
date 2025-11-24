@@ -448,8 +448,11 @@ const EditorPlanoDiario = ({
       isCoordinator: isCoordinator(),
       planoId: plano?.id,
       tipo_plano: formData.tipo_plano,
+      data: formData.data,
       formDataKeys: Object.keys(formData)
     });
+    
+    console.log('📅 [handleSave] DATA DO FORM:', formData.data);
     
     const dadosPlano = {
       ...formData,
@@ -461,7 +464,9 @@ const EditorPlanoDiario = ({
       professorUid: user?.uid
     };
     
-    console.log('📦 [handleSave] Aulas detalhadas sendo salvas:', {
+    console.log('� [handleSave] DATA NO DADOS PLANO:', dadosPlano.data);
+    
+    console.log('�📦 [handleSave] Aulas detalhadas sendo salvas:', {
       numAulas: dadosPlano.aulasDetalhadas?.length || 0,
       aulas: dadosPlano.aulasDetalhadas
     });
@@ -469,6 +474,7 @@ const EditorPlanoDiario = ({
     console.log('🔍 [handleSave] Dados do plano a salvar:', {
       id: dadosPlano.id,
       tipo_plano: dadosPlano.tipo_plano,
+      data: dadosPlano.data,
       hasAulasDetalhadas: !!dadosPlano.aulasDetalhadas,
       numAulas: dadosPlano.aulasDetalhadas?.length
     });

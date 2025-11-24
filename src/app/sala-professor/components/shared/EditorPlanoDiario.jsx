@@ -266,9 +266,19 @@ const EditorPlanoDiario = ({
       } else {
         // Modo criação: resetar para novo plano
         const hoje = new Date();
-        const dataLocal = new Date(hoje.getTime() - (hoje.getTimezoneOffset() * 60000))
-          .toISOString()
-          .split('T')[0];
+        // Formatar data no timezone local sem conversão UTC
+        const ano = hoje.getFullYear();
+        const mes = String(hoje.getMonth() + 1).padStart(2, '0');
+        const dia = String(hoje.getDate()).padStart(2, '0');
+        const dataLocal = `${ano}-${mes}-${dia}`;
+        
+        console.log('📅 [EditorPlanoDiario] Inicializando com data de hoje:', {
+          hoje,
+          ano,
+          mes,
+          dia,
+          dataLocal
+        });
         
         setFormData({
           tipo_plano: 'diario',
@@ -289,6 +299,10 @@ const EditorPlanoDiario = ({
   }, [open, plano, isEditing, user]);
 
   const handleChange = async (field, value) => {
+    if (field === 'data') {
+      console.log('📅 [EditorPlanoDiario] Data alterada:', value);
+    }
+    
     // Se mudou a data ou turma, buscar aulas do dia
     if (field === 'data' && formData.turmaId) {
       const aulasDoDia = await buscarAulasDoDia(value, formData.turmaId);

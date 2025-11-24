@@ -647,6 +647,21 @@ const Dashboard = () => {
           console.log('❌ [Dashboard] Nenhum dado de cronograma encontrado');
         }
 
+        // Contar usuários aguardando aprovação
+        if (usuariosData) {
+          const superAdminId = 'qD6UucWtcgPC9GHA41OB8rSaghZ2';
+          const usuariosPendentes = Object.entries(usuariosData).filter(([uid, u]) => {
+            if (!u.role) {
+              if (uid === userId) return false; // Não contar o próprio usuário
+              if (uid === superAdminId) return false; // Não contar super admin
+              if (!u.nome && !u.email) return false; // Não contar sem dados
+              return true;
+            }
+            return false;
+          });
+          totalPendenciasCount += usuariosPendentes.length;
+        }
+
         setTotalPendencias(totalPendenciasCount);
 
         // Processar avisos

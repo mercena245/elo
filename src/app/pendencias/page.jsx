@@ -44,16 +44,18 @@ import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
 
 const PendenciasPage = () => {
   const router = useRouter();
-  const { userRole } = useAuthUser();
+  const { userRole, user } = useAuthUser();
   const { getData, isReady, currentSchool } = useSchoolDatabase();
   const currentSchoolId = typeof currentSchool === 'string' ? currentSchool : currentSchool?.id;
   const mensagensPath = currentSchoolId ? `escolas/${currentSchoolId}/mensagens` : 'mensagens';
+  const superAdminId = 'qD6UucWtcgPC9GHA41OB8rSaghZ2';
 
   const [loading, setLoading] = useState(true);
   const [planosPendentes, setPlanosPendentes] = useState([]);
   const [relatoriosPendentes, setRelatoriosPendentes] = useState([]);
   const [titulosEmAnalise, setTitulosEmAnalise] = useState([]);
   const [eventosPendentes, setEventosPendentes] = useState([]);
+  const [usuariosPendentes, setUsuariosPendentes] = useState([]);
   const [turmas, setTurmas] = useState({});
   const [disciplinas, setDisciplinas] = useState({});
   const [alunos, setAlunos] = useState({});
@@ -62,7 +64,8 @@ const PendenciasPage = () => {
   const [totalTitulos, setTotalTitulos] = useState(0);
   const [totalMensagensPendentes, setTotalMensagensPendentes] = useState(0);
   const [totalEventos, setTotalEventos] = useState(0);
-  const totalPendenciasPagina = totalPendencias + totalRelatorios + totalTitulos + totalMensagensPendentes + totalEventos;
+  const [totalUsuarios, setTotalUsuarios] = useState(0);
+  const totalPendenciasPagina = totalPendencias + totalRelatorios + totalTitulos + totalMensagensPendentes + totalEventos + totalUsuarios;
 
   useEffect(() => {
     // Aguardar até que userRole esteja definido
@@ -90,7 +93,8 @@ const PendenciasPage = () => {
         disciplinasData,
         alunosData,
         mensagensData,
-        cronogramaData
+        cronogramaData,
+        usuariosData
       ] = await Promise.all([
         getData('planos-aula'),
         getData('relatorios-pedagogicos'),
@@ -99,7 +103,8 @@ const PendenciasPage = () => {
         getData('disciplinas'),
         getData('alunos'),
         getData(mensagensPath),
-        getData('cronograma-academico')
+        getData('cronograma-academico'),
+        getData('usuarios')
       ]);
 
       setTurmas(turmasData || {});
@@ -247,6 +252,33 @@ const PendenciasPage = () => {
         setTotalEventos(0);
       }
 
+      // Processar usuários pendentes de aprovação
+      if (usuariosData) {
+        console.log('👥 [Pendências] Dados de usuários:', usuariosData);
+        const usuariosList = Object.entries(usuariosData)
+          .filter(([uid, u]) => {
+            // Filtrar usuários sem role (pendentes de aprovação)
+            if (!u.role) {
+              // Não mostrar o próprio usuário logado
+              if (uid === user?.uid) return false;
+              // Não mostrar super admin
+              if (uid === superAdminId) return false;
+              // Não mostrar sem dados válidos
+              if (!u.nome && !u.email) return false;
+              return true;
+            }
+            return false;
+          })
+          .map(([uid, u]) => ({ uid, ...u }));
+
+        console.log('⚠️ [Pendências] Usuários pendentes encontrados:', usuariosList.length);
+        setUsuariosPendentes(usuariosList);
+        setTotalUsuarios(usuariosList.length);
+      } else {
+        setUsuariosPendentes([]);
+        setTotalUsuarios(0);
+      }
+
     } catch (error) {
       console.error('Erro ao carregar pendências:', error);
     } finally {
@@ -355,7 +387,7 @@ const PendenciasPage = () => {
                 {totalPendenciasPagina} pendência(s) aguardando ação.
               </Typography>
               <Typography variant="body2">
-                Planos: {totalPendencias} · Relatórios: {totalRelatorios} · Pagamentos: {totalTitulos} · Mensagens: {totalMensagensPendentes} · Eventos: {totalEventos}
+                Planos: {totalPendencias} · Relatórios: {totalRelatorios} · Pagamentos: {totalTitulos} · Mensagens: {totalMensagensPendentes} · Eventos: {totalEventos} · Usuários: {totalUsuarios}
               </Typography>
             </Alert>
           )}
@@ -478,6 +510,37 @@ const PendenciasPage = () => {
           </Grid>
 
           <Grid item xs={12} md={3}>
+            <Card 
+              sx={{ 
+                bgcolor: '#E0F2FE', 
+                borderLeft: '4px solid #0EA5E9',
+                boxShadow: 2,
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                '&:hover': {
+                  boxShadow: 4,
+                  transform: 'translateY(-2px)'
+                }
+              }}
+              onClick={() => router.push('/configuracoes?aba=0')}
+            >
+              <CardContent>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <PersonIcon sx={{ fontSize: 40, color: '#0EA5E9' }} />
+                  <Box>
+                    <Typography variant="h3" sx={{ fontWeight: 'bold', color: '#075985' }}>
+                      {totalUsuarios}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Usuários aguardando aprovação
+                    </Typography>
+                  </Box>
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          <Grid item xs={12} md={3}>
             <Card sx={{ 
               bgcolor: '#D1FAE5', 
               borderLeft: '4px solid #10B981',
@@ -488,7 +551,7 @@ const PendenciasPage = () => {
                   <CheckCircleIcon sx={{ fontSize: 40, color: '#10B981' }} />
                   <Box>
                     <Typography variant="h3" sx={{ fontWeight: 'bold', color: '#065F46' }}>
-                      {totalPendencias + totalRelatorios + totalTitulos + totalMensagensPendentes + totalEventos}
+                      {totalPendencias + totalRelatorios + totalTitulos + totalMensagensPendentes + totalEventos + totalUsuarios}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
                       Total de Pendências
@@ -907,6 +970,85 @@ const PendenciasPage = () => {
                       />
                       
                       <IconButton edge="end" sx={{ color: '#EC4899' }}>
+                        <ChevronRightIcon />
+                      </IconButton>
+                    </ListItem>
+                  </React.Fragment>
+                ))}
+              </List>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Usuários Aguardando Aprovação */}
+        <Card sx={{ mt: 3 }}>
+          <CardContent>
+            <Typography variant="h6" sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 1 }}>
+              <PersonIcon sx={{ color: '#0EA5E9' }} />
+              Usuários Aguardando Aprovação de Acesso
+            </Typography>
+
+            {totalUsuarios === 0 ? (
+              <Alert severity="info" sx={{ mt: 2 }}>
+                <Typography variant="h6">✅ Tudo certo!</Typography>
+                <Typography>Não há usuários aguardando aprovação de acesso no momento.</Typography>
+              </Alert>
+            ) : (
+              <List>
+                {usuariosPendentes.map((usuario, index) => (
+                  <React.Fragment key={usuario.uid}>
+                    {index > 0 && <Divider />}
+                    <ListItem
+                      sx={{ 
+                        py: 2,
+                        '&:hover': { 
+                          bgcolor: '#f0f9ff',
+                          cursor: 'pointer'
+                        },
+                        transition: 'background-color 0.2s'
+                      }}
+                      onClick={() => router.push('/configuracoes?aba=0')}
+                    >
+                      <ListItemAvatar>
+                        <Avatar sx={{ 
+                          bgcolor: '#E0F2FE',
+                          color: '#0EA5E9'
+                        }}>
+                          <PersonIcon />
+                        </Avatar>
+                      </ListItemAvatar>
+                      
+                      <ListItemText
+                        primary={
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                            <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
+                              {usuario.nome || usuario.email || 'Usuário sem identificação'}
+                            </Typography>
+                            <Chip 
+                              label="Aguardando Aprovação" 
+                              color="info"
+                              size="small"
+                            />
+                          </Box>
+                        }
+                        secondary={
+                          <Box sx={{ mt: 1 }}>
+                            <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                              📧 <strong>Email:</strong> {usuario.email || 'Não informado'}
+                            </Typography>
+                            {usuario.telefone && (
+                              <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                                📱 <strong>Telefone:</strong> {usuario.telefone}
+                              </Typography>
+                            )}
+                            <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.85rem', fontStyle: 'italic', mt: 1 }}>
+                              💡 Clique para aprovar ou rejeitar acesso
+                            </Typography>
+                          </Box>
+                        }
+                      />
+                      
+                      <IconButton edge="end" sx={{ color: '#0EA5E9' }}>
                         <ChevronRightIcon />
                       </IconButton>
                     </ListItem>

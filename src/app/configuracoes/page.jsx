@@ -150,11 +150,31 @@ export default function Configuracoes() {
     const all = await getData('usuarios');
     if (all) {
       const listaPendentes = Object.entries(all)
-        .filter(([_, u]) => !u.role)
+        .filter(([uid, u]) => {
+          // Não mostrar usuários sem role que sejam:
+          // 1. O próprio usuário logado
+          // 2. Usuários sem nome E sem email válido
+          // 3. Super admin
+          if (!u.role) {
+            if (uid === user?.uid) return false; // Não mostrar o próprio usuário
+            if (uid === superAdminId) return false; // Não mostrar super admin
+            if (!u.nome && !u.email) return false; // Não mostrar sem dados
+            return true;
+          }
+          return false;
+        })
         .map(([uid, u]) => ({ ...u, uid }));
       setPendentes(listaPendentes);
-      // Todos os usuários
+      
+      // Todos os usuários (exceto super admin na lista geral se não for super admin visualizando)
       const listaUsuarios = Object.entries(all)
+        .filter(([uid, u]) => {
+          // Filtrar usuários inválidos
+          if (!u.nome && !u.email) return false;
+          // Se não for super admin, não mostrar o super admin na lista
+          if (!isSuperAdmin && uid === superAdminId) return false;
+          return true;
+        })
         .map(([uid, u]) => ({ ...u, uid }));
       setUsuarios(listaUsuarios);
     } else {
@@ -956,7 +976,10 @@ export default function Configuracoes() {
                       {pendentes.map(user => (
                         <ListItem key={user.uid} divider disablePadding>
                           <ListItemButton onClick={() => { setSelectedUser(user); setDialogOpen(true); }}>
-                            <ListItemText primary={user.nome || user.email} secondary={user.email} />
+                            <ListItemText 
+                              primary={user.nome || user.email || 'Usuário sem identificação'} 
+                              secondary={user.email || 'Email não informado'} 
+                            />
                             <Button variant="outlined" color="primary" onClick={(e) => { e.stopPropagation(); setSelectedUser(user); setDialogOpen(true); }}>Validar acesso</Button>
                           </ListItemButton>
                         </ListItem>
@@ -1044,9 +1067,9 @@ export default function Configuracoes() {
                                 setEditDialogOpen(true);
                               }}>
                               <ListItemText
-                                primary={user.nome || user.email}
+                                primary={user.nome || user.email || 'Usuário sem identificação'}
                                 secondary={
-                                  user.email + 
+                                  (user.email || 'Email não informado') + 
                                   (user.role ? ` • ${user.role}` : ' • (pendente)') +
                                   (user.role === 'pai' ? (() => {
                                     const alunosVinculados = user.alunosVinculados || (user.alunoVinculado ? [user.alunoVinculado] : []);

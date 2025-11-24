@@ -38,7 +38,7 @@ import { auth, deleteUserFunction } from '../../firebase';
 
 import UserApprovalDialog from '../../components/UserApprovalDialog';
 import TwoFactorManager from '../../components/TwoFactorManager';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '../../context/AuthContext';
 import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
 import { useSchoolServices } from '../../hooks/useSchoolServices';
@@ -55,6 +55,7 @@ import {
 
 export default function Configuracoes() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [tabValue, setTabValue] = useState(0);
 
   const handleTabChange = (event, newValue) => {
@@ -531,6 +532,17 @@ export default function Configuracoes() {
   const [roleChecked, setRoleChecked] = useState(false);
   // Busca o userId diretamente do usuário autenticado
   const userId = auth.currentUser ? auth.currentUser.uid : null;
+
+  // useEffect para detectar parâmetro 'aba' na URL e mudar para aba correspondente
+  useEffect(() => {
+    const abaParam = searchParams.get('aba');
+    if (abaParam !== null) {
+      const abaNumero = parseInt(abaParam, 10);
+      if (!isNaN(abaNumero) && abaNumero >= 0 && abaNumero <= 4) {
+        setTabValue(abaNumero);
+      }
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     fetchUsuarios();

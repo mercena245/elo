@@ -522,7 +522,7 @@ const PendenciasPage = () => {
                   transform: 'translateY(-2px)'
                 }
               }}
-              onClick={() => router.push('/configuracoes?aba=0')}
+              onClick={() => router.push('/configuracoes?aba=1')}
             >
               <CardContent>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -1007,7 +1007,7 @@ const PendenciasPage = () => {
                         },
                         transition: 'background-color 0.2s'
                       }}
-                      onClick={() => router.push('/configuracoes?aba=0')}
+                      onClick={() => router.push('/configuracoes?aba=1')}
                     >
                       <ListItemAvatar>
                         <Avatar sx={{ 

@@ -316,7 +316,8 @@ export default function Configuracoes() {
           ...userData,
           role: editRole,
           turmas: editUser.turmas || [],
-          alunosVinculados: (editRole === 'pai' && alunosSelecionados.length > 0) ? alunosSelecionados.map(a => a.id) : []
+          alunosVinculados: (editRole === 'pai' && alunosSelecionados.length > 0) ? alunosSelecionados.map(a => a.id) : [],
+          isSuporte: editUser.isSuporte || false
         };
         
         await setData(`usuarios/${editUser.uid}`, updatedUserData);
@@ -1246,6 +1247,26 @@ export default function Configuracoes() {
                   ))}
                 </Select>
               </FormControl>
+
+              {/* Checkbox para atribuir função de suporte */}
+              {isSuperAdmin && (
+                <FormControl fullWidth sx={{ mt: 2 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <input
+                      type="checkbox"
+                      checked={editUser?.isSuporte || false}
+                      onChange={(e) => setEditUser({ ...editUser, isSuporte: e.target.checked })}
+                      style={{ width: 20, height: 20, cursor: 'pointer' }}
+                    />
+                    <Typography variant="body1">
+                      👤 Membro da equipe de suporte
+                    </Typography>
+                  </Box>
+                  <Typography variant="caption" color="text.secondary" sx={{ ml: 3.5, mt: 0.5 }}>
+                    Usuários com esta permissão podem visualizar e responder todos os tickets de suporte
+                  </Typography>
+                </FormControl>
+              )}
               
               {/* Seleção de alunos (apenas para role "pai") */}
               {editRole === 'pai' && (

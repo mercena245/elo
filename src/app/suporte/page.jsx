@@ -840,12 +840,119 @@ const SuportePage = () => {
           titulo: '🎓 Alunos',
           descricao: 'Cadastro completo de alunos com dados pessoais, documentação, matrícula e contratos.',
           funcionalidades: [
-            'Cadastrar novos alunos',
-            'Gerenciar dados pessoais e responsáveis',
-            'Vincular aluno a turma',
-            'Gerar ficha de matrícula e contrato',
-            'Upload de documentos',
-            'Controlar status de matrícula'
+            {
+              nome: 'Cadastrar novos alunos',
+              tutorial: [
+                'Acesse o menu "Alunos"',
+                'Clique no botão "Novo Aluno"',
+                'Preencha dados pessoais: nome completo, data de nascimento, CPF',
+                'Adicione foto do aluno (opcional)',
+                'Preencha dados dos responsáveis: nome, CPF, telefone, email',
+                'Defina grau de parentesco (pai, mãe, avô, etc)',
+                'Clique em "Salvar"'
+              ],
+              dicas: [
+                'CPF é único - não pode cadastrar aluno duplicado',
+                'Email do responsável será usado para acesso ao sistema',
+                'Foto ajuda na identificação rápida'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            },
+            {
+              nome: 'Gerenciar dados pessoais e responsáveis',
+              tutorial: [
+                'Na lista de alunos, clique no aluno desejado',
+                'Clique no ícone de edição (lápis)',
+                'Atualize os dados necessários',
+                'Para adicionar novo responsável, clique em "Adicionar Responsável"',
+                'Para remover responsável, clique no ícone de lixeira',
+                'Salve as alterações'
+              ],
+              dicas: [
+                'Mantenha telefones atualizados para contato emergencial',
+                'Aluno pode ter múltiplos responsáveis'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            },
+            {
+              nome: 'Vincular aluno a turma',
+              tutorial: [
+                'Edite o aluno',
+                'Na seção "Matrícula", clique em "Vincular a Turma"',
+                'Selecione o período letivo ativo',
+                'Escolha a turma desejada',
+                'Defina data de matrícula',
+                'Confirme o vínculo',
+                'Status da matrícula mudará para "Ativo"'
+              ],
+              dicas: [
+                'Aluno só pode estar em 1 turma por período letivo',
+                'Para mudar de turma, desvincule da atual primeiro',
+                'Histórico de turmas fica registrado'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            },
+            {
+              nome: 'Gerar ficha de matrícula e contrato',
+              tutorial: [
+                'Selecione o aluno',
+                'Clique em "Documentos"',
+                'Escolha "Gerar Ficha de Matrícula"',
+                'Revise os dados preenchidos automaticamente',
+                'Clique em "Gerar PDF"',
+                'Para contrato: escolha "Gerar Contrato"',
+                'Personalize cláusulas se necessário',
+                'Imprima ou envie por email'
+              ],
+              dicas: [
+                'Ficha inclui dados do aluno e responsáveis',
+                'Contrato pode ser personalizado por escola',
+                'PDFs são salvos automaticamente'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            },
+            {
+              nome: 'Upload de documentos',
+              tutorial: [
+                'Na tela do aluno, vá para aba "Documentos"',
+                'Clique em "Adicionar Documento"',
+                'Selecione o tipo: RG, CPF, Certidão, Histórico, etc',
+                'Escolha o arquivo (PDF, JPG ou PNG)',
+                'Adicione observações se necessário',
+                'Clique em "Upload"',
+                'Documento ficará disponível para download'
+              ],
+              dicas: [
+                'Tamanho máximo: 5MB por arquivo',
+                'Formatos aceitos: PDF, JPG, PNG',
+                'Organize por tipo para fácil localização'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            },
+            {
+              nome: 'Controlar status de matrícula',
+              tutorial: [
+                'Na lista de alunos, veja os status em chips coloridos',
+                'Verde = Ativo, Amarelo = Pendente, Vermelho = Inativo',
+                'Para mudar status, edite o aluno',
+                'Vá em "Status da Matrícula"',
+                'Escolha: Ativo, Pendente, Inativo, Transferido, Concluído',
+                'Adicione motivo da mudança (obrigatório para inativo)',
+                'Salve alteração'
+              ],
+              dicas: [
+                'Alunos inativos não aparecem em listas padrão',
+                'Use filtros para ver todos os status',
+                'Histórico de mudanças fica registrado'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            }
           ],
           relacoes: [
             'REQUER Turmas (criadas em Escola)',
@@ -861,11 +968,110 @@ const SuportePage = () => {
           titulo: '👩‍🏫 Sala do Professor',
           descricao: 'Área exclusiva do professor com ferramentas pedagógicas: planejamento, diário de classe, relatórios e biblioteca.',
           funcionalidades: [
-            'Planejar aulas e sequências didáticas',
-            'Registrar diário de classe',
-            'Criar relatórios pedagógicos',
-            'Gerenciar cronograma acadêmico',
-            'Acessar biblioteca de materiais'
+            {
+              nome: 'Planejar aulas e sequências didáticas',
+              tutorial: [
+                'Acesse "Sala do Professor"',
+                'Clique na aba "Planos de Aula"',
+                'Clique em "Novo Plano"',
+                'Selecione turma e disciplina',
+                'Defina data e duração da aula',
+                'Escolha habilidades BNCC (busque por código ou descrição)',
+                'Descreva objetivos, conteúdo e metodologia',
+                'Adicione recursos necessários',
+                'Defina avaliação',
+                'Salve o plano'
+              ],
+              dicas: [
+                'Use BNCC para alinhar com currículo nacional',
+                'Vincule planos às aulas do calendário',
+                'Duplique planos para economizar tempo'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            },
+            {
+              nome: 'Registrar diário de classe',
+              tutorial: [
+                'Na aba "Diário de Classe"',
+                'Selecione turma e data',
+                'Marque presença/falta dos alunos',
+                'Adicione observações sobre a aula',
+                'Registre conteúdo ministrado',
+                'Anote ocorrências comportamentais',
+                'Salve o diário',
+                'Sistema calcula % de frequência automaticamente'
+              ],
+              dicas: [
+                'Registre diariamente para precisão',
+                'Observações ajudam em relatórios futuros',
+                'Faltas justificadas devem ser anotadas'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            },
+            {
+              nome: 'Criar relatórios pedagógicos',
+              tutorial: [
+                'Vá para aba "Relatórios"',
+                'Clique em "Novo Relatório"',
+                'Escolha tipo: individual, turma, ou período',
+                'Selecione aluno(s) e período',
+                'Sistema preenche dados automaticamente',
+                'Adicione observações qualitativas',
+                'Inclua progressos e dificuldades',
+                'Sugira intervenções se necessário',
+                'Revise e finalize',
+                'Relatório pode ser enviado aos pais'
+              ],
+              dicas: [
+                'Use linguagem clara e objetiva',
+                'Baseie-se em dados concretos',
+                'Seja construtivo nas críticas'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            },
+            {
+              nome: 'Gerenciar cronograma acadêmico',
+              tutorial: [
+                'Acesse aba "Cronograma"',
+                'Visualize calendário de aulas',
+                'Clique em data para adicionar evento',
+                'Defina: prova, trabalho, atividade, etc',
+                'Adicione descrição e peso',
+                'Vincule a habilidades BNCC',
+                'Notifique alunos automaticamente',
+                'Acompanhe entregas e prazos'
+              ],
+              dicas: [
+                'Planeje avaliações com antecedência',
+                'Evite acumular provas em mesma semana',
+                'Sincroniza com agenda da escola'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            },
+            {
+              nome: 'Acessar biblioteca de materiais',
+              tutorial: [
+                'Entre na aba "Biblioteca"',
+                'Navegue por categorias ou busque',
+                'Clique em material para visualizar',
+                'Faça download de recursos',
+                'Upload de seus próprios materiais',
+                'Compartilhe com outros professores',
+                'Organize em pastas personalizadas',
+                'Vincule materiais aos planos de aula'
+              ],
+              dicas: [
+                'Contribua com materiais de qualidade',
+                'Respeite direitos autorais',
+                'Organize por disciplina e série'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            }
           ],
           relacoes: [
             'USA Grade Horária (da Escola)',
@@ -881,11 +1087,105 @@ const SuportePage = () => {
           titulo: '📝 Notas & Frequência',
           descricao: 'Lançamento e gestão de notas e frequência dos alunos por disciplina.',
           funcionalidades: [
-            'Lançar notas por bimestre/trimestre',
-            'Registrar frequência diária',
-            'Calcular médias automaticamente',
-            'Visualizar boletim do aluno',
-            'Gerar relatórios de desempenho'
+            {
+              nome: 'Lançar notas por bimestre/trimestre',
+              tutorial: [
+                'Acesse "Notas & Frequência"',
+                'Selecione turma e disciplina',
+                'Escolha bimestre/trimestre',
+                'Sistema mostra lista de alunos',
+                'Digite nota de cada aluno (0 a 10)',
+                'Adicione peso se houver',
+                'Sistema calcula média automaticamente',
+                'Salve as notas',
+                'Notas ficam disponíveis para consulta'
+              ],
+              dicas: [
+                'Revise antes de salvar - alterações ficam registradas',
+                'Use conceitos (A, B, C) se configurado',
+                'Notas aparecem no boletim imediatamente'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            },
+            {
+              nome: 'Registrar frequência diária',
+              tutorial: [
+                'Na aba "Frequência"',
+                'Selecione turma e data',
+                'Marque P (presente) ou F (falta)',
+                'Use J para falta justificada',
+                'Adicione observação na falta justificada',
+                'Sistema calcula % automaticamente',
+                'Salve registro',
+                'Alertas aparecem se frequência < 75%'
+              ],
+              dicas: [
+                'Registre todo dia para precisão',
+                'Faltas justificadas não contam para reprovação',
+                'Pais podem ver frequência em tempo real'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            },
+            {
+              nome: 'Calcular médias automaticamente',
+              tutorial: [
+                'Sistema calcula automaticamente ao salvar notas',
+                'Média = soma das notas / quantidade de avaliações',
+                'Se houver pesos: (nota1*peso1 + nota2*peso2) / soma pesos',
+                'Média final = média dos bimestres',
+                'Veja cálculos em "Detalhes do Aluno"',
+                'Configurações de cálculo em "Escola"'
+              ],
+              dicas: [
+                'Verifique configuração de médias da escola',
+                'Média mínima para aprovação geralmente é 6.0',
+                'Sistema indica aprovado/recuperação/reprovado'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            },
+            {
+              nome: 'Visualizar boletim do aluno',
+              tutorial: [
+                'Clique no aluno desejado',
+                'Vá para "Boletim"',
+                'Veja todas as disciplinas',
+                'Notas por bimestre e média final',
+                'Frequência por disciplina',
+                'Observações dos professores',
+                'Gere PDF do boletim',
+                'Envie por email ou imprima'
+              ],
+              dicas: [
+                'Boletim é atualizado em tempo real',
+                'Pais têm acesso ao boletim online',
+                'Pode ser personalizado por escola'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            },
+            {
+              nome: 'Gerar relatórios de desempenho',
+              tutorial: [
+                'Acesse "Relatórios"',
+                'Escolha tipo: individual, turma ou geral',
+                'Selecione período',
+                'Filtre por disciplina se desejar',
+                'Sistema gera gráficos e estatísticas',
+                'Veja médias, aproveitamento, comparativos',
+                'Identifique alunos em dificuldade',
+                'Exporte em PDF ou Excel'
+              ],
+              dicas: [
+                'Use para reuniões pedagógicas',
+                'Identifique padrões e tendências',
+                'Planeje intervenções baseadas em dados'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            }
           ],
           relacoes: [
             'REQUER Alunos cadastrados',
@@ -901,11 +1201,99 @@ const SuportePage = () => {
           titulo: '⚠️ Pendências',
           descricao: 'Sistema de controle de pendências acadêmicas e administrativas dos alunos.',
           funcionalidades: [
-            'Criar pendências por aluno',
-            'Categorizar pendências (documentação, financeiro, pedagógico)',
-            'Definir prioridade e prazo',
-            'Acompanhar resolução',
-            'Notificar responsáveis'
+            {
+              nome: 'Criar pendências por aluno',
+              tutorial: [
+                'Acesse "Pendências"',
+                'Clique em "Nova Pendência"',
+                'Selecione o aluno',
+                'Escolha categoria: Documentação, Financeiro, Pedagógico, Comportamental',
+                'Defina título e descrição detalhada',
+                'Adicione observações importantes',
+                'Salve a pendência'
+              ],
+              dicas: [
+                'Seja específico na descrição',
+                'Anexe documentos se necessário',
+                'Pendência fica visível para coordenação'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            },
+            {
+              nome: 'Categorizar pendências (documentação, financeiro, pedagógico)',
+              tutorial: [
+                'Ao criar/editar pendência',
+                'Selecione categoria apropriada',
+                'Documentação: RG, CPF, histórico faltando',
+                'Financeiro: mensalidade atrasada, material não pago',
+                'Pedagógico: atividades pendentes, notas a recuperar',
+                'Comportamental: ocorrências a resolver',
+                'Sistema filtra por categoria'
+              ],
+              dicas: [
+                'Categorização ajuda na organização',
+                'Filtre por categoria para ver agrupado',
+                'Cada categoria pode ter ações específicas'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            },
+            {
+              nome: 'Definir prioridade e prazo',
+              tutorial: [
+                'Na criação da pendência',
+                'Escolha prioridade: Baixa (verde), Média (amarela), Alta (vermelha)',
+                'Defina data limite para resolução',
+                'Sistema enviará alertas próximo ao prazo',
+                'Prioridade alta aparece em destaque',
+                'Salve configurações'
+              ],
+              dicas: [
+                'Alta prioridade para questões urgentes',
+                'Prazo realista para resolução',
+                'Sistema alerta 3 dias antes do vencimento'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            },
+            {
+              nome: 'Acompanhar resolução',
+              tutorial: [
+                'Na lista de pendências, veja status',
+                'Aberta (vermelho), Em Andamento (amarelo), Resolvida (verde)',
+                'Clique na pendência para ver histórico',
+                'Adicione atualizações e comentários',
+                'Mude status conforme progresso',
+                'Quando resolver, marque como "Resolvida"',
+                'Adicione resolução detalhada'
+              ],
+              dicas: [
+                'Mantenha histórico atualizado',
+                'Documente ações tomadas',
+                'Pendências resolvidas podem ser arquivadas'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            },
+            {
+              nome: 'Notificar responsáveis',
+              tutorial: [
+                'Ao criar pendência, marque "Notificar Responsável"',
+                'Sistema envia email automático',
+                'Responsável vê pendência no sistema',
+                'Pode enviar mensagem sobre a pendência',
+                'Notifica novamente se não resolver no prazo',
+                'Histórico de notificações fica registrado'
+              ],
+              dicas: [
+                'Use linguagem clara e respeitosa',
+                'Explique claramente o que precisa',
+                'Ofereça canais para dúvidas'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            }
           ],
           relacoes: [
             'Vinculado a Alunos específicos',
@@ -920,11 +1308,108 @@ const SuportePage = () => {
           titulo: '📋 Secretaria Digital',
           descricao: 'Emissão de documentos oficiais: declarações, históricos, boletins e certificados.',
           funcionalidades: [
-            'Gerar declarações de matrícula',
-            'Emitir histórico escolar',
-            'Imprimir boletins',
-            'Criar certificados de conclusão',
-            'Gerenciar documentação oficial'
+            {
+              nome: 'Gerar declarações de matrícula',
+              tutorial: [
+                'Acesse "Secretaria Digital"',
+                'Escolha "Declarações"',
+                'Selecione o aluno',
+                'Escolha tipo: matrícula, frequência, conclusão',
+                'Sistema preenche dados automaticamente',
+                'Revise informações',
+                'Personalize texto se necessário',
+                'Gere PDF com logo da escola',
+                'Imprima ou envie por email'
+              ],
+              dicas: [
+                'Declaração tem validade oficial',
+                'Inclui assinatura digital',
+                'Pode autenticar com QR Code'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            },
+            {
+              nome: 'Emitir histórico escolar',
+              tutorial: [
+                'Vá em "Histórico Escolar"',
+                'Selecione o aluno',
+                'Escolha período (anos de estudo)',
+                'Sistema busca notas de todos os períodos',
+                'Calcula médias e resultado final',
+                'Adiciona frequência',
+                'Gera documento oficial',
+                'Assina digitalmente',
+                'Exporta em PDF'
+              ],
+              dicas: [
+                'Certifique-se que todas as notas estão lançadas',
+                'Histórico é documento oficial',
+                'Necessário para transferências'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            },
+            {
+              nome: 'Imprimir boletins',
+              tutorial: [
+                'Selecione "Boletins"',
+                'Escolha turma ou aluno individual',
+                'Selecione período (bimestre/ano)',
+                'Sistema gera boletim com notas e frequência',
+                'Revise dados',
+                'Imprima individual ou em lote',
+                'Envie por email aos responsáveis',
+                'Salve PDF para histórico'
+              ],
+              dicas: [
+                'Boletim pode ser personalizado',
+                'Inclui gráficos de desempenho',
+                'Pais podem acessar online também'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            },
+            {
+              nome: 'Criar certificados de conclusão',
+              tutorial: [
+                'Acesse "Certificados"',
+                'Selecione alunos formandos',
+                'Escolha modelo de certificado',
+                'Sistema preenche: nome, curso, datas',
+                'Adicione notas/conceitos se necessário',
+                'Personalize texto e layout',
+                'Gere certificados em lote',
+                'Imprima em papel especial'
+              ],
+              dicas: [
+                'Use papel certificado para oficialidade',
+                'Verifique dados antes de imprimir',
+                'Guarde cópia digital'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            },
+            {
+              nome: 'Gerenciar documentação oficial',
+              tutorial: [
+                'Vá em "Arquivo"',
+                'Veja todos os documentos emitidos',
+                'Filtre por tipo, aluno, período',
+                'Reemita documentos se necessário',
+                'Faça download de PDFs',
+                'Organize em pastas',
+                'Busque por protocolo',
+                'Audite emissões'
+              ],
+              dicas: [
+                'Mantenha backup dos documentos',
+                'Protocolo único para rastreamento',
+                'Histórico não pode ser apagado'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            }
           ],
           relacoes: [
             'USA dados de Alunos',
@@ -940,11 +1425,106 @@ const SuportePage = () => {
           titulo: '🖨️ Impressões',
           descricao: 'Central de geração de relatórios e documentos para impressão.',
           funcionalidades: [
-            'Gerar listas de alunos por turma',
-            'Imprimir fichas de matrícula',
-            'Criar relatórios gerenciais',
-            'Exportar dados em PDF/Excel',
-            'Personalizar layouts de impressão'
+            {
+              nome: 'Gerar listas de alunos por turma',
+              tutorial: [
+                'Acesse "Impressões"',
+                'Escolha "Listas"',
+                'Selecione uma ou várias turmas',
+                'Escolha dados a incluir: foto, responsável, telefone, etc',
+                'Defina ordem: alfabética, matrícula, data nascimento',
+                'Visualize pré-impressão',
+                'Gere PDF',
+                'Imprima ou salve'
+              ],
+              dicas: [
+                'Liste apenas campos necessários',
+                'Use para chamada, eventos, comunicados',
+                'Pode exportar para Excel'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            },
+            {
+              nome: 'Imprimir fichas de matrícula',
+              tutorial: [
+                'Vá em "Fichas"',
+                'Selecione alunos',
+                'Sistema gera ficha completa',
+                'Inclui dados pessoais, responsáveis, endereço',
+                'Adiciona campos para assinaturas',
+                'Personaliza cabeçalho com logo',
+                'Imprime em lote',
+                'Pode salvar modelos'
+              ],
+              dicas: [
+                'Útil para arquivo físico',
+                'Imprima em início de ano',
+                'Guarde assinada'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            },
+            {
+              nome: 'Criar relatórios gerenciais',
+              tutorial: [
+                'Escolha "Relatórios"',
+                'Selecione tipo: financeiro, acadêmico, administrativo',
+                'Defina período e filtros',
+                'Sistema gera estatísticas',
+                'Veja gráficos e tabelas',
+                'Analise dados consolidados',
+                'Exporte em PDF ou Excel',
+                'Use em reuniões'
+              ],
+              dicas: [
+                'Relatórios ajudam na gestão',
+                'Compare períodos',
+                'Identifique tendências'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            },
+            {
+              nome: 'Exportar dados em PDF/Excel',
+              tutorial: [
+                'Em qualquer relatório/lista',
+                'Clique em "Exportar"',
+                'Escolha formato: PDF ou Excel',
+                'PDF: mantém formatação visual',
+                'Excel: permite edição e análise',
+                'Defina nome do arquivo',
+                'Faça download',
+                'Arquivo salvo automaticamente'
+              ],
+              dicas: [
+                'PDF para impressão',
+                'Excel para análise de dados',
+                'Nomeie arquivos claramente'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            },
+            {
+              nome: 'Personalizar layouts de impressão',
+              tutorial: [
+                'Acesse "Configurar Impressões"',
+                'Escolha documento a personalizar',
+                'Ajuste margens e espaçamento',
+                'Defina cabeçalho e rodapé',
+                'Adicione logo e assinaturas',
+                'Escolha fonte e tamanho',
+                'Salve como modelo',
+                'Use modelo nas próximas impressões'
+              ],
+              dicas: [
+                'Crie modelos por tipo de documento',
+                'Mantenha identidade visual',
+                'Teste antes de imprimir em lote'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            }
           ],
           relacoes: [
             'Acessa dados de todas as telas',
@@ -959,11 +1539,100 @@ const SuportePage = () => {
           titulo: '👨‍👩‍👧 Turma do Filho',
           descricao: 'Área exclusiva para pais acompanharem informações acadêmicas dos filhos.',
           funcionalidades: [
-            'Ver informações da turma do filho',
-            'Acompanhar grade horária',
-            'Visualizar calendário de aulas',
-            'Ver avisos da turma',
-            'Acessar notas e frequência (quando compartilhado)'
+            {
+              nome: 'Ver informações da turma do filho',
+              tutorial: [
+                'Faça login como responsável',
+                'Acesse "Turma do Filho" no menu',
+                'Sistema identifica automaticamente seu filho',
+                'Veja nome da turma, professor, período',
+                'Lista de disciplinas e professores',
+                'Quantidade de alunos na turma',
+                'Horários e informações gerais'
+              ],
+              dicas: [
+                'Se tiver mais de um filho, selecione qual visualizar',
+                'Informações são atualizadas em tempo real'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            },
+            {
+              nome: 'Acompanhar grade horária',
+              tutorial: [
+                'Na tela "Turma do Filho"',
+                'Clique em "Grade Horária"',
+                'Veja grade semanal completa',
+                'Horários de cada disciplina',
+                'Professor responsável por cada aula',
+                'Salve grade em PDF',
+                'Use para organizar rotina do filho'
+              ],
+              dicas: [
+                'Grade pode mudar durante o ano',
+                'Verifique periodicamente',
+                'Sincronize com agenda pessoal'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            },
+            {
+              nome: 'Visualizar calendário de aulas',
+              tutorial: [
+                'Acesse "Calendário"',
+                'Veja dias letivos do mês',
+                'Identifique feriados e recessos',
+                'Veja eventos da turma',
+                'Provas e trabalhos agendados',
+                'Reuniões de pais',
+                'Adicione lembretes pessoais'
+              ],
+              dicas: [
+                'Calendário sincronizado com escola',
+                'Receba notificações de eventos',
+                'Planeje férias considerando calendário'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            },
+            {
+              nome: 'Ver avisos da turma',
+              tutorial: [
+                'Avisos aparecem na página inicial',
+                'Clique em "Avisos" para ver todos',
+                'Filtre por data ou categoria',
+                'Leia avisos gerais e específicos da turma',
+                'Marque como lido',
+                'Responda se necessário',
+                'Receba notificação de avisos novos'
+              ],
+              dicas: [
+                'Verifique avisos diariamente',
+                'Configure notificações por email',
+                'Avisos importantes ficam em destaque'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            },
+            {
+              nome: 'Acessar notas e frequência (quando compartilhado)',
+              tutorial: [
+                'Se escola permitir, veja "Notas"',
+                'Selecione disciplina',
+                'Veja notas por período',
+                'Acompanhe frequência do filho',
+                'Veja médias e desempenho',
+                'Identifique dificuldades',
+                'Entre em contato com professor se necessário'
+              ],
+              dicas: [
+                'Nem todas escolas compartilham online',
+                'Acompanhe regularmente',
+                'Converse com filho sobre desempenho'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            }
           ],
           relacoes: [
             'Mostra dados da Turma',
@@ -985,12 +1654,126 @@ const SuportePage = () => {
           titulo: '💰 Caixa (Financeiro)',
           descricao: 'Gestão financeira completa: mensalidades, pagamentos, inadimplência e relatórios.',
           funcionalidades: [
-            'Lançar mensalidades dos alunos',
-            'Registrar pagamentos recebidos',
-            'Controlar inadimplência',
-            'Gerar recibos',
-            'Emitir relatórios financeiros',
-            'Acompanhar fluxo de caixa'
+            {
+              nome: 'Lançar mensalidades dos alunos',
+              tutorial: [
+                'Acesse "Financeiro"',
+                'Clique em "Lançar Mensalidades"',
+                'Selecione mês de referência',
+                'Escolha turma ou todos os alunos',
+                'Sistema gera mensalidades automaticamente',
+                'Defina valor e data de vencimento',
+                'Adicione juros/multa se configurado',
+                'Confirme lançamento em lote'
+              ],
+              dicas: [
+                'Lance mensalidades no início do mês',
+                'Valores podem ser individualizados',
+                'Sistema envia cobrança automaticamente'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            },
+            {
+              nome: 'Registrar pagamentos recebidos',
+              tutorial: [
+                'Vá em "Recebimentos"',
+                'Busque aluno ou mensalidade',
+                'Clique em "Registrar Pagamento"',
+                'Selecione forma: dinheiro, PIX, cartão, boleto',
+                'Digite valor pago e data',
+                'Adicione observações se necessário',
+                'Sistema atualiza status automaticamente',
+                'Emita recibo'
+              ],
+              dicas: [
+                'Registre no dia do pagamento',
+                'Confira valores antes de salvar',
+                'Recibo tem validade legal'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            },
+            {
+              nome: 'Controlar inadimplência',
+              tutorial: [
+                'Acesse "Inadimplentes"',
+                'Sistema lista mensalidades vencidas',
+                'Veja alunos com atraso',
+                'Filtros por quantidade de meses',
+                'Envie lembretes por email/WhatsApp',
+                'Registre tentativas de contato',
+                'Defina ações: bloqueio, negociação',
+                'Acompanhe histórico de pagamentos'
+              ],
+              dicas: [
+                'Entre em contato antes de bloquear',
+                'Ofereça negociação quando possível',
+                'Documente todas as comunicações'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            },
+            {
+              nome: 'Gerar recibos',
+              tutorial: [
+                'Após registrar pagamento',
+                'Clique em "Gerar Recibo"',
+                'Sistema preenche dados automaticamente',
+                'Revise informações',
+                'Adicione observações se necessário',
+                'Gere PDF com logo da escola',
+                'Imprima ou envie por email',
+                'Recibo fica arquivado no sistema'
+              ],
+              dicas: [
+                'Recibo oficial com CNPJ',
+                'Numeração sequencial',
+                'Pode ser autenticado digitalmente'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            },
+            {
+              nome: 'Emitir relatórios financeiros',
+              tutorial: [
+                'Vá em "Relatórios Financeiros"',
+                'Escolha tipo: recebimentos, inadimplência, fluxo de caixa',
+                'Defina período',
+                'Sistema gera gráficos e tabelas',
+                'Veja totais, médias, comparativos',
+                'Analise evolução mês a mês',
+                'Exporte em PDF ou Excel',
+                'Use para planejamento financeiro'
+              ],
+              dicas: [
+                'Gere relatórios mensalmente',
+                'Compare com meses anteriores',
+                'Identifique sazonalidades'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            },
+            {
+              nome: 'Acompanhar fluxo de caixa',
+              tutorial: [
+                'Acesse "Fluxo de Caixa"',
+                'Veja entradas (mensalidades, taxas)',
+                'Veja saídas (despesas)',
+                'Acompanhe saldo diário',
+                'Projeções futuras',
+                'Identifique períodos críticos',
+                'Planeje com antecedência',
+                'Exporte dados para análise'
+              ],
+              dicas: [
+                'Registre todas as movimentações',
+                'Categorize despesas corretamente',
+                'Use para decisões estratégicas'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            }
           ],
           relacoes: [
             'REQUER Alunos cadastrados',
@@ -1006,11 +1789,108 @@ const SuportePage = () => {
           titulo: '🛒 Loja',
           descricao: 'Módulo de venda de produtos escolares (uniformes, materiais, etc).',
           funcionalidades: [
-            'Cadastrar produtos',
-            'Gerenciar estoque',
-            'Registrar vendas',
-            'Emitir comprovantes',
-            'Controlar inadimplência de compras'
+            {
+              nome: 'Cadastrar produtos',
+              tutorial: [
+                'Acesse "Loja"',
+                'Clique em "Novo Produto"',
+                'Digite nome do produto',
+                'Adicione descrição',
+                'Upload de foto',
+                'Defina preço',
+                'Escolha categoria: uniforme, material, livro, etc',
+                'Defina estoque inicial',
+                'Salve produto'
+              ],
+              dicas: [
+                'Use fotos de boa qualidade',
+                'Descrição clara do produto',
+                'Mantenha preços atualizados'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            },
+            {
+              nome: 'Gerenciar estoque',
+              tutorial: [
+                'Vá em "Estoque"',
+                'Veja lista de produtos e quantidades',
+                'Receba alertas quando acabar',
+                'Registre entrada de novos produtos',
+                'Registre saídas (vendas)',
+                'Faça inventário periódico',
+                'Ajuste estoque se necessário',
+                'Veja histórico de movimentações'
+              ],
+              dicas: [
+                'Defina estoque mínimo',
+                'Faça pedidos com antecedência',
+                'Inventário mensal recomendado'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            },
+            {
+              nome: 'Registrar vendas',
+              tutorial: [
+                'Clique em "Nova Venda"',
+                'Selecione cliente (aluno/responsável)',
+                'Adicione produtos ao carrinho',
+                'Defina quantidade de cada item',
+                'Sistema calcula total automaticamente',
+                'Escolha forma de pagamento',
+                'Registre se à vista ou parcelado',
+                'Finalize venda',
+                'Estoque atualiza automaticamente'
+              ],
+              dicas: [
+                'Verifique disponibilidade em estoque',
+                'Ofereça desconto para pagamento à vista',
+                'Registre vendas imediatamente'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            },
+            {
+              nome: 'Emitir comprovantes',
+              tutorial: [
+                'Após finalizar venda',
+                'Clique em "Emitir Comprovante"',
+                'Sistema gera documento com dados da compra',
+                'Lista produtos, quantidades e valores',
+                'Forma de pagamento',
+                'Gere PDF',
+                'Imprima ou envie por email',
+                'Comprovante fica arquivado'
+              ],
+              dicas: [
+                'Comprovante serve como garantia',
+                'Numeração sequencial',
+                'Cliente pode reimprimir'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            },
+            {
+              nome: 'Controlar inadimplência de compras',
+              tutorial: [
+                'Acesse "Compras a Prazo"',
+                'Veja vendas parceladas',
+                'Identifique parcelas vencidas',
+                'Envie lembretes de cobrança',
+                'Registre pagamentos de parcelas',
+                'Acompanhe histórico',
+                'Tome ações em caso de inadimplência',
+                'Gere relatório de recebíveis'
+              ],
+              dicas: [
+                'Defina limite de crédito por cliente',
+                'Cobre com antecedência',
+                'Ofereça facilidades para regularização'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            }
           ],
           relacoes: [
             'Integrado com Financeiro',
@@ -1031,11 +1911,106 @@ const SuportePage = () => {
           titulo: '📅 Agenda',
           descricao: 'Calendário escolar com eventos, reuniões, feriados e atividades.',
           funcionalidades: [
-            'Criar eventos escolares',
-            'Agendar reuniões',
-            'Marcar feriados e recessos',
-            'Notificar participantes',
-            'Visualizar calendário mensal/anual'
+            {
+              nome: 'Criar eventos escolares',
+              tutorial: [
+                'Acesse "Agenda"',
+                'Clique em uma data no calendário',
+                'Escolha "Novo Evento"',
+                'Digite título do evento',
+                'Defina hora de início e fim',
+                'Adicione descrição detalhada',
+                'Escolha tipo: pedagógico, administrativo, festivo',
+                'Defina se é visível para pais/alunos',
+                'Salve evento'
+              ],
+              dicas: [
+                'Use cores para categorizar eventos',
+                'Eventos importantes em destaque',
+                'Notifique participantes automaticamente'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            },
+            {
+              nome: 'Agendar reuniões',
+              tutorial: [
+                'No calendário, clique em data/hora',
+                'Selecione "Nova Reunião"',
+                'Defina assunto e pauta',
+                'Convide participantes',
+                'Escolha local (sala, online)',
+                'Se online, adicione link',
+                'Defina lembretes',
+                'Envie convites',
+                'Participantes confirmam presença'
+              ],
+              dicas: [
+                'Envie convite com 1 semana de antecedência',
+                'Inclua pauta na descrição',
+                'Configure lembretes para 1 dia antes'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            },
+            {
+              nome: 'Marcar feriados e recessos',
+              tutorial: [
+                'Clique no dia do feriado',
+                'Escolha "Feriado/Recesso"',
+                'Digite nome do feriado',
+                'Defina se é nacional, estadual ou municipal',
+                'Marque se suspende aulas',
+                'Sistema marca em vermelho no calendário',
+                'Salve e notifique comunidade escolar'
+              ],
+              dicas: [
+                'Marque início de ano todos os feriados',
+                'Recessos aparecem em período',
+                'Pais veem automaticamente'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            },
+            {
+              nome: 'Notificar participantes',
+              tutorial: [
+                'Ao criar evento/reunião',
+                'Marque "Notificar participantes"',
+                'Escolha quem notificar: todos, turmas específicas, roles',
+                'Sistema envia email automaticamente',
+                'Notificação aparece no sistema',
+                'Lembretes enviados conforme configurado',
+                'Veja confirmações de leitura'
+              ],
+              dicas: [
+                'Configure lembretes importantes',
+                'Use notificação push se disponível',
+                'Verifique confirmações'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            },
+            {
+              nome: 'Visualizar calendário mensal/anual',
+              tutorial: [
+                'Na agenda, alterne entre visões',
+                'Mensal: vê todos eventos do mês',
+                'Semanal: detalha semana',
+                'Anual: visão geral do ano',
+                'Filtre por tipo de evento',
+                'Filtre por turma',
+                'Exporte calendário em PDF',
+                'Sincronize com Google Calendar'
+              ],
+              dicas: [
+                'Visão anual para planejamento',
+                'Exporte para impressão',
+                'Sincronize com agenda pessoal'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            }
           ],
           relacoes: [
             'Eventos visíveis para todas as roles',
@@ -1050,11 +2025,102 @@ const SuportePage = () => {
           titulo: '📢 Avisos',
           descricao: 'Sistema de comunicados e avisos direcionados por turma ou geral.',
           funcionalidades: [
-            'Criar avisos gerais ou por turma',
-            'Enviar notificações',
-            'Anexar arquivos aos avisos',
-            'Controlar visualização',
-            'Arquivar avisos antigos'
+            {
+              nome: 'Criar avisos gerais ou por turma',
+              tutorial: [
+                'Acesse "Avisos"',
+                'Clique em "Novo Aviso"',
+                'Digite título chamativo',
+                'Escreva mensagem clara e objetiva',
+                'Escolha destinatários: todos, turmas específicas, roles',
+                'Defina prioridade: normal, importante, urgente',
+                'Marque categoria: informativo, evento, cobrança',
+                'Salve e publique'
+              ],
+              dicas: [
+                'Título claro atrai atenção',
+                'Mensagens curtas são mais lidas',
+                'Use prioridade com critério'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            },
+            {
+              nome: 'Enviar notificações',
+              tutorial: [
+                'Ao criar aviso, marque "Notificar"',
+                'Sistema envia para todos os destinatários',
+                'Email com resumo do aviso',
+                'Notificação no app',
+                'Opção de enviar SMS (se configurado)',
+                'Veja estatísticas de entrega',
+                'Acompanhe visualizações'
+              ],
+              dicas: [
+                'Avisos urgentes = notificação imediata',
+                'Verifique taxa de visualização',
+                'Reenvie se necessário'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            },
+            {
+              nome: 'Anexar arquivos aos avisos',
+              tutorial: [
+                'Na criação do aviso',
+                'Clique em "Anexar Arquivo"',
+                'Escolha arquivo (PDF, imagem, documento)',
+                'Máximo 10MB por arquivo',
+                'Adicione múltiplos arquivos se necessário',
+                'Arquivos ficam disponíveis para download',
+                'Podem ser removidos depois'
+              ],
+              dicas: [
+                'PDFs para documentos oficiais',
+                'Imagens para divulgação',
+                'Comprima arquivos grandes'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            },
+            {
+              nome: 'Controlar visualização',
+              tutorial: [
+                'Após publicar aviso',
+                'Veja estatísticas de visualização',
+                'Quem visualizou e quando',
+                'Quem ainda não viu',
+                'Envie lembrete para não visualizados',
+                'Exporte lista de visualizações',
+                'Use para confirmar comunicação'
+              ],
+              dicas: [
+                'Avisos importantes: acompanhe visualização',
+                'Entre em contato com quem não viu',
+                'Guarde comprovante de envio'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            },
+            {
+              nome: 'Arquivar avisos antigos',
+              tutorial: [
+                'Avisos expirados vão para arquivo automaticamente',
+                'Ou clique em "Arquivar" manualmente',
+                'Avisos arquivados saem da lista principal',
+                'Mas continuam acessíveis em "Arquivo"',
+                'Busque avisos antigos quando necessário',
+                'Restaure se precisar reenviar',
+                'Exclua definitivamente se desejar'
+              ],
+              dicas: [
+                'Mantenha lista principal limpa',
+                'Arquivo serve como histórico',
+                'Não exclua avisos importantes'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            }
           ],
           relacoes: [
             'Pode ser direcionado a Turmas específicas',
@@ -1069,11 +2135,103 @@ const SuportePage = () => {
           titulo: '📸 Galeria de Fotos',
           descricao: 'Álbum de fotos dos eventos e atividades escolares.',
           funcionalidades: [
-            'Upload de fotos de eventos',
-            'Organizar em álbuns',
-            'Compartilhar com pais',
-            'Criar descrições das fotos',
-            'Controlar privacidade'
+            {
+              nome: 'Upload de fotos de eventos',
+              tutorial: [
+                'Acesse "Galeria"',
+                'Clique em "Nova Foto" ou "Upload em Lote"',
+                'Selecione fotos do computador',
+                'Múltiplas fotos de uma vez',
+                'Aguarde upload',
+                'Fotos processadas automaticamente',
+                'Thumbnails geradas',
+                'Ficam disponíveis imediatamente'
+              ],
+              dicas: [
+                'Fotos em alta resolução',
+                'JPG ou PNG',
+                'Renomeie arquivos antes de subir'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            },
+            {
+              nome: 'Organizar em álbuns',
+              tutorial: [
+                'Clique em "Novo Álbum"',
+                'Digite nome do álbum (ex: Festa Junina 2025)',
+                'Adicione descrição',
+                'Defina data do evento',
+                'Escolha foto de capa',
+                'Adicione fotos ao álbum',
+                'Organize ordem das fotos',
+                'Publique álbum'
+              ],
+              dicas: [
+                'Um álbum por evento',
+                'Nome descritivo com data',
+                'Melhor foto como capa'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            },
+            {
+              nome: 'Compartilhar com pais',
+              tutorial: [
+                'No álbum, clique em "Compartilhar"',
+                'Escolha com quem: turma específica ou todos',
+                'Envie link do álbum',
+                'Pais podem baixar fotos',
+                'Podem comentar se permitido',
+                'Controle privacidade',
+                'Desative compartilhamento se necessário'
+              ],
+              dicas: [
+                'Peça autorização de imagem dos pais',
+                'Não exponha crianças indevidamente',
+                'Modere comentários'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            },
+            {
+              nome: 'Criar descrições das fotos',
+              tutorial: [
+                'Clique em foto',
+                'Adicione legenda',
+                'Descreva momento/atividade',
+                'Marque alunos presentes (se permitido)',
+                'Adicione hashtags para organização',
+                'Salve descrição',
+                'Facilita busca futura'
+              ],
+              dicas: [
+                'Legendas tornam álbum mais rico',
+                'Use hashtags para categorizar',
+                'Não marque alunos sem autorização'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            },
+            {
+              nome: 'Controlar privacidade',
+              tutorial: [
+                'Em configurações do álbum',
+                'Defina visibilidade: público, turma, privado',
+                'Público: todos veem',
+                'Turma: só pais da turma',
+                'Privado: só coordenação',
+                'Pode mudar depois',
+                'Respeite autorização de imagem'
+              ],
+              dicas: [
+                'Padrão: privado ou turma',
+                'Público apenas eventos gerais',
+                'Sempre tenha autorização dos pais'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            }
           ],
           relacoes: [
             'Conectado com Agenda (fotos de eventos)',
@@ -1088,12 +2246,122 @@ const SuportePage = () => {
           titulo: '🎧 Suporte',
           descricao: 'Central de atendimento com sistema de tickets, chat e base de conhecimento.',
           funcionalidades: [
-            'Abrir tickets de suporte',
-            'Conversar via chat',
-            'Anexar arquivos (imagens/vídeos)',
-            'Acompanhar status do ticket',
-            'Acessar base de conhecimento',
-            'Equipe de suporte gerenciar atendimentos'
+            {
+              nome: 'Abrir tickets de suporte',
+              tutorial: [
+                'Acesse "Suporte"',
+                'Clique em "Novo Ticket"',
+                'Escolha categoria: Dúvida, Bug, Melhoria, Outro',
+                'Defina prioridade: Baixa, Média, Alta',
+                'Digite assunto claro',
+                'Descreva problema/dúvida detalhadamente',
+                'Anexe prints se ajudar',
+                'Envie ticket'
+              ],
+              dicas: [
+                'Seja específico na descrição',
+                'Anexe evidências (prints, vídeos)',
+                'Um problema por ticket'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            },
+            {
+              nome: 'Conversar via chat',
+              tutorial: [
+                'Abra seu ticket',
+                'Use campo de mensagem no rodapé',
+                'Digite mensagem e envie',
+                'Equipe de suporte responde',
+                'Conversação em tempo real',
+                'Histórico completo salvo',
+                'Notificações de novas respostas'
+              ],
+              dicas: [
+                'Responda rapidamente',
+                'Forneça informações solicitadas',
+                'Seja cordial'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            },
+            {
+              nome: 'Anexar arquivos (imagens/vídeos)',
+              tutorial: [
+                'No ticket, clique em ícone de anexo',
+                'Escolha arquivo',
+                'Imagens até 10MB',
+                'Vídeos até 50MB',
+                'Aguarde upload',
+                'Arquivo aparece na conversa',
+                'Suporte pode baixar'
+              ],
+              dicas: [
+                'Prints ajudam muito',
+                'Vídeos curtos explicando problema',
+                'Comprima vídeos grandes'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            },
+            {
+              nome: 'Acompanhar status do ticket',
+              tutorial: [
+                'Status do ticket muda conforme atendimento',
+                'Aberto: aguardando primeira resposta',
+                'Em Andamento: sendo resolvido',
+                'Resolvido: solução aplicada',
+                'Fechado: finalizado',
+                'Receba notificações de mudança',
+                'Pode reabrir se não resolver'
+              ],
+              dicas: [
+                'Acompanhe pela aba "Meus Tickets"',
+                'Confirme resolução',
+                'Avalie atendimento'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            },
+            {
+              nome: 'Acessar base de conhecimento',
+              tutorial: [
+                'Vá para aba "Base de Conhecimento"',
+                'Navegue por categorias',
+                'Use busca para encontrar',
+                'Clique em funcionalidade',
+                'Veja tutorial passo a passo',
+                'Assista vídeos/GIFs demonstrativos',
+                'Aprenda sozinho antes de abrir ticket'
+              ],
+              dicas: [
+                'Consulte antes de abrir ticket',
+                'Tutoriais sempre atualizados',
+                'Economize tempo com autoatendimento'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            },
+            {
+              nome: 'Equipe de suporte gerenciar atendimentos',
+              tutorial: [
+                'Membros da equipe veem aba "Gerenciar Tickets"',
+                'Lista todos os tickets de todas escolas',
+                'Priorize por urgência',
+                'Atribua tickets para membros',
+                'Responda na conversa',
+                'Mude status conforme progresso',
+                'Feche quando resolver',
+                'Estatísticas de atendimento'
+              ],
+              dicas: [
+                'Responda em até 24h',
+                'Seja claro e educado',
+                'Documente soluções na base'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            }
           ],
           relacoes: [
             'Independente - não depende de outras telas',

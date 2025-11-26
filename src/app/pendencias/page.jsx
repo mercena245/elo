@@ -22,7 +22,8 @@ import {
   Button,
   Accordion,
   AccordionSummary,
-  AccordionDetails
+  AccordionDetails,
+  Paper
 } from '@mui/material';
 import {
   Assignment as AssignmentIcon,
@@ -351,47 +352,95 @@ const PendenciasPage = () => {
       <SidebarMenu />
       
       <Box sx={{ flexGrow: 1, p: 3 }}>
-        {/* Cabeçalho */}
-        <Box sx={{ mb: 4 }}>
-          <Button
-            startIcon={<ArrowBackIcon />}
-            onClick={() => router.push('/dashboard')}
-            sx={{ mb: 2 }}
-          >
-            Voltar ao Dashboard
-          </Button>
+        {/* Cabeçalho Centralizado */}
+        <Paper 
+          elevation={0}
+          sx={{ 
+            mb: 4,
+            p: { xs: 2, sm: 2.5, md: 3 },
+            borderRadius: 3,
+            background: 'linear-gradient(135deg, #EF4444 0%, #DC2626 100%)',
+            color: 'white',
+            position: 'relative',
+            overflow: 'hidden'
+          }}
+        >
+          {/* Padrão decorativo */}
+          <Box sx={{
+            position: 'absolute',
+            top: -30,
+            right: -30,
+            width: '250px',
+            height: '250px',
+            background: 'radial-gradient(circle, rgba(255,255,255,0.12) 0%, transparent 70%)',
+            pointerEvents: 'none',
+            display: { xs: 'none', md: 'block' }
+          }} />
           
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-            <WarningIcon sx={{ fontSize: 48, color: '#EF4444' }} />
+          <Box sx={{ 
+            position: 'relative', 
+            zIndex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            textAlign: 'center',
+            gap: 1.5
+          }}>
+            <Avatar sx={{ 
+              width: { xs: 60, sm: 70, md: 80 }, 
+              height: { xs: 60, sm: 70, md: 80 }, 
+              bgcolor: 'rgba(255,255,255,0.25)',
+              backdropFilter: 'blur(10px)',
+              border: '3px solid rgba(255,255,255,0.3)',
+              boxShadow: '0 6px 24px rgba(0,0,0,0.2)'
+            }}>
+              <WarningIcon sx={{ fontSize: { xs: '2rem', sm: '2.5rem', md: '3rem' } }} />
+            </Avatar>
+            
             <Box>
-              <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#1f2937' }}>
+              <Typography 
+                variant="h4" 
+                fontWeight={700}
+                sx={{
+                  fontSize: { xs: '1.5rem', sm: '1.75rem', md: '2rem' },
+                  textShadow: '0 2px 10px rgba(0,0,0,0.3)',
+                  letterSpacing: '-0.01em'
+                }}
+              >
                 Central de Pendências
               </Typography>
-              <Typography variant="body1" color="text.secondary">
+              <Typography 
+                variant="body1" 
+                sx={{ 
+                  opacity: 0.92,
+                  fontSize: { xs: '0.875rem', sm: '0.95rem', md: '1rem' },
+                  textShadow: '0 1px 5px rgba(0,0,0,0.2)',
+                  mt: 0.5
+                }}
+              >
                 Acompanhe e gerencie todas as pendências da coordenação
               </Typography>
             </Box>
+            
+            {totalPendenciasPagina > 0 && (
+              <Chip 
+                icon={<WarningIcon />}
+                label={`${totalPendenciasPagina} pendência(s) aguardando ação`}
+                size="small"
+                sx={{ 
+                  bgcolor: 'rgba(255,255,255,0.25)',
+                  backdropFilter: 'blur(10px)',
+                  color: 'white',
+                  fontWeight: 600,
+                  fontSize: '0.75rem',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                  '& .MuiChip-icon': { color: 'white', fontSize: '1rem' },
+                  mt: 0.5
+                }} 
+              />
+            )}
           </Box>
-
-          {totalPendenciasPagina > 0 && (
-            <Alert
-              severity="warning"
-              icon={<WarningIcon />}
-              sx={{
-                borderLeft: '4px solid #f97316',
-                bgcolor: '#FEF3C7',
-                color: '#92400E'
-              }}
-            >
-              <Typography variant="subtitle1" fontWeight={600}>
-                {totalPendenciasPagina} pendência(s) aguardando ação.
-              </Typography>
-              <Typography variant="body2">
-                Planos: {totalPendencias} · Relatórios: {totalRelatorios} · Pagamentos: {totalTitulos} · Mensagens: {totalMensagensPendentes} · Eventos: {totalEventos} · Usuários: {totalUsuarios}
-              </Typography>
-            </Alert>
-          )}
-        </Box>
+        </Paper>
 
         {/* Resumo de Pendências */}
         <Grid container spacing={3} sx={{ mb: 4 }}>

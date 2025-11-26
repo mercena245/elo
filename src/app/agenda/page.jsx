@@ -198,29 +198,59 @@ const Agenda = () => {
         <SidebarMenu />
         <main className="dashboard-main">
           <Box sx={{ p: { xs: 2, sm: 3 }, bgcolor: '#f8fafc', minHeight: '100vh' }}>
-            {/* Header */}
+            {/* Header Centralizado */}
             <Paper 
               elevation={0} 
               sx={{ 
-                p: { xs: 2, sm: 3 }, 
+                p: { xs: 2, sm: 2.5, md: 3 }, 
                 mb: 3, 
                 background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                 color: 'white',
                 borderRadius: 3
               }}
             >
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Box sx={{ 
+                display: 'flex', 
+                flexDirection: 'column',
+                alignItems: 'center', 
+                textAlign: 'center',
+                gap: 1.5
+              }}>
+                <Avatar sx={{ 
+                  width: { xs: 60, sm: 70, md: 80 }, 
+                  height: { xs: 60, sm: 70, md: 80 }, 
+                  bgcolor: 'rgba(255,255,255,0.25)',
+                  backdropFilter: 'blur(10px)',
+                  border: '3px solid rgba(255,255,255,0.3)',
+                  boxShadow: '0 6px 24px rgba(0,0,0,0.2)'
+                }}>
+                  <Schedule sx={{ fontSize: { xs: '2rem', sm: '2.5rem', md: '3rem' } }} />
+                </Avatar>
+                
                 <Box>
-                  <Typography variant="h4" fontWeight={700} gutterBottom>
+                  <Typography 
+                    variant="h4" 
+                    fontWeight={700}
+                    sx={{
+                      fontSize: { xs: '1.5rem', sm: '1.75rem', md: '2rem' },
+                      textShadow: '0 2px 10px rgba(0,0,0,0.3)',
+                      letterSpacing: '-0.01em'
+                    }}
+                  >
                     📅 Agenda Escolar
                   </Typography>
-                  <Typography variant="h6" sx={{ opacity: 0.9 }}>
+                  <Typography 
+                    variant="body1" 
+                    sx={{ 
+                      opacity: 0.92,
+                      fontSize: { xs: '0.875rem', sm: '0.95rem', md: '1rem' },
+                      textShadow: '0 1px 5px rgba(0,0,0,0.2)',
+                      mt: 0.5
+                    }}
+                  >
                     Centro de comunicação escola-família
                   </Typography>
                 </Box>
-                <Avatar sx={{ width: 64, height: 64, bgcolor: 'rgba(255,255,255,0.2)' }}>
-                  <Schedule sx={{ fontSize: 32 }} />
-                </Avatar>
               </Box>
             </Paper>
 

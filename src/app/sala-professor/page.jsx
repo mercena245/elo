@@ -79,10 +79,10 @@ const SalaProfessor = () => {
         >
           <Box sx={{ mt: { xs: 1, sm: 2 } }}>
             
-            {/* Header da Sala do Professor */}
+            {/* Header Centralizado da Sala do Professor */}
             <Box sx={{ 
-              mb: { xs: 2, md: 4 }, 
-              p: { xs: 2, sm: 3, md: 4 }, 
+              mb: { xs: 2, md: 3 }, 
+              p: { xs: 2, sm: 2.5, md: 3 }, 
               borderRadius: { xs: 2, md: 3 }, 
               background: 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)', 
               color: 'white',
@@ -92,63 +92,76 @@ const SalaProfessor = () => {
               {/* Decoração de fundo */}
               <Box sx={{
                 position: 'absolute',
-                top: { xs: -10, md: -20 },
-                right: { xs: -10, md: -20 },
-                opacity: 0.1,
-                fontSize: { xs: '60px', sm: '80px', md: '120px' }
-              }}>
-                👩‍🏫
-              </Box>
+                top: -30,
+                right: -30,
+                width: '250px',
+                height: '250px',
+                background: 'radial-gradient(circle, rgba(255,255,255,0.12) 0%, transparent 70%)',
+                pointerEvents: 'none',
+                display: { xs: 'none', md: 'block' }
+              }} />
               
-              <Box sx={{ position: 'relative', zIndex: 1 }}>
-                <Typography 
-                  variant="h4" 
-                  fontWeight="bold" 
-                  gutterBottom
-                  sx={{
-                    fontSize: { xs: '1.5rem', sm: '2rem', md: '2.125rem' }
-                  }}
-                >
-                  👩‍🏫 Sala do Professor
-                </Typography>
-                <Typography 
-                  variant="h6" 
-                  sx={{ 
-                    opacity: 0.9, 
-                    mb: { xs: 1, md: 2 },
-                    fontSize: { xs: '1rem', sm: '1.125rem', md: '1.25rem' }
-                  }}
-                >
-                  Bem-vinda, {user?.displayName || user?.email || 'Professor'}!
-                </Typography>
-                <Typography 
-                  variant="body1" 
-                  sx={{ 
-                    opacity: 0.8,
-                    fontSize: { xs: '0.875rem', md: '1rem' },
-                    display: { xs: 'none', sm: 'block' }
-                  }}
-                >
-                  Aqui você pode gerenciar seus planejamentos de aula, relatórios pedagógicos e 
-                  acompanhar o desenvolvimento dos seus alunos.
-                </Typography>
-                
-                <Box sx={{ 
-                  mt: { xs: 1, md: 2 }, 
-                  display: 'flex', 
-                  gap: 1,
-                  flexWrap: 'wrap'
+              <Box sx={{ 
+                position: 'relative', 
+                zIndex: 1,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                textAlign: 'center',
+                gap: 1.5
+              }}>
+                {/* Ícone */}
+                <Avatar sx={{ 
+                  width: { xs: 60, sm: 70, md: 80 }, 
+                  height: { xs: 60, sm: 70, md: 80 }, 
+                  bgcolor: 'rgba(255,255,255,0.25)',
+                  backdropFilter: 'blur(10px)',
+                  border: '3px solid rgba(255,255,255,0.3)',
+                  boxShadow: '0 6px 24px rgba(0,0,0,0.2)',
+                  fontSize: { xs: '2rem', sm: '2.5rem', md: '3rem' }
                 }}>
-                  <Chip 
-                    label={role === 'professor' ? '👩‍🏫 Professor' : '👑 Coordenador'} 
+                  👩‍🏫
+                </Avatar>
+                
+                {/* Textos */}
+                <Box>
+                  <Typography 
+                    variant="h4" 
+                    fontWeight={700}
+                    sx={{
+                      fontSize: { xs: '1.5rem', sm: '1.75rem', md: '2rem' },
+                      textShadow: '0 2px 10px rgba(0,0,0,0.3)',
+                      letterSpacing: '-0.01em'
+                    }}
+                  >
+                    Sala do Professor
+                  </Typography>
+                  <Typography 
+                    variant="body1" 
                     sx={{ 
-                      bgcolor: 'rgba(255,255,255,0.2)', 
-                      color: 'white',
-                      fontWeight: 'bold',
-                      fontSize: { xs: '0.75rem', md: '0.875rem' }
-                    }} 
-                  />
+                      opacity: 0.92,
+                      fontSize: { xs: '0.875rem', sm: '0.95rem', md: '1rem' },
+                      textShadow: '0 1px 5px rgba(0,0,0,0.2)',
+                      mt: 0.5
+                    }}
+                  >
+                    Bem-vinda, {user?.displayName || user?.email || 'Professor'}! 👋
+                  </Typography>
                 </Box>
+                
+                {/* Role Badge */}
+                <Chip 
+                  label={role === 'professor' ? '👩‍🏫 Professor' : '👑 Coordenador'} 
+                  size="small"
+                  sx={{ 
+                    bgcolor: 'rgba(255,255,255,0.25)',
+                    backdropFilter: 'blur(10px)',
+                    color: 'white',
+                    fontWeight: 600,
+                    fontSize: '0.75rem',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                  }} 
+                />
               </Box>
             </Box>
 

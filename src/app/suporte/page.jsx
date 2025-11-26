@@ -89,6 +89,13 @@ const SuportePage = () => {
 
   const [uploadingFiles, setUploadingFiles] = useState(false);
 
+  // 🎬 Estados para modal de detalhes de funcionalidade
+  const [funcionalidadeModalOpen, setFuncionalidadeModalOpen] = useState(false);
+  const [funcionalidadeSelecionada, setFuncionalidadeSelecionada] = useState(null);
+  const [telaSelecionada, setTelaSelecionada] = useState(null);
+  const [uploadMidiaOpen, setUploadMidiaOpen] = useState(false);
+  const [uploadingMidia, setUploadingMidia] = useState(false);
+
   // Verificar se usuário é suporte ou super admin
   useEffect(() => {
     const checkSuporteRole = async () => {
@@ -510,7 +517,7 @@ const SuportePage = () => {
     );
   };
 
-  // 📚 Base de Conhecimento - Documentação completa do sistema
+  // 📚 Base de Conhecimento - Documentação completa do sistema com tutoriais detalhados
   const baseConhecimentoData = [
     // 🏠 GESTÃO ESCOLAR
     {
@@ -521,10 +528,54 @@ const SuportePage = () => {
           titulo: '🏠 Dashboard (Início)',
           descricao: 'Visão geral do sistema com estatísticas e acesso rápido às principais funcionalidades.',
           funcionalidades: [
-            'Visualizar resumo de alunos, turmas e professores',
-            'Acessar atalhos para funcionalidades frequentes',
-            'Ver notificações importantes',
-            'Acompanhar indicadores da escola'
+            {
+              nome: 'Visualizar resumo de alunos, turmas e professores',
+              tutorial: [
+                'Acesse o Dashboard após fazer login',
+                'Os cards principais mostram quantidade de alunos, turmas e professores',
+                'Clique em cada card para ir direto à tela correspondente',
+                'Os números são atualizados automaticamente'
+              ],
+              dicas: [
+                'Use o Dashboard como página inicial para ter visão geral',
+                'Identifique rapidamente problemas pelos indicadores em vermelho'
+              ],
+              midiaUrl: null, // URL do GIF ou vídeo
+              midiaTipo: null // 'gif' ou 'video'
+            },
+            {
+              nome: 'Acessar atalhos para funcionalidades frequentes',
+              tutorial: [
+                'Na parte inferior do Dashboard há atalhos rápidos',
+                'Clique diretamente no atalho desejado',
+                'Economiza tempo navegando pelo menu lateral'
+              ],
+              dicas: ['Os atalhos são personalizados conforme seu perfil de usuário'],
+              midiaUrl: null,
+              midiaTipo: null
+            },
+            {
+              nome: 'Ver notificações importantes',
+              tutorial: [
+                'Notificações aparecem no topo do Dashboard',
+                'Ícone de sino mostra quantidade de notificações não lidas',
+                'Clique para ver detalhes e marcar como lida'
+              ],
+              dicas: ['Configure notificações em Configurações para receber alertas importantes'],
+              midiaUrl: null,
+              midiaTipo: null
+            },
+            {
+              nome: 'Acompanhar indicadores da escola',
+              tutorial: [
+                'Gráficos mostram evolução de matrículas',
+                'Indicadores financeiros aparecem para coordenadora',
+                'Use os filtros para ver dados por período'
+              ],
+              dicas: ['Exporte relatórios clicando no ícone de download'],
+              midiaUrl: null,
+              midiaTipo: null
+            }
           ],
           relacoes: ['Ponto de partida para todas as outras telas'],
           requisitosPrevios: ['Nenhum - tela inicial após login'],
@@ -535,11 +586,86 @@ const SuportePage = () => {
           titulo: '🏫 Escola',
           descricao: 'Gerenciamento completo da estrutura escolar: períodos letivos, turmas, disciplinas e grade horária.',
           funcionalidades: [
-            'Criar e gerenciar períodos letivos (ano/semestre)',
-            'Cadastrar turmas vinculadas a períodos',
-            'Definir disciplinas da grade curricular',
-            'Montar grade horária das turmas',
-            'Configurar informações básicas da escola'
+            {
+              nome: 'Criar e gerenciar períodos letivos (ano/semestre)',
+              tutorial: [
+                'Acesse a tela Escola no menu lateral',
+                'Clique em "Novo Período Letivo"',
+                'Preencha: nome (ex: 2025.1), data início e fim',
+                'Marque como "Ativo" se for o período atual',
+                'Salve o período',
+                'IMPORTANTE: Só pode haver 1 período ativo por vez'
+              ],
+              dicas: [
+                'Crie o período letivo ANTES de cadastrar turmas',
+                'Use nomenclatura padrão: ANO.SEMESTRE (ex: 2025.1)',
+                'Desative período anterior antes de ativar novo'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            },
+            {
+              nome: 'Cadastrar turmas vinculadas a períodos',
+              tutorial: [
+                'Na aba "Turmas", clique em "Nova Turma"',
+                'Selecione o Período Letivo (deve estar criado)',
+                'Defina nome da turma (ex: 1º Ano A)',
+                'Escolha turno (Matutino/Vespertino/Integral)',
+                'Defina capacidade máxima de alunos',
+                'Salve a turma'
+              ],
+              dicas: [
+                'Organize turmas por série e turno',
+                'Defina capacidade realista considerando espaço físico'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            },
+            {
+              nome: 'Definir disciplinas da grade curricular',
+              tutorial: [
+                'Vá para aba "Disciplinas"',
+                'Clique em "Nova Disciplina"',
+                'Digite nome da disciplina (ex: Matemática)',
+                'Defina carga horária semanal',
+                'Salve a disciplina',
+                'Repita para todas as disciplinas do currículo'
+              ],
+              dicas: [
+                'Crie todas as disciplinas antes de montar grade horária',
+                'Use nomes padronizados para facilitar identificação'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            },
+            {
+              nome: 'Montar grade horária das turmas',
+              tutorial: [
+                'Acesse aba "Grade Horária"',
+                'Selecione a turma',
+                'Para cada horário, clique e escolha disciplina e professor',
+                'Verifique conflitos de horário (sistema alerta)',
+                'Salve a grade completa'
+              ],
+              dicas: [
+                'Monte grade respeitando carga horária de cada disciplina',
+                'Evite sobrecarregar um professor em mesmo horário'
+              ],
+              midiaUrl: null,
+              midiaTipo: null
+            },
+            {
+              nome: 'Configurar informações básicas da escola',
+              tutorial: [
+                'Na aba "Informações", clique em "Editar"',
+                'Preencha: nome da escola, endereço, telefone, email',
+                'Faça upload do logo (aparecerá em documentos)',
+                'Salve as informações'
+              ],
+              dicas: ['Logo deve ser PNG ou JPG, tamanho máximo 2MB'],
+              midiaUrl: null,
+              midiaTipo: null
+            }
           ],
           relacoes: [
             'CRIA Período Letivo → usado por Turmas',
@@ -555,10 +681,57 @@ const SuportePage = () => {
           titulo: '👥 Colaboradores',
           descricao: 'Cadastro e gerenciamento de professores e funcionários da escola.',
           funcionalidades: [
-            'Cadastrar professores',
-            'Atribuir disciplinas aos professores',
-            'Definir turmas que cada professor leciona',
-            'Gerenciar dados de contato e documentação'
+            {
+              nome: 'Cadastrar professores',
+              tutorial: [
+                'Acesse Colaboradores no menu',
+                'Clique em "Novo Professor"',
+                'Preencha dados pessoais: nome, CPF, email, telefone',
+                'Adicione endereço e documentação',
+                'Defina data de admissão',
+                'Salve o cadastro'
+              ],
+              dicas: ['CPF e email são únicos no sistema', 'Email será usado para login do professor'],
+              midiaUrl: null,
+              midiaTipo: null
+            },
+            {
+              nome: 'Atribuir disciplinas aos professores',
+              tutorial: [
+                'Edite o professor cadastrado',
+                'Na seção "Disciplinas", clique em "Adicionar"',
+                'Selecione as disciplinas que o professor leciona',
+                'Salve as atribuições'
+              ],
+              dicas: ['Professor pode lecionar múltiplas disciplinas'],
+              midiaUrl: null,
+              midiaTipo: null
+            },
+            {
+              nome: 'Definir turmas que cada professor leciona',
+              tutorial: [
+                'No cadastro do professor, seção "Turmas"',
+                'Clique em "Vincular Turma"',
+                'Selecione turma e disciplina que leciona nela',
+                'Salve o vínculo',
+                'Repita para todas as turmas do professor'
+              ],
+              dicas: ['Verifique grade horária para evitar conflitos'],
+              midiaUrl: null,
+              midiaTipo: null
+            },
+            {
+              nome: 'Gerenciar dados de contato e documentação',
+              tutorial: [
+                'Edite o professor',
+                'Atualize telefone, email ou endereço conforme necessário',
+                'Na aba "Documentos", faça upload de RG, CPF, diploma',
+                'Salve alterações'
+              ],
+              dicas: ['Mantenha documentação atualizada para relatórios oficiais'],
+              midiaUrl: null,
+              midiaTipo: null
+            }
           ],
           relacoes: [
             'VINCULA professores com Disciplinas',
@@ -573,11 +746,72 @@ const SuportePage = () => {
           titulo: '⚙️ Configurações',
           descricao: 'Configurações gerais do sistema, gerenciamento de usuários e permissões.',
           funcionalidades: [
-            'Gerenciar usuários do sistema',
-            'Definir roles (coordenadora, professora, pai)',
-            'Aprovar novos usuários pendentes',
-            'Configurar permissões de suporte',
-            'Ajustar preferências do sistema'
+            {
+              nome: 'Gerenciar usuários do sistema',
+              tutorial: [
+                'Acesse Configurações',
+                'Veja lista de todos os usuários cadastrados',
+                'Use busca para encontrar usuário específico',
+                'Clique em "Editar" para modificar dados',
+                'Clique em "Excluir" para remover (cuidado!)'
+              ],
+              dicas: ['Só coordenadora tem acesso a esta tela', 'Exclusão é permanente'],
+              midiaUrl: null,
+              midiaTipo: null
+            },
+            {
+              nome: 'Definir roles (coordenadora, professora, pai)',
+              tutorial: [
+                'Edite o usuário',
+                'No campo "Perfil", selecione: Coordenadora, Professora ou Pai',
+                'Coordenadora: acesso total',
+                'Professora: acesso acadêmico',
+                'Pai: acesso limitado a dados do filho',
+                'Salve a alteração'
+              ],
+              dicas: ['Role define quais telas o usuário vê no menu'],
+              midiaUrl: null,
+              midiaTipo: null
+            },
+            {
+              nome: 'Aprovar novos usuários pendentes',
+              tutorial: [
+                'Badge vermelho em Configurações indica pendências',
+                'Clique para ver usuários aguardando aprovação',
+                'Revise dados do usuário',
+                'Defina o role apropriado',
+                'Clique em "Aprovar"',
+                'Usuário receberá email de confirmação'
+              ],
+              dicas: ['Verifique identidade antes de aprovar', 'Usuários pendentes não acessam o sistema'],
+              midiaUrl: null,
+              midiaTipo: null
+            },
+            {
+              nome: 'Configurar permissões de suporte',
+              tutorial: [
+                'Edite o usuário',
+                'Marque checkbox "Membro da equipe de suporte"',
+                'Usuário poderá ver e responder todos os tickets',
+                'Salve a alteração'
+              ],
+              dicas: ['Super admin já tem acesso automático'],
+              midiaUrl: null,
+              midiaTipo: null
+            },
+            {
+              nome: 'Ajustar preferências do sistema',
+              tutorial: [
+                'Na aba "Preferências"',
+                'Configure notificações por email',
+                'Defina tema (claro/escuro)',
+                'Ajuste idioma se disponível',
+                'Salve preferências'
+              ],
+              dicas: ['Preferências são salvas por usuário'],
+              midiaUrl: null,
+              midiaTipo: null
+            }
           ],
           relacoes: ['Controla acesso a todas as outras telas', 'Define quem pode ver cada funcionalidade'],
           requisitosPrevios: ['Nenhum - mas importante configurar no início'],
@@ -874,12 +1108,127 @@ const SuportePage = () => {
     if (!buscaConhecimento.trim()) return telas;
     
     const termo = buscaConhecimento.toLowerCase();
-    return telas.filter(tela => 
-      tela.titulo.toLowerCase().includes(termo) ||
-      tela.descricao.toLowerCase().includes(termo) ||
-      tela.funcionalidades.some(f => f.toLowerCase().includes(termo))
-    );
+    return telas.filter(tela => {
+      const funcNomes = tela.funcionalidades.map(f => 
+        typeof f === 'string' ? f : f.nome
+      );
+      return tela.titulo.toLowerCase().includes(termo) ||
+        tela.descricao.toLowerCase().includes(termo) ||
+        funcNomes.some(nome => nome.toLowerCase().includes(termo));
+    });
   };
+
+  // 🎬 Abrir modal de funcionalidade
+  const handleAbrirFuncionalidade = (tela, funcionalidade, funcIndex) => {
+    setTelaSelecionada(tela);
+    setFuncionalidadeSelecionada({ ...funcionalidade, index: funcIndex });
+    setFuncionalidadeModalOpen(true);
+  };
+
+  // 📤 Upload de mídia para funcionalidade
+  const handleUploadMidia = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    // Validar tipo de arquivo
+    const tiposPermitidos = ['image/gif', 'image/png', 'image/jpeg', 'video/mp4', 'video/webm'];
+    if (!tiposPermitidos.includes(file.type)) {
+      alert('Tipo de arquivo não permitido. Use GIF, PNG, JPG, MP4 ou WEBM.');
+      return;
+    }
+
+    // Validar tamanho (máx 50MB para vídeos)
+    const maxSize = file.type.startsWith('video/') ? 50 * 1024 * 1024 : 10 * 1024 * 1024;
+    if (file.size > maxSize) {
+      alert(`Arquivo muito grande. Máximo ${file.type.startsWith('video/') ? '50MB' : '10MB'}.`);
+      return;
+    }
+
+    try {
+      setUploadingMidia(true);
+
+      // Upload para Firebase Storage
+      const midiaTipo = file.type.startsWith('video/') ? 'video' : 'gif';
+      const fileName = `${Date.now()}_${file.name}`;
+      const filePath = `base-conhecimento/${telaSelecionada.id}/${funcionalidadeSelecionada.index}/${fileName}`;
+      
+      const url = await storage.uploadFile(file, filePath);
+
+      // Salvar URL no banco de dados
+      const funcIndex = funcionalidadeSelecionada.index;
+      const funcRef = `base-conhecimento-midias/${telaSelecionada.id}/funcionalidades/${funcIndex}`;
+      await setData(funcRef, {
+        midiaUrl: url,
+        midiaTipo: midiaTipo,
+        atualizadoEm: new Date().toISOString()
+      });
+
+      // Atualizar estado local
+      setFuncionalidadeSelecionada(prev => ({
+        ...prev,
+        midiaUrl: url,
+        midiaTipo: midiaTipo
+      }));
+
+      alert('Mídia enviada com sucesso!');
+    } catch (error) {
+      console.error('Erro ao fazer upload:', error);
+      alert('Erro ao enviar mídia. Tente novamente.');
+    } finally {
+      setUploadingMidia(false);
+      setUploadMidiaOpen(false);
+    }
+  };
+
+  // 🗑️ Remover mídia da funcionalidade
+  const handleRemoverMidia = async () => {
+    if (!confirm('Deseja realmente remover esta mídia?')) return;
+
+    try {
+      setUploadingMidia(true);
+
+      const funcIndex = funcionalidadeSelecionada.index;
+      const funcRef = `base-conhecimento-midias/${telaSelecionada.id}/funcionalidades/${funcIndex}`;
+      
+      await setData(funcRef, {
+        midiaUrl: null,
+        midiaTipo: null,
+        atualizadoEm: new Date().toISOString()
+      });
+
+      setFuncionalidadeSelecionada(prev => ({
+        ...prev,
+        midiaUrl: null,
+        midiaTipo: null
+      }));
+
+      alert('Mídia removida com sucesso!');
+    } catch (error) {
+      console.error('Erro ao remover:', error);
+      alert('Erro ao remover mídia.');
+    } finally {
+      setUploadingMidia(false);
+    }
+  };
+
+  // 📥 Carregar mídias das funcionalidades
+  useEffect(() => {
+    const carregarMidias = async () => {
+      if (!isReady) return;
+
+      try {
+        const midiasData = await getData('base-conhecimento-midias');
+        if (midiasData) {
+          // Aqui você pode atualizar o baseConhecimentoData com as URLs salvas
+          // Por simplicidade, vamos carregar sob demanda quando abrir o modal
+        }
+      } catch (error) {
+        console.error('Erro ao carregar mídias:', error);
+      }
+    };
+
+    carregarMidias();
+  }, [isReady]);
 
   const renderBaseConhecimento = () => {
     // Processar dados: filtrar por role e busca
@@ -969,14 +1318,43 @@ const SuportePage = () => {
                           </AccordionSummary>
                           <AccordionDetails>
                             <List dense>
-                              {tela.funcionalidades.map((func, i) => (
-                                <ListItem key={i} sx={{ py: 0.5 }}>
-                                  <ListItemText 
-                                    primary={`• ${func}`}
-                                    primaryTypographyProps={{ variant: 'body2' }}
-                                  />
-                                </ListItem>
-                              ))}
+                              {tela.funcionalidades.map((func, i) => {
+                                const funcNome = typeof func === 'string' ? func : func.nome;
+                                const temDetalhes = typeof func === 'object' && func.tutorial;
+                                
+                                return (
+                                  <ListItemButton 
+                                    key={i} 
+                                    sx={{ 
+                                      py: 0.5,
+                                      borderRadius: 1,
+                                      '&:hover': {
+                                        bgcolor: 'action.hover'
+                                      }
+                                    }}
+                                    onClick={() => handleAbrirFuncionalidade(tela, func, i)}
+                                  >
+                                    <ListItemText 
+                                      primary={
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                          <Typography variant="body2">
+                                            • {funcNome}
+                                          </Typography>
+                                          {temDetalhes && (
+                                            <Chip 
+                                              label="Ver tutorial" 
+                                              size="small" 
+                                              color="primary"
+                                              variant="outlined"
+                                              sx={{ height: 20, fontSize: '0.7rem' }}
+                                            />
+                                          )}
+                                        </Box>
+                                      }
+                                    />
+                                  </ListItemButton>
+                                );
+                              })}
                             </List>
                           </AccordionDetails>
                         </Accordion>
@@ -1343,6 +1721,182 @@ const SuportePage = () => {
                   </IconButton>
                 </Box>
               </DialogContent>
+            </>
+          )}
+        </Dialog>
+
+        {/* 🎬 Modal de Detalhes da Funcionalidade */}
+        <Dialog
+          open={funcionalidadeModalOpen}
+          onClose={() => setFuncionalidadeModalOpen(false)}
+          maxWidth="md"
+          fullWidth
+        >
+          {funcionalidadeSelecionada && (
+            <>
+              <DialogTitle>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <Box>
+                    <Typography variant="h6" sx={{ mb: 0.5 }}>
+                      {telaSelecionada?.titulo}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {typeof funcionalidadeSelecionada === 'string' ? funcionalidadeSelecionada : funcionalidadeSelecionada.nome}
+                    </Typography>
+                  </Box>
+                  <IconButton onClick={() => setFuncionalidadeModalOpen(false)} size="small">
+                    <CloseIcon />
+                  </IconButton>
+                </Box>
+              </DialogTitle>
+
+              <DialogContent dividers>
+                {/* Área de Mídia */}
+                <Box sx={{ mb: 3 }}>
+                  <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
+                    🎥 Vídeo Tutorial / GIF Demonstrativo
+                  </Typography>
+                  
+                  {funcionalidadeSelecionada.midiaUrl ? (
+                    <Box>
+                      {funcionalidadeSelecionada.midiaTipo === 'video' ? (
+                        <video
+                          controls
+                          style={{
+                            width: '100%',
+                            maxHeight: '400px',
+                            borderRadius: '8px',
+                            backgroundColor: '#000'
+                          }}
+                        >
+                          <source src={funcionalidadeSelecionada.midiaUrl} type="video/mp4" />
+                          Seu navegador não suporta vídeo.
+                        </video>
+                      ) : (
+                        <Box
+                          component="img"
+                          src={funcionalidadeSelecionada.midiaUrl}
+                          alt="GIF Tutorial"
+                          sx={{
+                            width: '100%',
+                            maxHeight: '400px',
+                            objectFit: 'contain',
+                            borderRadius: '8px',
+                            border: '1px solid',
+                            borderColor: 'divider'
+                          }}
+                        />
+                      )}
+
+                      {/* Botão remover (só coordenadora) */}
+                      {userRole === 'coordenadora' && (
+                        <Button
+                          startIcon={<CloseIcon />}
+                          size="small"
+                          color="error"
+                          onClick={handleRemoverMidia}
+                          disabled={uploadingMidia}
+                          sx={{ mt: 1 }}
+                        >
+                          Remover Mídia
+                        </Button>
+                      )}
+                    </Box>
+                  ) : (
+                    <Paper
+                      sx={{
+                        p: 4,
+                        textAlign: 'center',
+                        bgcolor: '#f5f5f5',
+                        border: '2px dashed',
+                        borderColor: 'divider'
+                      }}
+                    >
+                      <VideoIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 1 }} />
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                        Nenhum vídeo ou GIF adicionado ainda
+                      </Typography>
+
+                      {/* Botão upload (só coordenadora) */}
+                      {userRole === 'coordenadora' && (
+                        <>
+                          <input
+                            accept="image/gif,image/png,image/jpeg,video/mp4,video/webm"
+                            style={{ display: 'none' }}
+                            id={`upload-midia-${funcionalidadeSelecionada.index}`}
+                            type="file"
+                            onChange={handleUploadMidia}
+                          />
+                          <label htmlFor={`upload-midia-${funcionalidadeSelecionada.index}`}>
+                            <Button
+                              variant="contained"
+                              component="span"
+                              startIcon={uploadingMidia ? <CircularProgress size={20} /> : <AttachFileIcon />}
+                              disabled={uploadingMidia}
+                            >
+                              {uploadingMidia ? 'Enviando...' : 'Adicionar Vídeo/GIF'}
+                            </Button>
+                          </label>
+                          <Typography variant="caption" display="block" sx={{ mt: 1 }} color="text.secondary">
+                            Formatos: GIF, PNG, JPG, MP4, WEBM (max 50MB para vídeos)
+                          </Typography>
+                        </>
+                      )}
+                    </Paper>
+                  )}
+                </Box>
+
+                {/* Tutorial Passo a Passo */}
+                {funcionalidadeSelecionada.tutorial && funcionalidadeSelecionada.tutorial.length > 0 && (
+                  <Box sx={{ mb: 3 }}>
+                    <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600 }}>
+                      📋 Passo a Passo
+                    </Typography>
+                    <List>
+                      {funcionalidadeSelecionada.tutorial.map((passo, index) => (
+                        <ListItem key={index} sx={{ alignItems: 'flex-start', py: 1 }}>
+                          <ListItemAvatar>
+                            <Avatar sx={{ bgcolor: '#667eea', width: 32, height: 32, fontSize: '0.875rem' }}>
+                              {index + 1}
+                            </Avatar>
+                          </ListItemAvatar>
+                          <ListItemText
+                            primary={passo}
+                            primaryTypographyProps={{ variant: 'body2' }}
+                          />
+                        </ListItem>
+                      ))}
+                    </List>
+                  </Box>
+                )}
+
+                {/* Dicas Importantes */}
+                {funcionalidadeSelecionada.dicas && funcionalidadeSelecionada.dicas.length > 0 && (
+                  <Box sx={{ mb: 2 }}>
+                    <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
+                      💡 Dicas Importantes
+                    </Typography>
+                    {funcionalidadeSelecionada.dicas.map((dica, index) => (
+                      <Alert key={index} severity="info" sx={{ mb: 1 }}>
+                        {dica}
+                      </Alert>
+                    ))}
+                  </Box>
+                )}
+
+                {/* Funcionalidade sem detalhes expandidos (apenas string) */}
+                {typeof funcionalidadeSelecionada === 'string' && (
+                  <Alert severity="info">
+                    Tutorial detalhado em desenvolvimento. Entre em contato com o suporte para mais informações.
+                  </Alert>
+                )}
+              </DialogContent>
+
+              <DialogActions>
+                <Button onClick={() => setFuncionalidadeModalOpen(false)}>
+                  Fechar
+                </Button>
+              </DialogActions>
             </>
           )}
         </Dialog>

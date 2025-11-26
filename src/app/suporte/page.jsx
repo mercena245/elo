@@ -49,10 +49,10 @@ import {
   Lightbulb as IdeaIcon,
   Settings as SettingsIcon,
   CheckCircle as CheckCircleIcon,
+  Search as SearchIcon,
   Schedule as ScheduleIcon,
   Cancel as CancelIcon,
   ExpandMore as ExpandMoreIcon,
-  Search as SearchIcon,
   ArrowBack as ArrowBackIcon,
   Support as SupportIcon,
   MenuBook as MenuBookIcon,
@@ -510,91 +510,540 @@ const SuportePage = () => {
     );
   };
 
-  const renderBaseConhecimento = () => (
-    <Box>
-      <Typography variant="h6" sx={{ mb: 3 }}>Base de Conhecimento</Typography>
+  // 📚 Base de Conhecimento - Documentação completa do sistema
+  const baseConhecimentoData = [
+    // 🏠 GESTÃO ESCOLAR
+    {
+      categoria: 'Gestão Escolar',
+      telas: [
+        {
+          id: 'dashboard',
+          titulo: '🏠 Dashboard (Início)',
+          descricao: 'Visão geral do sistema com estatísticas e acesso rápido às principais funcionalidades.',
+          funcionalidades: [
+            'Visualizar resumo de alunos, turmas e professores',
+            'Acessar atalhos para funcionalidades frequentes',
+            'Ver notificações importantes',
+            'Acompanhar indicadores da escola'
+          ],
+          relacoes: ['Ponto de partida para todas as outras telas'],
+          requisitosPrevios: ['Nenhum - tela inicial após login'],
+          rolesComAcesso: ['coordenadora', 'professora', 'pai']
+        },
+        {
+          id: 'escola',
+          titulo: '🏫 Escola',
+          descricao: 'Gerenciamento completo da estrutura escolar: períodos letivos, turmas, disciplinas e grade horária.',
+          funcionalidades: [
+            'Criar e gerenciar períodos letivos (ano/semestre)',
+            'Cadastrar turmas vinculadas a períodos',
+            'Definir disciplinas da grade curricular',
+            'Montar grade horária das turmas',
+            'Configurar informações básicas da escola'
+          ],
+          relacoes: [
+            'CRIA Período Letivo → usado por Turmas',
+            'CRIA Turmas → usadas por Alunos e Notas',
+            'CRIA Disciplinas → usadas por Grade e Notas',
+            'CONFIGURA Grade Horária → usada por Sala Professor'
+          ],
+          requisitosPrevios: ['Primeiro passo: criar período letivo', 'Depois criar turmas e disciplinas'],
+          rolesComAcesso: ['coordenadora']
+        },
+        {
+          id: 'colaboradores',
+          titulo: '👥 Colaboradores',
+          descricao: 'Cadastro e gerenciamento de professores e funcionários da escola.',
+          funcionalidades: [
+            'Cadastrar professores',
+            'Atribuir disciplinas aos professores',
+            'Definir turmas que cada professor leciona',
+            'Gerenciar dados de contato e documentação'
+          ],
+          relacoes: [
+            'VINCULA professores com Disciplinas',
+            'VINCULA professores com Turmas',
+            'Dados usados em Sala Professor e Notas'
+          ],
+          requisitosPrevios: ['Ter disciplinas e turmas criadas na tela Escola'],
+          rolesComAcesso: ['coordenadora']
+        },
+        {
+          id: 'configuracoes',
+          titulo: '⚙️ Configurações',
+          descricao: 'Configurações gerais do sistema, gerenciamento de usuários e permissões.',
+          funcionalidades: [
+            'Gerenciar usuários do sistema',
+            'Definir roles (coordenadora, professora, pai)',
+            'Aprovar novos usuários pendentes',
+            'Configurar permissões de suporte',
+            'Ajustar preferências do sistema'
+          ],
+          relacoes: ['Controla acesso a todas as outras telas', 'Define quem pode ver cada funcionalidade'],
+          requisitosPrevios: ['Nenhum - mas importante configurar no início'],
+          rolesComAcesso: ['coordenadora']
+        }
+      ]
+    },
+    // 📚 ACADÊMICO
+    {
+      categoria: 'Acadêmico',
+      telas: [
+        {
+          id: 'alunos',
+          titulo: '🎓 Alunos',
+          descricao: 'Cadastro completo de alunos com dados pessoais, documentação, matrícula e contratos.',
+          funcionalidades: [
+            'Cadastrar novos alunos',
+            'Gerenciar dados pessoais e responsáveis',
+            'Vincular aluno a turma',
+            'Gerar ficha de matrícula e contrato',
+            'Upload de documentos',
+            'Controlar status de matrícula'
+          ],
+          relacoes: [
+            'REQUER Turmas (criadas em Escola)',
+            'Alimenta dados para Notas & Frequência',
+            'Dados usados em Financeiro',
+            'Informações aparecem em Secretaria Digital'
+          ],
+          requisitosPrevios: ['Ter turmas criadas', 'Ter período letivo ativo'],
+          rolesComAcesso: ['coordenadora', 'professora']
+        },
+        {
+          id: 'sala-professor',
+          titulo: '👩‍🏫 Sala do Professor',
+          descricao: 'Área exclusiva do professor com ferramentas pedagógicas: planejamento, diário de classe, relatórios e biblioteca.',
+          funcionalidades: [
+            'Planejar aulas e sequências didáticas',
+            'Registrar diário de classe',
+            'Criar relatórios pedagógicos',
+            'Gerenciar cronograma acadêmico',
+            'Acessar biblioteca de materiais'
+          ],
+          relacoes: [
+            'USA Grade Horária (da Escola)',
+            'USA Turmas e Disciplinas',
+            'Conectado com Notas & Frequência',
+            'Relatórios enviados aos pais'
+          ],
+          requisitosPrevios: ['Professor vinculado a turmas e disciplinas', 'Grade horária configurada'],
+          rolesComAcesso: ['coordenadora', 'professora']
+        },
+        {
+          id: 'notas-frequencia',
+          titulo: '📝 Notas & Frequência',
+          descricao: 'Lançamento e gestão de notas e frequência dos alunos por disciplina.',
+          funcionalidades: [
+            'Lançar notas por bimestre/trimestre',
+            'Registrar frequência diária',
+            'Calcular médias automaticamente',
+            'Visualizar boletim do aluno',
+            'Gerar relatórios de desempenho'
+          ],
+          relacoes: [
+            'REQUER Alunos cadastrados',
+            'REQUER Turmas e Disciplinas',
+            'Dados aparecem em Secretaria Digital',
+            'Usado para gerar histórico escolar'
+          ],
+          requisitosPrevios: ['Alunos matriculados', 'Disciplinas e turmas criadas', 'Professor vinculado'],
+          rolesComAcesso: ['professora']
+        },
+        {
+          id: 'pendencias',
+          titulo: '⚠️ Pendências',
+          descricao: 'Sistema de controle de pendências acadêmicas e administrativas dos alunos.',
+          funcionalidades: [
+            'Criar pendências por aluno',
+            'Categorizar pendências (documentação, financeiro, pedagógico)',
+            'Definir prioridade e prazo',
+            'Acompanhar resolução',
+            'Notificar responsáveis'
+          ],
+          relacoes: [
+            'Vinculado a Alunos específicos',
+            'Pode gerar notificações',
+            'Bloqueia ações se crítico'
+          ],
+          requisitosPrevios: ['Ter alunos cadastrados'],
+          rolesComAcesso: ['coordenadora']
+        },
+        {
+          id: 'secretaria-digital',
+          titulo: '📋 Secretaria Digital',
+          descricao: 'Emissão de documentos oficiais: declarações, históricos, boletins e certificados.',
+          funcionalidades: [
+            'Gerar declarações de matrícula',
+            'Emitir histórico escolar',
+            'Imprimir boletins',
+            'Criar certificados de conclusão',
+            'Gerenciar documentação oficial'
+          ],
+          relacoes: [
+            'USA dados de Alunos',
+            'USA dados de Notas & Frequência',
+            'USA informações da Escola',
+            'Documentos baseados em Turmas'
+          ],
+          requisitosPrevios: ['Aluno com matrícula completa', 'Notas lançadas (para histórico)'],
+          rolesComAcesso: ['coordenadora', 'pai']
+        },
+        {
+          id: 'impressoes',
+          titulo: '🖨️ Impressões',
+          descricao: 'Central de geração de relatórios e documentos para impressão.',
+          funcionalidades: [
+            'Gerar listas de alunos por turma',
+            'Imprimir fichas de matrícula',
+            'Criar relatórios gerenciais',
+            'Exportar dados em PDF/Excel',
+            'Personalizar layouts de impressão'
+          ],
+          relacoes: [
+            'Acessa dados de todas as telas',
+            'Complemento da Secretaria Digital',
+            'Consolida informações para relatórios'
+          ],
+          requisitosPrevios: ['Dados cadastrados nas respectivas telas'],
+          rolesComAcesso: ['coordenadora']
+        },
+        {
+          id: 'turma-filho',
+          titulo: '👨‍👩‍👧 Turma do Filho',
+          descricao: 'Área exclusiva para pais acompanharem informações acadêmicas dos filhos.',
+          funcionalidades: [
+            'Ver informações da turma do filho',
+            'Acompanhar grade horária',
+            'Visualizar calendário de aulas',
+            'Ver avisos da turma',
+            'Acessar notas e frequência (quando compartilhado)'
+          ],
+          relacoes: [
+            'Mostra dados da Turma',
+            'Conectado com Grade Horária',
+            'Recebe Avisos direcionados',
+            'Pode ver dados de Notas (se permitido)'
+          ],
+          requisitosPrevios: ['Filho(a) matriculado', 'Pai cadastrado no sistema'],
+          rolesComAcesso: ['pai']
+        }
+      ]
+    },
+    // 💰 FINANCEIRO
+    {
+      categoria: 'Financeiro',
+      telas: [
+        {
+          id: 'financeiro',
+          titulo: '💰 Caixa (Financeiro)',
+          descricao: 'Gestão financeira completa: mensalidades, pagamentos, inadimplência e relatórios.',
+          funcionalidades: [
+            'Lançar mensalidades dos alunos',
+            'Registrar pagamentos recebidos',
+            'Controlar inadimplência',
+            'Gerar recibos',
+            'Emitir relatórios financeiros',
+            'Acompanhar fluxo de caixa'
+          ],
+          relacoes: [
+            'REQUER Alunos cadastrados',
+            'Pode gerar Pendências financeiras',
+            'Dados aparecem em relatórios',
+            'Vinculado a contratos (Alunos)'
+          ],
+          requisitosPrevios: ['Alunos matriculados com contrato'],
+          rolesComAcesso: ['coordenadora', 'pai']
+        },
+        {
+          id: 'loja',
+          titulo: '🛒 Loja',
+          descricao: 'Módulo de venda de produtos escolares (uniformes, materiais, etc).',
+          funcionalidades: [
+            'Cadastrar produtos',
+            'Gerenciar estoque',
+            'Registrar vendas',
+            'Emitir comprovantes',
+            'Controlar inadimplência de compras'
+          ],
+          relacoes: [
+            'Integrado com Financeiro',
+            'Vendas vinculadas a alunos/responsáveis',
+            'Gera movimentações no caixa'
+          ],
+          requisitosPrevios: ['Cadastro de produtos', 'Sistema financeiro configurado'],
+          rolesComAcesso: ['coordenadora', 'pai']
+        }
+      ]
+    },
+    // 📢 COMUNICAÇÃO
+    {
+      categoria: 'Comunicação',
+      telas: [
+        {
+          id: 'agenda',
+          titulo: '📅 Agenda',
+          descricao: 'Calendário escolar com eventos, reuniões, feriados e atividades.',
+          funcionalidades: [
+            'Criar eventos escolares',
+            'Agendar reuniões',
+            'Marcar feriados e recessos',
+            'Notificar participantes',
+            'Visualizar calendário mensal/anual'
+          ],
+          relacoes: [
+            'Eventos visíveis para todas as roles',
+            'Integrado com notificações',
+            'Usado por Sala Professor para cronogramas'
+          ],
+          requisitosPrevios: ['Nenhum - pode usar desde o início'],
+          rolesComAcesso: ['coordenadora', 'professora', 'pai']
+        },
+        {
+          id: 'avisos',
+          titulo: '📢 Avisos',
+          descricao: 'Sistema de comunicados e avisos direcionados por turma ou geral.',
+          funcionalidades: [
+            'Criar avisos gerais ou por turma',
+            'Enviar notificações',
+            'Anexar arquivos aos avisos',
+            'Controlar visualização',
+            'Arquivar avisos antigos'
+          ],
+          relacoes: [
+            'Pode ser direcionado a Turmas específicas',
+            'Notifica usuários por role',
+            'Pais veem avisos da turma do filho'
+          ],
+          requisitosPrevios: ['Ter turmas criadas (para avisos específicos)'],
+          rolesComAcesso: ['coordenadora', 'professora', 'pai']
+        },
+        {
+          id: 'galeria',
+          titulo: '📸 Galeria de Fotos',
+          descricao: 'Álbum de fotos dos eventos e atividades escolares.',
+          funcionalidades: [
+            'Upload de fotos de eventos',
+            'Organizar em álbuns',
+            'Compartilhar com pais',
+            'Criar descrições das fotos',
+            'Controlar privacidade'
+          ],
+          relacoes: [
+            'Conectado com Agenda (fotos de eventos)',
+            'Visível para pais da turma',
+            'Complementa comunicação escolar'
+          ],
+          requisitosPrevios: ['Nenhum - pode usar a qualquer momento'],
+          rolesComAcesso: ['coordenadora', 'professora', 'pai']
+        },
+        {
+          id: 'suporte',
+          titulo: '🎧 Suporte',
+          descricao: 'Central de atendimento com sistema de tickets, chat e base de conhecimento.',
+          funcionalidades: [
+            'Abrir tickets de suporte',
+            'Conversar via chat',
+            'Anexar arquivos (imagens/vídeos)',
+            'Acompanhar status do ticket',
+            'Acessar base de conhecimento',
+            'Equipe de suporte gerenciar atendimentos'
+          ],
+          relacoes: [
+            'Independente - não depende de outras telas',
+            'Equipe de suporte definida em Configurações',
+            'Base de conhecimento documenta todas as telas'
+          ],
+          requisitosPrevios: ['Nenhum - disponível para todos'],
+          rolesComAcesso: ['coordenadora', 'professora', 'pai']
+        }
+      ]
+    }
+  ];
 
-      <Grid container spacing={3}>
-        <Grid item xs={12} md={6}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-                <Avatar sx={{ bgcolor: '#667eea' }}>
-                  <MenuBookIcon />
-                </Avatar>
-                <Typography variant="h6">Primeiros Passos</Typography>
-              </Box>
-              <List>
-                <ListItemButton>
-                  <ListItemText 
-                    primary="Como criar minha conta"
-                    secondary="Aprenda a se cadastrar no sistema"
-                  />
-                </ListItemButton>
-                <ListItemButton>
-                  <ListItemText 
-                    primary="Navegando pelo dashboard"
-                    secondary="Conheça a tela principal"
-                  />
-                </ListItemButton>
-                <ListItemButton>
-                  <ListItemText 
-                    primary="Configurações iniciais"
-                    secondary="Configure seu perfil"
-                  />
-                </ListItemButton>
-              </List>
-            </CardContent>
-          </Card>
-        </Grid>
+  // 🔍 Estado para busca na base de conhecimento
+  const [buscaConhecimento, setBuscaConhecimento] = useState('');
 
-        <Grid item xs={12} md={6}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-                <Avatar sx={{ bgcolor: '#10B981' }}>
-                  <QuestionAnswerIcon />
-                </Avatar>
-                <Typography variant="h6">Perguntas Frequentes</Typography>
-              </Box>
-              <Accordion>
-                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                  <Typography>Como alterar minha senha?</Typography>
-                </AccordionSummary>
-                <AccordionDetails>
-                  <Typography variant="body2" color="text.secondary">
-                    Vá em Configurações {'>'} Perfil {'>'} Alterar Senha. Digite sua senha atual e a nova senha duas vezes.
-                  </Typography>
-                </AccordionDetails>
-              </Accordion>
+  // 🎯 Filtrar telas por role do usuário
+  const filtrarTelasPorRole = (telas) => {
+    return telas.filter(tela => tela.rolesComAcesso.includes(userRole));
+  };
 
-              <Accordion>
-                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                  <Typography>Como adicionar um novo aluno?</Typography>
-                </AccordionSummary>
-                <AccordionDetails>
-                  <Typography variant="body2" color="text.secondary">
-                    Acesse o menu Alunos, clique em "Novo Aluno" e preencha o formulário com os dados do aluno.
-                  </Typography>
-                </AccordionDetails>
-              </Accordion>
+  // 🔍 Filtrar telas por busca
+  const filtrarTelasPorBusca = (telas) => {
+    if (!buscaConhecimento.trim()) return telas;
+    
+    const termo = buscaConhecimento.toLowerCase();
+    return telas.filter(tela => 
+      tela.titulo.toLowerCase().includes(termo) ||
+      tela.descricao.toLowerCase().includes(termo) ||
+      tela.funcionalidades.some(f => f.toLowerCase().includes(termo))
+    );
+  };
 
-              <Accordion>
-                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                  <Typography>Como gerar relatórios?</Typography>
-                </AccordionSummary>
-                <AccordionDetails>
-                  <Typography variant="body2" color="text.secondary">
-                    Vá em Impressões, selecione o tipo de relatório desejado, escolha os filtros e clique em Gerar.
-                  </Typography>
-                </AccordionDetails>
-              </Accordion>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
-    </Box>
-  );
+  const renderBaseConhecimento = () => {
+    // Processar dados: filtrar por role e busca
+    const categoriasFiltradas = baseConhecimentoData
+      .map(categoria => ({
+        ...categoria,
+        telas: filtrarTelasPorBusca(filtrarTelasPorRole(categoria.telas))
+      }))
+      .filter(categoria => categoria.telas.length > 0);
+
+    return (
+      <Box>
+        <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Typography variant="h6">📚 Base de Conhecimento do Sistema</Typography>
+          <Chip 
+            label={`Mostrando telas para: ${userRole === 'coordenadora' ? 'Coordenador(a)' : userRole === 'professora' ? 'Professor(a)' : 'Responsável'}`}
+            color="primary"
+            size="small"
+          />
+        </Box>
+
+        {/* Campo de busca */}
+        <TextField
+          fullWidth
+          placeholder="Buscar tela ou funcionalidade..."
+          value={buscaConhecimento}
+          onChange={(e) => setBuscaConhecimento(e.target.value)}
+          sx={{ mb: 3 }}
+          InputProps={{
+            startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />
+          }}
+        />
+
+        {categoriasFiltradas.length === 0 ? (
+          <Alert severity="info">
+            Nenhuma tela encontrada com o termo "{buscaConhecimento}"
+          </Alert>
+        ) : (
+          categoriasFiltradas.map((categoria, catIndex) => (
+            <Box key={catIndex} sx={{ mb: 4 }}>
+              {/* Título da categoria */}
+              <Typography 
+                variant="h6" 
+                sx={{ 
+                  mb: 2, 
+                  color: '#667eea',
+                  fontWeight: 600,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1
+                }}
+              >
+                {categoria.categoria === 'Gestão Escolar' && '🏫'}
+                {categoria.categoria === 'Acadêmico' && '📚'}
+                {categoria.categoria === 'Financeiro' && '💰'}
+                {categoria.categoria === 'Comunicação' && '📢'}
+                {categoria.categoria}
+              </Typography>
+
+              <Grid container spacing={2}>
+                {categoria.telas.map((tela, telaIndex) => (
+                  <Grid item xs={12} md={6} lg={4} key={telaIndex}>
+                    <Card 
+                      sx={{ 
+                        height: '100%',
+                        transition: 'all 0.3s ease',
+                        '&:hover': {
+                          transform: 'translateY(-4px)',
+                          boxShadow: '0 8px 24px rgba(0,0,0,0.15)'
+                        }
+                      }}
+                    >
+                      <CardContent>
+                        <Typography variant="h6" sx={{ mb: 1, fontSize: '1rem', fontWeight: 600 }}>
+                          {tela.titulo}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                          {tela.descricao}
+                        </Typography>
+
+                        {/* Accordion com detalhes */}
+                        <Accordion>
+                          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                              ✨ Funcionalidades
+                            </Typography>
+                          </AccordionSummary>
+                          <AccordionDetails>
+                            <List dense>
+                              {tela.funcionalidades.map((func, i) => (
+                                <ListItem key={i} sx={{ py: 0.5 }}>
+                                  <ListItemText 
+                                    primary={`• ${func}`}
+                                    primaryTypographyProps={{ variant: 'body2' }}
+                                  />
+                                </ListItem>
+                              ))}
+                            </List>
+                          </AccordionDetails>
+                        </Accordion>
+
+                        <Accordion>
+                          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                              🔗 Relações com outras telas
+                            </Typography>
+                          </AccordionSummary>
+                          <AccordionDetails>
+                            <List dense>
+                              {tela.relacoes.map((rel, i) => (
+                                <ListItem key={i} sx={{ py: 0.5 }}>
+                                  <ListItemText 
+                                    primary={`• ${rel}`}
+                                    primaryTypographyProps={{ variant: 'body2', color: 'primary' }}
+                                  />
+                                </ListItem>
+                              ))}
+                            </List>
+                          </AccordionDetails>
+                        </Accordion>
+
+                        <Accordion>
+                          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                              ⚡ Requisitos prévios
+                            </Typography>
+                          </AccordionSummary>
+                          <AccordionDetails>
+                            <List dense>
+                              {tela.requisitosPrevios.map((req, i) => (
+                                <ListItem key={i} sx={{ py: 0.5 }}>
+                                  <ListItemText 
+                                    primary={`• ${req}`}
+                                    primaryTypographyProps={{ variant: 'body2', color: 'warning.main' }}
+                                  />
+                                </ListItem>
+                              ))}
+                            </List>
+                          </AccordionDetails>
+                        </Accordion>
+
+                        {/* Badge de acesso */}
+                        <Box sx={{ mt: 2, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                          {tela.rolesComAcesso.map((role, i) => (
+                            <Chip
+                              key={i}
+                              label={role === 'coordenadora' ? 'Coord.' : role === 'professora' ? 'Prof.' : 'Resp.'}
+                              size="small"
+                              color={role === userRole ? 'primary' : 'default'}
+                              variant={role === userRole ? 'filled' : 'outlined'}
+                            />
+                          ))}
+                        </Box>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                ))}
+              </Grid>
+            </Box>
+          ))
+        )}
+      </Box>
+    );
+  };
 
   if (!user) {
     return (
@@ -611,14 +1060,6 @@ const SuportePage = () => {
       <Box sx={{ flexGrow: 1, p: 3 }}>
         {/* Cabeçalho */}
         <Box sx={{ mb: 4 }}>
-          <Button
-            startIcon={<ArrowBackIcon />}
-            onClick={() => router.push('/dashboard')}
-            sx={{ mb: 2 }}
-          >
-            Voltar ao Dashboard
-          </Button>
-          
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             <Avatar sx={{ bgcolor: '#10B981', width: 56, height: 56 }}>
               <SupportIcon fontSize="large" />

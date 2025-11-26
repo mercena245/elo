@@ -61,12 +61,24 @@ import {
 import SidebarMenu from '../../components/SidebarMenu';
 import { useAuthUser } from '../../hooks/useAuthUser';
 import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
+import { useManagementDatabase } from '../../hooks/useManagementDatabase';
 import { isSuperAdmin } from '../../config/constants';
 
 const SuportePage = () => {
   const router = useRouter();
   const { user, userRole } = useAuthUser();
+  
+  // Hook para tickets (banco da escola)
   const { getData, setData, pushData, updateData, isReady, storage } = useSchoolDatabase();
+  
+  // Hook para base de conhecimento GLOBAL (banco de gerenciamento)
+  const managementDB = useManagementDatabase();
+  const { 
+    getData: getDataGlobal, 
+    setData: setDataGlobal, 
+    isReady: managementReady,
+    storage: managementStorage 
+  } = managementDB;
 
   const [loading, setLoading] = useState(true);
   const [tabValue, setTabValue] = useState(0);
@@ -1118,14 +1130,36 @@ const SuportePage = () => {
     });
   };
 
-  // 🎬 Abrir modal de funcionalidade
-  const handleAbrirFuncionalidade = (tela, funcionalidade, funcIndex) => {
+  // 🎬 Abrir modal de funcionalidade e carregar mídia do banco GLOBAL
+  const handleAbrirFuncionalidade = async (tela, funcionalidade, funcIndex) => {
     setTelaSelecionada(tela);
-    setFuncionalidadeSelecionada({ ...funcionalidade, index: funcIndex });
+    
+    // Carregar mídia do banco de gerenciamento (global)
+    try {
+      const funcRef = `base-conhecimento-midias/${tela.id}/funcionalidades/${funcIndex}`;
+      const midiaData = await getDataGlobal(funcRef);
+      
+      if (midiaData && midiaData.midiaUrl) {
+        // Funcionalidade com mídia do banco global
+        setFuncionalidadeSelecionada({ 
+          ...funcionalidade, 
+          index: funcIndex,
+          midiaUrl: midiaData.midiaUrl,
+          midiaTipo: midiaData.midiaTipo
+        });
+      } else {
+        // Funcionalidade sem mídia
+        setFuncionalidadeSelecionada({ ...funcionalidade, index: funcIndex });
+      }
+    } catch (error) {
+      console.error('Erro ao carregar mídia:', error);
+      setFuncionalidadeSelecionada({ ...funcionalidade, index: funcIndex });
+    }
+    
     setFuncionalidadeModalOpen(true);
   };
 
-  // 📤 Upload de mídia para funcionalidade
+  // 📤 Upload de mídia para funcionalidade (GLOBAL - banco de gerenciamento)
   const handleUploadMidia = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
@@ -1147,20 +1181,21 @@ const SuportePage = () => {
     try {
       setUploadingMidia(true);
 
-      // Upload para Firebase Storage
+      // Upload para Firebase Storage do GERENCIAMENTO (global)
       const midiaTipo = file.type.startsWith('video/') ? 'video' : 'gif';
       const fileName = `${Date.now()}_${file.name}`;
       const filePath = `base-conhecimento/${telaSelecionada.id}/${funcionalidadeSelecionada.index}/${fileName}`;
       
-      const url = await storage.uploadFile(file, filePath);
+      const url = await managementStorage.uploadFile(file, filePath);
 
-      // Salvar URL no banco de dados
+      // Salvar URL no banco de dados de GERENCIAMENTO (global)
       const funcIndex = funcionalidadeSelecionada.index;
       const funcRef = `base-conhecimento-midias/${telaSelecionada.id}/funcionalidades/${funcIndex}`;
-      await setData(funcRef, {
+      await setDataGlobal(funcRef, {
         midiaUrl: url,
         midiaTipo: midiaTipo,
-        atualizadoEm: new Date().toISOString()
+        atualizadoEm: new Date().toISOString(),
+        atualizadoPor: user.email
       });
 
       // Atualizar estado local
@@ -1170,7 +1205,7 @@ const SuportePage = () => {
         midiaTipo: midiaTipo
       }));
 
-      alert('Mídia enviada com sucesso!');
+      alert('Mídia enviada com sucesso! Todas as escolas verão esta atualização.');
     } catch (error) {
       console.error('Erro ao fazer upload:', error);
       alert('Erro ao enviar mídia. Tente novamente.');
@@ -1180,9 +1215,9 @@ const SuportePage = () => {
     }
   };
 
-  // 🗑️ Remover mídia da funcionalidade
+  // 🗑️ Remover mídia da funcionalidade (GLOBAL)
   const handleRemoverMidia = async () => {
-    if (!confirm('Deseja realmente remover esta mídia?')) return;
+    if (!confirm('Deseja realmente remover esta mídia? Esta ação afetará TODAS as escolas.')) return;
 
     try {
       setUploadingMidia(true);
@@ -1190,10 +1225,11 @@ const SuportePage = () => {
       const funcIndex = funcionalidadeSelecionada.index;
       const funcRef = `base-conhecimento-midias/${telaSelecionada.id}/funcionalidades/${funcIndex}`;
       
-      await setData(funcRef, {
+      await setDataGlobal(funcRef, {
         midiaUrl: null,
         midiaTipo: null,
-        atualizadoEm: new Date().toISOString()
+        atualizadoEm: new Date().toISOString(),
+        removidoPor: user.email
       });
 
       setFuncionalidadeSelecionada(prev => ({
@@ -1202,7 +1238,7 @@ const SuportePage = () => {
         midiaTipo: null
       }));
 
-      alert('Mídia removida com sucesso!');
+      alert('Mídia removida com sucesso em todas as escolas!');
     } catch (error) {
       console.error('Erro ao remover:', error);
       alert('Erro ao remover mídia.');
@@ -1211,24 +1247,24 @@ const SuportePage = () => {
     }
   };
 
-  // 📥 Carregar mídias das funcionalidades
+  // 📥 Carregar mídias das funcionalidades do banco GLOBAL (gerenciamento)
   useEffect(() => {
-    const carregarMidias = async () => {
-      if (!isReady) return;
+    const carregarMidiasGlobal = async () => {
+      if (!managementReady) return;
 
       try {
-        const midiasData = await getData('base-conhecimento-midias');
+        const midiasData = await getDataGlobal('base-conhecimento-midias');
         if (midiasData) {
-          // Aqui você pode atualizar o baseConhecimentoData com as URLs salvas
-          // Por simplicidade, vamos carregar sob demanda quando abrir o modal
+          console.log('✅ Mídias globais carregadas:', midiasData);
+          // Mídias são carregadas sob demanda quando modal é aberto
         }
       } catch (error) {
-        console.error('Erro ao carregar mídias:', error);
+        console.error('❌ Erro ao carregar mídias globais:', error);
       }
     };
 
-    carregarMidias();
-  }, [isReady]);
+    carregarMidiasGlobal();
+  }, [managementReady]);
 
   const renderBaseConhecimento = () => {
     // Processar dados: filtrar por role e busca

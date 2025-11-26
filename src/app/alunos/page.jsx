@@ -2610,61 +2610,135 @@ const Alunos = () => {
       <SidebarMenu />
       <main className="dashboard-main">
         <Box sx={{ width: '100%', px: 3, py: 2 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, p: 3, borderRadius: 3, background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)', color: 'white', boxShadow: '0 8px 32px rgba(99, 102, 241, 0.2)' }}>
-            <Typography variant="h4" fontWeight="bold" gutterBottom={false}>👥 Gestão de Alunos</Typography>
-            <Box sx={{ display: 'flex', gap: 1 }}>
-              <Button 
-                variant="outlined" 
-                size="small"
-                onClick={async () => {
-                  setVerificandoPagamentos(true);
-                  const alunosPreMatricula = alunos.filter(a => a.status === 'pre_matricula');
-                  let ativados = 0;
-                  for (const aluno of alunosPreMatricula) {
-                    const ativado = await ativarAutomaticamenteSeAprovado(aluno);
-                    if (ativado) ativados++;
-                  }
-                  if (ativados > 0) {
-                    await fetchData();
-                  }
-                  setVerificandoPagamentos(false);
-                }}
-                disabled={verificandoPagamentos}
-                sx={{ 
-                  bgcolor: 'rgba(255,255,255,0.1)', 
-                  color: 'white',
-                  borderColor: 'rgba(255,255,255,0.3)',
+          {/* Header Centralizado */}
+          <Box sx={{ 
+            mb: 3, 
+            p: { xs: 2, sm: 2.5, md: 3 }, 
+            borderRadius: 3, 
+            background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)', 
+            color: 'white', 
+            boxShadow: '0 8px 32px rgba(99, 102, 241, 0.2)',
+            position: 'relative',
+            overflow: 'hidden'
+          }}>
+            {/* Padrão decorativo */}
+            <Box sx={{
+              position: 'absolute',
+              top: -30,
+              right: -30,
+              width: '250px',
+              height: '250px',
+              background: 'radial-gradient(circle, rgba(255,255,255,0.12) 0%, transparent 70%)',
+              pointerEvents: 'none',
+              display: { xs: 'none', md: 'block' }
+            }} />
+            
+            <Box sx={{ 
+              position: 'relative', 
+              zIndex: 1,
+              display: 'flex',
+              flexDirection: { xs: 'column', md: 'row' },
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 2
+            }}>
+              {/* Título Centralizado */}
+              <Box sx={{ 
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                textAlign: 'center',
+                flex: 1,
+                gap: 1
+              }}>
+                <Box sx={{ 
+                  width: { xs: 50, sm: 60, md: 70 }, 
+                  height: { xs: 50, sm: 60, md: 70 },
+                  bgcolor: 'rgba(255,255,255,0.25)',
                   backdropFilter: 'blur(10px)',
-                  border: '1px solid rgba(255,255,255,0.2)',
-                  borderRadius: 2,
-                  fontSize: '0.75rem',
-                  '&:hover': { 
-                    bgcolor: 'rgba(255,255,255,0.2)',
-                    borderColor: 'rgba(255,255,255,0.4)'
-                  }
-                }} 
-              >
-                {verificandoPagamentos ? '🔄 Verificando...' : '🔍 Verificar Pagamentos'}
-              </Button>
-              <Button 
-                variant="contained" 
-                sx={{ 
-                  bgcolor: 'rgba(255,255,255,0.15)', 
-                  color: 'white',
-                  backdropFilter: 'blur(10px)',
-                  border: '1px solid rgba(255,255,255,0.2)',
-                  borderRadius: 2,
-                  '&:hover': { 
-                    bgcolor: 'rgba(255,255,255,0.25)',
-                    transform: 'translateY(-2px)',
-                    boxShadow: '0 8px 25px rgba(0,0,0,0.15)'
-                  },
-                  transition: 'all 0.3s ease'
-                }} 
-                onClick={handleAddAluno}
-              >
-                + Nova Matrícula
-              </Button>
+                  border: '3px solid rgba(255,255,255,0.3)',
+                  boxShadow: '0 6px 24px rgba(0,0,0,0.2)',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: { xs: '1.5rem', sm: '2rem', md: '2.5rem' }
+                }}>
+                  👥
+                </Box>
+                <Typography 
+                  variant="h4" 
+                  fontWeight={700}
+                  sx={{
+                    fontSize: { xs: '1.5rem', sm: '1.75rem', md: '2rem' },
+                    textShadow: '0 2px 10px rgba(0,0,0,0.3)',
+                    letterSpacing: '-0.01em'
+                  }}
+                >
+                  Gestão de Alunos
+                </Typography>
+              </Box>
+              
+              {/* Botões */}
+              <Box sx={{ 
+                display: 'flex', 
+                gap: 1,
+                flexWrap: 'wrap',
+                justifyContent: 'center'
+              }}>
+                <Button 
+                  variant="outlined" 
+                  size="small"
+                  onClick={async () => {
+                    setVerificandoPagamentos(true);
+                    const alunosPreMatricula = alunos.filter(a => a.status === 'pre_matricula');
+                    let ativados = 0;
+                    for (const aluno of alunosPreMatricula) {
+                      const ativado = await ativarAutomaticamenteSeAprovado(aluno);
+                      if (ativado) ativados++;
+                    }
+                    if (ativados > 0) {
+                      await fetchData();
+                    }
+                    setVerificandoPagamentos(false);
+                  }}
+                  disabled={verificandoPagamentos}
+                  sx={{ 
+                    bgcolor: 'rgba(255,255,255,0.1)', 
+                    color: 'white',
+                    borderColor: 'rgba(255,255,255,0.3)',
+                    backdropFilter: 'blur(10px)',
+                    border: '1px solid rgba(255,255,255,0.2)',
+                    borderRadius: 2,
+                    fontSize: '0.75rem',
+                    '&:hover': { 
+                      bgcolor: 'rgba(255,255,255,0.2)',
+                      borderColor: 'rgba(255,255,255,0.4)'
+                    }
+                  }} 
+                >
+                  {verificandoPagamentos ? '🔄 Verificando...' : '🔍 Verificar Pagamentos'}
+                </Button>
+                <Button 
+                  variant="contained" 
+                  sx={{ 
+                    bgcolor: 'rgba(255,255,255,0.15)', 
+                    color: 'white',
+                    backdropFilter: 'blur(10px)',
+                    border: '1px solid rgba(255,255,255,0.2)',
+                    borderRadius: 2,
+                    '&:hover': { 
+                      bgcolor: 'rgba(255,255,255,0.25)',
+                      transform: 'translateY(-2px)',
+                      boxShadow: '0 8px 25px rgba(0,0,0,0.15)'
+                    },
+                    transition: 'all 0.3s ease'
+                  }} 
+                  onClick={handleAddAluno}
+                >
+                  + Novo Aluno
+                </Button>
+              </Box>
             </Box>
           </Box>
           

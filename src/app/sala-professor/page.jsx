@@ -12,7 +12,8 @@ import {
   Chip,
   Paper,
   Tabs,
-  Tab
+  Tab,
+  Avatar
 } from '@mui/material';
 import { useAuth } from '../../context/AuthContext';
 import { PlanejamentoAulas, RelatoriosPedagogicos, CronogramaAcademico, BibliotecaMateriais } from './components';

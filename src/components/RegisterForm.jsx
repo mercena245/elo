@@ -1,6 +1,6 @@
 "use client";
 import React, { useState } from 'react';
-import { auth, db, ref, get, set } from '../firebase';
+import { auth, managementDB, ref, set } from '../firebase';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { 
   Button, 
@@ -41,20 +41,34 @@ const RegisterForm = ({ onRegisterStart }) => {
     if (onRegisterStart) onRegisterStart();
     
     try {
+      console.log('🔐 [Register] Iniciando criação de usuário...');
+      console.log('📧 [Register] Email:', email);
+      console.log('👤 [Register] Nome:', nome);
+      
+      // Criar usuário no Firebase Auth
       const userCredential = await createUserWithEmailAndPassword(auth, email, senha);
       const user = userCredential.user;
       
+      console.log('✅ [Register] Usuário criado no Firebase Auth:', user.uid);
+      
       // Atualizar o perfil com o nome
       await updateProfile(user, { displayName: nome });
+      console.log('✅ [Register] Nome atualizado no perfil');
       
-      // Criar entrada no banco de dados sem role (aguardando aprovação)
-      const userRef = ref(db, `usuarios/${user.uid}`);
+      // Criar entrada no banco de GERENCIAMENTO (não no banco principal)
+      // Usuário aguarda aprovação para ser vinculado a uma escola
+      const userRef = ref(managementDB, `usuarios/${user.uid}`);
       await set(userRef, {
         email: user.email,
         nome: nome,
         role: null, // Sem role = aguardando aprovação
-        createdAt: new Date().toISOString()
+        escolas: {}, // Objeto vazio - será preenchido quando for aprovado
+        createdAt: new Date().toISOString(),
+        status: 'pending_approval' // Status explícito de aguardando aprovação
       });
+      
+      console.log('✅ [Register] Dados salvos no managementDB');
+      console.log('📊 [Register] Path:', `usuarios/${user.uid}`);
       
       setSuccess(true);
       
@@ -65,7 +79,9 @@ const RegisterForm = ({ onRegisterStart }) => {
       
     } catch (error) {
       setLoading(false);
-      console.error("Erro ao criar conta:", error);
+      console.error("❌ [Register] Erro ao criar conta:", error);
+      console.error("❌ [Register] Código do erro:", error.code);
+      console.error("❌ [Register] Mensagem:", error.message);
       
       // Traduzir erros do Firebase para português
       switch (error.code) {
@@ -78,8 +94,14 @@ const RegisterForm = ({ onRegisterStart }) => {
         case 'auth/invalid-email':
           setError('E-mail inválido. Verifique o formato.');
           break;
+        case 'auth/network-request-failed':
+          setError('Erro de conexão. Verifique sua internet.');
+          break;
+        case 'auth/too-many-requests':
+          setError('Muitas tentativas. Tente novamente mais tarde.');
+          break;
         default:
-          setError('Erro ao criar conta. Tente novamente.');
+          setError(`Erro ao criar conta: ${error.message}`);
       }
     }
   };

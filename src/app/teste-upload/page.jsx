@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { Container, Typography, Box, Paper } from '@mui/material';
-import FileUploadZone from '../../../components/FileUploadZone';
+import FileUploadZone from '../../components/FileUploadZone';
 
 /**
  * Página de demonstração do componente FileUploadZone

@@ -5437,6 +5437,7 @@ const FinanceiroPage = () => {
           onClose={() => setRelatorioPersonalizadoAberto(false)}
           titulos={titulos}
           alunos={alunos}
+          turmas={turmas}
         />
       </Box>
     </ProtectedRoute>

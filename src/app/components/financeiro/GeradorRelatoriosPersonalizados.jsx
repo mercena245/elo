@@ -19,7 +19,8 @@ const GeradorRelatoriosPersonalizados = ({
   open,
   onClose,
   titulos = [],
-  alunos = []
+  alunos = [],
+  turmas = {}
 }) => {
   const [tabAtiva, setTabAtiva] = useState(0);
   
@@ -105,17 +106,26 @@ const GeradorRelatoriosPersonalizados = ({
     const campos = config.camposSelecionados;
 
     if (!aluno) {
+      console.warn('⚠️ Aluno não encontrado para título');
       aluno = { nome: 'N/A', matricula: 'N/A', turma: 'N/A' };
     }
 
+    console.log('📊 Gerando linha para aluno:', aluno.nome, 'Dados completos:', aluno);
+
     if (campos.nomeAluno) linha['Nome do Aluno'] = aluno.nome || 'N/A';
     if (campos.matricula) linha['Matrícula'] = aluno.matricula || 'N/A';
-    if (campos.turma) linha['Turma'] = aluno.turma || 'N/A';
+    if (campos.turma) {
+      const turmaId = aluno.turmaId || aluno.turma;
+      linha['Turma'] = turmas[turmaId]?.nome || aluno.turma || turmaId || 'N/A';
+    }
     if (campos.statusAluno) linha['Status do Aluno'] = aluno.status || 'ativo';
-    if (campos.nomeResponsavel) linha['Nome do Responsável'] = aluno.responsavelNome || 'N/A';
-    if (campos.cpfResponsavel) linha['CPF do Responsável'] = aluno.responsavelCpf || 'N/A';
-    if (campos.telefone) linha['Telefone'] = aluno.telefone || aluno.responsavelTelefone || 'N/A';
-    if (campos.email) linha['Email'] = aluno.email || aluno.responsavelEmail || 'N/A';
+    
+    // Acesso correto aos dados do responsável
+    const responsavel = aluno.responsavel || aluno.responsavelFinanceiro || {};
+    if (campos.nomeResponsavel) linha['Nome do Responsável'] = responsavel.nome || aluno.responsavelNome || 'N/A';
+    if (campos.cpfResponsavel) linha['CPF do Responsável'] = responsavel.cpf || aluno.responsavelCpf || 'N/A';
+    if (campos.telefone) linha['Telefone'] = responsavel.telefone || aluno.telefone || aluno.contatoEmergencia?.telefone || 'N/A';
+    if (campos.email) linha['Email'] = responsavel.email || aluno.email || 'N/A';
     if (campos.enderecoCompleto && aluno.endereco) {
       linha['Endereço Completo'] = `${aluno.endereco.rua || ''}, ${aluno.endereco.numero || ''} - ${aluno.endereco.bairro || ''}, ${aluno.endereco.cidade || ''}`;
     }
@@ -152,6 +162,14 @@ const GeradorRelatoriosPersonalizados = ({
   };
 
   const dadosRelatorio = useMemo(() => {
+    console.log('🔍 [GeradorRelatorios] Gerando relatório:', {
+      totalTitulos: titulos.length,
+      totalAlunos: alunos.length,
+      tipoRelatorio: config.tipo,
+      filtros: config.filtros,
+      periodo: config.periodo
+    });
+
     const hoje = new Date();
     let dadosFiltrados = [];
     let titulosFiltrados = [...titulos];
@@ -236,6 +254,12 @@ const GeradorRelatoriosPersonalizados = ({
       const valorA = a[config.ordenacao.campo] || '';
       const valorB = b[config.ordenacao.campo] || '';
       return config.ordenacao.direcao === 'asc' ? (valorA > valorB ? 1 : -1) : (valorA < valorB ? 1 : -1);
+    });
+
+    console.log('✅ [GeradorRelatorios] Relatório gerado:', {
+      registrosGerados: dadosFiltrados.length,
+      primeiroRegistro: dadosFiltrados[0],
+      camposSelecionados: Object.keys(config.camposSelecionados).filter(k => config.camposSelecionados[k])
     });
 
     return dadosFiltrados;

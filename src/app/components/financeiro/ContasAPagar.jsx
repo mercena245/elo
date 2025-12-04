@@ -110,12 +110,14 @@ const ContasAPagar = ({
     descricao: '',
     categoria: '',
     fornecedor: '',
+    numeroNotaFiscal: '', // ✨ NOVO
     valor: '',
     vencimento: '',
     observacoes: '',
     recorrente: false,
     tipoRecorrencia: 'mensal',
-    anexos: []
+    quantidadeParcelas: 12, // ✨ NOVO: controle de parcelas
+    anexos: [] // ✨ NOVO: upload de documentos
   });
 
   // Estados de pagamento
@@ -125,6 +127,15 @@ const ContasAPagar = ({
     observacoes: '',
     comprovante: null
   });
+
+  // ✨ NOVOS ESTADOS
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
+  const [errosValidacao, setErrosValidacao] = useState({});
+  const [uploadandoAnexo, setUploadandoAnexo] = useState(false);
+  const [filtroRapido, setFiltroRapido] = useState('todos'); // todos, hoje, semana, mes
+  const [buscaDebounce, setBuscaDebounce] = useState('');
+  const [modalEstorno, setModalEstorno] = useState({ aberto: false, conta: null });
+  const [motivoEstorno, setMotivoEstorno] = useState('');
 
   // Categorias disponíveis
   const categorias = [

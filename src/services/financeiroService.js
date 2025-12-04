@@ -1001,56 +1001,148 @@ const financeiroService = {
     }
   },
 
+  // ✨ NOVO: Estornar pagamento de conta
+  async estornarPagamento(contaPagaId, motivo, userId) {
+    try {
+      // Buscar conta paga
+      const contaPagaRef = ref(db, `contas_pagas/${contaPagaId}`);
+      const snapshot = await get(contaPagaRef);
+      
+      if (!snapshot.exists()) {
+        return { success: false, error: 'Conta paga não encontrada' };
+      }
+
+      const contaPaga = snapshot.val();
+      
+      // Restaurar conta para pendente
+      const contaRestaurada = {
+        ...contaPaga,
+        status: 'pendente',
+        estornada: true,
+        motivoEstorno: motivo,
+        dataEstorno: new Date().toISOString(),
+        estornadoPor: userId,
+        // Manter histórico do pagamento original
+        pagamentoOriginal: {
+          dataPagamento: contaPaga.dataPagamento,
+          formaPagamento: contaPaga.formaPagamento,
+          pagoPor: contaPaga.pagoPor,
+          pagoEm: contaPaga.pagoEm
+        }
+      };
+
+      // Adicionar de volta em contas a pagar
+      const contasPagarRef = ref(db, 'contas_pagar');
+      await push(contasPagarRef, contaRestaurada);
+
+      // Remover de contas pagas
+      await remove(contaPagaRef);
+
+      // Atualizar saldo (devolver o valor)
+      const saldoResult = await this.obterSaldoEscola();
+      if (saldoResult.success) {
+        const novoSaldo = saldoResult.saldo + contaPaga.valor;
+        const escolaRef = ref(db, 'configuracoes/escola/saldoDisponivel');
+        await set(escolaRef, novoSaldo);
+      }
+
+      // Registrar no histórico
+      const historicoRef = ref(db, 'historico_estornos');
+      await push(historicoRef, {
+        tipo: 'estorno_conta',
+        contaId: contaPagaId,
+        valor: contaPaga.valor,
+        motivo,
+        estornadoPor: userId,
+        dataHora: new Date().toISOString()
+      });
+
+      return { success: true };
+    } catch (error) {
+      console.error('Erro ao estornar pagamento:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
   async obterSaldoEscola() {
     try {
+      // 💰 NOVO: Cálculo de saldo ACUMULADO (carry-over entre meses)
+      
+      // 1. Buscar saldo inicial configurado
+      const saldoInicialRef = ref(db, 'configuracoes/escola/saldoInicial');
+      const saldoInicialSnap = await get(saldoInicialRef);
+      const saldoInicial = saldoInicialSnap.exists() ? parseFloat(saldoInicialSnap.val()) || 0 : 0;
+      
+      // 2. Calcular TODA receita desde o início (títulos pagos)
+      const titulosRef = ref(db, 'titulos_financeiros');
+      const titulosSnapshot = await get(titulosRef);
+      
+      let receitaTotal = 0;
+      let receitaMensal = 0;
       const mesAtual = new Date().getMonth() + 1;
       const anoAtual = new Date().getFullYear();
       
-      // Calcular receita mensal atual (títulos pagos do mês)
-      const titulosRef = ref(db, 'titulos_financeiros');
-      const snapshot = await get(titulosRef);
-      
-      let receitaMensal = 0;
-      
-      if (snapshot.exists()) {
-        Object.values(snapshot.val()).forEach(titulo => {
+      if (titulosSnapshot.exists()) {
+        Object.values(titulosSnapshot.val()).forEach(titulo => {
           if (titulo.status === 'pago' && titulo.dataPagamento) {
+            const valor = parseFloat(titulo.valor) || 0;
+            receitaTotal += valor;
+            
+            // Calcular receita do mês atual também
             const dataPagamento = new Date(titulo.dataPagamento);
             if (dataPagamento.getMonth() + 1 === mesAtual && 
                 dataPagamento.getFullYear() === anoAtual) {
-              receitaMensal += parseFloat(titulo.valor) || 0;
+              receitaMensal += valor;
             }
           }
         });
       }
       
-      // Calcular gastos mensais (contas pagas do mês)
+      // 3. Calcular TODAS as despesas desde o início (contas pagas)
       const contasPagasRef = ref(db, 'contas_pagas');
       const contasPagasSnapshot = await get(contasPagasRef);
       
+      let despesaTotal = 0;
       let gastosMensais = 0;
+      
       if (contasPagasSnapshot.exists()) {
         Object.values(contasPagasSnapshot.val()).forEach(conta => {
           if (conta.dataPagamento) {
+            const valor = parseFloat(conta.valor) || 0;
+            despesaTotal += valor;
+            
+            // Calcular gastos do mês atual também
             const dataPagamento = new Date(conta.dataPagamento);
             if (dataPagamento.getMonth() + 1 === mesAtual && 
                 dataPagamento.getFullYear() === anoAtual) {
-              gastosMensais += parseFloat(conta.valor) || 0;
+              gastosMensais += valor;
             }
           }
         });
       }
       
-      // Saldo = Receita Mensal - Gastos Mensais
-      const saldoCalculado = receitaMensal - gastosMensais;
+      // 4. SALDO ACUMULADO = Saldo Inicial + Receita Total - Despesa Total
+      const saldoAcumulado = saldoInicial + receitaTotal - despesaTotal;
       
-      // Atualizar saldo calculado no Firebase para cache
+      // 5. Atualizar saldo no Firebase para cache
       const escolaRef = ref(db, 'configuracoes/escola/saldoDisponivel');
-      await set(escolaRef, saldoCalculado);
+      await set(escolaRef, saldoAcumulado);
+      
+      console.log('💰 Saldo calculado:', {
+        saldoInicial,
+        receitaTotal,
+        despesaTotal,
+        saldoAcumulado,
+        receitaMensal,
+        gastosMensais
+      });
       
       return { 
         success: true, 
-        saldo: saldoCalculado,
+        saldo: saldoAcumulado,
+        saldoInicial,
+        receitaTotal,
+        despesaTotal,
         receitaMensal,
         gastosMensais
       };
@@ -1060,13 +1152,38 @@ const financeiroService = {
     }
   },
 
-  async criarContasRecorrentes(contaData, userId) {
+  // Configurar saldo inicial da escola (usar apenas uma vez ou ao fechar mês)
+  async configurarSaldoInicial(valor, userId) {
+    try {
+      const saldoInicialRef = ref(db, 'configuracoes/escola/saldoInicial');
+      await set(saldoInicialRef, parseFloat(valor) || 0);
+      
+      // Registrar no histórico
+      const historicoRef = ref(db, 'historico_saldo');
+      await push(historicoRef, {
+        tipo: 'saldo_inicial',
+        valor: parseFloat(valor) || 0,
+        configuradoPor: userId,
+        dataHora: new Date().toISOString()
+      });
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Erro ao configurar saldo inicial:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  async criarContasRecorrentes(contaData, userId, quantidadeParcelas = 12) {
     try {
       const { tipoRecorrencia, vencimento } = contaData;
       const dataBase = new Date(vencimento);
       const contasRecorrentes = [];
 
-      for (let i = 1; i <= 12; i++) { // Criar 12 ocorrências futuras
+      // ✨ NOVO: Permite escolher quantas parcelas criar (1-36)
+      const parcelas = Math.min(Math.max(quantidadeParcelas, 1), 36); // Limita entre 1 e 36
+
+      for (let i = 1; i <= parcelas; i++) {
         let proximaData = new Date(dataBase);
         
         switch (tipoRecorrencia) {
@@ -1078,6 +1195,10 @@ const financeiroService = {
             break;
           case 'anual':
             proximaData.setFullYear(proximaData.getFullYear() + i);
+            break;
+          default:
+            proximaData.setMonth(proximaData.getMonth() + i);
+        }
             break;
         }
 

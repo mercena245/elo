@@ -1217,8 +1217,6 @@ const financeiroService = {
           default:
             proximaData.setMonth(proximaData.getMonth() + i);
         }
-            break;
-        }
 
         const contaRecorrente = {
           ...contaData,

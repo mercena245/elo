@@ -538,11 +538,15 @@ const GeradorRelatoriosPersonalizados = ({
               <Card>
                 <CardContent>
                   <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 2 }}>Filtros Adicionais</Typography>
-                  <Grid container spacing={2}>
-                    <Grid item xs={12} md={6}>
-                      <FormControl fullWidth size="small">
+                  <Grid container spacing={{ xs: 2, md: 3 }} sx={{ width: '100%' }}>
+                    <Grid item xs={12} sx={{ minWidth: '300px' }}>
+                      <FormControl fullWidth sx={{ minWidth: '250px' }}>
                         <InputLabel>Status</InputLabel>
-                        <Select value={config.filtros.status} onChange={(e) => setConfig({ ...config, filtros: { ...config.filtros, status: e.target.value } })}>
+                        <Select 
+                          value={config.filtros.status} 
+                          label="Status"
+                          onChange={(e) => setConfig({ ...config, filtros: { ...config.filtros, status: e.target.value } })}
+                        >
                           <MenuItem value="">Todos</MenuItem>
                           <MenuItem value="pago">✅ Pago</MenuItem>
                           <MenuItem value="pendente">⏳ Pendente</MenuItem>
@@ -550,10 +554,14 @@ const GeradorRelatoriosPersonalizados = ({
                         </Select>
                       </FormControl>
                     </Grid>
-                    <Grid item xs={12} md={6}>
-                      <FormControl fullWidth size="small">
+                    <Grid item xs={12} sx={{ minWidth: '300px' }}>
+                      <FormControl fullWidth sx={{ minWidth: '250px' }}>
                         <InputLabel>Tipo</InputLabel>
-                        <Select value={config.filtros.tipoTitulo} onChange={(e) => setConfig({ ...config, filtros: { ...config.filtros, tipoTitulo: e.target.value } })}>
+                        <Select 
+                          value={config.filtros.tipoTitulo} 
+                          label="Tipo"
+                          onChange={(e) => setConfig({ ...config, filtros: { ...config.filtros, tipoTitulo: e.target.value } })}
+                        >
                           <MenuItem value="">Todos</MenuItem>
                           <MenuItem value="Mensalidade">Mensalidade</MenuItem>
                           <MenuItem value="Matrícula">Matrícula</MenuItem>

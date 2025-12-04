@@ -681,7 +681,8 @@ export default function Configuracoes() {
   // Função para validar senha DEV e UID
   const handleDevPasswordSubmit = () => {
     if (devPassword === '984984') {
-      if (userId === 'qD6UucWtcgPC9GHA41OB8rSaghZ2') {
+      // Verificar se o usuário é Super Admin usando a função centralizada
+      if (checkIsSuperAdmin(userId)) {
         setDevAccess(true);
         setDevModalOpen(false);
         setDevPassword('');

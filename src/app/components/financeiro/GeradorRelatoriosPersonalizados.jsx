@@ -120,14 +120,20 @@ const GeradorRelatoriosPersonalizados = ({
     }
     if (campos.statusAluno) linha['Status do Aluno'] = aluno.status || 'ativo';
     
-    // Acesso correto aos dados do responsável
-    const responsavel = aluno.responsavel || aluno.responsavelFinanceiro || {};
-    if (campos.nomeResponsavel) linha['Nome do Responsável'] = responsavel.nome || aluno.responsavelNome || 'N/A';
-    if (campos.cpfResponsavel) linha['CPF do Responsável'] = responsavel.cpf || aluno.responsavelCpf || 'N/A';
-    if (campos.telefone) linha['Telefone'] = responsavel.telefone || aluno.telefone || aluno.contatoEmergencia?.telefone || 'N/A';
-    if (campos.email) linha['Email'] = responsavel.email || aluno.email || 'N/A';
+    // Busca abrangente dos dados do responsável (múltiplos formatos possíveis)
+    const responsavel = aluno.responsavel || aluno.responsavelFinanceiro || aluno.pai || aluno.mae || {};
+    const nomeResp = responsavel.nome || aluno.responsavelNome || aluno.nomePai || aluno.nomeMae || aluno.nomeResponsavel;
+    const cpfResp = responsavel.cpf || aluno.responsavelCpf || aluno.cpfPai || aluno.cpfMae || aluno.cpfResponsavel;
+    const telefoneResp = responsavel.telefone || aluno.telefone || aluno.telefonePai || aluno.telefoneMae || 
+                         aluno.contatoEmergencia?.telefone || aluno.contato?.telefone;
+    const emailResp = responsavel.email || aluno.email || aluno.emailPai || aluno.emailMae || aluno.emailResponsavel;
+    
+    if (campos.nomeResponsavel) linha['Nome do Responsável'] = nomeResp || 'N/A';
+    if (campos.cpfResponsavel) linha['CPF do Responsável'] = cpfResp || 'N/A';
+    if (campos.telefone) linha['Telefone'] = telefoneResp || 'N/A';
+    if (campos.email) linha['Email'] = emailResp || 'N/A';
     if (campos.enderecoCompleto && aluno.endereco) {
-      linha['Endereço Completo'] = `${aluno.endereco.rua || ''}, ${aluno.endereco.numero || ''} - ${aluno.endereco.bairro || ''}, ${aluno.endereco.cidade || ''}`;
+      linha['Endereço Completo'] = `${aluno.endereco.rua || ''}, ${aluno.endereco.numero || ''} - ${aluno.endereco.bairro || ''}, ${aluno.endereco.cidade || ''}`.trim();
     }
 
     if (detalhado && titulos.length === 1) {

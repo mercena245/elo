@@ -8,6 +8,15 @@ import { db, ref, push, set, get, query, orderByChild, equalTo } from '../fireba
 import { logAction } from './auditService';
 import jsPDF from 'jspdf';
 import QRCode from 'qrcode';
+import { PDFGenerator } from '../utils/pdfGenerator';
+import {
+  gerarCertificadoConclusao,
+  gerarGuiaTransferencia,
+  gerarDeclaracaoConclusao,
+  gerarDeclaracaoFrequencia,
+  cancelarDocumento as cancelarDoc,
+  reemitirDocumento as reemitirDoc
+} from './secretariaDigitalExtensions';
 
 // Tipos de documentos da secretaria digital
 export const DOCUMENT_TYPES = {
@@ -989,6 +998,32 @@ class SecretariaDigitalService {
     const responsavel = documento.dadosInstituicao?.responsavel || {};
     pdf.text(responsavel.nome || 'Diretor(a)', pageWidth/2, yPos, { align: 'center' });
     pdf.text(responsavel.cargo || 'Direção', pageWidth/2, yPos + 8, { align: 'center' });
+  }
+
+  // ===== MÉTODOS ESTENDIDOS =====
+  
+  async gerarCertificado(alunoId, nivelEnsino, observacoes = '') {
+    return await gerarCertificadoConclusao(this, alunoId, nivelEnsino, observacoes);
+  }
+
+  async gerarTransferencia(alunoId, escolaDestino, motivoTransferencia = '', observacoes = '') {
+    return await gerarGuiaTransferencia(this, alunoId, escolaDestino, motivoTransferencia, observacoes);
+  }
+
+  async gerarDeclaracaoConclusao(alunoId, nivelEnsino, finalidade = 'Para fins diversos') {
+    return await gerarDeclaracaoConclusao(this, alunoId, nivelEnsino, finalidade);
+  }
+
+  async gerarDeclaracaoFrequencia(alunoId, periodoInicio, periodoFim, finalidade = 'Para fins diversos') {
+    return await gerarDeclaracaoFrequencia(this, alunoId, periodoInicio, periodoFim, finalidade);
+  }
+
+  async cancelarDocumento(codigoVerificacao, motivo) {
+    return await cancelarDoc(this, codigoVerificacao, motivo);
+  }
+
+  async reemitirDocumento(documentoOriginal) {
+    return await reemitirDoc(this, documentoOriginal);
   }
 }
 

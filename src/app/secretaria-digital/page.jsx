@@ -178,12 +178,48 @@ const SecretariaDigital = () => {
             observacoes
           );
           break;
+        
         case 'declaracao':
           documento = await secretariaDigitalService.gerarDeclaracaoMatricula(
             selectedAluno, 
             finalidade
           );
           break;
+        
+        case 'certificado':
+          documento = await secretariaDigitalService.gerarCertificado(
+            selectedAluno,
+            'Ensino Fundamental', // TODO: permitir seleção
+            observacoes
+          );
+          break;
+        
+        case 'transferencia':
+          documento = await secretariaDigitalService.gerarTransferencia(
+            selectedAluno,
+            finalidade, // escola destino
+            observacoes, // motivo
+            '' // observações adicionais
+          );
+          break;
+        
+        case 'declaracao_conclusao':
+          documento = await secretariaDigitalService.gerarDeclaracaoConclusao(
+            selectedAluno,
+            'Ensino Fundamental',
+            finalidade
+          );
+          break;
+        
+        case 'declaracao_frequencia':
+          documento = await secretariaDigitalService.gerarDeclaracaoFrequencia(
+            selectedAluno,
+            '01/01/2024', // TODO: permitir seleção
+            '31/12/2024',
+            finalidade
+          );
+          break;
+        
         default:
           throw new Error('Tipo de documento não suportado');
       }

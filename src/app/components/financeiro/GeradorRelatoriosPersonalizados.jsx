@@ -103,6 +103,67 @@ const GeradorRelatoriosPersonalizados = ({
     ]
   };
 
+  // Função auxiliar para criar linha de relatório (deve estar antes do useMemo)
+  const criarLinhaRelatorio = (aluno, titulos, hoje, detalhado = false) => {
+    const linha = {};
+    const campos = config.camposSelecionados;
+
+    if (!aluno) {
+      aluno = {
+        nome: 'Aluno não cadastrado',
+        matricula: 'N/A',
+        turma: 'N/A'
+      };
+    }
+
+    // Dados do Aluno
+    if (campos.nomeAluno) linha['Nome do Aluno'] = aluno.nome || 'N/A';
+    if (campos.matricula) linha['Matrícula'] = aluno.matricula || 'N/A';
+    if (campos.turma) linha['Turma'] = aluno.turma || 'N/A';
+    if (campos.statusAluno) linha['Status do Aluno'] = aluno.status || 'ativo';
+
+    // Dados do Responsável
+    if (campos.nomeResponsavel) linha['Nome do Responsável'] = aluno.responsavelNome || 'N/A';
+    if (campos.cpfResponsavel) linha['CPF do Responsável'] = aluno.responsavelCpf || 'N/A';
+    if (campos.telefone) linha['Telefone'] = aluno.telefone || aluno.responsavelTelefone || 'N/A';
+    if (campos.email) linha['Email'] = aluno.email || aluno.responsavelEmail || 'N/A';
+    if (campos.enderecoCompleto && aluno.endereco) {
+      linha['Endereço Completo'] = `${aluno.endereco.rua || ''}, ${aluno.endereco.numero || ''} - ${aluno.endereco.bairro || ''}, ${aluno.endereco.cidade || ''}/${aluno.endereco.estado || ''} - CEP: ${aluno.endereco.cep || ''}`;
+    }
+
+    if (detalhado && titulos.length === 1) {
+      // Modo detalhado (um título por linha)
+      const titulo = titulos[0];
+      if (campos.tipoTitulo) linha['Tipo'] = titulo.tipo || 'N/A';
+      if (campos.descricaoTitulo) linha['Descrição'] = titulo.descricao || 'N/A';
+      if (campos.valor) linha['Valor'] = titulo.valor || 0;
+      if (campos.vencimento) linha['Vencimento'] = new Date(titulo.vencimento).toLocaleDateString('pt-BR');
+      if (campos.statusTitulo) linha['Status'] = titulo.status === 'pago' ? 'Pago' : 'Pendente';
+      if (campos.dataPagamento) linha['Data Pagamento'] = titulo.dataPagamento ? new Date(titulo.dataPagamento).toLocaleDateString('pt-BR') : 'N/A';
+      if (campos.diasAtraso && titulo.status !== 'pago') {
+        const venc = new Date(titulo.vencimento);
+        linha['Dias de Atraso'] = venc < hoje ? Math.floor((hoje - venc) / (1000 * 60 * 60 * 24)) : 0;
+      }
+    } else {
+      // Modo agrupado (estatísticas)
+      const valorTotal = titulos.reduce((sum, t) => sum + (t.valor || 0), 0);
+      const valorPago = titulos.filter(t => t.status === 'pago').reduce((sum, t) => sum + (t.valor || 0), 0);
+      const maiorAtraso = Math.max(0, ...titulos.map(t => {
+        if (t.status === 'pago') return 0;
+        const venc = new Date(t.vencimento);
+        return venc < hoje ? Math.floor((hoje - venc) / (1000 * 60 * 60 * 24)) : 0;
+      }));
+
+      if (campos.quantidadeTitulos) linha['Quantidade de Títulos'] = titulos.length;
+      if (campos.valorTotal) linha['Valor Total'] = valorTotal;
+      if (campos.valorPago) linha['Valor Pago'] = valorPago;
+      if (campos.valorPendente) linha['Valor Pendente'] = valorTotal - valorPago;
+      if (campos.diasAtraso) linha['Maior Atraso (dias)'] = maiorAtraso;
+    }
+
+    return linha;
+  };
+
   // Gerar dados do relatório com base na configuração
   const dadosRelatorio = useMemo(() => {
     const hoje = new Date();
@@ -212,67 +273,6 @@ const GeradorRelatoriosPersonalizados = ({
 
     return dadosFiltrados;
   }, [titulos, alunos, config, config.filtros]);
-
-  // Criar linha de relatório com os campos selecionados
-  const criarLinhaRelatorio = (aluno, titulos, hoje, detalhado = false) => {
-    const linha = {};
-    const campos = config.camposSelecionados;
-
-    if (!aluno) {
-      aluno = {
-        nome: 'Aluno não cadastrado',
-        matricula: 'N/A',
-        turma: 'N/A'
-      };
-    }
-
-    // Dados do Aluno
-    if (campos.nomeAluno) linha['Nome do Aluno'] = aluno.nome || 'N/A';
-    if (campos.matricula) linha['Matrícula'] = aluno.matricula || 'N/A';
-    if (campos.turma) linha['Turma'] = aluno.turma || 'N/A';
-    if (campos.statusAluno) linha['Status do Aluno'] = aluno.status || 'ativo';
-
-    // Dados do Responsável
-    if (campos.nomeResponsavel) linha['Nome do Responsável'] = aluno.responsavelNome || 'N/A';
-    if (campos.cpfResponsavel) linha['CPF do Responsável'] = aluno.responsavelCpf || 'N/A';
-    if (campos.telefone) linha['Telefone'] = aluno.telefone || aluno.responsavelTelefone || 'N/A';
-    if (campos.email) linha['Email'] = aluno.email || aluno.responsavelEmail || 'N/A';
-    if (campos.enderecoCompleto && aluno.endereco) {
-      linha['Endereço Completo'] = `${aluno.endereco.rua || ''}, ${aluno.endereco.numero || ''} - ${aluno.endereco.bairro || ''}, ${aluno.endereco.cidade || ''}/${aluno.endereco.estado || ''} - CEP: ${aluno.endereco.cep || ''}`;
-    }
-
-    if (detalhado && titulos.length === 1) {
-      // Modo detalhado (um título por linha)
-      const titulo = titulos[0];
-      if (campos.tipoTitulo) linha['Tipo'] = titulo.tipo || 'N/A';
-      if (campos.descricaoTitulo) linha['Descrição'] = titulo.descricao || 'N/A';
-      if (campos.valor) linha['Valor'] = titulo.valor || 0;
-      if (campos.vencimento) linha['Vencimento'] = new Date(titulo.vencimento).toLocaleDateString('pt-BR');
-      if (campos.statusTitulo) linha['Status'] = titulo.status === 'pago' ? 'Pago' : 'Pendente';
-      if (campos.dataPagamento) linha['Data Pagamento'] = titulo.dataPagamento ? new Date(titulo.dataPagamento).toLocaleDateString('pt-BR') : 'N/A';
-      if (campos.diasAtraso && titulo.status !== 'pago') {
-        const venc = new Date(titulo.vencimento);
-        linha['Dias de Atraso'] = venc < hoje ? Math.floor((hoje - venc) / (1000 * 60 * 60 * 24)) : 0;
-      }
-    } else {
-      // Modo agrupado (estatísticas)
-      const valorTotal = titulos.reduce((sum, t) => sum + (t.valor || 0), 0);
-      const valorPago = titulos.filter(t => t.status === 'pago').reduce((sum, t) => sum + (t.valor || 0), 0);
-      const maiorAtraso = Math.max(0, ...titulos.map(t => {
-        if (t.status === 'pago') return 0;
-        const venc = new Date(t.vencimento);
-        return venc < hoje ? Math.floor((hoje - venc) / (1000 * 60 * 60 * 24)) : 0;
-      }));
-
-      if (campos.quantidadeTitulos) linha['Quantidade de Títulos'] = titulos.length;
-      if (campos.valorTotal) linha['Valor Total'] = valorTotal;
-      if (campos.valorPago) linha['Valor Pago'] = valorPago;
-      if (campos.valorPendente) linha['Valor Pendente'] = valorTotal - valorPago;
-      if (campos.diasAtraso) linha['Maior Atraso (dias)'] = maiorAtraso;
-    }
-
-    return linha;
-  };
 
   // Exportar relatório
   const handleExportar = async () => {

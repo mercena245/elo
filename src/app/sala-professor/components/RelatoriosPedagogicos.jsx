@@ -375,7 +375,8 @@ Relacione as observações com as habilidades específicas da BNCC para a série
 
       if (resultado.sucesso) {
         console.log('✅ Relatório gerado com sucesso!');
-        setRelatorioGerado(resultado.relatorio);
+        const relatorioProcessado = processarMarkdown(resultado.relatorio);
+        setRelatorioGerado(relatorioProcessado);
       } else {
         throw new Error(resultado.erro || 'Erro desconhecido na geração do relatório');
       }
@@ -526,6 +527,24 @@ Relacione as observações com as habilidades específicas da BNCC para a série
   // Função para fechar feedback
   const fecharFeedback = () => setFeedback('');
 
+  // Função para processar markdown e formatar o relatório
+  const processarMarkdown = (texto) => {
+    if (!texto) return '';
+    
+    return texto
+      // Remover múltiplas hashtags (## ou ### ou ####)
+      .replace(/^#{1,6}\s+/gm, '')
+      // Remover ** (negrito)
+      .replace(/\*\*([^*]+)\*\*/g, '$1')
+      // Remover * simples (itálico)
+      .replace(/\*([^*]+)\*/g, '$1')
+      // Remover --- (separadores)
+      .replace(/^---$/gm, '')
+      // Limpar linhas vazias excessivas (mais de 2 seguidas)
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+  };
+
   return (
     <Box sx={{ p: { xs: 1, sm: 2, md: 3 } }}>
       <Box sx={{ 
@@ -646,8 +665,8 @@ Relacione as observações com as habilidades específicas da BNCC para a série
                     </Box>
                   </AccordionSummary>
                   <AccordionDetails>
-                    <Box sx={{ whiteSpace: 'pre-line', lineHeight: 1.6 }}>
-                      {relatorio.conteudo}
+                    <Box sx={{ whiteSpace: 'pre-line', lineHeight: 1.8, fontSize: '0.95rem' }}>
+                      {processarMarkdown(relatorio.conteudo)}
                     </Box>
                     <Box sx={{ mt: 2, display: 'flex', gap: 1 }}>
                       <Button size="small" startIcon={<DownloadIcon />} onClick={() => baixarPDF(relatorio)}>
@@ -774,12 +793,27 @@ Relacione as observações com as habilidades específicas da BNCC para a série
 
           {relatorioGerado && (
             <Box sx={{ mt: 3 }}>
-              <Typography variant="h6" gutterBottom>
-                Relatório Gerado:
+              <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                ✏️ Relatório Gerado (Editável):
               </Typography>
-              <Paper sx={{ p: 2, maxHeight: 400, overflow: 'auto', whiteSpace: 'pre-line' }}>
-                {relatorioGerado}
-              </Paper>
+              <TextField
+                fullWidth
+                multiline
+                minRows={12}
+                maxRows={20}
+                value={relatorioGerado}
+                onChange={(e) => setRelatorioGerado(e.target.value)}
+                variant="outlined"
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    fontFamily: 'inherit',
+                    fontSize: '0.95rem',
+                    lineHeight: 1.8,
+                    bgcolor: '#f9fafb'
+                  }
+                }}
+                helperText="💡 Você pode editar o texto acima antes de salvar"
+              />
             </Box>
           )}
         </DialogContent>

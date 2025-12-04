@@ -13,7 +13,7 @@ import {
   TableChart, CheckBox, CheckBoxOutlineBlank,
   Info, FilterList
 } from '@mui/icons-material';
-import { exportarParaExcel, exportarParaPDF, exportarParaCSV } from '../../utils/exportUtils';
+import { exportarParaExcel, exportarParaPDF, exportarParaCSV } from '../../../utils/exportUtils';
 
 const GeradorRelatoriosPersonalizados = ({
   open,
@@ -285,21 +285,13 @@ const GeradorRelatoriosPersonalizados = ({
 
     try {
       if (config.formato === 'excel') {
-        const resultado = exportarParaExcel(dadosRelatorio, nomeArquivo, 'Relatório');
-        if (resultado.success) {
-          alert('Relatório exportado para Excel com sucesso!');
-          onClose();
-        } else {
-          alert(`Erro ao exportar: ${resultado.error}`);
-        }
+        exportarParaExcel(dadosRelatorio, nomeArquivo, 'Relatório');
+        alert('Relatório exportado para Excel com sucesso!');
+        onClose();
       } else if (config.formato === 'csv') {
-        const resultado = exportarParaCSV(dadosRelatorio, nomeArquivo);
-        if (resultado.success) {
-          alert('Relatório exportado para CSV com sucesso!');
-          onClose();
-        } else {
-          alert(`Erro ao exportar: ${resultado.error}`);
-        }
+        exportarParaCSV(dadosRelatorio, nomeArquivo);
+        alert('Relatório exportado para CSV com sucesso!');
+        onClose();
       } else if (config.formato === 'pdf') {
         // Preparar colunas para PDF
         const colunas = Object.keys(dadosRelatorio[0]).map(key => ({

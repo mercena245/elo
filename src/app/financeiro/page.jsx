@@ -88,7 +88,7 @@ import ContasPagas from '../components/financeiro/ContasPagas';
 import GeradorRelatoriosPersonalizados from '../components/financeiro/GeradorRelatoriosPersonalizados';
 import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
 import { useSchoolServices } from '../../hooks/useSchoolServices';
-import { exportToExcel, exportToPDF, generateCSV } from '@/utils/exportUtils';
+import { exportarParaExcel, exportarParaPDF, exportarParaCSV } from '@/utils/exportUtils';
 
 const FinanceiroPage = () => {
   // Services multi-tenant
@@ -2081,9 +2081,9 @@ const FinanceiroPage = () => {
       }));
     }
 
-    exportToExcel(
+    exportarParaExcel(
       dadosExport, 
-      `${nomeRelatorio.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.xlsx`,
+      `${nomeRelatorio.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}`,
       nomeRelatorio
     );
   };
@@ -2142,12 +2142,20 @@ const FinanceiroPage = () => {
       }));
     }
 
-    exportToPDF(
-      dadosPDF,
-      `${nomeRelatorio.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`,
-      nomeRelatorio,
-      'portrait'
-    );
+    // Preparar colunas para PDF
+    const colunas = dadosPDF.length > 0 ? Object.keys(dadosPDF[0]).map(key => ({
+      header: key,
+      dataKey: key
+    })) : [];
+
+    exportarParaPDF({
+      dados: dadosPDF,
+      titulo: nomeRelatorio,
+      colunas: colunas,
+      orientacao: 'portrait',
+      formatoMoeda: ['Valor', 'Total', 'Pago', 'Pendente', 'Saldo'],
+      subtitulo: `Gerado em ${new Date().toLocaleDateString('pt-BR')}`
+    });
   };
 
   const formatCurrency = (value) => {
@@ -3268,9 +3276,9 @@ const FinanceiroPage = () => {
                         'Forma Pagamento': conta.formaPagamento || '',
                         'Observações': conta.observacoes || ''
                       }));
-                      exportToExcel(
+                      exportarParaExcel(
                         dadosExcel,
-                        `Contas_Pagas_${new Date().toISOString().split('T')[0]}.xlsx`,
+                        `Contas_Pagas_${new Date().toISOString().split('T')[0]}`,
                         'Histórico de Pagamentos'
                       );
                       showFeedback('success', 'Exportado', 'Excel gerado com sucesso!');
@@ -3284,12 +3292,19 @@ const FinanceiroPage = () => {
                         'Pagamento': conta.dataPagamento || '',
                         'Forma': conta.formaPagamento || ''
                       }));
-                      exportToPDF(
-                        dadosPDF,
-                        `Contas_Pagas_${new Date().toISOString().split('T')[0]}.pdf`,
-                        'Histórico de Contas Pagas',
-                        'landscape'
-                      );
+                      const colunas = dadosPDF.length > 0 ? Object.keys(dadosPDF[0]).map(key => ({
+                        header: key,
+                        dataKey: key
+                      })) : [];
+                      
+                      exportarParaPDF({
+                        dados: dadosPDF,
+                        titulo: 'Histórico de Contas Pagas',
+                        colunas: colunas,
+                        orientacao: 'landscape',
+                        formatoMoeda: ['Valor'],
+                        subtitulo: `Período exportado: ${new Date().toLocaleDateString('pt-BR')}`
+                      });
                       showFeedback('success', 'Exportado', 'PDF gerado com sucesso!');
                     }
                   }}

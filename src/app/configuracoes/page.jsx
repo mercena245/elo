@@ -42,6 +42,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '../../context/AuthContext';
 import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
 import { useSchoolServices } from '../../hooks/useSchoolServices';
+import { isSuperAdmin as checkIsSuperAdmin } from '../../config/constants';
 import {
   Settings as SettingsIcon,
   Business as BusinessIcon,
@@ -68,8 +69,7 @@ export default function Configuracoes() {
   const { auditService, financeiroService, LOG_ACTIONS, isReady: servicesReady } = useSchoolServices();
 
   const { user } = useAuth();
-  const superAdminId = 'qD6UucWtcgPC9GHA41OB8rSaghZ2';
-  const isSuperAdmin = user?.uid === superAdminId;
+  const isUserSuperAdmin = checkIsSuperAdmin(user?.uid);
   // Função para recusar usuário (excluir do banco e do Auth)
   async function rejectUser(uid) {
     if (!isReady) {
@@ -171,8 +171,8 @@ export default function Configuracoes() {
         .filter(([uid, u]) => {
           // Filtrar usuários inválidos
           if (!u.nome && !u.email) return false;
-          // Se não for super admin, não mostrar o super admin na lista
-          if (!isSuperAdmin && uid === superAdminId) return false;
+          // Se não for super admin, não mostrar outros super admins na lista
+          if (!isUserSuperAdmin && checkIsSuperAdmin(uid)) return false;
           return true;
         })
         .map(([uid, u]) => ({ ...u, uid }));
@@ -1108,7 +1108,7 @@ export default function Configuracoes() {
             )}
 
             {/* ABA 3: Segurança */}
-            {tabValue === 3 && isSuperAdmin && (
+            {tabValue === 3 && isUserSuperAdmin && (
               <Card 
                 sx={{ 
                   mb: 3,
@@ -1249,7 +1249,7 @@ export default function Configuracoes() {
               </FormControl>
 
               {/* Checkbox para atribuir função de suporte */}
-              {isSuperAdmin && (
+              {isUserSuperAdmin && (
                 <FormControl fullWidth sx={{ mt: 2 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <input

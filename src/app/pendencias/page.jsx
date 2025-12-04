@@ -42,6 +42,7 @@ import {
 import SidebarMenu from '../../components/SidebarMenu';
 import { useAuthUser } from '../../hooks/useAuthUser';
 import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
+import { isSuperAdmin } from '../../config/constants';
 
 const PendenciasPage = () => {
   const router = useRouter();
@@ -49,7 +50,7 @@ const PendenciasPage = () => {
   const { getData, isReady, currentSchool } = useSchoolDatabase();
   const currentSchoolId = typeof currentSchool === 'string' ? currentSchool : currentSchool?.id;
   const mensagensPath = currentSchoolId ? `escolas/${currentSchoolId}/mensagens` : 'mensagens';
-  const superAdminId = 'qD6UucWtcgPC9GHA41OB8rSaghZ2';
+  const isUserSuperAdmin = isSuperAdmin(user?.uid);
 
   const [loading, setLoading] = useState(true);
   const [planosPendentes, setPlanosPendentes] = useState([]);

@@ -1,7 +1,7 @@
 # 🔐 Como Adicionar Novos Super Admins
 
-**Data:** 3 de dezembro de 2025  
-**Versão:** 1.0
+**Data:** 4 de dezembro de 2025  
+**Versão:** 2.0 - Atualizado
 
 ---
 
@@ -23,13 +23,13 @@ Antes de adicionar um novo super admin, você precisa:
 
 ## 🔍 Como Obter o UID de um Usuário
 
-### Opção 1: Firebase Console
+### Opção 1: Firebase Console (Recomendado)
 
 1. Acesse o [Firebase Console](https://console.firebase.google.com)
 2. Selecione o projeto: **elo-school**
 3. Vá em **Authentication** → **Users**
 4. Localize o usuário pelo e-mail
-5. Copie o **User UID** (uma string como: `abc123xyz456...`)
+5. Copie o **User UID** (uma string como: `qD6UucWtcgPC9GHA41OB8rSaghZ2`)
 
 ### Opção 2: Pelo Sistema
 
@@ -40,9 +40,32 @@ Antes de adicionar um novo super admin, você precisa:
 
 ---
 
-## ✏️ Como Adicionar um Novo Super Admin
+## ⚡ Como Adicionar um Novo Super Admin
 
-### Passo 1: Editar o Arquivo de Configuração
+### 🚀 MÉTODO 1: Script Automatizado (RECOMENDADO)
+
+O sistema agora tem um script que facilita o processo:
+
+```bash
+node scripts/add-super-admin.js <UID_DO_FIREBASE>
+```
+
+**Exemplo:**
+```bash
+node scripts/add-super-admin.js qD6UucWtcgPC9GHA41OB8rSaghZ2
+```
+
+O script irá:
+- ✅ Adicionar o UID automaticamente
+- ✅ Verificar duplicatas
+- ✅ Adicionar comentário com a data
+- ✅ Mostrar próximos passos
+
+---
+
+### 📝 MÉTODO 2: Manual
+
+#### Passo 1: Editar o Arquivo de Configuração
 
 Abra o arquivo:
 ```

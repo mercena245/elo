@@ -514,24 +514,42 @@ const financeiroService = {
   async buscarTitulosProximosVencimento(dias = 7) {
     try {
       const titulosRef = ref(db, 'titulos_financeiros');
-      const snapshot = await get(titulosRef);
+      const alunosRef = ref(db, 'alunos');
       
-      if (!snapshot.exists()) {
+      const [titulosSnap, alunosSnap] = await Promise.all([
+        get(titulosRef),
+        get(alunosRef)
+      ]);
+      
+      if (!titulosSnap.exists()) {
         return { success: true, titulos: [] };
       }
+
+      const alunos = alunosSnap.exists() ? 
+        Object.entries(alunosSnap.val()).reduce((acc, [id, aluno]) => {
+          acc[id] = aluno;
+          return acc;
+        }, {}) : {};
 
       const hoje = new Date();
       const dataLimite = new Date(hoje.getTime() + dias * 24 * 60 * 60 * 1000);
       const hojeStr = hoje.toISOString().split('T')[0];
       const dataLimiteStr = dataLimite.toISOString().split('T')[0];
       
-      const titulosProximos = Object.entries(snapshot.val())
+      const titulosProximos = Object.entries(titulosSnap.val())
         .filter(([id, titulo]) => 
           titulo.status === 'pendente' && 
           titulo.vencimento >= hojeStr && 
           titulo.vencimento <= dataLimiteStr
         )
-        .map(([id, titulo]) => ({ id, ...titulo }));
+        .map(([id, titulo]) => {
+          const aluno = alunos[titulo.alunoId];
+          return { 
+            id, 
+            ...titulo, 
+            alunoNome: aluno?.nome || 'Aluno não cadastrado'
+          };
+        });
 
       return { success: true, titulos: titulosProximos };
     } catch (error) {

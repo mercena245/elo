@@ -304,7 +304,7 @@ const ContasAPagarMelhorado = ({
     
     const valorVencido = vencidas.reduce((sum, c) => sum + (c.valor || 0), 0);
     
-    const vencem Hoje = contasNaoPagas.filter(c => {
+    const vencemHoje = contasNaoPagas.filter(c => {
       const venc = new Date(c.vencimento);
       return isToday(venc);
     });

@@ -85,8 +85,10 @@ import DashboardFinanceiro from '../../components/DashboardFinanceiro';
 import BaixaTituloDialog from '../../components/BaixaTituloDialog';
 import ContasAPagar from '../components/financeiro/ContasAPagar';
 import ContasPagas from '../components/financeiro/ContasPagas';
+import GeradorRelatoriosPersonalizados from '../components/financeiro/GeradorRelatoriosPersonalizados';
 import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
 import { useSchoolServices } from '../../hooks/useSchoolServices';
+import { exportToExcel, exportToPDF, generateCSV } from '@/utils/exportUtils';
 
 const FinanceiroPage = () => {
   // Services multi-tenant
@@ -164,6 +166,7 @@ const FinanceiroPage = () => {
   const [geradorMensalidadesDialog, setGeradorMensalidadesDialog] = useState(false);
   const [pagamentoDialog, setPagamentoDialog] = useState(false);
   const [comprovanteDialog, setComprovanteDialog] = useState(false);
+  const [relatorioPersonalizadoAberto, setRelatorioPersonalizadoAberto] = useState(false);
   const [tituloSelecionado, setTituloSelecionado] = useState(null);
   const [calculoJurosMultaPai, setCalculoJurosMultaPai] = useState(null);
   
@@ -1999,9 +2002,6 @@ const FinanceiroPage = () => {
   };
 
   const exportarParaExcel = (tipoRelatorio, dados) => {
-    // Criar dados CSV
-    let csvContent = "\uFEFF"; // BOM para UTF-8
-    
     const nomeRelatorio = {
       'receitas': 'Relatório de Receitas',
       'inadimplencia': 'Relatório de Inadimplência',
@@ -2009,36 +2009,83 @@ const FinanceiroPage = () => {
       'demonstrativo': 'Demonstrativo por Aluno'
     }[tipoRelatorio];
 
-    csvContent += `${nomeRelatorio}\n`;
-    csvContent += `Gerado em: ${new Date().toLocaleDateString('pt-BR')}\n\n`;
+    let dadosExport = [];
 
     if (tipoRelatorio === 'receitas') {
-      csvContent += `Resumo Financeiro\n`;
-      csvContent += `Receita Mensal,${dados.receitaMensal}\n`;
-      csvContent += `Receita Anual,${dados.receitaAnual}\n\n`;
-      csvContent += `Títulos Pagos\n`;
-      csvContent += `Aluno,Tipo,Descrição,Valor,Data Pagamento\n`;
+      // Resumo
+      dadosExport.push({
+        'Tipo': 'RESUMO FINANCEIRO',
+        'Valor': '',
+        'Data': ''
+      });
+      dadosExport.push({
+        'Tipo': 'Receita Mensal',
+        'Valor': dados.receitaMensal || 0,
+        'Data': ''
+      });
+      dadosExport.push({
+        'Tipo': 'Receita Anual',
+        'Valor': dados.receitaAnual || 0,
+        'Data': ''
+      });
+      dadosExport.push({
+        'Tipo': '',
+        'Valor': '',
+        'Data': ''
+      });
+      dadosExport.push({
+        'Tipo': 'TÍTULOS PAGOS',
+        'Valor': '',
+        'Data': ''
+      });
+      
+      // Títulos
       dados.titulosPagos.forEach(titulo => {
         const aluno = alunos.find(a => a.id === titulo.alunoId);
-        csvContent += `"${aluno?.nome || 'N/A'}","${titulo.tipo}","${titulo.descricao}","${titulo.valor}","${titulo.dataPagamento ? formatDate(titulo.dataPagamento) : 'N/A'}"\n`;
+        dadosExport.push({
+          'Aluno': aluno?.nome || 'N/A',
+          'Tipo': titulo.tipo || '',
+          'Descrição': titulo.descricao || '',
+          'Valor': titulo.valor || 0,
+          'Data Pagamento': titulo.dataPagamento ? formatDate(titulo.dataPagamento) : 'N/A'
+        });
       });
     } else if (tipoRelatorio === 'demonstrativo') {
-      csvContent += `Aluno,Matrícula,Turma,Total Títulos,Valor Total,Valor Pago,Valor Pendente\n`;
-      dados.demonstrativos.forEach(item => {
-        csvContent += `"${item.aluno}","${item.matricula}","${item.turma}","${item.totalTitulos}","${item.valorTotal}","${item.valorPago}","${item.valorPendente}"\n`;
+      dadosExport = dados.demonstrativos.map(item => ({
+        'Aluno': item.aluno || '',
+        'Matrícula': item.matricula || '',
+        'Turma': item.turma || '',
+        'Total Títulos': item.totalTitulos || 0,
+        'Valor Total': item.valorTotal || 0,
+        'Valor Pago': item.valorPago || 0,
+        'Valor Pendente': item.valorPendente || 0
+      }));
+    } else if (tipoRelatorio === 'inadimplencia') {
+      dadosExport = (dados.titulosVencidos || []).map(titulo => {
+        const aluno = alunos.find(a => a.id === titulo.alunoId);
+        return {
+          'Aluno': aluno?.nome || 'N/A',
+          'Descrição': titulo.descricao || '',
+          'Valor': titulo.valor || 0,
+          'Vencimento': titulo.vencimento || '',
+          'Dias Vencido': Math.floor((new Date() - new Date(titulo.vencimento)) / (1000 * 60 * 60 * 24))
+        };
       });
+    } else if (tipoRelatorio === 'fluxocaixa') {
+      dadosExport = (dados.movimentacoes || []).map(mov => ({
+        'Data': mov.data || '',
+        'Tipo': mov.tipo || '',
+        'Descrição': mov.descricao || '',
+        'Valor': mov.valor || 0,
+        'Saldo': mov.saldo || 0
+      }));
     }
 
-    // Criar blob e download
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${nomeRelatorio.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    exportToExcel(
+      dadosExport, 
+      `${nomeRelatorio.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.xlsx`,
+      nomeRelatorio
+    );
   };
 
   const imprimirRelatorio = (tipoRelatorio, dados) => {
@@ -2049,36 +2096,58 @@ const FinanceiroPage = () => {
       'demonstrativo': 'Demonstrativo por Aluno'
     }[tipoRelatorio];
 
-    // Criar janela de impressão
-    const printWindow = window.open('', '_blank');
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>${nomeRelatorio}</title>
-          <style>
-            @media print {
-              body { margin: 0; }
-              @page { margin: 1cm; }
-            }
-            body { font-family: Arial, sans-serif; }
-            h1 { color: #10B981; text-align: center; }
-            table { width: 100%; border-collapse: collapse; margin: 10px 0; }
-            th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
-            th { background-color: #f5f5f5; }
-          </style>
-        </head>
-        <body>
-          <h1>${nomeRelatorio}</h1>
-          <p><strong>Data:</strong> ${new Date().toLocaleDateString('pt-BR')}</p>
-          ${document.querySelector('[role="tabpanel"] .MuiDialogContent-root')?.innerHTML || ''}
-        </body>
-      </html>
-    `);
-    
-    printWindow.document.close();
-    printWindow.focus();
-    printWindow.print();
-    printWindow.close();
+    let dadosPDF = [];
+
+    if (tipoRelatorio === 'receitas') {
+      // Títulos pagos
+      dadosPDF = (dados.titulosPagos || []).map(titulo => {
+        const aluno = alunos.find(a => a.id === titulo.alunoId);
+        return {
+          'Aluno': aluno?.nome || 'N/A',
+          'Tipo': titulo.tipo || '',
+          'Descrição': titulo.descricao || '',
+          'Valor': formatCurrency(titulo.valor || 0),
+          'Data Pgto': titulo.dataPagamento ? formatDate(titulo.dataPagamento) : 'N/A'
+        };
+      });
+    } else if (tipoRelatorio === 'demonstrativo') {
+      dadosPDF = (dados.demonstrativos || []).map(item => ({
+        'Aluno': item.aluno || '',
+        'Matrícula': item.matricula || '',
+        'Turma': item.turma || '',
+        'Títulos': item.totalTitulos || 0,
+        'Total': formatCurrency(item.valorTotal || 0),
+        'Pago': formatCurrency(item.valorPago || 0),
+        'Pendente': formatCurrency(item.valorPendente || 0)
+      }));
+    } else if (tipoRelatorio === 'inadimplencia') {
+      dadosPDF = (dados.titulosVencidos || []).map(titulo => {
+        const aluno = alunos.find(a => a.id === titulo.alunoId);
+        const diasVencido = Math.floor((new Date() - new Date(titulo.vencimento)) / (1000 * 60 * 60 * 24));
+        return {
+          'Aluno': aluno?.nome || 'N/A',
+          'Descrição': titulo.descricao || '',
+          'Valor': formatCurrency(titulo.valor || 0),
+          'Vencimento': titulo.vencimento || '',
+          'Dias': diasVencido
+        };
+      });
+    } else if (tipoRelatorio === 'fluxocaixa') {
+      dadosPDF = (dados.movimentacoes || []).map(mov => ({
+        'Data': mov.data || '',
+        'Tipo': mov.tipo || '',
+        'Descrição': mov.descricao || '',
+        'Valor': formatCurrency(mov.valor || 0),
+        'Saldo': formatCurrency(mov.saldo || 0)
+      }));
+    }
+
+    exportToPDF(
+      dadosPDF,
+      `${nomeRelatorio.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`,
+      nomeRelatorio,
+      'portrait'
+    );
   };
 
   const formatCurrency = (value) => {
@@ -3188,10 +3257,40 @@ const FinanceiroPage = () => {
                   contas={contasPagas}
                   loading={loading}
                   onExportar={(formato) => {
-                    if (formato === 'pdf') {
-                      imprimirDemonstrativo();
-                    } else {
-                      showFeedback('info', 'Em Desenvolvimento', 'Exportação para Excel em breve!');
+                    if (formato === 'excel') {
+                      // Preparar dados para Excel
+                      const dadosExcel = contasPagas.map(conta => ({
+                        'Descrição': conta.descricao || '',
+                        'Categoria': conta.categoria || '',
+                        'Valor': conta.valor || 0,
+                        'Data Vencimento': conta.dataVencimento || '',
+                        'Data Pagamento': conta.dataPagamento || '',
+                        'Forma Pagamento': conta.formaPagamento || '',
+                        'Observações': conta.observacoes || ''
+                      }));
+                      exportToExcel(
+                        dadosExcel,
+                        `Contas_Pagas_${new Date().toISOString().split('T')[0]}.xlsx`,
+                        'Histórico de Pagamentos'
+                      );
+                      showFeedback('success', 'Exportado', 'Excel gerado com sucesso!');
+                    } else if (formato === 'pdf') {
+                      // Preparar dados para PDF
+                      const dadosPDF = contasPagas.map(conta => ({
+                        'Descrição': conta.descricao || '',
+                        'Categoria': conta.categoria || '',
+                        'Valor': formatCurrency(conta.valor || 0),
+                        'Vencimento': conta.dataVencimento || '',
+                        'Pagamento': conta.dataPagamento || '',
+                        'Forma': conta.formaPagamento || ''
+                      }));
+                      exportToPDF(
+                        dadosPDF,
+                        `Contas_Pagas_${new Date().toISOString().split('T')[0]}.pdf`,
+                        'Histórico de Contas Pagas',
+                        'landscape'
+                      );
+                      showFeedback('success', 'Exportado', 'PDF gerado com sucesso!');
                     }
                   }}
                 />
@@ -3245,6 +3344,49 @@ const FinanceiroPage = () => {
                         <Grid item xs={12} sm={3}>
                           <Button variant="contained" fullWidth sx={{ height: '40px' }}>
                             Atualizar
+                          </Button>
+                        </Grid>
+                      </Grid>
+                    </Paper>
+
+                    {/* Relatório Personalizado - DESTAQUE */}
+                    <Paper sx={{ p: 3, mb: 3, bgcolor: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', border: '2px solid #667eea' }}>
+                      <Grid container spacing={2} alignItems="center">
+                        <Grid item xs={12} md={8}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                            <AutoAwesome sx={{ color: '#667eea', mr: 1, fontSize: 32 }} />
+                            <Typography variant="h5" color="primary" fontWeight="bold">
+                              Gerador de Relatórios Personalizados
+                            </Typography>
+                          </Box>
+                          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                            Crie relatórios customizados com filtros avançados, escolha os campos que deseja exibir, 
+                            agrupe por diferentes critérios e exporte em múltiplos formatos (Excel, PDF, CSV).
+                          </Typography>
+                          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 2 }}>
+                            <Chip size="small" label="25+ Campos" color="primary" variant="outlined" />
+                            <Chip size="small" label="9 Agrupamentos" color="primary" variant="outlined" />
+                            <Chip size="small" label="Filtros Avançados" color="primary" variant="outlined" />
+                            <Chip size="small" label="5 Templates" color="primary" variant="outlined" />
+                            <Chip size="small" label="3 Formatos Export" color="primary" variant="outlined" />
+                          </Box>
+                        </Grid>
+                        <Grid item xs={12} md={4}>
+                          <Button 
+                            variant="contained" 
+                            size="large"
+                            fullWidth
+                            startIcon={<Assessment />}
+                            onClick={() => setRelatorioPersonalizadoAberto(true)}
+                            sx={{ 
+                              height: '56px',
+                              fontSize: '1.1rem',
+                              fontWeight: 'bold',
+                              background: 'linear-gradient(45deg, #667eea 30%, #764ba2 90%)',
+                              boxShadow: '0 3px 5px 2px rgba(102, 126, 234, .3)',
+                            }}
+                          >
+                            Abrir Gerador
                           </Button>
                         </Grid>
                       </Grid>
@@ -5273,6 +5415,14 @@ const FinanceiroPage = () => {
           <CircularProgress color="inherit" />
           <Typography sx={{ ml: 2 }}>Processando...</Typography>
         </Backdrop>
+
+        {/* Gerador de Relatórios Personalizados */}
+        <GeradorRelatoriosPersonalizados
+          open={relatorioPersonalizadoAberto}
+          onClose={() => setRelatorioPersonalizadoAberto(false)}
+          titulos={titulos}
+          alunos={alunos}
+        />
       </Box>
     </ProtectedRoute>
   );

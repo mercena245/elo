@@ -126,11 +126,11 @@ class SecretariaDigitalService {
    */
   async getDadosAluno(alunoId) {
     try {
-      const alunoRef = this.getDbRef(`alunos/${alunoId}`);
-      const snapshot = await get(alunoRef);
+      // Usar getData do schoolDatabase
+      const alunoData = await this.getData(`alunos/${alunoId}`);
       
-      if (snapshot.exists()) {
-        return snapshot.val();
+      if (alunoData) {
+        return alunoData;
       }
       throw new Error('Aluno não encontrado');
     } catch (error) {
@@ -144,21 +144,18 @@ class SecretariaDigitalService {
    */
   async getNomeDisciplina(disciplinaId) {
     try {
-      const disciplinaRef = this.getDbRef(`disciplinas/${disciplinaId}`);
-      const snapshot = await get(disciplinaRef);
+      // Usar getData do schoolDatabase
+      const disciplina = await this.getData(`disciplinas/${disciplinaId}`);
       
-      if (snapshot.exists()) {
-        const disciplina = snapshot.val();
+      if (disciplina) {
         return disciplina.nome || disciplina.nomeDisciplina || disciplinaId;
       }
       
       // Tentar buscar em Escola/Disciplinas (estrutura alternativa)
-      const escolaRef = this.getDbRef(`Escola/Disciplinas/${disciplinaId}`);
-      const escolaSnapshot = await get(escolaRef);
+      const escolaDisciplina = await this.getData(`Escola/Disciplinas/${disciplinaId}`);
       
-      if (escolaSnapshot.exists()) {
-        const disciplina = escolaSnapshot.val();
-        return disciplina.nome || disciplina.nomeDisciplina || disciplinaId;
+      if (escolaDisciplina) {
+        return escolaDisciplina.nome || escolaDisciplina.nomeDisciplina || disciplinaId;
       }
       
       // Retornar o ID se não encontrar
@@ -174,11 +171,37 @@ class SecretariaDigitalService {
    */
   async getDadosInstituicao() {
     try {
-      const configRef = this.getDbRef('secretariaDigital/configuracoes/instituicao');
-      const snapshot = await get(configRef);
+      // Tentar buscar configuração primeiro
+      const config = await this.getData('secretariaDigital/configuracoes/instituicao');
       
-      if (snapshot.exists()) {
-        return snapshot.val();
+      if (config) {
+        return config;
+      }
+      
+      // Se não tem config, buscar dados da escola
+      const escolaData = await this.getData('escola');
+      
+      if (escolaData) {
+        // Mapear dados da escola para formato esperado
+        return {
+          nome: escolaData.nome || 'Escola ELO',
+          cnpj: escolaData.cnpj || '00.000.000/0001-00',
+          codigoINEP: escolaData.codigoINEP || escolaData.inep,
+          endereco: escolaData.endereco || {
+            rua: 'Rua da Escola, 123',
+            bairro: 'Centro',
+            cidade: 'São Paulo',
+            estado: 'SP',
+            cep: '00000-000'
+          },
+          telefone: escolaData.telefone || '(11) 0000-0000',
+          email: escolaData.email || 'secretaria@escola.com.br',
+          responsavel: escolaData.responsavel || {
+            nome: 'Diretor(a)',
+            cpf: '000.000.000-00',
+            cargo: 'Diretor(a) Escolar'
+          }
+        };
       }
       
       // Dados padrão se não configurado
@@ -328,9 +351,8 @@ class SecretariaDigitalService {
       // Sanitizar documento removendo valores undefined
       const documentoSanitizado = this.sanitizarDocumento(documento);
 
-      // Salvar no Firebase
-      const documentoRef = this.getDbRef(`secretariaDigital/documentos/declaracoes/${verificationCode}`);
-      await set(documentoRef, documentoSanitizado);
+      // Salvar no Firebase usando setData
+      await this.setData(`secretariaDigital/documentos/historicos/${verificationCode}`, documentoSanitizado);
 
       console.log('✅ [Histórico] Histórico completo gerado:', verificationCode);
 
@@ -394,9 +416,8 @@ class SecretariaDigitalService {
       documento.assinatura = assinatura;
       documento.status = DOCUMENT_STATUS.ASSINADO;
 
-      // Salvar no Firebase
-      const documentoRef = this.getDbRef(`secretariaDigital/documentos/declaracoes/${verificationCode}`);
-      await set(documentoRef, documento);
+      // Salvar no Firebase usando setData
+      await this.setData(`secretariaDigital/documentos/declaracoes/${verificationCode}`, documento);
 
       // Log da ação
       await logAction('DIGITAL_SECRETARY_DECLARATION_GENERATED', {
@@ -554,8 +575,7 @@ class SecretariaDigitalService {
    */
   async configurarInstituicao(dados) {
     try {
-      const configRef = this.getDbRef('secretariaDigital/configuracoes/instituicao');
-      await set(configRef, {
+      await this.setData('secretariaDigital/configuracoes/instituicao', {
         ...dados,
         dataAtualizacao: new Date().toISOString()
       });

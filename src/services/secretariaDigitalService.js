@@ -41,27 +41,62 @@ export const DOCUMENT_STATUS = {
 };
 
 class SecretariaDigitalService {
-  constructor(schoolDb = null) {
+  constructor() {
     this.baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
     this.historicoService = new HistoricoEscolarCompleto(this);
-    this.schoolDb = schoolDb; // Banco de dados específico da escola
+    this.useSchoolDb = false; // Flag para usar funções do schoolDatabase
+    this.schoolDbFunctions = null; // Funções getData, setData, etc.
   }
 
   /**
-   * Define o banco de dados da escola (multi-tenant)
+   * Define as funções do banco de dados da escola (multi-tenant)
    */
-  setSchoolDatabase(schoolDb) {
-    this.schoolDb = schoolDb;
+  setSchoolDatabaseFunctions(dbFunctions) {
+    this.schoolDbFunctions = dbFunctions;
+    this.useSchoolDb = true;
   }
 
   /**
    * Obtém a referência do banco correto (escola específica ou global)
    */
   getDbRef(path) {
-    if (this.schoolDb) {
-      return ref(this.schoolDb, path);
+    // Se não está usando schoolDb, usa o db global
+    if (!this.useSchoolDb) {
+      return ref(db, path);
     }
-    return ref(db, path);
+    
+    // Se está usando schoolDb mas não tem as funções, usa db global como fallback
+    if (!this.schoolDbFunctions || !this.schoolDbFunctions.db) {
+      console.warn('⚠️ SchoolDb não configurado, usando db global');
+      return ref(db, path);
+    }
+    
+    return ref(this.schoolDbFunctions.db, path);
+  }
+
+  /**
+   * Get data usando funções do schoolDatabase (quando disponível)
+   */
+  async getData(path) {
+    if (this.useSchoolDb && this.schoolDbFunctions?.getData) {
+      return await this.schoolDbFunctions.getData(path);
+    }
+    
+    // Fallback para método tradicional
+    const snapshot = await get(this.getDbRef(path));
+    return snapshot.exists() ? snapshot.val() : null;
+  }
+
+  /**
+   * Set data usando funções do schoolDatabase (quando disponível)
+   */
+  async setData(path, data) {
+    if (this.useSchoolDb && this.schoolDbFunctions?.setData) {
+      return await this.schoolDbFunctions.setData(path, data);
+    }
+    
+    // Fallback para método tradicional
+    return await set(this.getDbRef(path), data);
   }
 
   /**

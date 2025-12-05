@@ -208,11 +208,18 @@ const SecretariaDigital = () => {
 
   // Configurar banco da escola no service
   useEffect(() => {
-    if (schoolDb && isReady) {
+    if (isReady && currentSchool) {
       console.log('🏫 Configurando Secretaria Digital para escola:', currentSchool);
-      secretariaDigitalService.setSchoolDatabase(schoolDb);
+      secretariaDigitalService.setSchoolDatabaseFunctions({
+        db: schoolDb,
+        getData,
+        setData,
+        pushData,
+        updateData,
+        removeData
+      });
     }
-  }, [schoolDb, isReady, currentSchool]);
+  }, [isReady, currentSchool, schoolDb, getData, setData, pushData, updateData, removeData]);
 
   useEffect(() => {
     if (!accessLoading && userRole) {

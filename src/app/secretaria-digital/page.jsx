@@ -72,7 +72,7 @@ import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
 const SecretariaDigital = () => {
   // Hooks multi-tenant
   const { auditService, financeiroService, LOG_ACTIONS, isReady: servicesReady } = useSchoolServices();
-  const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, storage: schoolStorage } = useSchoolDatabase();
+  const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, storage: schoolStorage, db: schoolDb } = useSchoolDatabase();
 
   const [loading, setLoading] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -205,6 +205,14 @@ const SecretariaDigital = () => {
         : [...prev, ano].sort()
     );
   };
+
+  // Configurar banco da escola no service
+  useEffect(() => {
+    if (schoolDb && isReady) {
+      console.log('🏫 Configurando Secretaria Digital para escola:', currentSchool);
+      secretariaDigitalService.setSchoolDatabase(schoolDb);
+    }
+  }, [schoolDb, isReady, currentSchool]);
 
   useEffect(() => {
     if (!accessLoading && userRole) {

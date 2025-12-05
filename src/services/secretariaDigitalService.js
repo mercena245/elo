@@ -41,9 +41,27 @@ export const DOCUMENT_STATUS = {
 };
 
 class SecretariaDigitalService {
-  constructor() {
+  constructor(schoolDb = null) {
     this.baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
     this.historicoService = new HistoricoEscolarCompleto(this);
+    this.schoolDb = schoolDb; // Banco de dados específico da escola
+  }
+
+  /**
+   * Define o banco de dados da escola (multi-tenant)
+   */
+  setSchoolDatabase(schoolDb) {
+    this.schoolDb = schoolDb;
+  }
+
+  /**
+   * Obtém a referência do banco correto (escola específica ou global)
+   */
+  getDbRef(path) {
+    if (this.schoolDb) {
+      return ref(this.schoolDb, path);
+    }
+    return ref(db, path);
   }
 
   /**
@@ -73,7 +91,7 @@ class SecretariaDigitalService {
    */
   async getDadosAluno(alunoId) {
     try {
-      const alunoRef = ref(db, `alunos/${alunoId}`);
+      const alunoRef = this.getDbRef(`alunos/${alunoId}`);
       const snapshot = await get(alunoRef);
       
       if (snapshot.exists()) {
@@ -91,7 +109,7 @@ class SecretariaDigitalService {
    */
   async getNomeDisciplina(disciplinaId) {
     try {
-      const disciplinaRef = ref(db, `disciplinas/${disciplinaId}`);
+      const disciplinaRef = this.getDbRef(`disciplinas/${disciplinaId}`);
       const snapshot = await get(disciplinaRef);
       
       if (snapshot.exists()) {
@@ -100,7 +118,7 @@ class SecretariaDigitalService {
       }
       
       // Tentar buscar em Escola/Disciplinas (estrutura alternativa)
-      const escolaRef = ref(db, `Escola/Disciplinas/${disciplinaId}`);
+      const escolaRef = this.getDbRef(`Escola/Disciplinas/${disciplinaId}`);
       const escolaSnapshot = await get(escolaRef);
       
       if (escolaSnapshot.exists()) {
@@ -121,7 +139,7 @@ class SecretariaDigitalService {
    */
   async getDadosInstituicao() {
     try {
-      const configRef = ref(db, 'secretariaDigital/configuracoes/instituicao');
+      const configRef = this.getDbRef('secretariaDigital/configuracoes/instituicao');
       const snapshot = await get(configRef);
       
       if (snapshot.exists()) {
@@ -276,7 +294,7 @@ class SecretariaDigitalService {
       const documentoSanitizado = this.sanitizarDocumento(documento);
 
       // Salvar no Firebase
-      const documentoRef = ref(db, `secretariaDigital/documentos/historicos/${verificationCode}`);
+      const documentoRef = this.getDbRef(`secretariaDigital/documentos/declaracoes/${verificationCode}`);
       await set(documentoRef, documentoSanitizado);
 
       console.log('✅ [Histórico] Histórico completo gerado:', verificationCode);
@@ -342,7 +360,7 @@ class SecretariaDigitalService {
       documento.status = DOCUMENT_STATUS.ASSINADO;
 
       // Salvar no Firebase
-      const documentoRef = ref(db, `secretariaDigital/documentos/declaracoes/${verificationCode}`);
+      const documentoRef = this.getDbRef(`secretariaDigital/documentos/declaracoes/${verificationCode}`);
       await set(documentoRef, documento);
 
       // Log da ação
@@ -370,7 +388,7 @@ class SecretariaDigitalService {
       const tiposDocumento = ['historicos', 'declaracoes', 'certificados', 'transferencias'];
       
       for (const tipo of tiposDocumento) {
-        const documentoRef = ref(db, `secretariaDigital/documentos/${tipo}/${codigoVerificacao}`);
+        const documentoRef = this.getDbRef(`secretariaDigital/documentos/${tipo}/${codigoVerificacao}`);
         const snapshot = await get(documentoRef);
         
         if (snapshot.exists()) {
@@ -432,7 +450,7 @@ class SecretariaDigitalService {
       const tiposDocumento = tipo ? [tipo] : ['historicos', 'declaracoes', 'certificados', 'transferencias'];
       
       for (const tipoDoc of tiposDocumento) {
-        const documentosRef = ref(db, `secretariaDigital/documentos/${tipoDoc}`);
+        const documentosRef = this.getDbRef(`secretariaDigital/documentos/${tipoDoc}`);
         const snapshot = await get(documentosRef);
         
         if (snapshot.exists()) {
@@ -471,7 +489,7 @@ class SecretariaDigitalService {
       const tiposDocumento = ['historicos', 'declaracoes', 'certificados', 'transferencias'];
       
       for (const tipo of tiposDocumento) {
-        const documentosRef = ref(db, `secretariaDigital/documentos/${tipo}`);
+        const documentosRef = this.getDbRef(`secretariaDigital/documentos/${tipo}`);
         const snapshot = await get(documentosRef);
         
         if (snapshot.exists()) {
@@ -501,7 +519,7 @@ class SecretariaDigitalService {
    */
   async configurarInstituicao(dados) {
     try {
-      const configRef = ref(db, 'secretariaDigital/configuracoes/instituicao');
+      const configRef = this.getDbRef('secretariaDigital/configuracoes/instituicao');
       await set(configRef, {
         ...dados,
         dataAtualizacao: new Date().toISOString()

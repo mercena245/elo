@@ -34,7 +34,13 @@ import {
   IconButton,
   Tooltip,
   Tab,
-  Tabs
+  Tabs,
+  Radio,
+  RadioGroup,
+  FormControlLabel,
+  FormLabel,
+  Checkbox,
+  FormGroup
 } from '@mui/material';
 import { 
   Description as HistoricoIcon,
@@ -80,6 +86,13 @@ const SecretariaDigital = () => {
   const [estatisticas, setEstatisticas] = useState(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
   const [tabValue, setTabValue] = useState(0);
+  
+  // Estados para seleção de períodos no histórico
+  const [anosDisponiveis, setAnosDisponiveis] = useState([]);
+  const [periodosSelecionados, setPeriodosSelecionados] = useState([]);
+  const [selecaoTipo, setSelecaoTipo] = useState('todos'); // 'todos', 'personalizado', 'faixa'
+  const [anoInicio, setAnoInicio] = useState('');
+  const [anoFim, setAnoFim] = useState('');
 
   const { 
     userRole, 
@@ -105,6 +118,74 @@ const SecretariaDigital = () => {
 
   const getDataNascimentoAluno = (doc) => {
     return doc?.aluno?.dataNascimento || doc?.dadosAluno?.dataNascimento || 'Data não disponível';
+  };
+
+  // Carregar anos disponíveis para um aluno
+  const carregarAnosDisponiveis = async (alunoId) => {
+    if (!isReady || !alunoId) return;
+    
+    try {
+      const notasData = await getData(`notas/${alunoId}`);
+      const frequenciaData = await getData(`frequencia/${alunoId}`);
+      
+      const anosNotas = notasData ? Object.keys(notasData) : [];
+      const anosFrequencia = frequenciaData ? Object.keys(frequenciaData) : [];
+      
+      // Combinar e remover duplicatas
+      const todosAnos = [...new Set([...anosNotas, ...anosFrequencia])].sort();
+      setAnosDisponiveis(todosAnos);
+      
+      // Selecionar todos por padrão
+      setPeriodosSelecionados(todosAnos);
+      setSelecaoTipo('todos');
+      
+      // Definir faixa padrão
+      if (todosAnos.length > 0) {
+        setAnoInicio(todosAnos[0]);
+        setAnoFim(todosAnos[todosAnos.length - 1]);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar anos disponíveis:', error);
+    }
+  };
+
+  // Atualizar períodos selecionados baseado no tipo de seleção
+  const handleSelecaoTipoChange = (tipo) => {
+    setSelecaoTipo(tipo);
+    
+    if (tipo === 'todos') {
+      setPeriodosSelecionados(anosDisponiveis);
+    } else if (tipo === 'faixa' && anoInicio && anoFim) {
+      const inicio = parseInt(anoInicio);
+      const fim = parseInt(anoFim);
+      const anosSelecionados = anosDisponiveis.filter(ano => {
+        const anoNum = parseInt(ano);
+        return anoNum >= inicio && anoNum <= fim;
+      });
+      setPeriodosSelecionados(anosSelecionados);
+    }
+  };
+
+  // Atualizar quando mudar a faixa
+  useEffect(() => {
+    if (selecaoTipo === 'faixa' && anoInicio && anoFim) {
+      const inicio = parseInt(anoInicio);
+      const fim = parseInt(anoFim);
+      const anosSelecionados = anosDisponiveis.filter(ano => {
+        const anoNum = parseInt(ano);
+        return anoNum >= inicio && anoNum <= fim;
+      });
+      setPeriodosSelecionados(anosSelecionados);
+    }
+  }, [anoInicio, anoFim, selecaoTipo, anosDisponiveis]);
+
+  // Toggle de seleção individual
+  const togglePeriodo = (ano) => {
+    setPeriodosSelecionados(prev => 
+      prev.includes(ano)
+        ? prev.filter(a => a !== ano)
+        : [...prev, ano].sort()
+    );
   };
 
   useEffect(() => {
@@ -189,9 +270,10 @@ const SecretariaDigital = () => {
       
       switch (dialogType) {
         case 'historico':
+          // Passar anos letivos selecionados ao invés de um único ano
           documento = await secretariaDigitalService.gerarHistoricoEscolar(
             selectedAluno, 
-            anoLetivo, 
+            periodosSelecionados.length > 0 ? periodosSelecionados : [anoLetivo], 
             observacoes
           );
           break;
@@ -702,7 +784,12 @@ const SecretariaDigital = () => {
                 <InputLabel>Aluno</InputLabel>
                 <Select
                   value={selectedAluno}
-                  onChange={(e) => setSelectedAluno(e.target.value)}
+                  onChange={(e) => {
+                    setSelectedAluno(e.target.value);
+                    if (dialogType === 'historico') {
+                      carregarAnosDisponiveis(e.target.value);
+                    }
+                  }}
                   label="Aluno"
                 >
                   {alunos.map((aluno) => (
@@ -713,15 +800,90 @@ const SecretariaDigital = () => {
                 </Select>
               </FormControl>
 
-              {dialogType === 'historico' && (
-                <TextField
-                  fullWidth
-                  margin="normal"
-                  label="Ano Letivo"
-                  value={anoLetivo}
-                  onChange={(e) => setAnoLetivo(e.target.value)}
-                  type="number"
-                />
+              {dialogType === 'historico' && selectedAluno && (
+                <Box sx={{ mt: 3 }}>
+                  <FormControl component="fieldset" fullWidth>
+                    <FormLabel component="legend" sx={{ mb: 2, fontWeight: 'bold' }}>
+                      Selecionar Períodos do Histórico
+                    </FormLabel>
+                    <RadioGroup
+                      value={selecaoTipo}
+                      onChange={(e) => handleSelecaoTipoChange(e.target.value)}
+                    >
+                      <FormControlLabel 
+                        value="todos" 
+                        control={<Radio />} 
+                        label="Todos os períodos disponíveis" 
+                      />
+                      <FormControlLabel 
+                        value="faixa" 
+                        control={<Radio />} 
+                        label="Selecionar faixa de anos" 
+                      />
+                      <FormControlLabel 
+                        value="personalizado" 
+                        control={<Radio />} 
+                        label="Selecionar períodos específicos" 
+                      />
+                    </RadioGroup>
+                  </FormControl>
+
+                  {selecaoTipo === 'faixa' && (
+                    <Grid container spacing={2} sx={{ mt: 1 }}>
+                      <Grid item xs={6}>
+                        <FormControl fullWidth>
+                          <InputLabel>Ano Início</InputLabel>
+                          <Select
+                            value={anoInicio}
+                            onChange={(e) => setAnoInicio(e.target.value)}
+                            label="Ano Início"
+                          >
+                            {anosDisponiveis.map((ano) => (
+                              <MenuItem key={ano} value={ano}>{ano}</MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
+                      </Grid>
+                      <Grid item xs={6}>
+                        <FormControl fullWidth>
+                          <InputLabel>Ano Fim</InputLabel>
+                          <Select
+                            value={anoFim}
+                            onChange={(e) => setAnoFim(e.target.value)}
+                            label="Ano Fim"
+                          >
+                            {anosDisponiveis.map((ano) => (
+                              <MenuItem key={ano} value={ano}>{ano}</MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
+                      </Grid>
+                    </Grid>
+                  )}
+
+                  {selecaoTipo === 'personalizado' && anosDisponiveis.length > 0 && (
+                    <FormGroup sx={{ mt: 2, pl: 2 }}>
+                      {anosDisponiveis.map((ano) => (
+                        <FormControlLabel
+                          key={ano}
+                          control={
+                            <Checkbox
+                              checked={periodosSelecionados.includes(ano)}
+                              onChange={() => togglePeriodo(ano)}
+                            />
+                          }
+                          label={`Ano ${ano}`}
+                        />
+                      ))}
+                    </FormGroup>
+                  )}
+
+                  <Alert severity="info" sx={{ mt: 2 }}>
+                    Períodos selecionados: {periodosSelecionados.length > 0 
+                      ? periodosSelecionados.join(', ') 
+                      : 'Nenhum período selecionado'}
+                  </Alert>
+                </Box>
               )}
 
               {dialogType === 'declaracao' && (

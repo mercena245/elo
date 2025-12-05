@@ -36,8 +36,8 @@ export class HistoricoEscolarCompleto {
       // 2. Dados da Instituição
       const dadosInstituicao = await this.service.getDadosInstituicao();
       
-      // 3. Histórico Acadêmico Completo
-      const historicoAcademico = await this.processarHistoricoAcademico(alunoId, dadosAluno);
+      // 3. Histórico Acadêmico Completo (com filtro de anos se especificado)
+      const historicoAcademico = await this.processarHistoricoAcademico(alunoId, dadosAluno, opcoes);
       
       // 4. Dados de Matrícula e Transferências
       const historicoMatriculas = await this.processarHistoricoMatriculas(dadosAluno);
@@ -151,7 +151,7 @@ export class HistoricoEscolarCompleto {
   /**
    * Processar histórico acadêmico completo
    */
-  async processarHistoricoAcademico(alunoId, dadosAluno) {
+  async processarHistoricoAcademico(alunoId, dadosAluno, opcoes = {}) {
     const historicoCompleto = [];
     
     // Buscar dados do histórico acadêmico estruturado
@@ -167,7 +167,14 @@ export class HistoricoEscolarCompleto {
     const todasTurmas = turmasSnapshot.exists() ? turmasSnapshot.val() : {};
 
     // Processar cada ano letivo do histórico
-    const anosLetivos = Object.keys(historicoAcademico).sort();
+    let anosLetivos = Object.keys(historicoAcademico).sort();
+    
+    // 🆕 Filtrar por anos selecionados se especificado
+    if (opcoes.anosLetivos && opcoes.anosLetivos.length > 0) {
+      const anosSelecionados = opcoes.anosLetivos.map(String);
+      anosLetivos = anosLetivos.filter(ano => anosSelecionados.includes(ano));
+      console.log(`📅 Filtrando anos selecionados: ${anosLetivos.join(', ')}`);
+    }
     
     for (const anoLetivo of anosLetivos) {
       const dadosAno = historicoAcademico[anoLetivo];

@@ -90,6 +90,11 @@ const SecretariaDigital = () => {
     filtrarAlunosPermitidos
   } = useSecretariaAccess();
 
+  // Helper para obter nome do aluno de forma segura (compatibilidade v2.0 e v3.0)
+  const getNomeAluno = (doc) => {
+    return doc?.aluno?.nome || doc?.dadosAluno?.nome || 'Nome não disponível';
+  };
+
   useEffect(() => {
     if (!accessLoading && userRole) {
       carregarDados();
@@ -247,17 +252,18 @@ const SecretariaDigital = () => {
 
   const baixarDocumento = async (documento) => {
     try {
+      const nomeAluno = getNomeAluno(documento);
       const pdf = await secretariaDigitalService.gerarPDF(documento);
-      pdf.save(`${documento.tipo}_${documento.dadosAluno.nome}_${documento.codigoVerificacao}.pdf`);
+      pdf.save(`${documento.tipo}_${nomeAluno}_${documento.codigoVerificacao}.pdf`);
       
       await auditService?.logAction({
         action: 'DIGITAL_SECRETARY_DOCUMENT_DOWNLOADED',
         entityId: documento.id,
-        details: `Download do documento ${documento.tipo} do aluno ${documento.dadosAluno.nome}`,
+        details: `Download do documento ${documento.tipo} do aluno ${nomeAluno}`,
         changes: {
           documentoId: documento.id,
           tipoDocumento: documento.tipo,
-          alunoNome: documento.dadosAluno.nome
+          alunoNome: nomeAluno
         }
       });
       
@@ -628,7 +634,7 @@ const SecretariaDigital = () => {
                           >
                             <Box component="span" sx={{ display: 'flex', alignItems: 'center' }}>
                               <PersonIcon sx={{ fontSize: 14, mr: 0.5 }} />
-                              {doc.dadosAluno.nome}
+                              {getNomeAluno(doc)}
                             </Box>
                             <Box component="span" sx={{ display: 'flex', alignItems: 'center' }}>
                               <QrCodeIcon sx={{ fontSize: 12, mr: 0.5 }} />

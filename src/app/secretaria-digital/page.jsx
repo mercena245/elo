@@ -772,14 +772,20 @@ const SecretariaDigital = () => {
 
         {/* Dialog para Gerar Documentos (apenas coordenadora) */}
         {userRole === 'coordenadora' && (
-          <Dialog open={dialogOpen} onClose={fecharDialog} maxWidth="sm" fullWidth>
-            <DialogTitle>
-              {dialogType === 'historico' && 'Gerar Histórico Escolar'}
-              {dialogType === 'declaracao' && 'Gerar Declaração'}
-              {dialogType === 'certificado' && 'Gerar Certificado'}
-              {dialogType === 'transferencia' && 'Gerar Transferência'}
+          <Dialog open={dialogOpen} onClose={fecharDialog} maxWidth="md" fullWidth>
+            <DialogTitle sx={{ 
+              bgcolor: 'primary.main', 
+              color: 'white',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.12)'
+            }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                {dialogType === 'historico' && <><HistoricoIcon /> Gerar Histórico Escolar</>}
+                {dialogType === 'declaracao' && <><DeclaracaoIcon /> Gerar Declaração</>}
+                {dialogType === 'certificado' && <><CertificadoIcon /> Gerar Certificado</>}
+                {dialogType === 'transferencia' && <><TransferenciaIcon /> Gerar Transferência</>}
+              </Box>
             </DialogTitle>
-            <DialogContent>
+            <DialogContent sx={{ pt: 3 }}>
               <FormControl fullWidth margin="normal">
                 <InputLabel>Aluno</InputLabel>
                 <Select
@@ -800,90 +806,145 @@ const SecretariaDigital = () => {
                 </Select>
               </FormControl>
 
-              {dialogType === 'historico' && selectedAluno && (
-                <Box sx={{ mt: 3 }}>
-                  <FormControl component="fieldset" fullWidth>
-                    <FormLabel component="legend" sx={{ mb: 2, fontWeight: 'bold' }}>
-                      Selecionar Períodos do Histórico
-                    </FormLabel>
-                    <RadioGroup
-                      value={selecaoTipo}
-                      onChange={(e) => handleSelecaoTipoChange(e.target.value)}
-                    >
-                      <FormControlLabel 
-                        value="todos" 
-                        control={<Radio />} 
-                        label="Todos os períodos disponíveis" 
-                      />
-                      <FormControlLabel 
-                        value="faixa" 
-                        control={<Radio />} 
-                        label="Selecionar faixa de anos" 
-                      />
-                      <FormControlLabel 
-                        value="personalizado" 
-                        control={<Radio />} 
-                        label="Selecionar períodos específicos" 
-                      />
-                    </RadioGroup>
-                  </FormControl>
+              {dialogType === 'historico' && selectedAluno && anosDisponiveis.length > 0 && (
+                <Paper elevation={2} sx={{ mt: 3, p: 3, bgcolor: '#f8fafc' }}>
+                  <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold', color: 'primary.main', mb: 2 }}>
+                    📅 Selecionar Períodos do Histórico
+                  </Typography>
+                  
+                  <RadioGroup
+                    value={selecaoTipo}
+                    onChange={(e) => handleSelecaoTipoChange(e.target.value)}
+                  >
+                    <FormControlLabel 
+                      value="todos" 
+                      control={<Radio color="primary" />} 
+                      label={
+                        <Box>
+                          <Typography variant="body1" fontWeight={500}>Todos os períodos disponíveis</Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            Incluir todo o histórico acadêmico do aluno
+                          </Typography>
+                        </Box>
+                      }
+                      sx={{ mb: 1, p: 1.5, borderRadius: 1, '&:hover': { bgcolor: 'action.hover' } }}
+                    />
+                    <FormControlLabel 
+                      value="faixa" 
+                      control={<Radio color="primary" />} 
+                      label={
+                        <Box>
+                          <Typography variant="body1" fontWeight={500}>Selecionar faixa de anos</Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            Escolher um período específico (ex: 2020 a 2023)
+                          </Typography>
+                        </Box>
+                      }
+                      sx={{ mb: 1, p: 1.5, borderRadius: 1, '&:hover': { bgcolor: 'action.hover' } }}
+                    />
+                    <FormControlLabel 
+                      value="personalizado" 
+                      control={<Radio color="primary" />} 
+                      label={
+                        <Box>
+                          <Typography variant="body1" fontWeight={500}>Selecionar anos específicos</Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            Escolher manualmente quais anos incluir
+                          </Typography>
+                        </Box>
+                      }
+                      sx={{ p: 1.5, borderRadius: 1, '&:hover': { bgcolor: 'action.hover' } }}
+                    />
+                  </RadioGroup>
 
                   {selecaoTipo === 'faixa' && (
-                    <Grid container spacing={2} sx={{ mt: 1 }}>
-                      <Grid item xs={6}>
-                        <FormControl fullWidth>
-                          <InputLabel>Ano Início</InputLabel>
-                          <Select
-                            value={anoInicio}
-                            onChange={(e) => setAnoInicio(e.target.value)}
-                            label="Ano Início"
-                          >
-                            {anosDisponiveis.map((ano) => (
-                              <MenuItem key={ano} value={ano}>{ano}</MenuItem>
-                            ))}
-                          </Select>
-                        </FormControl>
+                    <Box sx={{ mt: 3, p: 2, bgcolor: 'white', borderRadius: 1, border: '1px solid #e2e8f0' }}>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                        Selecione o intervalo de anos:
+                      </Typography>
+                      <Grid container spacing={2}>
+                        <Grid item xs={6}>
+                          <FormControl fullWidth size="small">
+                            <InputLabel>Ano Início</InputLabel>
+                            <Select
+                              value={anoInicio}
+                              onChange={(e) => setAnoInicio(e.target.value)}
+                              label="Ano Início"
+                            >
+                              {anosDisponiveis.map((ano) => (
+                                <MenuItem key={ano} value={ano}>{ano}</MenuItem>
+                              ))}
+                            </Select>
+                          </FormControl>
+                        </Grid>
+                        <Grid item xs={6}>
+                          <FormControl fullWidth size="small">
+                            <InputLabel>Ano Fim</InputLabel>
+                            <Select
+                              value={anoFim}
+                              onChange={(e) => setAnoFim(e.target.value)}
+                              label="Ano Fim"
+                            >
+                              {anosDisponiveis.map((ano) => (
+                                <MenuItem key={ano} value={ano}>{ano}</MenuItem>
+                              ))}
+                            </Select>
+                          </FormControl>
+                        </Grid>
                       </Grid>
-                      <Grid item xs={6}>
-                        <FormControl fullWidth>
-                          <InputLabel>Ano Fim</InputLabel>
-                          <Select
-                            value={anoFim}
-                            onChange={(e) => setAnoFim(e.target.value)}
-                            label="Ano Fim"
-                          >
-                            {anosDisponiveis.map((ano) => (
-                              <MenuItem key={ano} value={ano}>{ano}</MenuItem>
-                            ))}
-                          </Select>
-                        </FormControl>
-                      </Grid>
-                    </Grid>
+                    </Box>
                   )}
 
-                  {selecaoTipo === 'personalizado' && anosDisponiveis.length > 0 && (
-                    <FormGroup sx={{ mt: 2, pl: 2 }}>
-                      {anosDisponiveis.map((ano) => (
-                        <FormControlLabel
-                          key={ano}
-                          control={
-                            <Checkbox
-                              checked={periodosSelecionados.includes(ano)}
-                              onChange={() => togglePeriodo(ano)}
-                            />
-                          }
-                          label={`Ano ${ano}`}
-                        />
-                      ))}
-                    </FormGroup>
+                  {selecaoTipo === 'personalizado' && (
+                    <Box sx={{ mt: 3, p: 2, bgcolor: 'white', borderRadius: 1, border: '1px solid #e2e8f0' }}>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                        Marque os anos que deseja incluir:
+                      </Typography>
+                      <FormGroup>
+                        <Grid container spacing={1}>
+                          {anosDisponiveis.map((ano) => (
+                            <Grid item xs={6} sm={4} key={ano}>
+                              <FormControlLabel
+                                control={
+                                  <Checkbox
+                                    checked={periodosSelecionados.includes(ano)}
+                                    onChange={() => togglePeriodo(ano)}
+                                    color="primary"
+                                  />
+                                }
+                                label={`Ano ${ano}`}
+                                sx={{ 
+                                  m: 0,
+                                  p: 1,
+                                  borderRadius: 1,
+                                  '&:hover': { bgcolor: 'action.hover' }
+                                }}
+                              />
+                            </Grid>
+                          ))}
+                        </Grid>
+                      </FormGroup>
+                    </Box>
                   )}
 
-                  <Alert severity="info" sx={{ mt: 2 }}>
-                    Períodos selecionados: {periodosSelecionados.length > 0 
-                      ? periodosSelecionados.join(', ') 
-                      : 'Nenhum período selecionado'}
+                  <Alert 
+                    severity={periodosSelecionados.length > 0 ? "success" : "warning"} 
+                    icon={periodosSelecionados.length > 0 ? "✓" : "⚠️"}
+                    sx={{ mt: 2 }}
+                  >
+                    <Typography variant="body2" fontWeight={500}>
+                      {periodosSelecionados.length > 0 
+                        ? `${periodosSelecionados.length} período(s) selecionado(s): ${periodosSelecionados.join(', ')}` 
+                        : 'Nenhum período selecionado'}
+                    </Typography>
                   </Alert>
-                </Box>
+                </Paper>
+              )}
+
+              {dialogType === 'historico' && selectedAluno && anosDisponiveis.length === 0 && (
+                <Alert severity="warning" sx={{ mt: 2 }}>
+                  Nenhum histórico acadêmico encontrado para este aluno.
+                </Alert>
               )}
 
               {dialogType === 'declaracao' && (

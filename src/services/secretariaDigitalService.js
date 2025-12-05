@@ -9,6 +9,7 @@ import { logAction } from './auditService';
 import jsPDF from 'jspdf';
 import QRCode from 'qrcode';
 import { PDFGenerator } from '../utils/pdfGenerator';
+import HistoricoEscolarCompleto from './historicoEscolarService';
 import {
   gerarCertificadoConclusao,
   gerarGuiaTransferencia,
@@ -42,6 +43,7 @@ export const DOCUMENT_STATUS = {
 class SecretariaDigitalService {
   constructor() {
     this.baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+    this.historicoService = new HistoricoEscolarCompleto(this);
   }
 
   /**
@@ -228,202 +230,37 @@ class SecretariaDigitalService {
   }
 
   /**
-   * Gerar Histórico Escolar Digital - NOVA VERSÃO COM PRESERVAÇÃO DE HISTÓRICO
+   * Gerar Histórico Escolar Digital - VERSÃO 3.0 COMPLETA
+   * Inclui todas as informações acadêmicas conforme normas do MEC
    */
   async gerarHistoricoEscolar(alunoId, anosLetivos = [], observacoes = '') {
     try {
-      const dadosAluno = await this.getDadosAluno(alunoId);
-      const dadosInstituicao = await this.getDadosInstituicao();
+      console.log('📚 [Histórico] Gerando histórico escolar completo para:', alunoId);
+      
       const verificationCode = this.generateVerificationCode();
       
-      // 🆕 Buscar histórico acadêmico completo do aluno
-      const historicoAcademico = dadosAluno.historicoAcademico || {};
-      const periodosAcademicos = [];
-      
-      // Se não especificou anos, pegar todos os períodos do histórico
-      const anosProcurar = anosLetivos.length > 0 ? anosLetivos : Object.keys(historicoAcademico);
-      
-      if (anosProcurar.length === 0) {
-        // Fallback para sistema antigo - usar ano atual
-        const anoAtual = new Date().getFullYear().toString();
-        anosProcurar.push(anoAtual);
-      }
+      // 🆕 Usar novo serviço de histórico completo
+      const dadosCompletos = await this.historicoService.coletarDadosCompletos(alunoId, {
+        anosLetivos: anosLetivos,
+        observacoes: observacoes
+      });
 
-      // Buscar todas as notas e frequências uma única vez (mais eficiente e sem precisar de índice)
-      const notasRef = ref(db, 'notas');
-      const notasSnapshot = await get(notasRef);
-      
-      const frequenciaRef = ref(db, 'frequencia');
-      const frequenciaSnapshot = await get(frequenciaRef);
-      
-      // Para cada ano letivo, processar dados
-      for (const anoLetivo of anosProcurar) {
-        const periodoDados = historicoAcademico[anoLetivo];
-        
-        const disciplinasNotas = new Map();
-        const disciplinasFrequencia = new Map();
-
-        // Processar notas
-        if (notasSnapshot.exists()) {
-          Object.values(notasSnapshot.val()).forEach(nota => {
-            // 🔍 Filtrar apenas notas deste aluno
-            if (nota.alunoId !== alunoId) return;
-            
-            // Filtrar por ano letivo - priorizar campo anoLetivo, fallback para turmaId do período
-            const notaAnoLetivo = nota.anoLetivo || anoLetivo;
-            const turmaNotaId = nota.turmaId;
-            const turmaPeriodoId = periodoDados?.turmaId;
-            
-            if (notaAnoLetivo === anoLetivo || turmaNotaId === turmaPeriodoId) {
-              const disciplinaId = nota.disciplinaId;
-              if (!disciplinasNotas.has(disciplinaId)) {
-                disciplinasNotas.set(disciplinaId, {
-                  disciplinaId,
-                  nome: nota.disciplinaNome || disciplinaId,
-                  notas: {},
-                  mediaFinal: 0,
-                  situacao: 'Pendente'
-                });
-              }
-              
-              const disciplina = disciplinasNotas.get(disciplinaId);
-              disciplina.notas[nota.bimestre] = parseFloat(nota.nota);
-            }
-          });
-        }
-
-        // Processar frequência
-        if (frequenciaSnapshot.exists()) {
-          Object.values(frequenciaSnapshot.val()).forEach(freq => {
-            // 🔍 Filtrar apenas frequência deste aluno
-            if (freq.alunoId !== alunoId) return;
-            
-            const freqAnoLetivo = freq.anoLetivo || anoLetivo;
-            const turmaFreqId = freq.turmaId;
-            const turmaPeriodoId = periodoDados?.turmaId;
-            
-            if (freqAnoLetivo === anoLetivo || turmaFreqId === turmaPeriodoId) {
-              const disciplinaId = freq.disciplinaId;
-              if (!disciplinasFrequencia.has(disciplinaId)) {
-                disciplinasFrequencia.set(disciplinaId, {
-                  totalAulas: 0,
-                  totalPresencas: 0,
-                  percentualFrequencia: 0
-                });
-              }
-              
-              const disciplina = disciplinasFrequencia.get(disciplinaId);
-              disciplina.totalAulas++;
-              if (freq.presente) {
-                disciplina.totalPresencas++;
-              }
-            }
-          });
-        }
-
-        // Calcular estatísticas finais para cada disciplina
-        const disciplinasFinais = [];
-        
-        // Processar disciplinas em batch para obter nomes corretos
-        const disciplinaIds = Array.from(disciplinasNotas.keys());
-        const nomesDisciplinas = new Map();
-        
-        // Buscar nomes das disciplinas
-        for (const disciplinaId of disciplinaIds) {
-          const nomeCompleto = await this.getNomeDisciplina(disciplinaId);
-          nomesDisciplinas.set(disciplinaId, nomeCompleto);
-        }
-        
-        disciplinasNotas.forEach((disciplina, disciplinaId) => {
-          const notas = Object.values(disciplina.notas);
-          const mediaFinal = notas.length > 0 ? notas.reduce((sum, nota) => sum + nota, 0) / notas.length : 0;
-          
-          const freqData = disciplinasFrequencia.get(disciplinaId) || { totalAulas: 0, totalPresencas: 0 };
-          const percentualFrequencia = freqData.totalAulas > 0 ? 
-            (freqData.totalPresencas / freqData.totalAulas) * 100 : 100;
-          
-          const situacao = mediaFinal >= 7 && percentualFrequencia >= 75 ? 'Aprovado' : 'Reprovado';
-          
-          disciplinasFinais.push({
-            nome: disciplina.nome, // Nome original (fallback)
-            nomeCompleto: nomesDisciplinas.get(disciplinaId), // Nome correto do banco
-            disciplinaId: disciplinaId,
-            notas: disciplina.notas,
-            mediaFinal: parseFloat(mediaFinal.toFixed(2)),
-            frequencia: parseFloat(percentualFrequencia.toFixed(1)),
-            frequenciaPercentual: `${percentualFrequencia.toFixed(0)}%`,
-            totalAulas: freqData.totalAulas,
-            totalPresencas: freqData.totalPresencas,
-            totalFaltas: freqData.totalAulas - freqData.totalPresencas,
-            situacao
-          });
-        });
-
-        // Adicionar período ao histórico
-        if (disciplinasFinais.length > 0 || periodoDados) {
-          periodosAcademicos.push({
-            anoLetivo,
-            periodoLetivo: periodoDados?.periodoLetivo || `Período ${anoLetivo}`,
-            turmaId: periodoDados?.turmaId,
-            situacao: periodoDados?.situacao || 'Concluído',
-            dataInicio: periodoDados?.dataInicio,
-            dataFim: periodoDados?.dataFim,
-            resultadoFinal: periodoDados?.resultadoFinal || 
-              (disciplinasFinais.every(d => d.situacao === 'Aprovado') ? 'Aprovado' : 'Reprovado'),
-            disciplinas: disciplinasFinais
-          });
-        }
-      }
-
-      // Gerar documento final
+      // Montar documento final
       const documento = {
         id: verificationCode,
         tipo: DOCUMENT_TYPES.HISTORICO_ESCOLAR,
         status: DOCUMENT_STATUS.PENDENTE_ASSINATURA,
-        dadosAluno: {
-          nome: dadosAluno.nome || 'Nome não informado',
-          matricula: dadosAluno.matricula || alunoId,
-          cpf: dadosAluno.cpf || 'CPF não informado',
-          rg: dadosAluno.rg || 'RG não informado',
-          dataNascimento: dadosAluno.dataNascimento || 'Data não informada',
-          sexo: dadosAluno.sexo || 'M',
-          naturalidade: dadosAluno.naturalidade || 'Naturalidade não informada',
-          uf: dadosAluno.uf || 'UF não informada',
-          nomePai: dadosAluno.pai?.nome || dadosAluno.nomePai || 'Nome do pai não informado',
-          nomeMae: dadosAluno.mae?.nome || dadosAluno.nomeMae || 'Nome da mãe não informado'
-        },
         
-        // Adicionar matrícula diretamente no documento também
-        matricula: dadosAluno.matricula || alunoId,
-        alunoId: alunoId,
+        // Dados completos do histórico
+        ...dadosCompletos,
         
-        // 🆕 Nova estrutura com histórico completo
-        historicoCompleto: {
-          totalPeriodos: periodosAcademicos.length,
-          periodosAcademicos: periodosAcademicos,
-          situacaoGeral: periodosAcademicos.every(p => p.resultadoFinal === 'Aprovado') ? 'Aprovado' : 'Em Análise'
-        },
-        
-        // Manter compatibilidade com estrutura antiga
-        curso: {
-          nome: dadosAluno.serie || 'Ensino Fundamental',
-          nivel: 'Fundamental',
-          anosLetivos: anosProcurar,
-          cargaHoraria: `${periodosAcademicos.length * 800} horas`
-        },
-        
-        // Resumo das disciplinas (para compatibilidade)
-        disciplinas: periodosAcademicos.flatMap(p => p.disciplinas || []),
-        situacaoFinal: periodosAcademicos.every(p => p.resultadoFinal === 'Aprovado') ? 'Aprovado' : 'Pendente',
-        observacoes: observacoes,
-        dadosInstituicao: dadosInstituicao,
-        dataEmissao: new Date().toISOString(),
+        // Código de verificação
         codigoVerificacao: verificationCode,
+        dataEmissao: new Date().toISOString(),
         
-        // 🆕 Metadados do novo sistema
-        versaoSistema: '2.0',
-        preservacaoHistorico: true,
-        totalRematriculas: dadosAluno.historicoRematriculas?.length || 0
+        // Versão do sistema
+        versaoSistema: '3.0',
+        versaoCompleta: true
       };
 
       // Gerar QR Code
@@ -431,7 +268,7 @@ class SecretariaDigitalService {
       documento.qrCode = qrCode;
 
       // Simular assinatura digital
-      const assinatura = await this.simularAssinaturaDigital(documento, dadosInstituicao.responsavel);
+      const assinatura = await this.simularAssinaturaDigital(documento, dadosCompletos.instituicao.responsavel);
       documento.assinatura = assinatura;
       documento.status = DOCUMENT_STATUS.ASSINADO;
 
@@ -442,19 +279,22 @@ class SecretariaDigitalService {
       const documentoRef = ref(db, `secretariaDigital/documentos/historicos/${verificationCode}`);
       await set(documentoRef, documentoSanitizado);
 
+      console.log('✅ [Histórico] Histórico completo gerado:', verificationCode);
+
       // Log da ação
       await logAction('DIGITAL_SECRETARY_HISTORIC_GENERATED', {
         alunoId: alunoId,
-        alunoNome: dadosAluno.nome,
-        anosLetivos: anosProcurar,
-        totalPeriodos: periodosAcademicos.length,
+        alunoNome: dadosCompletos.aluno.nome,
+        totalAnos: dadosCompletos.resumo.totalAnos,
+        totalDisciplinas: dadosCompletos.resumo.totalDisciplinas,
+        cargaHorariaTotal: dadosCompletos.resumo.cargaHorariaTotal,
         codigoVerificacao: verificationCode,
-        documentoId: documento.id
+        versao: '3.0'
       });
 
       return documento;
     } catch (error) {
-      console.error('Erro ao gerar histórico escolar:', error);
+      console.error('❌ [Histórico] Erro ao gerar histórico escolar:', error);
       throw error;
     }
   }

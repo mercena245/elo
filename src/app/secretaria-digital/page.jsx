@@ -125,14 +125,31 @@ const SecretariaDigital = () => {
     if (!isReady || !alunoId) return;
     
     try {
+      // Buscar dados do aluno
+      const alunoData = await getData(`alunos/${alunoId}`);
+      
+      if (!alunoData) {
+        console.warn('Aluno não encontrado:', alunoId);
+        setAnosDisponiveis([]);
+        return;
+      }
+
+      // 1. Buscar anos do histórico acadêmico estruturado
+      const historicoAcademico = alunoData.historicoAcademico || {};
+      const anosHistorico = Object.keys(historicoAcademico);
+      
+      // 2. Buscar anos das notas e frequência (fallback/complemento)
       const notasData = await getData(`notas/${alunoId}`);
       const frequenciaData = await getData(`frequencia/${alunoId}`);
       
       const anosNotas = notasData ? Object.keys(notasData) : [];
       const anosFrequencia = frequenciaData ? Object.keys(frequenciaData) : [];
       
-      // Combinar e remover duplicatas
-      const todosAnos = [...new Set([...anosNotas, ...anosFrequencia])].sort();
+      // Combinar todas as fontes e remover duplicatas
+      const todosAnos = [...new Set([...anosHistorico, ...anosNotas, ...anosFrequencia])].sort();
+      
+      console.log('📅 Anos disponíveis encontrados:', todosAnos);
+      
       setAnosDisponiveis(todosAnos);
       
       // Selecionar todos por padrão
@@ -146,6 +163,7 @@ const SecretariaDigital = () => {
       }
     } catch (error) {
       console.error('Erro ao carregar anos disponíveis:', error);
+      setAnosDisponiveis([]);
     }
   };
 

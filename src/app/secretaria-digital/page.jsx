@@ -95,6 +95,18 @@ const SecretariaDigital = () => {
     return doc?.aluno?.nome || doc?.dadosAluno?.nome || 'Nome não disponível';
   };
 
+  const getCpfAluno = (doc) => {
+    return doc?.aluno?.cpf || doc?.dadosAluno?.cpf || 'CPF não disponível';
+  };
+
+  const getRgAluno = (doc) => {
+    return doc?.aluno?.rg || doc?.dadosAluno?.rg || 'RG não disponível';
+  };
+
+  const getDataNascimentoAluno = (doc) => {
+    return doc?.aluno?.dataNascimento || doc?.dadosAluno?.dataNascimento || 'Data não disponível';
+  };
+
   useEffect(() => {
     if (!accessLoading && userRole) {
       carregarDados();
@@ -571,7 +583,7 @@ const SecretariaDigital = () => {
                             Turma: {aluno.turma}
                           </Typography>
                           <Chip 
-                            label={`${documentos.filter(d => d.dadosAluno.nome === aluno.nome).length} documentos`}
+                            label={`${documentos.filter(d => getNomeAluno(d) === aluno.nome).length} documentos`}
                             size="small"
                             color="primary"
                             sx={{ mt: 1 }}
@@ -779,7 +791,7 @@ const SecretariaDigital = () => {
               </Typography>
               {documentoVisualizado && (
                 <Typography variant="body2" color="text.secondary">
-                  {getDocumentTypeLabel(documentoVisualizado.tipo)} - {documentoVisualizado.dadosAluno.nome}
+                  {getDocumentTypeLabel(documentoVisualizado.tipo)} - {getNomeAluno(documentoVisualizado)}
                 </Typography>
               )}
             </Box>
@@ -814,19 +826,19 @@ const SecretariaDigital = () => {
                   <Grid container spacing={2}>
                     <Grid item xs={12} sm={6}>
                       <Typography variant="body2" color="text.secondary">Nome:</Typography>
-                      <Typography variant="body1">{documentoVisualizado.dadosAluno.nome}</Typography>
+                      <Typography variant="body1">{getNomeAluno(documentoVisualizado)}</Typography>
                     </Grid>
                     <Grid item xs={12} sm={6}>
                       <Typography variant="body2" color="text.secondary">CPF:</Typography>
-                      <Typography variant="body1">{documentoVisualizado.dadosAluno.cpf}</Typography>
+                      <Typography variant="body1">{getCpfAluno(documentoVisualizado)}</Typography>
                     </Grid>
                     <Grid item xs={12} sm={6}>
                       <Typography variant="body2" color="text.secondary">RG:</Typography>
-                      <Typography variant="body1">{documentoVisualizado.dadosAluno.rg}</Typography>
+                      <Typography variant="body1">{getRgAluno(documentoVisualizado)}</Typography>
                     </Grid>
                     <Grid item xs={12} sm={6}>
                       <Typography variant="body2" color="text.secondary">Data de Nascimento:</Typography>
-                      <Typography variant="body1">{documentoVisualizado.dadosAluno.dataNascimento}</Typography>
+                      <Typography variant="body1">{getDataNascimentoAluno(documentoVisualizado)}</Typography>
                     </Grid>
                   </Grid>
                 </Paper>

@@ -844,36 +844,38 @@ const SecretariaDigital = () => {
                 </Paper>
 
                 {/* Histórico Acadêmico */}
-                {documentoVisualizado.historicoCompleto?.periodosAcademicos && (
+                {documentoVisualizado.historicoAcademico && documentoVisualizado.historicoAcademico.length > 0 && (
                   <Paper elevation={1} sx={{ p: 3, mb: 3 }}>
                     <Typography variant="h6" gutterBottom color="primary">
                       Histórico Acadêmico
                     </Typography>
-                    {documentoVisualizado.historicoCompleto.periodosAcademicos.map((periodo, index) => (
+                    {documentoVisualizado.historicoAcademico.map((ano, index) => (
                       <Box key={index} sx={{ mb: 3 }}>
                         <Typography variant="subtitle1" fontWeight="bold">
-                          {periodo.anoLetivo} - {periodo.periodoLetivo}
+                          {ano.anoLetivo} - {ano.serie} ({ano.turma})
                         </Typography>
                         <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                          Situação: {periodo.resultadoFinal || 'Em andamento'}
+                          Situação: {ano.situacao || 'Em andamento'} | Carga Horária: {ano.cargaHoraria || 0}h
                         </Typography>
                         
-                        {periodo.disciplinas && periodo.disciplinas.length > 0 && (
+                        {ano.disciplinas && ano.disciplinas.length > 0 && (
                           <Box sx={{ mt: 2 }}>
                             <Typography variant="body2" fontWeight="bold" gutterBottom>
-                              Disciplinas:
+                              Disciplinas ({ano.disciplinas.length}):
                             </Typography>
                             <Grid container spacing={1}>
-                              {periodo.disciplinas.map((disciplina, discIndex) => (
+                              {ano.disciplinas.map((disciplina, discIndex) => (
                                 <Grid item xs={12} sm={6} key={discIndex}>
                                   <Box sx={{ p: 1, border: '1px solid #e0e0e0', borderRadius: 1 }}>
                                     <Typography variant="body2" fontWeight="bold">
                                       {disciplina.nome}
                                     </Typography>
                                     <Typography variant="caption" display="block">
-                                      Média: {disciplina.mediaFinal || 'N/A'} | 
-                                      Frequência: {disciplina.frequencia || 'N/A'}% | 
-                                      Situação: {disciplina.situacao || 'Pendente'}
+                                      Média: {disciplina.mediaFinal?.toFixed(1) || 'N/A'} | 
+                                      Frequência: {disciplina.frequenciaPercentual?.toFixed(1) || 'N/A'}%
+                                    </Typography>
+                                    <Typography variant="caption" display="block" color={disciplina.aprovado ? 'success.main' : 'error.main'}>
+                                      {disciplina.situacao || 'Pendente'}
                                     </Typography>
                                   </Box>
                                 </Grid>
@@ -883,6 +885,45 @@ const SecretariaDigital = () => {
                         )}
                       </Box>
                     ))}
+                  </Paper>
+                )}
+
+                {/* Resumo Geral */}
+                {documentoVisualizado.resumo && (
+                  <Paper elevation={1} sx={{ p: 3, mb: 3 }}>
+                    <Typography variant="h6" gutterBottom color="primary">
+                      Resumo Geral
+                    </Typography>
+                    <Grid container spacing={2}>
+                      <Grid item xs={6} sm={3}>
+                        <Typography variant="body2" color="text.secondary">Anos Cursados:</Typography>
+                        <Typography variant="h6">{documentoVisualizado.resumo.totalAnos || 0}</Typography>
+                      </Grid>
+                      <Grid item xs={6} sm={3}>
+                        <Typography variant="body2" color="text.secondary">Total Disciplinas:</Typography>
+                        <Typography variant="h6">{documentoVisualizado.resumo.totalDisciplinas || 0}</Typography>
+                      </Grid>
+                      <Grid item xs={6} sm={3}>
+                        <Typography variant="body2" color="text.secondary">Média Geral:</Typography>
+                        <Typography variant="h6" color="primary">
+                          {documentoVisualizado.resumo.mediaGeral?.toFixed(2) || 'N/A'}
+                        </Typography>
+                      </Grid>
+                      <Grid item xs={6} sm={3}>
+                        <Typography variant="body2" color="text.secondary">Frequência Geral:</Typography>
+                        <Typography variant="h6" color="success.main">
+                          {documentoVisualizado.resumo.frequenciaGeral?.toFixed(1) || 'N/A'}%
+                        </Typography>
+                      </Grid>
+                      <Grid item xs={12}>
+                        <Typography variant="body2" color="text.secondary">Situação:</Typography>
+                        <Chip 
+                          label={documentoVisualizado.resumo.situacaoGeral || 'Em Andamento'}
+                          color={documentoVisualizado.resumo.situacaoGeral === 'Concluído' ? 'success' : 'default'}
+                          sx={{ mt: 0.5 }}
+                        />
+                      </Grid>
+                    </Grid>
                   </Paper>
                 )}
 

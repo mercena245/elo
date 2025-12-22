@@ -22,6 +22,7 @@ const AlunosListSection = ({
   toggleCardExpansao,
   editarAluno,
   confirmarInativacao,
+  handleAbrirSelecaoTemplate,
   userRole,
   getTurmaNome
 }) => {
@@ -88,6 +89,22 @@ const AlunosListSection = ({
                             }}
                           >
                             ✏️ Editar
+                          </Button>
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            onClick={() => handleAbrirSelecaoTemplate(aluno)}
+                            sx={{ 
+                              borderColor: '#10b981',
+                              color: '#10b981',
+                              '&:hover': {
+                                borderColor: '#059669',
+                                backgroundColor: '#10b981',
+                                color: 'white'
+                              }
+                            }}
+                          >
+                            📄 Gerar Contrato
                           </Button>
                           {userRole === 'coordenadora' && aluno.status === 'ativo' && (
                             <IconButton

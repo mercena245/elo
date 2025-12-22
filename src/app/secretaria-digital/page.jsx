@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import HistoricoEscolarPrint from '../../components/HistoricoEscolarPrint';
 import { 
   Container, 
   Typography, 
@@ -222,10 +223,11 @@ const SecretariaDigital = () => {
   }, [isReady, currentSchool, schoolDb, getData, setData, pushData, updateData, removeData]);
 
   useEffect(() => {
-    if (!accessLoading && userRole) {
+    if (!accessLoading && userRole && isReady) {
+      console.log('🔄 [SecretariaDigital] Iniciando carregamento de dados...');
       carregarDados();
     }
-  }, [accessLoading, userRole]);
+  }, [accessLoading, userRole, isReady]);
 
   const carregarDados = async () => {
     if (!isReady) {
@@ -235,36 +237,46 @@ const SecretariaDigital = () => {
 
     setLoading(true);
     try {
-      // Carregar alunos
+      console.log('📚 [SecretariaDigital] Carregando alunos...');
+      
+      // Carregar alunos diretamente do banco da escola
       let todosAlunos = [];
-      const alunosResponse = await fetch('/api/alunos');
-      if (alunosResponse.ok) {
-        const alunosData = await alunosResponse.json();
-        todosAlunos = alunosData;
-      } else {
-        // Fallback para buscar usando useSchoolDatabase
+      try {
         const alunosData = await getData('alunos');
+        console.log('📚 [SecretariaDigital] Dados de alunos:', alunosData ? 'encontrados' : 'não encontrados');
+        
         if (alunosData) {
           todosAlunos = Object.entries(alunosData)
-            .map(([id, aluno]) => ({ id, ...aluno }));
+            .filter(([id, aluno]) => aluno && typeof aluno === 'object')
+            .map(([id, aluno]) => ({ 
+              id, 
+              ...aluno,
+              nome: aluno.nome || aluno.nomeCompleto || 'Nome não informado'
+            }));
+          console.log(`📚 [SecretariaDigital] ${todosAlunos.length} alunos carregados`);
         }
+      } catch (error) {
+        console.error('❌ [SecretariaDigital] Erro ao carregar alunos:', error);
       }
 
       // Filtrar alunos baseado nas permissões
       const alunosPermitidos = filtrarAlunosPermitidos(todosAlunos);
+      console.log(`📚 [SecretariaDigital] ${alunosPermitidos.length} alunos permitidos após filtro`);
       setAlunos(alunosPermitidos);
 
       // Carregar documentos recentes
       const docs = await secretariaDigitalService.listarDocumentos(null, 50);
       const docsPermitidos = filtrarDocumentosPermitidos(docs);
       setDocumentos(docsPermitidos);
+      console.log(`📄 [SecretariaDigital] ${docsPermitidos.length} documentos carregados`);
 
       // Carregar estatísticas
       const stats = await secretariaDigitalService.obterEstatisticas();
       setEstatisticas(stats);
+      console.log('📊 [SecretariaDigital] Estatísticas carregadas:', stats);
 
     } catch (error) {
-      console.error('Erro ao carregar dados:', error);
+      console.error('❌ [SecretariaDigital] Erro ao carregar dados:', error);
       setSnackbar({ 
         open: true, 
         message: 'Erro ao carregar dados da secretaria digital', 
@@ -379,28 +391,28 @@ const SecretariaDigital = () => {
 
   const baixarDocumento = async (documento) => {
     try {
-      const nomeAluno = getNomeAluno(documento);
-      const pdf = await secretariaDigitalService.gerarPDF(documento);
-      pdf.save(`${documento.tipo}_${nomeAluno}_${documento.codigoVerificacao}.pdf`);
+      setLoading(true);
+      console.log('📥 [SecretariaDigital] Abrindo visualização para impressão:', documento.id);
       
-      await auditService?.logAction({
-        action: 'DIGITAL_SECRETARY_DOCUMENT_DOWNLOADED',
-        entityId: documento.id,
-        details: `Download do documento ${documento.tipo} do aluno ${nomeAluno}`,
-        changes: {
-          documentoId: documento.id,
-          tipoDocumento: documento.tipo,
-          alunoNome: nomeAluno
-        }
+      // Abrir modal de visualização ao invés de gerar PDF direto
+      setDocumentoVisualizado(documento);
+      setModalVisualizacao(true);
+      
+      setSnackbar({ 
+        open: true, 
+        message: 'Documento aberto para impressão. Use Ctrl+P para imprimir/salvar como PDF', 
+        severity: 'info' 
       });
       
     } catch (error) {
-      console.error('Erro ao baixar documento:', error);
+      console.error('❌ [SecretariaDigital] Erro ao abrir documento:', error);
       setSnackbar({ 
         open: true, 
-        message: 'Erro ao baixar documento', 
+        message: `Erro ao abrir documento: ${error.message}`, 
         severity: 'error' 
       });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -417,6 +429,11 @@ const SecretariaDigital = () => {
   const fecharVisualizacao = () => {
     setModalVisualizacao(false);
     setDocumentoVisualizado(null);
+  };
+
+  // 🆕 Função para imprimir documento
+  const imprimirDocumento = () => {
+    window.print();
   };
 
   const menuCardsCoord = [
@@ -1034,10 +1051,10 @@ const SecretariaDigital = () => {
         <Dialog 
           open={modalVisualizacao} 
           onClose={fecharVisualizacao}
-          maxWidth="md"
+          maxWidth="lg"
           fullWidth
           PaperProps={{
-            sx: { minHeight: '80vh' }
+            sx: { minHeight: '90vh', maxHeight: '90vh' }
           }}
         >
           <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1056,162 +1073,9 @@ const SecretariaDigital = () => {
             </IconButton>
           </DialogTitle>
           
-          <DialogContent dividers>
+          <DialogContent dividers sx={{ overflow: 'auto' }}>
             {documentoVisualizado && (
-              <Box sx={{ p: 2 }}>
-                {/* Cabeçalho do Documento */}
-                <Paper elevation={1} sx={{ p: 3, mb: 3, textAlign: 'center' }}>
-                  <Typography variant="h5" gutterBottom color="primary">
-                    {documentoVisualizado.dadosInstituicao?.nome || 'ESCOLA ELO'}
-                  </Typography>
-                  <Typography variant="h6" gutterBottom>
-                    {getDocumentTypeLabel(documentoVisualizado.tipo).toUpperCase()}
-                  </Typography>
-                  <Chip 
-                    label={documentoVisualizado.status} 
-                    color={getStatusColor(documentoVisualizado.status)}
-                    sx={{ mt: 1 }}
-                  />
-                </Paper>
-
-                {/* Dados do Aluno */}
-                <Paper elevation={1} sx={{ p: 3, mb: 3 }}>
-                  <Typography variant="h6" gutterBottom color="primary">
-                    Dados do Aluno
-                  </Typography>
-                  <Grid container spacing={2}>
-                    <Grid item xs={12} sm={6}>
-                      <Typography variant="body2" color="text.secondary">Nome:</Typography>
-                      <Typography variant="body1">{getNomeAluno(documentoVisualizado)}</Typography>
-                    </Grid>
-                    <Grid item xs={12} sm={6}>
-                      <Typography variant="body2" color="text.secondary">CPF:</Typography>
-                      <Typography variant="body1">{getCpfAluno(documentoVisualizado)}</Typography>
-                    </Grid>
-                    <Grid item xs={12} sm={6}>
-                      <Typography variant="body2" color="text.secondary">RG:</Typography>
-                      <Typography variant="body1">{getRgAluno(documentoVisualizado)}</Typography>
-                    </Grid>
-                    <Grid item xs={12} sm={6}>
-                      <Typography variant="body2" color="text.secondary">Data de Nascimento:</Typography>
-                      <Typography variant="body1">{getDataNascimentoAluno(documentoVisualizado)}</Typography>
-                    </Grid>
-                  </Grid>
-                </Paper>
-
-                {/* Histórico Acadêmico */}
-                {documentoVisualizado.historicoAcademico && documentoVisualizado.historicoAcademico.length > 0 && (
-                  <Paper elevation={1} sx={{ p: 3, mb: 3 }}>
-                    <Typography variant="h6" gutterBottom color="primary">
-                      Histórico Acadêmico
-                    </Typography>
-                    {documentoVisualizado.historicoAcademico.map((ano, index) => (
-                      <Box key={index} sx={{ mb: 3 }}>
-                        <Typography variant="subtitle1" fontWeight="bold">
-                          {ano.anoLetivo} - {ano.serie} ({ano.turma})
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                          Situação: {ano.situacao || 'Em andamento'} | Carga Horária: {ano.cargaHoraria || 0}h
-                        </Typography>
-                        
-                        {ano.disciplinas && ano.disciplinas.length > 0 && (
-                          <Box sx={{ mt: 2 }}>
-                            <Typography variant="body2" fontWeight="bold" gutterBottom>
-                              Disciplinas ({ano.disciplinas.length}):
-                            </Typography>
-                            <Grid container spacing={1}>
-                              {ano.disciplinas.map((disciplina, discIndex) => (
-                                <Grid item xs={12} sm={6} key={discIndex}>
-                                  <Box sx={{ p: 1, border: '1px solid #e0e0e0', borderRadius: 1 }}>
-                                    <Typography variant="body2" fontWeight="bold">
-                                      {disciplina.nome}
-                                    </Typography>
-                                    <Typography variant="caption" display="block">
-                                      Média: {disciplina.mediaFinal?.toFixed(1) || 'N/A'} | 
-                                      Frequência: {disciplina.frequenciaPercentual?.toFixed(1) || 'N/A'}%
-                                    </Typography>
-                                    <Typography variant="caption" display="block" color={disciplina.aprovado ? 'success.main' : 'error.main'}>
-                                      {disciplina.situacao || 'Pendente'}
-                                    </Typography>
-                                  </Box>
-                                </Grid>
-                              ))}
-                            </Grid>
-                          </Box>
-                        )}
-                      </Box>
-                    ))}
-                  </Paper>
-                )}
-
-                {/* Resumo Geral */}
-                {documentoVisualizado.resumo && (
-                  <Paper elevation={1} sx={{ p: 3, mb: 3 }}>
-                    <Typography variant="h6" gutterBottom color="primary">
-                      Resumo Geral
-                    </Typography>
-                    <Grid container spacing={2}>
-                      <Grid item xs={6} sm={3}>
-                        <Typography variant="body2" color="text.secondary">Anos Cursados:</Typography>
-                        <Typography variant="h6">{documentoVisualizado.resumo.totalAnos || 0}</Typography>
-                      </Grid>
-                      <Grid item xs={6} sm={3}>
-                        <Typography variant="body2" color="text.secondary">Total Disciplinas:</Typography>
-                        <Typography variant="h6">{documentoVisualizado.resumo.totalDisciplinas || 0}</Typography>
-                      </Grid>
-                      <Grid item xs={6} sm={3}>
-                        <Typography variant="body2" color="text.secondary">Média Geral:</Typography>
-                        <Typography variant="h6" color="primary">
-                          {documentoVisualizado.resumo.mediaGeral?.toFixed(2) || 'N/A'}
-                        </Typography>
-                      </Grid>
-                      <Grid item xs={6} sm={3}>
-                        <Typography variant="body2" color="text.secondary">Frequência Geral:</Typography>
-                        <Typography variant="h6" color="success.main">
-                          {documentoVisualizado.resumo.frequenciaGeral?.toFixed(1) || 'N/A'}%
-                        </Typography>
-                      </Grid>
-                      <Grid item xs={12}>
-                        <Typography variant="body2" color="text.secondary">Situação:</Typography>
-                        <Chip 
-                          label={documentoVisualizado.resumo.situacaoGeral || 'Em Andamento'}
-                          color={documentoVisualizado.resumo.situacaoGeral === 'Concluído' ? 'success' : 'default'}
-                          sx={{ mt: 0.5 }}
-                        />
-                      </Grid>
-                    </Grid>
-                  </Paper>
-                )}
-
-                {/* Informações do Documento */}
-                <Paper elevation={1} sx={{ p: 3 }}>
-                  <Typography variant="h6" gutterBottom color="primary">
-                    Informações do Documento
-                  </Typography>
-                  <Grid container spacing={2}>
-                    <Grid item xs={12} sm={6}>
-                      <Typography variant="body2" color="text.secondary">Código de Verificação:</Typography>
-                      <Typography variant="body1" fontFamily="monospace">
-                        {documentoVisualizado.codigoVerificacao}
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={12} sm={6}>
-                      <Typography variant="body2" color="text.secondary">Data de Emissão:</Typography>
-                      <Typography variant="body1">
-                        {new Date(documentoVisualizado.dataEmissao).toLocaleDateString('pt-BR')}
-                      </Typography>
-                    </Grid>
-                    {documentoVisualizado.totalRematriculas > 0 && (
-                      <Grid item xs={12}>
-                        <Typography variant="body2" color="text.secondary">Rematrículas:</Typography>
-                        <Typography variant="body1">
-                          {documentoVisualizado.totalRematriculas} rematrícula(s) registrada(s)
-                        </Typography>
-                      </Grid>
-                    )}
-                  </Grid>
-                </Paper>
-              </Box>
+              <HistoricoEscolarPrint documento={documentoVisualizado} />
             )}
           </DialogContent>
           
@@ -1219,18 +1083,14 @@ const SecretariaDigital = () => {
             <Button onClick={fecharVisualizacao}>
               Fechar
             </Button>
-            {documentoVisualizado && (
-              <Button 
-                variant="contained" 
-                startIcon={<DownloadIcon />}
-                onClick={() => {
-                  baixarDocumento(documentoVisualizado);
-                  fecharVisualizacao();
-                }}
-              >
-                Baixar PDF
-              </Button>
-            )}
+            <Button 
+              variant="contained" 
+              color="primary"
+              startIcon={<DownloadIcon />}
+              onClick={imprimirDocumento}
+            >
+              Imprimir / Salvar PDF
+            </Button>
           </DialogActions>
         </Dialog>
       </Container>

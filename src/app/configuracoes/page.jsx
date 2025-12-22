@@ -3,6 +3,7 @@ import SidebarMenu from '../../components/SidebarMenu';
 import AdminClaimChecker from '../../components/AdminClaimChecker';
 import DevClaimsAccordion from '../../components/DevClaimsAccordion';
 import LogsViewer from '../components/LogsViewer';
+import TemplatesContratos from '../../components/TemplatesContratos';
 import { 
   Box, 
   Typography, 
@@ -51,7 +52,8 @@ import {
   Storage as StorageIcon,
   ArrowBack,
   Notifications,
-  CheckCircle
+  CheckCircle,
+  Description as DescriptionIcon
 } from '@mui/icons-material';
 
 export default function Configuracoes() {
@@ -854,6 +856,7 @@ export default function Configuracoes() {
               />
               <Tab icon={<PeopleIcon />} iconPosition="start" label="Usuários do Sistema" />
               <Tab icon={<SecurityIcon />} iconPosition="start" label="Segurança" />
+              <Tab icon={<DescriptionIcon />} iconPosition="start" label="Templates e Contratos" />
               {devAccess && <Tab icon={<StorageIcon />} iconPosition="start" label="DEV" />}
             </Tabs>
           </Paper>
@@ -1127,8 +1130,20 @@ export default function Configuracoes() {
               </Card>
             )}
 
-            {/* ABA 4: DEV (só aparece se devAccess) */}
-            {devAccess && tabValue === 4 && (
+            {/* ABA 4: Templates e Contratos */}
+            {tabValue === 4 && (
+              <TemplatesContratos 
+                getData={getData}
+                setData={setData}
+                pushData={pushData}
+                removeData={removeData}
+                updateData={updateData}
+                storage={schoolStorage}
+              />
+            )}
+
+            {/* ABA 5: DEV (só aparece se devAccess) */}
+            {devAccess && tabValue === 5 && (
               <Card 
                 sx={{ 
                   mb: 3,

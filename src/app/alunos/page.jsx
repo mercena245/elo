@@ -40,15 +40,17 @@ import ContentCopy from '@mui/icons-material/ContentCopy';
 import InfoOutlined from '@mui/icons-material/InfoOutlined';
 import EditIcon from '@mui/icons-material/Edit';
 import Print from '@mui/icons-material/Print';
+import Description from '@mui/icons-material/Description';
 import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs from 'dayjs';
 import { auth, onAuthStateChanged } from '../../firebase';
-import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
+import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject, getBlob } from "firebase/storage";
 
 
 import FichaMatricula from '../../components/FichaMatricula';
 import ContratoAluno from '../../components/ContratoAlunoNovo';
+import contratoTemplateService from '../../services/contratoTemplateService';
 import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
 import { useSchoolServices } from '../../hooks/useSchoolServices';
 import RematriculaDialog from './components/RematriculaDialog';
@@ -610,6 +612,12 @@ const Alunos = () => {
   const [selecaoFichaOpen, setSelecaoFichaOpen] = useState(false);
   const [matriculasDisponiveisFicha, setMatriculasDisponiveisFicha] = useState([]);
   const [fichaSelecionada, setFichaSelecionada] = useState(null);
+
+  // Estados para templates de contrato
+  const [templatesDisponiveis, setTemplatesDisponiveis] = useState([]);
+  const [templateSelecionado, setTemplateSelecionado] = useState(null);
+  const [usarTemplate, setUsarTemplate] = useState(false);
+  const [gerandoContrato, setGerandoContrato] = useState(false);
 
   // Remover anexo do Storage e do registro do aluno
   const handleRemoverAnexo = async (anexo, idx) => {
@@ -1907,8 +1915,10 @@ const Alunos = () => {
   };
 
   // Função para abrir dialog de seleção (Ficha ou Contrato)
-  const handleAbrirSelecaoImpressao = (aluno) => {
+  const handleAbrirSelecaoImpressao = async (aluno) => {
     setAlunoSelecionadoFicha(aluno);
+    // Carregar templates disponíveis
+    await carregarTemplatesDisponiveis();
     setDialogSelecaoOpen(true);
   };
 
@@ -2017,8 +2027,60 @@ const Alunos = () => {
     console.group('🎯 DEBUG - HandleAbrirContrato');
     console.log('dadosContrato recebido:', dadosContrato);
     console.log('alunoSelecionadoFicha atual:', alunoSelecionadoFicha);
+    console.log('usarTemplate:', usarTemplate);
+    console.log('templateSelecionado:', templateSelecionado);
     
     setDialogSelecaoOpen(false);
+    
+    // Se deve usar template, gerar contrato com template
+    if (usarTemplate && templateSelecionado) {
+      console.log('✅ Gerando contrato com template');
+      // Processar dados do aluno antes de gerar
+      const aluno = dadosContrato || alunoSelecionadoFicha;
+      const temRematricula = await verificarSeTemRematricula(aluno);
+      
+      let alunoProcessado = aluno;
+      
+      if (!dadosContrato) {
+        if (temRematricula) {
+          const matriculas = await buscarMatriculasDisponiveis(aluno);
+          if (matriculas.length > 0) {
+            const matriculaRecente = matriculas[matriculas.length - 1];
+            alunoProcessado = await buscarDadosFinanceirosMatricula(matriculaRecente);
+          }
+        } else {
+          const turmaId = aluno.turmaId;
+          let periodoLetivo = null;
+          
+          if (turmaId && turmas[turmaId]) {
+            const turma = turmas[turmaId];
+            const periodoId = turma.periodoLetivoId || turma.periodoId;
+            
+            if (periodoId) {
+              periodoLetivo = await getData(`periodosLetivos/${periodoId}`);
+              
+              if (!periodoLetivo) {
+                const match = periodoId.match(/^(\d{4})/);
+                if (match) {
+                  periodoLetivo = { ano: parseInt(match[1]), id: periodoId };
+                }
+              }
+            }
+          }
+          
+          alunoProcessado = {
+            ...aluno,
+            periodoLetivo: periodoLetivo,
+            turmaInfo: turmas[turmaId]
+          };
+        }
+      }
+      
+      setAlunoSelecionadoFicha(alunoProcessado);
+      await handleGerarContratoComTemplate();
+      console.groupEnd();
+      return;
+    }
     
     // Se foi passado dados específicos (vem do diálogo de seleção), usar eles
     if (dadosContrato) {
@@ -2102,6 +2164,88 @@ const Alunos = () => {
   const handleFecharContrato = () => {
     setContratoOpen(false);
     setAlunoSelecionadoFicha(null);
+  };
+
+  // Carregar templates disponíveis
+  const carregarTemplatesDisponiveis = async () => {
+    try {
+      const templatesData = await getData('configuracoes/contratos/templates');
+      
+      if (templatesData) {
+        const templatesArray = Object.entries(templatesData)
+          .map(([id, data]) => ({ id, ...data }))
+          .filter(template => template.ativo);
+        setTemplatesDisponiveis(templatesArray);
+      } else {
+        setTemplatesDisponiveis([]);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar templates:', error);
+      setTemplatesDisponiveis([]);
+    }
+  };
+
+  // Gerar contrato com template
+  const handleGerarContratoComTemplate = async () => {
+    if (!templateSelecionado || !alunoSelecionadoFicha) {
+      alert('Selecione um template e um aluno');
+      return;
+    }
+
+    try {
+      setGerandoContrato(true);
+      console.log('📄 [Template] Gerando contrato...');
+      console.log('Template:', templateSelecionado);
+      console.log('Aluno:', alunoSelecionadoFicha);
+
+      // Verificar se temos o arquivo em base64 no banco
+      if (!templateSelecionado.arquivoBase64) {
+        alert('Este template foi criado na versão antiga e não possui o arquivo salvo.\n\nPor favor:\n1. Vá em Configurações → Templates e Contratos\n2. Exclua este template\n3. Faça o upload novamente');
+        setGerandoContrato(false);
+        return;
+      }
+
+      // Buscar configurações da escola
+      const configEscola = await getData('configuracoes/escola');
+      console.log('🏫 [Template] Configurações da escola:', configEscola);
+
+      // Converter base64 para ArrayBuffer
+      console.log('📥 [Template] Convertendo template de base64...');
+      const binaryString = atob(templateSelecionado.arquivoBase64);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      const templateArrayBuffer = bytes.buffer;
+      console.log('✅ [Template] Template carregado, tamanho:', templateArrayBuffer.byteLength);
+
+      // Processar template com os dados
+      console.log('🔄 [Template] Processando template...');
+      const docBlob = await contratoTemplateService.processarTemplate(
+        templateArrayBuffer,
+        alunoSelecionadoFicha,
+        configEscola
+      );
+      console.log('✅ [Template] Template processado com sucesso');
+
+      // Baixar documento
+      console.log('📥 [Template] Dados do aluno para download:', alunoSelecionadoFicha);
+      console.log('📥 [Template] Nome do aluno:', alunoSelecionadoFicha?.nome);
+      contratoTemplateService.baixarDocumento(docBlob, alunoSelecionadoFicha?.nome || 'Aluno');
+      
+      // Fechar dialogs
+      setSelecaoContratoOpen(false);
+      setTemplateSelecionado(null);
+      setUsarTemplate(false);
+      setAlunoSelecionadoFicha(null);
+
+      alert('Contrato gerado com sucesso!');
+    } catch (error) {
+      console.error('❌ [Template] Erro ao gerar contrato:', error);
+      alert(`Erro ao gerar contrato: ${error.message}`);
+    } finally {
+      setGerandoContrato(false);
+    }
   };
 
   // Função para fechar diálogo de seleção de contrato
@@ -4530,7 +4674,11 @@ const Alunos = () => {
                         <Button
                           variant="outlined"
                           fullWidth
-                          onClick={() => handleAbrirContrato()}
+                          onClick={() => {
+                            setUsarTemplate(false);
+                            setTemplateSelecionado(null);
+                            handleAbrirContrato();
+                          }}
                           sx={{
                             py: 2,
                             borderColor: '#6366f1',
@@ -4545,8 +4693,44 @@ const Alunos = () => {
                             transition: 'all 0.2s'
                           }}
                         >
-                          📄 Contrato de Prestação de Serviços
+                          📄 Contrato Padrão (visualizar)
                         </Button>
+
+                        {templatesDisponiveis.length > 0 && (
+                          <>
+                            <Typography variant="body2" color="text.secondary" sx={{ mt: 1, textAlign: 'center' }}>
+                              ou gerar com template:
+                            </Typography>
+                            
+                            {templatesDisponiveis.map((template) => (
+                              <Button
+                                key={template.id}
+                                variant="outlined"
+                                fullWidth
+                                onClick={() => {
+                                  setTemplateSelecionado(template);
+                                  setUsarTemplate(true);
+                                  handleAbrirContrato();
+                                }}
+                                sx={{
+                                  py: 2,
+                                  borderColor: '#8b5cf6',
+                                  color: '#8b5cf6',
+                                  fontSize: '1rem',
+                                  fontWeight: 600,
+                                  '&:hover': {
+                                    bgcolor: '#faf5ff',
+                                    borderColor: '#7c3aed',
+                                    transform: 'scale(1.02)'
+                                  },
+                                  transition: 'all 0.2s'
+                                }}
+                              >
+                                📝 {template.nome}
+                              </Button>
+                            ))}
+                          </>
+                        )}
                       </Box>
                     </DialogContent>
                     <DialogActions>

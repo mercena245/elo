@@ -1,8 +1,10 @@
 ﻿rules_version = '2';
+
 service firebase.storage {
   match /b/{bucket}/o {
+    // Permitir leitura e escrita apenas para usuários autenticados
     match /{allPaths=**} {
-      allow read, write: if true;
+      allow read, write: if request.auth != null;
     }
   }
 }

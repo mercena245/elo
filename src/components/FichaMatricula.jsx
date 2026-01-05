@@ -10,12 +10,13 @@ import { useSchoolDatabase } from '../hooks/useSchoolDatabase';
 const FichaMatricula = ({ aluno, turmas, onClose }) => {
   const { getData, isReady } = useSchoolDatabase();
   const [nomeEscola, setNomeEscola] = useState('ESCOLA ELO');
+  const [periodoLetivo, setPeriodoLetivo] = useState(null);
 
   useEffect(() => {
-    const buscarNomeEscola = async () => {
-      console.log('🔍 [FichaMatricula] Iniciando busca do nome da escola...');
+    const buscarDados = async () => {
+      console.log('🔍 [FichaMatricula] Iniciando busca de dados...');
       console.log('🔍 [FichaMatricula] isReady:', isReady);
-      console.log('🔍 [FichaMatricula] getData:', typeof getData);
+      console.log('🔍 [FichaMatricula] Aluno recebido:', aluno);
 
       if (!isReady) {
         console.log('⏳ [FichaMatricula] Aguardando conexão com banco...');
@@ -23,6 +24,7 @@ const FichaMatricula = ({ aluno, turmas, onClose }) => {
       }
 
       try {
+        // Buscar nome da escola
         console.log('🔍 [FichaMatricula] Buscando configuracoes/escola...');
         const configEscola = await getData('configuracoes/escola');
         console.log('📋 [FichaMatricula] Resultado:', configEscola);
@@ -33,13 +35,66 @@ const FichaMatricula = ({ aluno, turmas, onClose }) => {
         } else {
           console.log('⚠️ [FichaMatricula] nomeEscola não encontrado em configuracoes/escola');
         }
+
+        // Buscar período letivo
+        console.log('🔍 [FichaMatricula] Buscando período letivo...');
+        console.log('📊 [FichaMatricula] aluno.periodoLetivo:', aluno.periodoLetivo);
+        console.log('📊 [FichaMatricula] aluno.turmaId:', aluno.turmaId);
+        console.log('📊 [FichaMatricula] turmas disponíveis:', turmas);
+        
+        // Se já veio no aluno, usar
+        if (aluno.periodoLetivo) {
+          console.log('✅ Período letivo já veio no aluno:', aluno.periodoLetivo);
+          console.log('📅 Ano do período:', aluno.periodoLetivo.ano || aluno.periodoLetivo.anoLetivo);
+          setPeriodoLetivo(aluno.periodoLetivo);
+        } else {
+          console.log('⚠️ Período letivo NÃO veio no aluno, buscando da turma...');
+          // Buscar da turma
+          const turmaId = aluno.turmaId;
+          console.log('🔍 TurmaId do aluno:', turmaId);
+          
+          if (turmaId && turmas?.[turmaId]) {
+            const turma = turmas[turmaId];
+            console.log('📋 Turma encontrada:', turma);
+            
+            const periodoId = turma.periodoLetivoId || turma.periodoId;
+            console.log('🔍 PeriodoId da turma:', periodoId);
+            
+            if (periodoId) {
+              console.log('🔍 Buscando período letivo da turma:', periodoId);
+              const periodo = await getData(`periodosLetivos/${periodoId}`);
+              if (periodo) {
+                console.log('✅ Período letivo encontrado:', periodo);
+                console.log('📅 Ano do período:', periodo.ano || periodo.anoLetivo);
+                setPeriodoLetivo(periodo);
+              } else {
+                console.log('❌ Período letivo não encontrado no banco');
+                console.log('🔧 Tentando extrair ano do ID do período:', periodoId);
+                
+                // Tentar extrair ano do ID do período (formato: 2026_1_1758679587927)
+                const match = periodoId.match(/^(\d{4})/);
+                if (match) {
+                  const anoExtraido = parseInt(match[1]);
+                  console.log('✅ Ano extraído do ID:', anoExtraido);
+                  setPeriodoLetivo({ ano: anoExtraido, id: periodoId });
+                } else {
+                  console.log('❌ Não foi possível extrair ano do ID');
+                }
+              }
+            } else {
+              console.log('❌ Turma não tem periodoId');
+            }
+          } else {
+            console.log('❌ Turma não encontrada para o aluno');
+          }
+        }
       } catch (error) {
-        console.error('❌ [FichaMatricula] Erro ao buscar nome da escola:', error);
+        console.error('❌ [FichaMatricula] Erro ao buscar dados:', error);
       }
     };
 
-    buscarNomeEscola();
-  }, [getData, isReady]);
+    buscarDados();
+  }, [getData, isReady, aluno, turmas]);
 
   const dataAtual = new Date().toLocaleDateString('pt-BR', {
     day: '2-digit',
@@ -370,7 +425,16 @@ const FichaMatricula = ({ aluno, turmas, onClose }) => {
               </div>
               <div className="field-row">
                 <span className="field-label">Ano Letivo:</span>
-                <span className="field-value">{new Date().getFullYear()}</span>
+                <span className="field-value">
+                  {(() => {
+                    const ano = periodoLetivo?.anoLetivo || periodoLetivo?.ano || new Date().getFullYear();
+                    console.log('🎯 [FichaMatricula] Exibindo ano letivo:', ano);
+                    console.log('   - periodoLetivo:', periodoLetivo);
+                    console.log('   - periodoLetivo.anoLetivo:', periodoLetivo?.anoLetivo);
+                    console.log('   - periodoLetivo.ano:', periodoLetivo?.ano);
+                    return ano;
+                  })()}
+                </span>
               </div>
             </div>
             

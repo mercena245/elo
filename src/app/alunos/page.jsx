@@ -40,15 +40,17 @@ import ContentCopy from '@mui/icons-material/ContentCopy';
 import InfoOutlined from '@mui/icons-material/InfoOutlined';
 import EditIcon from '@mui/icons-material/Edit';
 import Print from '@mui/icons-material/Print';
+import Description from '@mui/icons-material/Description';
 import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs from 'dayjs';
 import { auth, onAuthStateChanged } from '../../firebase';
-import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
+import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject, getBlob } from "firebase/storage";
 
 
 import FichaMatricula from '../../components/FichaMatricula';
 import ContratoAluno from '../../components/ContratoAlunoNovo';
+import contratoTemplateService from '../../services/contratoTemplateService';
 import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
 import { useSchoolServices } from '../../hooks/useSchoolServices';
 import RematriculaDialog from './components/RematriculaDialog';
@@ -605,6 +607,17 @@ const Alunos = () => {
   const [selecaoContratoOpen, setSelecaoContratoOpen] = useState(false);
   const [matriculasDisponiveis, setMatriculasDisponiveis] = useState([]);
   const [contratoSelecionado, setContratoSelecionado] = useState(null);
+
+  // Estados para seleção de ficha de matrícula de rematrícula
+  const [selecaoFichaOpen, setSelecaoFichaOpen] = useState(false);
+  const [matriculasDisponiveisFicha, setMatriculasDisponiveisFicha] = useState([]);
+  const [fichaSelecionada, setFichaSelecionada] = useState(null);
+
+  // Estados para templates de contrato
+  const [templatesDisponiveis, setTemplatesDisponiveis] = useState([]);
+  const [templateSelecionado, setTemplateSelecionado] = useState(null);
+  const [usarTemplate, setUsarTemplate] = useState(false);
+  const [gerandoContrato, setGerandoContrato] = useState(false);
 
   // Remover anexo do Storage e do registro do aluno
   const handleRemoverAnexo = async (anexo, idx) => {
@@ -1816,17 +1829,44 @@ const Alunos = () => {
   const buscarDadosFinanceirosMatricula = async (matriculaData) => {
     console.group('💰 DEBUG - BuscarDadosFinanceirosMatricula');
     console.log('Dados da matrícula recebida:', matriculaData);
+    console.log('TurmaInfo da matrícula:', matriculaData.turmaInfo);
     
     try {
       // Buscar dados do período letivo da turma selecionada
       let periodoLetivo = null;
-      const periodoId = matriculaData.turmaInfo?.periodoLetivoId || matriculaData.turmaInfo?.periodoId;
+      
+      // Tentar múltiplas formas de obter o periodoId
+      const periodoId = matriculaData.turmaInfo?.periodoLetivoId || 
+                        matriculaData.turmaInfo?.periodoId ||
+                        matriculaData.turmaInfo?.periodo_letivo_id ||
+                        matriculaData.periodoLetivoId ||
+                        matriculaData.periodoId;
+      
+      console.log('🔍 Tentando buscar periodoId:', periodoId);
+      console.log('   - turmaInfo.periodoLetivoId:', matriculaData.turmaInfo?.periodoLetivoId);
+      console.log('   - turmaInfo.periodoId:', matriculaData.turmaInfo?.periodoId);
+      console.log('   - turmaInfo.periodo_letivo_id:', matriculaData.turmaInfo?.periodo_letivo_id);
+      console.log('   - matriculaData.periodoLetivoId:', matriculaData.periodoLetivoId);
+      console.log('   - matriculaData.periodoId:', matriculaData.periodoId);
+      
       if (periodoId) {
-        console.log('Buscando período letivo:', periodoId);
+        console.log('✅ Buscando período letivo:', periodoId);
         periodoLetivo = await getData(`periodosLetivos/${periodoId}`);
-        console.log('Período letivo encontrado:', periodoLetivo);
+        console.log('📅 Período letivo encontrado:', periodoLetivo);
+        
+        // Se não encontrou no banco, tentar extrair ano do ID
+        if (!periodoLetivo) {
+          console.log('⚠️ Período não existe no banco, tentando extrair ano do ID:', periodoId);
+          const match = periodoId.match(/^(\d{4})/);
+          if (match) {
+            const anoExtraido = parseInt(match[1]);
+            console.log('✅ Ano extraído do ID:', anoExtraido);
+            periodoLetivo = { ano: anoExtraido, id: periodoId };
+          }
+        }
       } else {
-        console.log('❌ Nenhum periodoId encontrado na turmaInfo:', matriculaData.turmaInfo);
+        console.log('❌ Nenhum periodoId encontrado!');
+        console.log('   Estrutura completa da turmaInfo:', JSON.stringify(matriculaData.turmaInfo, null, 2));
       }
 
       const dadosCompletos = {
@@ -1875,15 +1915,98 @@ const Alunos = () => {
   };
 
   // Função para abrir dialog de seleção (Ficha ou Contrato)
-  const handleAbrirSelecaoImpressao = (aluno) => {
+  const handleAbrirSelecaoImpressao = async (aluno) => {
     setAlunoSelecionadoFicha(aluno);
+    // Carregar templates disponíveis
+    await carregarTemplatesDisponiveis();
     setDialogSelecaoOpen(true);
   };
 
   // Função para abrir ficha de matrícula
-  const handleAbrirFichaMatricula = () => {
+  const handleAbrirFichaMatricula = async (dadosFicha = null) => {
+    console.group('🎯 DEBUG - HandleAbrirFichaMatricula');
+    console.log('dadosFicha recebido:', dadosFicha);
+    console.log('alunoSelecionadoFicha atual:', alunoSelecionadoFicha);
+    
     setDialogSelecaoOpen(false);
-    setFichaMatriculaOpen(true);
+    
+    // Se foi passado dados específicos (vem do diálogo de seleção), usar eles
+    if (dadosFicha) {
+      console.log('✅ Usando dados específicos da ficha');
+      console.log('📋 Dados recebidos do diálogo:', dadosFicha);
+      setSelecaoFichaOpen(false);
+      
+      // Buscar dados financeiros específicos da matrícula selecionada
+      console.log('🔄 Chamando buscarDadosFinanceirosMatricula...');
+      const dadosCompletos = await buscarDadosFinanceirosMatricula(dadosFicha);
+      console.log('✅ Dados completos processados:', dadosCompletos);
+      setAlunoSelecionadoFicha(dadosCompletos);
+      setFichaMatriculaOpen(true);
+      console.groupEnd();
+      return;
+    }
+    
+    // Se não foi passado dados, verificar se aluno tem rematrícula
+    const aluno = alunoSelecionadoFicha;
+    console.log('🔍 Verificando se aluno tem rematrícula:', aluno?.nome);
+    console.log('dataRematricula:', aluno?.dataRematricula);
+    
+    const temRematricula = await verificarSeTemRematricula(aluno);
+    console.log('🎯 Resultado verificação rematrícula:', temRematricula);
+    
+    if (temRematricula) {
+      console.log('✅ Tem rematrícula - abrindo diálogo de seleção');
+      // Tem rematrícula - abrir diálogo de seleção
+      const matriculas = await buscarMatriculasDisponiveis(aluno);
+      console.log('📋 Matrículas disponíveis:', matriculas);
+      setMatriculasDisponiveisFicha(matriculas);
+      setSelecaoFichaOpen(true);
+    } else {
+      console.log('❌ Não tem rematrícula - buscando período letivo da turma');
+      // Não tem rematrícula - buscar período letivo da turma e abrir ficha
+      try {
+        const turmaId = aluno.turmaId;
+        let periodoLetivo = null;
+        
+        if (turmaId && turmas[turmaId]) {
+          const turma = turmas[turmaId];
+          const periodoId = turma.periodoLetivoId || turma.periodoId;
+          
+          if (periodoId) {
+            console.log('🔍 Buscando período letivo:', periodoId);
+            periodoLetivo = await getData(`periodosLetivos/${periodoId}`);
+            console.log('📅 Período letivo encontrado:', periodoLetivo);
+            
+            // Se não encontrou no banco, tentar extrair ano do ID
+            if (!periodoLetivo) {
+              console.log('⚠️ Período não existe no banco, tentando extrair ano do ID:', periodoId);
+              const match = periodoId.match(/^(\d{4})/);
+              if (match) {
+                const anoExtraido = parseInt(match[1]);
+                console.log('✅ Ano extraído do ID:', anoExtraido);
+                periodoLetivo = { ano: anoExtraido, id: periodoId };
+              }
+            }
+          }
+        }
+        
+        // Adicionar período letivo ao aluno
+        const alunoComPeriodo = {
+          ...aluno,
+          periodoLetivo: periodoLetivo,
+          turmaInfo: turmas[turmaId]
+        };
+        
+        console.log('✅ Abrindo ficha com período letivo:', alunoComPeriodo);
+        setAlunoSelecionadoFicha(alunoComPeriodo);
+      } catch (error) {
+        console.error('❌ Erro ao buscar período letivo:', error);
+      }
+      
+      setFichaMatriculaOpen(true);
+    }
+    
+    console.groupEnd();
   };
 
   const handleFecharFichaMatricula = () => {
@@ -1891,13 +2014,73 @@ const Alunos = () => {
     setAlunoSelecionadoFicha(null);
   };
 
+  // Função para fechar diálogo de seleção de ficha
+  const handleFecharSelecaoFicha = () => {
+    setSelecaoFichaOpen(false);
+    setMatriculasDisponiveisFicha([]);
+    setFichaSelecionada(null);
+    // Não limpar alunoSelecionadoFicha aqui para manter o contexto
+  };
+
   // Função para abrir contrato
   const handleAbrirContrato = async (dadosContrato = null) => {
     console.group('🎯 DEBUG - HandleAbrirContrato');
     console.log('dadosContrato recebido:', dadosContrato);
     console.log('alunoSelecionadoFicha atual:', alunoSelecionadoFicha);
+    console.log('usarTemplate:', usarTemplate);
+    console.log('templateSelecionado:', templateSelecionado);
     
     setDialogSelecaoOpen(false);
+    
+    // Se deve usar template, gerar contrato com template
+    if (usarTemplate && templateSelecionado) {
+      console.log('✅ Gerando contrato com template');
+      // Processar dados do aluno antes de gerar
+      const aluno = dadosContrato || alunoSelecionadoFicha;
+      const temRematricula = await verificarSeTemRematricula(aluno);
+      
+      let alunoProcessado = aluno;
+      
+      if (!dadosContrato) {
+        if (temRematricula) {
+          const matriculas = await buscarMatriculasDisponiveis(aluno);
+          if (matriculas.length > 0) {
+            const matriculaRecente = matriculas[matriculas.length - 1];
+            alunoProcessado = await buscarDadosFinanceirosMatricula(matriculaRecente);
+          }
+        } else {
+          const turmaId = aluno.turmaId;
+          let periodoLetivo = null;
+          
+          if (turmaId && turmas[turmaId]) {
+            const turma = turmas[turmaId];
+            const periodoId = turma.periodoLetivoId || turma.periodoId;
+            
+            if (periodoId) {
+              periodoLetivo = await getData(`periodosLetivos/${periodoId}`);
+              
+              if (!periodoLetivo) {
+                const match = periodoId.match(/^(\d{4})/);
+                if (match) {
+                  periodoLetivo = { ano: parseInt(match[1]), id: periodoId };
+                }
+              }
+            }
+          }
+          
+          alunoProcessado = {
+            ...aluno,
+            periodoLetivo: periodoLetivo,
+            turmaInfo: turmas[turmaId]
+          };
+        }
+      }
+      
+      setAlunoSelecionadoFicha(alunoProcessado);
+      await handleGerarContratoComTemplate();
+      console.groupEnd();
+      return;
+    }
     
     // Se foi passado dados específicos (vem do diálogo de seleção), usar eles
     if (dadosContrato) {
@@ -1931,8 +2114,47 @@ const Alunos = () => {
       setMatriculasDisponiveis(matriculas);
       setSelecaoContratoOpen(true);
     } else {
-      console.log('❌ Não tem rematrícula - abrindo contrato normal');
-      // Não tem rematrícula - abrir contrato normal
+      console.log('❌ Não tem rematrícula - buscando período letivo da turma');
+      // Não tem rematrícula - buscar período letivo da turma e abrir contrato
+      try {
+        const turmaId = aluno.turmaId;
+        let periodoLetivo = null;
+        
+        if (turmaId && turmas[turmaId]) {
+          const turma = turmas[turmaId];
+          const periodoId = turma.periodoLetivoId || turma.periodoId;
+          
+          if (periodoId) {
+            console.log('🔍 Buscando período letivo:', periodoId);
+            periodoLetivo = await getData(`periodosLetivos/${periodoId}`);
+            console.log('📅 Período letivo encontrado:', periodoLetivo);
+            
+            // Se não encontrou no banco, tentar extrair ano do ID
+            if (!periodoLetivo) {
+              console.log('⚠️ Período não existe no banco, tentando extrair ano do ID:', periodoId);
+              const match = periodoId.match(/^(\d{4})/);
+              if (match) {
+                const anoExtraido = parseInt(match[1]);
+                console.log('✅ Ano extraído do ID:', anoExtraido);
+                periodoLetivo = { ano: anoExtraido, id: periodoId };
+              }
+            }
+          }
+        }
+        
+        // Adicionar período letivo ao aluno
+        const alunoComPeriodo = {
+          ...aluno,
+          periodoLetivo: periodoLetivo,
+          turmaInfo: turmas[turmaId]
+        };
+        
+        console.log('✅ Abrindo contrato com período letivo:', alunoComPeriodo);
+        setAlunoSelecionadoFicha(alunoComPeriodo);
+      } catch (error) {
+        console.error('❌ Erro ao buscar período letivo:', error);
+      }
+      
       setContratoOpen(true);
     }
     
@@ -1942,6 +2164,88 @@ const Alunos = () => {
   const handleFecharContrato = () => {
     setContratoOpen(false);
     setAlunoSelecionadoFicha(null);
+  };
+
+  // Carregar templates disponíveis
+  const carregarTemplatesDisponiveis = async () => {
+    try {
+      const templatesData = await getData('configuracoes/contratos/templates');
+      
+      if (templatesData) {
+        const templatesArray = Object.entries(templatesData)
+          .map(([id, data]) => ({ id, ...data }))
+          .filter(template => template.ativo);
+        setTemplatesDisponiveis(templatesArray);
+      } else {
+        setTemplatesDisponiveis([]);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar templates:', error);
+      setTemplatesDisponiveis([]);
+    }
+  };
+
+  // Gerar contrato com template
+  const handleGerarContratoComTemplate = async () => {
+    if (!templateSelecionado || !alunoSelecionadoFicha) {
+      alert('Selecione um template e um aluno');
+      return;
+    }
+
+    try {
+      setGerandoContrato(true);
+      console.log('📄 [Template] Gerando contrato...');
+      console.log('Template:', templateSelecionado);
+      console.log('Aluno:', alunoSelecionadoFicha);
+
+      // Verificar se temos o arquivo em base64 no banco
+      if (!templateSelecionado.arquivoBase64) {
+        alert('Este template foi criado na versão antiga e não possui o arquivo salvo.\n\nPor favor:\n1. Vá em Configurações → Templates e Contratos\n2. Exclua este template\n3. Faça o upload novamente');
+        setGerandoContrato(false);
+        return;
+      }
+
+      // Buscar configurações da escola
+      const configEscola = await getData('configuracoes/escola');
+      console.log('🏫 [Template] Configurações da escola:', configEscola);
+
+      // Converter base64 para ArrayBuffer
+      console.log('📥 [Template] Convertendo template de base64...');
+      const binaryString = atob(templateSelecionado.arquivoBase64);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      const templateArrayBuffer = bytes.buffer;
+      console.log('✅ [Template] Template carregado, tamanho:', templateArrayBuffer.byteLength);
+
+      // Processar template com os dados
+      console.log('🔄 [Template] Processando template...');
+      const docBlob = await contratoTemplateService.processarTemplate(
+        templateArrayBuffer,
+        alunoSelecionadoFicha,
+        configEscola
+      );
+      console.log('✅ [Template] Template processado com sucesso');
+
+      // Baixar documento
+      console.log('📥 [Template] Dados do aluno para download:', alunoSelecionadoFicha);
+      console.log('📥 [Template] Nome do aluno:', alunoSelecionadoFicha?.nome);
+      contratoTemplateService.baixarDocumento(docBlob, alunoSelecionadoFicha?.nome || 'Aluno');
+      
+      // Fechar dialogs
+      setSelecaoContratoOpen(false);
+      setTemplateSelecionado(null);
+      setUsarTemplate(false);
+      setAlunoSelecionadoFicha(null);
+
+      alert('Contrato gerado com sucesso!');
+    } catch (error) {
+      console.error('❌ [Template] Erro ao gerar contrato:', error);
+      alert(`Erro ao gerar contrato: ${error.message}`);
+    } finally {
+      setGerandoContrato(false);
+    }
   };
 
   // Função para fechar diálogo de seleção de contrato
@@ -2450,61 +2754,135 @@ const Alunos = () => {
       <SidebarMenu />
       <main className="dashboard-main">
         <Box sx={{ width: '100%', px: 3, py: 2 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, p: 3, borderRadius: 3, background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)', color: 'white', boxShadow: '0 8px 32px rgba(99, 102, 241, 0.2)' }}>
-            <Typography variant="h4" fontWeight="bold" gutterBottom={false}>👥 Gestão de Alunos</Typography>
-            <Box sx={{ display: 'flex', gap: 1 }}>
-              <Button 
-                variant="outlined" 
-                size="small"
-                onClick={async () => {
-                  setVerificandoPagamentos(true);
-                  const alunosPreMatricula = alunos.filter(a => a.status === 'pre_matricula');
-                  let ativados = 0;
-                  for (const aluno of alunosPreMatricula) {
-                    const ativado = await ativarAutomaticamenteSeAprovado(aluno);
-                    if (ativado) ativados++;
-                  }
-                  if (ativados > 0) {
-                    await fetchData();
-                  }
-                  setVerificandoPagamentos(false);
-                }}
-                disabled={verificandoPagamentos}
-                sx={{ 
-                  bgcolor: 'rgba(255,255,255,0.1)', 
-                  color: 'white',
-                  borderColor: 'rgba(255,255,255,0.3)',
+          {/* Header Centralizado */}
+          <Box sx={{ 
+            mb: 3, 
+            p: { xs: 2, sm: 2.5, md: 3 }, 
+            borderRadius: 3, 
+            background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)', 
+            color: 'white', 
+            boxShadow: '0 8px 32px rgba(99, 102, 241, 0.2)',
+            position: 'relative',
+            overflow: 'hidden'
+          }}>
+            {/* Padrão decorativo */}
+            <Box sx={{
+              position: 'absolute',
+              top: -30,
+              right: -30,
+              width: '250px',
+              height: '250px',
+              background: 'radial-gradient(circle, rgba(255,255,255,0.12) 0%, transparent 70%)',
+              pointerEvents: 'none',
+              display: { xs: 'none', md: 'block' }
+            }} />
+            
+            <Box sx={{ 
+              position: 'relative', 
+              zIndex: 1,
+              display: 'flex',
+              flexDirection: { xs: 'column', md: 'row' },
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 2
+            }}>
+              {/* Título Centralizado */}
+              <Box sx={{ 
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                textAlign: 'center',
+                flex: 1,
+                gap: 1
+              }}>
+                <Box sx={{ 
+                  width: { xs: 50, sm: 60, md: 70 }, 
+                  height: { xs: 50, sm: 60, md: 70 },
+                  bgcolor: 'rgba(255,255,255,0.25)',
                   backdropFilter: 'blur(10px)',
-                  border: '1px solid rgba(255,255,255,0.2)',
-                  borderRadius: 2,
-                  fontSize: '0.75rem',
-                  '&:hover': { 
-                    bgcolor: 'rgba(255,255,255,0.2)',
-                    borderColor: 'rgba(255,255,255,0.4)'
-                  }
-                }} 
-              >
-                {verificandoPagamentos ? '🔄 Verificando...' : '🔍 Verificar Pagamentos'}
-              </Button>
-              <Button 
-                variant="contained" 
-                sx={{ 
-                  bgcolor: 'rgba(255,255,255,0.15)', 
-                  color: 'white',
-                  backdropFilter: 'blur(10px)',
-                  border: '1px solid rgba(255,255,255,0.2)',
-                  borderRadius: 2,
-                  '&:hover': { 
-                    bgcolor: 'rgba(255,255,255,0.25)',
-                    transform: 'translateY(-2px)',
-                    boxShadow: '0 8px 25px rgba(0,0,0,0.15)'
-                  },
-                  transition: 'all 0.3s ease'
-                }} 
-                onClick={handleAddAluno}
-              >
-                + Nova Matrícula
-              </Button>
+                  border: '3px solid rgba(255,255,255,0.3)',
+                  boxShadow: '0 6px 24px rgba(0,0,0,0.2)',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: { xs: '1.5rem', sm: '2rem', md: '2.5rem' }
+                }}>
+                  👥
+                </Box>
+                <Typography 
+                  variant="h4" 
+                  fontWeight={700}
+                  sx={{
+                    fontSize: { xs: '1.5rem', sm: '1.75rem', md: '2rem' },
+                    textShadow: '0 2px 10px rgba(0,0,0,0.3)',
+                    letterSpacing: '-0.01em'
+                  }}
+                >
+                  Gestão de Alunos
+                </Typography>
+              </Box>
+              
+              {/* Botões */}
+              <Box sx={{ 
+                display: 'flex', 
+                gap: 1,
+                flexWrap: 'wrap',
+                justifyContent: 'center'
+              }}>
+                <Button 
+                  variant="outlined" 
+                  size="small"
+                  onClick={async () => {
+                    setVerificandoPagamentos(true);
+                    const alunosPreMatricula = alunos.filter(a => a.status === 'pre_matricula');
+                    let ativados = 0;
+                    for (const aluno of alunosPreMatricula) {
+                      const ativado = await ativarAutomaticamenteSeAprovado(aluno);
+                      if (ativado) ativados++;
+                    }
+                    if (ativados > 0) {
+                      await fetchData();
+                    }
+                    setVerificandoPagamentos(false);
+                  }}
+                  disabled={verificandoPagamentos}
+                  sx={{ 
+                    bgcolor: 'rgba(255,255,255,0.1)', 
+                    color: 'white',
+                    borderColor: 'rgba(255,255,255,0.3)',
+                    backdropFilter: 'blur(10px)',
+                    border: '1px solid rgba(255,255,255,0.2)',
+                    borderRadius: 2,
+                    fontSize: '0.75rem',
+                    '&:hover': { 
+                      bgcolor: 'rgba(255,255,255,0.2)',
+                      borderColor: 'rgba(255,255,255,0.4)'
+                    }
+                  }} 
+                >
+                  {verificandoPagamentos ? '🔄 Verificando...' : '🔍 Verificar Pagamentos'}
+                </Button>
+                <Button 
+                  variant="contained" 
+                  sx={{ 
+                    bgcolor: 'rgba(255,255,255,0.15)', 
+                    color: 'white',
+                    backdropFilter: 'blur(10px)',
+                    border: '1px solid rgba(255,255,255,0.2)',
+                    borderRadius: 2,
+                    '&:hover': { 
+                      bgcolor: 'rgba(255,255,255,0.25)',
+                      transform: 'translateY(-2px)',
+                      boxShadow: '0 8px 25px rgba(0,0,0,0.15)'
+                    },
+                    transition: 'all 0.3s ease'
+                  }} 
+                  onClick={handleAddAluno}
+                >
+                  + Novo Aluno
+                </Button>
+              </Box>
             </Box>
           </Box>
           
@@ -4271,7 +4649,11 @@ const Alunos = () => {
                         <Button
                           variant="outlined"
                           fullWidth
-                          onClick={handleAbrirFichaMatricula}
+                          onClick={async () => {
+                            console.log('🔘 Botão Ficha clicado!');
+                            console.log('Aluno selecionado:', alunoSelecionadoFicha);
+                            await handleAbrirFichaMatricula();
+                          }}
                           sx={{
                             py: 2,
                             borderColor: '#059669',
@@ -4292,7 +4674,11 @@ const Alunos = () => {
                         <Button
                           variant="outlined"
                           fullWidth
-                          onClick={() => handleAbrirContrato()}
+                          onClick={() => {
+                            setUsarTemplate(false);
+                            setTemplateSelecionado(null);
+                            handleAbrirContrato();
+                          }}
                           sx={{
                             py: 2,
                             borderColor: '#6366f1',
@@ -4307,8 +4693,44 @@ const Alunos = () => {
                             transition: 'all 0.2s'
                           }}
                         >
-                          📄 Contrato de Prestação de Serviços
+                          📄 Contrato Padrão (visualizar)
                         </Button>
+
+                        {templatesDisponiveis.length > 0 && (
+                          <>
+                            <Typography variant="body2" color="text.secondary" sx={{ mt: 1, textAlign: 'center' }}>
+                              ou gerar com template:
+                            </Typography>
+                            
+                            {templatesDisponiveis.map((template) => (
+                              <Button
+                                key={template.id}
+                                variant="outlined"
+                                fullWidth
+                                onClick={() => {
+                                  setTemplateSelecionado(template);
+                                  setUsarTemplate(true);
+                                  handleAbrirContrato();
+                                }}
+                                sx={{
+                                  py: 2,
+                                  borderColor: '#8b5cf6',
+                                  color: '#8b5cf6',
+                                  fontSize: '1rem',
+                                  fontWeight: 600,
+                                  '&:hover': {
+                                    bgcolor: '#faf5ff',
+                                    borderColor: '#7c3aed',
+                                    transform: 'scale(1.02)'
+                                  },
+                                  transition: 'all 0.2s'
+                                }}
+                              >
+                                📝 {template.nome}
+                              </Button>
+                            ))}
+                          </>
+                        )}
                       </Box>
                     </DialogContent>
                     <DialogActions>
@@ -4514,6 +4936,94 @@ const Alunos = () => {
                         startIcon={<Print />}
                       >
                         Imprimir Contrato Selecionado
+                      </Button>
+                    </DialogActions>
+                  </Dialog>
+
+                  {/* Dialog Seleção de Ficha de Matrícula */}
+                  <Dialog
+                    open={selecaoFichaOpen}
+                    onClose={() => {
+                      setSelecaoFichaOpen(false);
+                      setMatriculasDisponiveisFicha([]);
+                      setFichaSelecionada(null);
+                    }}
+                    maxWidth="md"
+                    fullWidth
+                  >
+                    <DialogTitle>
+                      <Typography variant="h6" component="div" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Print /> Selecionar Ficha de Matrícula para Impressão
+                      </Typography>
+                    </DialogTitle>
+                    <DialogContent>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                        Este aluno possui múltiplas matrículas. Selecione qual ficha de matrícula deseja imprimir:
+                      </Typography>
+                      
+                      <Box sx={{ mt: 2 }}>
+                        {matriculasDisponiveisFicha.map((matricula, index) => (
+                          <Card 
+                            key={index}
+                            variant={fichaSelecionada === matricula ? "outlined" : "elevation"}
+                            sx={{ 
+                              mb: 2, 
+                              cursor: 'pointer',
+                              border: fichaSelecionada === matricula ? '2px solid #1976d2' : '1px solid #e0e0e0',
+                              backgroundColor: fichaSelecionada === matricula ? '#f3f8ff' : 'inherit',
+                              '&:hover': {
+                                backgroundColor: fichaSelecionada === matricula ? '#f3f8ff' : '#f5f5f5'
+                              }
+                            }}
+                            onClick={() => setFichaSelecionada(matricula)}
+                          >
+                            <CardContent>
+                              <Typography variant="h6" color="primary" sx={{ mb: 1 }}>
+                                {matricula.isCurrent ? 'REMATRÍCULA ATUAL' : `MATRÍCULA ${matricula.ano || new Date(matricula.dataMatricula).getFullYear()}`}
+                              </Typography>
+                              <Typography variant="body2" color="text.secondary">
+                                <strong>Data:</strong> {new Date(matricula.dataMatricula).toLocaleDateString('pt-BR')}
+                              </Typography>
+                              <Typography variant="body2" color="text.secondary">
+                                <strong>Turma:</strong> {matricula.nomeTurma || matricula.nometurma || 'Não informado'}
+                              </Typography>
+                              <Typography variant="body2" color="text.secondary">
+                                <strong>Status:</strong> {matricula.isCurrent ? 'Ativa (Rematrícula)' : 'Histórica'}
+                              </Typography>
+                              {matricula.valorMensalidade && (
+                                <Typography variant="body2" color="text.secondary">
+                                  <strong>Mensalidade:</strong> R$ {parseFloat(matricula.valorMensalidade).toFixed(2)}
+                                </Typography>
+                              )}
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </Box>
+                    </DialogContent>
+                    <DialogActions>
+                      <Button 
+                        onClick={() => {
+                          setSelecaoFichaOpen(false);
+                          setMatriculasDisponiveisFicha([]);
+                          setFichaSelecionada(null);
+                        }}
+                      >
+                        Cancelar
+                      </Button>
+                      <Button 
+                        variant="contained"
+                        disabled={!fichaSelecionada}
+                        onClick={() => {
+                          if (fichaSelecionada) {
+                            handleAbrirFichaMatricula(fichaSelecionada);
+                            setSelecaoFichaOpen(false);
+                            setMatriculasDisponiveisFicha([]);
+                            setFichaSelecionada(null);
+                          }
+                        }}
+                        startIcon={<Print />}
+                      >
+                        Imprimir Ficha Selecionada
                       </Button>
                     </DialogActions>
                   </Dialog>

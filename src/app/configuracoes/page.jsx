@@ -3,7 +3,37 @@ import SidebarMenu from '../../components/SidebarMenu';
 import AdminClaimChecker from '../../components/AdminClaimChecker';
 import DevClaimsAccordion from '../../components/DevClaimsAccordion';
 import LogsViewer from '../components/LogsViewer';
-import { Box, Typography, Card, CardContent, List, ListItem, ListItemButton, ListItemText, CircularProgress, Button, FormControl, InputLabel, Select, MenuItem, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Autocomplete, Chip } from '@mui/material';
+import TemplatesContratos from '../../components/TemplatesContratos';
+import { 
+  Box, 
+  Typography, 
+  Card, 
+  CardContent, 
+  List, 
+  ListItem, 
+  ListItemButton, 
+  ListItemText, 
+  CircularProgress, 
+  Button, 
+  FormControl, 
+  InputLabel, 
+  Select, 
+  MenuItem, 
+  Dialog, 
+  DialogTitle, 
+  DialogContent, 
+  DialogActions, 
+  TextField, 
+  Autocomplete, 
+  Chip,
+  Tabs,
+  Tab,
+  Paper,
+  Grid,
+  Divider,
+  IconButton,
+  Badge
+} from '@mui/material';
 import { useEffect, useState } from 'react';
 import { auth, deleteUserFunction } from '../../firebase';
 
@@ -13,8 +43,26 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '../../context/AuthContext';
 import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
 import { useSchoolServices } from '../../hooks/useSchoolServices';
+import { isSuperAdmin as checkIsSuperAdmin } from '../../config/constants';
+import {
+  Settings as SettingsIcon,
+  Business as BusinessIcon,
+  People as PeopleIcon,
+  Security as SecurityIcon,
+  Storage as StorageIcon,
+  ArrowBack,
+  Notifications,
+  CheckCircle,
+  Description as DescriptionIcon
+} from '@mui/icons-material';
 
 export default function Configuracoes() {
+  const router = useRouter();
+  const [tabValue, setTabValue] = useState(0);
+
+  const handleTabChange = (event, newValue) => {
+    setTabValue(newValue);
+  };
 
   // Hook para acessar banco da escola
   const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, storage: schoolStorage } = useSchoolDatabase();
@@ -23,8 +71,7 @@ export default function Configuracoes() {
   const { auditService, financeiroService, LOG_ACTIONS, isReady: servicesReady } = useSchoolServices();
 
   const { user } = useAuth();
-  const superAdminId = 'qD6UucWtcgPC9GHA41OB8rSaghZ2';
-  const isSuperAdmin = user?.uid === superAdminId;
+  const isUserSuperAdmin = checkIsSuperAdmin(user?.uid);
   // Função para recusar usuário (excluir do banco e do Auth)
   async function rejectUser(uid) {
     if (!isReady) {
@@ -105,11 +152,31 @@ export default function Configuracoes() {
     const all = await getData('usuarios');
     if (all) {
       const listaPendentes = Object.entries(all)
-        .filter(([_, u]) => !u.role)
+        .filter(([uid, u]) => {
+          // Não mostrar usuários sem role que sejam:
+          // 1. O próprio usuário logado
+          // 2. Usuários sem nome E sem email válido
+          // 3. Super admin
+          if (!u.role) {
+            if (uid === user?.uid) return false; // Não mostrar o próprio usuário
+            if (uid === superAdminId) return false; // Não mostrar super admin
+            if (!u.nome && !u.email) return false; // Não mostrar sem dados
+            return true;
+          }
+          return false;
+        })
         .map(([uid, u]) => ({ ...u, uid }));
       setPendentes(listaPendentes);
-      // Todos os usuários
+      
+      // Todos os usuários (exceto super admin na lista geral se não for super admin visualizando)
       const listaUsuarios = Object.entries(all)
+        .filter(([uid, u]) => {
+          // Filtrar usuários inválidos
+          if (!u.nome && !u.email) return false;
+          // Se não for super admin, não mostrar outros super admins na lista
+          if (!isUserSuperAdmin && checkIsSuperAdmin(uid)) return false;
+          return true;
+        })
         .map(([uid, u]) => ({ ...u, uid }));
       setUsuarios(listaUsuarios);
     } else {
@@ -251,7 +318,8 @@ export default function Configuracoes() {
           ...userData,
           role: editRole,
           turmas: editUser.turmas || [],
-          alunosVinculados: (editRole === 'pai' && alunosSelecionados.length > 0) ? alunosSelecionados.map(a => a.id) : []
+          alunosVinculados: (editRole === 'pai' && alunosSelecionados.length > 0) ? alunosSelecionados.map(a => a.id) : [],
+          isSuporte: editUser.isSuporte || false
         };
         
         await setData(`usuarios/${editUser.uid}`, updatedUserData);
@@ -462,11 +530,24 @@ export default function Configuracoes() {
   const [loadingUsuarios, setLoadingUsuarios] = useState(true);
   const [filtroNomeUsuario, setFiltroNomeUsuario] = useState('');
   const [turmas, setTurmas] = useState([]);
-  const router = useRouter();
   const [userRole, setUserRole] = useState(null);
   const [roleChecked, setRoleChecked] = useState(false);
   // Busca o userId diretamente do usuário autenticado
   const userId = auth.currentUser ? auth.currentUser.uid : null;
+
+  // useEffect para detectar parâmetro 'aba' na URL e mudar para aba correspondente
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const abaParam = urlParams.get('aba');
+      if (abaParam !== null) {
+        const abaNumero = parseInt(abaParam, 10);
+        if (!isNaN(abaNumero) && abaNumero >= 0 && abaNumero <= 4) {
+          setTabValue(abaNumero);
+        }
+      }
+    }
+  }, []);
 
   useEffect(() => {
     fetchUsuarios();
@@ -602,7 +683,8 @@ export default function Configuracoes() {
   // Função para validar senha DEV e UID
   const handleDevPasswordSubmit = () => {
     if (devPassword === '984984') {
-      if (userId === 'qD6UucWtcgPC9GHA41OB8rSaghZ2') {
+      // Verificar se o usuário é Super Admin usando a função centralizada
+      if (checkIsSuperAdmin(userId)) {
         setDevAccess(true);
         setDevModalOpen(false);
         setDevPassword('');
@@ -668,14 +750,443 @@ export default function Configuracoes() {
     <div className="dashboard-container">
       <SidebarMenu />
       <main className="dashboard-main">
-        <Box sx={{ maxWidth: 600, mx: 'auto', mt: 6 }}>
-          <Card sx={{ mb: 3 }} onClick={handleDevCardClick} style={{ cursor: 'pointer' }}>
-            <CardContent>
-              <Typography variant="h4" color="primary" gutterBottom align="center">
-                Configurações
-              </Typography>
-            </CardContent>
-          </Card>
+        <Box sx={{ maxWidth: 1200, mx: 'auto', mt: 4, px: 2 }}>
+          {/* Header com gradiente */}
+          <Paper 
+            sx={{ 
+              mb: 3,
+              borderRadius: 3,
+              overflow: 'hidden',
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              boxShadow: '0 8px 32px rgba(102, 126, 234, 0.25)',
+              position: 'relative'
+            }}
+          >
+            <Box sx={{ p: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
+              <IconButton 
+                onClick={() => window.history.back()}
+                sx={{ 
+                  color: 'white',
+                  '&:hover': { background: 'rgba(255,255,255,0.1)' }
+                }}
+              >
+                <ArrowBack />
+              </IconButton>
+              <Box sx={{ flex: 1 }}>
+                <Typography variant="h4" sx={{ color: 'white', fontWeight: 700, mb: 0.5 }}>
+                  ⚙️ Configurações do Sistema
+                </Typography>
+                <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.9)' }}>
+                  Gerencie usuários, dados da escola e configurações avançadas
+                </Typography>
+              </Box>
+              <IconButton 
+                onClick={handleDevCardClick}
+                sx={{ 
+                  color: 'white',
+                  '&:hover': { background: 'rgba(255,255,255,0.1)' }
+                }}
+              >
+                <SettingsIcon />
+              </IconButton>
+            </Box>
+          </Paper>
+
+          {/* Tabs */}
+          <Paper 
+            sx={{ 
+              mb: 3,
+              borderRadius: 3,
+              overflow: 'hidden',
+              boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+              border: '1px solid rgba(102, 126, 234, 0.1)'
+            }}
+          >
+            <Tabs
+              value={tabValue}
+              onChange={handleTabChange}
+              aria-label="Abas de Configurações"
+              variant="scrollable"
+              scrollButtons="auto"
+              allowScrollButtonsMobile
+              sx={{
+                background: 'linear-gradient(135deg, #667eea15 0%, #764ba215 100%)',
+                borderBottom: '2px solid rgba(102, 126, 234, 0.2)',
+                '& .MuiTab-root': {
+                  textTransform: 'none',
+                  fontSize: { xs: '0.875rem', sm: '0.95rem', md: '1rem' },
+                  fontWeight: 600,
+                  py: { xs: 2, md: 2.5 },
+                  px: { xs: 2, md: 3 },
+                  minHeight: { xs: 64, md: 72 },
+                  color: '#666',
+                  transition: 'all 0.3s ease',
+                  '&:hover': {
+                    background: 'rgba(102, 126, 234, 0.08)',
+                    color: '#667eea'
+                  },
+                  '&.Mui-selected': {
+                    color: '#667eea',
+                    fontWeight: 700,
+                    background: 'rgba(102, 126, 234, 0.1)'
+                  }
+                },
+                '& .MuiTabs-indicator': {
+                  height: 3,
+                  borderRadius: '3px 3px 0 0',
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                },
+                '& .MuiTabs-scrollButtons': {
+                  color: '#667eea',
+                  '&.Mui-disabled': {
+                    opacity: 0.3
+                  }
+                }
+              }}
+            >
+              <Tab icon={<BusinessIcon />} iconPosition="start" label="Dados da Escola" />
+              <Tab 
+                icon={
+                  <Badge badgeContent={pendentes.length} color="error" max={99}>
+                    <Notifications />
+                  </Badge>
+                } 
+                iconPosition="start" 
+                label="Aprovações Pendentes" 
+              />
+              <Tab icon={<PeopleIcon />} iconPosition="start" label="Usuários do Sistema" />
+              <Tab icon={<SecurityIcon />} iconPosition="start" label="Segurança" />
+              <Tab icon={<DescriptionIcon />} iconPosition="start" label="Templates e Contratos" />
+              {devAccess && <Tab icon={<StorageIcon />} iconPosition="start" label="DEV" />}
+            </Tabs>
+          </Paper>
+
+          {/* Conteúdo das Abas */}
+          <Box sx={{ mt: 3 }}>
+            
+            {/* ABA 0: Dados da Escola */}
+            {tabValue === 0 && (
+              <Card 
+                sx={{ 
+                  mb: 3,
+                  borderRadius: 3,
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+                  border: '1px solid rgba(102, 126, 234, 0.1)'
+                }}
+              >
+                <CardContent sx={{ p: 4 }}>
+                  <Typography variant="h6" color="primary" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <BusinessIcon /> Configurações da Escola para Relatórios
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                    Estas informações serão exibidas nas fichas de matrícula e outros documentos impressos
+                  </Typography>
+                  
+                  {loadingEscola ? (
+                    <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                      <CircularProgress />
+                    </Box>
+                  ) : (
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <TextField
+                        label="Nome da Escola"
+                        value={dadosEscola.nomeEscola}
+                        onChange={(e) => setDadosEscola({ ...dadosEscola, nomeEscola: e.target.value })}
+                        fullWidth
+                        required
+                        helperText="Nome completo da escola (aparece no cabeçalho dos relatórios)"
+                      />
+                      
+                      <TextField
+                        label="Endereço Completo"
+                        value={dadosEscola.endereco}
+                        onChange={(e) => setDadosEscola({ ...dadosEscola, endereco: e.target.value })}
+                        fullWidth
+                        multiline
+                        rows={2}
+                        helperText="Endereço completo da escola"
+                      />
+                      
+                      <Box sx={{ display: 'flex', gap: 2 }}>
+                        <TextField
+                          label="Telefone"
+                          value={dadosEscola.telefone}
+                          onChange={(e) => setDadosEscola({ ...dadosEscola, telefone: e.target.value })}
+                          fullWidth
+                          placeholder="(00) 00000-0000"
+                        />
+                        
+                        <TextField
+                          label="E-mail"
+                          value={dadosEscola.email}
+                          onChange={(e) => setDadosEscola({ ...dadosEscola, email: e.target.value })}
+                          fullWidth
+                          type="email"
+                          placeholder="contato@escola.com.br"
+                        />
+                      </Box>
+                      
+                      <Box sx={{ display: 'flex', gap: 2 }}>
+                        <TextField
+                          label="CNPJ"
+                          value={dadosEscola.cnpj}
+                          onChange={(e) => setDadosEscola({ ...dadosEscola, cnpj: e.target.value })}
+                          fullWidth
+                          placeholder="00.000.000/0000-00"
+                        />
+                        
+                        <TextField
+                          label="Diretor(a)"
+                          value={dadosEscola.diretor}
+                          onChange={(e) => setDadosEscola({ ...dadosEscola, diretor: e.target.value })}
+                          fullWidth
+                          placeholder="Nome do(a) diretor(a)"
+                        />
+                      </Box>
+                      
+                      <Button
+                        variant="contained"
+                        color="primary"
+                        onClick={handleSalvarDadosEscola}
+                        disabled={salvandoEscola || !dadosEscola.nomeEscola}
+                        sx={{ mt: 2 }}
+                      >
+                        {salvandoEscola ? 'Salvando...' : '💾 Salvar Configurações'}
+                      </Button>
+                    </Box>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* ABA 1: Aprovações Pendentes */}
+            {tabValue === 1 && (
+              <Card 
+                sx={{ 
+                  mb: 3,
+                  borderRadius: 3,
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+                  border: '1px solid rgba(102, 126, 234, 0.1)'
+                }}
+              >
+                <CardContent>
+                  <Typography variant="h6" color="primary" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Notifications /> Usuários pendentes de aprovação
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                    Revise e aprove novos usuários que solicitaram acesso ao sistema
+                  </Typography>
+                  {loading ? (
+                    <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                      <CircularProgress />
+                    </Box>
+                  ) : pendentes.length === 0 ? (
+                    <Box sx={{ textAlign: 'center', py: 6 }}>
+                      <CheckCircle sx={{ fontSize: 64, color: '#4caf50', mb: 2 }} />
+                      <Typography variant="h6" color="text.secondary">
+                        Nenhum usuário pendente
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Todas as solicitações de acesso foram processadas
+                      </Typography>
+                    </Box>
+                  ) : (
+                    <List>
+                      {pendentes.map(user => (
+                        <ListItem key={user.uid} divider disablePadding>
+                          <ListItemButton onClick={() => { setSelectedUser(user); setDialogOpen(true); }}>
+                            <ListItemText 
+                              primary={user.nome || user.email || 'Usuário sem identificação'} 
+                              secondary={user.email || 'Email não informado'} 
+                            />
+                            <Button variant="outlined" color="primary" onClick={(e) => { e.stopPropagation(); setSelectedUser(user); setDialogOpen(true); }}>Validar acesso</Button>
+                          </ListItemButton>
+                        </ListItem>
+                      ))}
+                    </List>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* ABA 2: Usuários do Sistema */}
+            {tabValue === 2 && (
+              <Card
+                sx={{ 
+                  mb: 3,
+                  borderRadius: 3,
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+                  border: '1px solid rgba(102, 126, 234, 0.1)'
+                }}
+              >
+                <CardContent>
+                  <Typography variant="h6" color="primary" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <PeopleIcon /> Gerenciar Usuários do Sistema
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                    Edite permissões, vincule alunos e gerencie o acesso dos usuários
+                  </Typography>
+                  <FormControl fullWidth sx={{ mb: 2 }}>
+                    <InputLabel id="role-filtro-label">Filtrar por tipo</InputLabel>
+                    <Select
+                      labelId="role-filtro-label"
+                      value={roleFiltro}
+                      label="Filtrar por tipo"
+                      onChange={e => setRoleFiltro(e.target.value)}
+                    >
+                      <MenuItem value="todos">Todos</MenuItem>
+                      <MenuItem value="coordenadora">Coordenadora</MenuItem>
+                      <MenuItem value="professora">Professora</MenuItem>
+                      <MenuItem value="pai">Pai</MenuItem>
+                      <MenuItem value="inativo">Inativo</MenuItem>
+                    </Select>
+                  </FormControl>
+                  <TextField
+                     label="Filtrar por nome"
+                     value={filtroNomeUsuario}
+                     onChange={e => setFiltroNomeUsuario(e.target.value)}
+                     placeholder="Digite o nome do usuário"
+                     variant="outlined"
+                     size="small"
+                     fullWidth
+                     sx={{ mb: 2 }}
+                   />
+                  {loadingUsuarios ? (
+                    <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                      <CircularProgress />
+                    </Box>
+                  ) : usuarios.length === 0 ? (
+                    <Typography align="center" color="text.secondary">Nenhum usuário cadastrado.</Typography>
+                  ) : (
+                    <List>
+                      {usuarios
+                        .filter(u => roleFiltro === 'todos' ? true : u.role === roleFiltro)
+                        .filter(u =>
+                          !filtroNomeUsuario ||
+                          (u.nome && u.nome.toLowerCase().includes(filtroNomeUsuario.toLowerCase())) ||
+                          (u.email && u.email.toLowerCase().includes(filtroNomeUsuario.toLowerCase()))
+                        )
+                          .map(user => (
+                            <ListItem key={user.uid} divider disablePadding>
+                              <ListItemButton onClick={() => {
+                                setEditUser(user);
+                                setEditRole(user.role || '');
+                                
+                                // Carregar alunos vinculados existentes se houver
+                                const alunosVinculados = user.alunosVinculados || (user.alunoVinculado ? [user.alunoVinculado] : []);
+                                if (alunosVinculados.length > 0) {
+                                  const alunosCarregados = alunosVinculados.map(id => 
+                                    alunos.find(aluno => aluno.id === id)
+                                  ).filter(Boolean); // Remove valores undefined
+                                  setAlunosSelecionados(alunosCarregados);
+                                } else {
+                                  setAlunosSelecionados([]);
+                                }
+                                
+                                setEditDialogOpen(true);
+                              }}>
+                              <ListItemText
+                                primary={user.nome || user.email || 'Usuário sem identificação'}
+                                secondary={
+                                  (user.email || 'Email não informado') + 
+                                  (user.role ? ` • ${user.role}` : ' • (pendente)') +
+                                  (user.role === 'pai' ? (() => {
+                                    const alunosVinculados = user.alunosVinculados || (user.alunoVinculado ? [user.alunoVinculado] : []);
+                                    if (alunosVinculados.length > 0) {
+                                      const nomesAlunos = alunosVinculados.map(id => 
+                                        alunos.find(a => a.id === id)?.nome || 'Nome não encontrado'
+                                      );
+                                      return ` • Filhos: ${nomesAlunos.join(', ')} (${alunosVinculados.length})`;
+                                    }
+                                    return '';
+                                  })() : '')
+                                }
+                              />
+                              </ListItemButton>
+                            </ListItem>
+                          ))}
+                      </List>
+                    )}
+                  </CardContent>
+                </Card>
+            )}
+
+            {/* ABA 3: Segurança */}
+            {tabValue === 3 && isUserSuperAdmin && (
+              <Card 
+                sx={{ 
+                  mb: 3,
+                  borderRadius: 3,
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+                  border: '1px solid rgba(102, 126, 234, 0.1)'
+                }}
+              >
+                <CardContent>
+                  <Typography variant="h6" color="primary" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <SecurityIcon /> Configurações de Segurança 2FA
+                  </Typography>
+                  <TwoFactorManager user={user} />
+                </CardContent>
+              </Card>
+            )}
+
+            {/* ABA 4: Templates e Contratos */}
+            {tabValue === 4 && (
+              <TemplatesContratos 
+                getData={getData}
+                setData={setData}
+                pushData={pushData}
+                removeData={removeData}
+                updateData={updateData}
+                storage={schoolStorage}
+              />
+            )}
+
+            {/* ABA 5: DEV (só aparece se devAccess) */}
+            {devAccess && tabValue === 5 && (
+              <Card 
+                sx={{ 
+                  mb: 3,
+                  bgcolor: '#222', 
+                  color: '#fff',
+                  borderRadius: 3,
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.3)'
+                }}
+              >
+                <CardContent>
+                  <Typography variant="h6" gutterBottom align="center">
+                    🔧 Área de Desenvolvedor
+                  </Typography>
+                  <Typography variant="body2" align="center" sx={{ mb: 2 }}>
+                    Funções exclusivas para DEV podem ser implementadas aqui.
+                  </Typography>
+                  <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', flexWrap: 'wrap' }}>
+                    <Button 
+                      variant="contained" 
+                      color="info" 
+                      onClick={handleBackupBanco}
+                      sx={{ minWidth: '200px' }}
+                    >
+                      Fazer backup do banco (JSON)
+                    </Button>
+                    <Button 
+                      variant="contained" 
+                      color="secondary" 
+                      onClick={() => setLogsDialogOpen(true)}
+                      sx={{ minWidth: '200px' }}
+                    >
+                      📋 Visualizar Logs de Auditoria
+                    </Button>
+                  </Box>
+                  {/* Menu recolhido para claims do usuário logado */}
+                  <Box sx={{ mt: 3 }}>
+                    <DevClaimsAccordion />
+                  </Box>
+                </CardContent>
+              </Card>
+            )}
+          </Box>
+
           {/* Modal DEV */}
           <Dialog open={devModalOpen} onClose={() => setDevModalOpen(false)} maxWidth="xs" fullWidth>
             <DialogTitle>Acesso Desenvolvedor</DialogTitle>
@@ -694,256 +1205,15 @@ export default function Configuracoes() {
               <Button onClick={handleDevPasswordSubmit} color="primary" disabled={!devPassword}>Entrar</Button>
             </DialogActions>
           </Dialog>
-          {/* Conteúdo DEV */}
-          {devAccess && (
-            <Card sx={{ mb: 3, bgcolor: '#222', color: '#fff' }}>
-              <CardContent>
-                <Typography variant="h6" gutterBottom align="center">
-                  Área de Desenvolvedor
-                </Typography>
-                <Typography variant="body2" align="center" sx={{ mb: 2 }}>
-                  Funções exclusivas para DEV podem ser implementadas aqui.
-                </Typography>
-                <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', flexWrap: 'wrap' }}>
-                  <Button 
-                    variant="contained" 
-                    color="info" 
-                    onClick={handleBackupBanco}
-                    sx={{ minWidth: '200px' }}
-                  >
-                    Fazer backup do banco (JSON)
-                  </Button>
-                  <Button 
-                    variant="contained" 
-                    color="secondary" 
-                    onClick={() => setLogsDialogOpen(true)}
-                    sx={{ minWidth: '200px' }}
-                  >
-                    📋 Visualizar Logs de Auditoria
-                  </Button>
-                </Box>
-                {/* Menu recolhido para claims do usuário logado */}
-                <Box sx={{ mt: 3 }}>
-                  <DevClaimsAccordion />
-                </Box>
-              </CardContent>
-            </Card>
-          )}
-          
-          {/* Configurações de Segurança 2FA - apenas para super admin */}
-          {isSuperAdmin && (
-            <Card sx={{ mb: 3 }}>
-              <CardContent>
-                <Typography variant="h6" color="primary" gutterBottom align="center">
-                  Configurações de Segurança
-                </Typography>
-                <TwoFactorManager user={user} />
-              </CardContent>
-            </Card>
-          )}
-          
-          {/* Card de Configurações da Escola para Relatórios */}
-          <Card sx={{ mb: 3 }}>
-            <CardContent>
-              <Typography variant="h6" color="primary" gutterBottom align="center">
-                📄 Configurações da Escola (Relatórios)
-              </Typography>
-              <Typography variant="body2" color="text.secondary" align="center" sx={{ mb: 3 }}>
-                Estas informações serão exibidas nas fichas de matrícula e outros documentos impressos
-              </Typography>
-              
-              {loadingEscola ? (
-                <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-                  <CircularProgress />
-                </Box>
-              ) : (
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  <TextField
-                    label="Nome da Escola"
-                    value={dadosEscola.nomeEscola}
-                    onChange={(e) => setDadosEscola({ ...dadosEscola, nomeEscola: e.target.value })}
-                    fullWidth
-                    required
-                    helperText="Nome completo da escola (aparece no cabeçalho dos relatórios)"
-                  />
-                  
-                  <TextField
-                    label="Endereço Completo"
-                    value={dadosEscola.endereco}
-                    onChange={(e) => setDadosEscola({ ...dadosEscola, endereco: e.target.value })}
-                    fullWidth
-                    multiline
-                    rows={2}
-                    helperText="Endereço completo da escola"
-                  />
-                  
-                  <Box sx={{ display: 'flex', gap: 2 }}>
-                    <TextField
-                      label="Telefone"
-                      value={dadosEscola.telefone}
-                      onChange={(e) => setDadosEscola({ ...dadosEscola, telefone: e.target.value })}
-                      fullWidth
-                      placeholder="(00) 00000-0000"
-                    />
-                    
-                    <TextField
-                      label="E-mail"
-                      value={dadosEscola.email}
-                      onChange={(e) => setDadosEscola({ ...dadosEscola, email: e.target.value })}
-                      fullWidth
-                      type="email"
-                      placeholder="contato@escola.com.br"
-                    />
-                  </Box>
-                  
-                  <Box sx={{ display: 'flex', gap: 2 }}>
-                    <TextField
-                      label="CNPJ"
-                      value={dadosEscola.cnpj}
-                      onChange={(e) => setDadosEscola({ ...dadosEscola, cnpj: e.target.value })}
-                      fullWidth
-                      placeholder="00.000.000/0000-00"
-                    />
-                    
-                    <TextField
-                      label="Diretor(a)"
-                      value={dadosEscola.diretor}
-                      onChange={(e) => setDadosEscola({ ...dadosEscola, diretor: e.target.value })}
-                      fullWidth
-                      placeholder="Nome do(a) diretor(a)"
-                    />
-                  </Box>
-                  
-                  <Button
-                    variant="contained"
-                    color="primary"
-                    onClick={handleSalvarDadosEscola}
-                    disabled={salvandoEscola || !dadosEscola.nomeEscola}
-                    sx={{ mt: 2 }}
-                  >
-                    {salvandoEscola ? 'Salvando...' : '💾 Salvar Configurações'}
-                  </Button>
-                </Box>
-              )}
-            </CardContent>
-          </Card>
-          
-          <Card sx={{ mb: 3 }}>
-            <CardContent>
-              <Typography variant="h6" color="primary" gutterBottom align="center">
-                Usuários pendentes de aprovação
-              </Typography>
-              {loading ? (
-                <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-                  <CircularProgress />
-                </Box>
-              ) : pendentes.length === 0 ? (
-                <Typography align="center" color="text.secondary">Nenhum usuário pendente.</Typography>
-              ) : (
-                <List>
-                  {pendentes.map(user => (
-                    <ListItem key={user.uid} divider disablePadding>
-                      <ListItemButton onClick={() => { setSelectedUser(user); setDialogOpen(true); }}>
-                        <ListItemText primary={user.nome || user.email} secondary={user.email} />
-                        <Button variant="outlined" color="primary" onClick={(e) => { e.stopPropagation(); setSelectedUser(user); setDialogOpen(true); }}>Validar acesso</Button>
-                      </ListItemButton>
-                    </ListItem>
-                  ))}
-                </List>
-              )}
-              <UserApprovalDialog
-                open={dialogOpen}
-                onClose={() => setDialogOpen(false)}
-                user={selectedUser || {}}
-                onApprove={handleApprove}
-              />
-            </CardContent>
-          </Card>
-          {/* Card de usuários do sistema */}
-          <Card>
-            <CardContent>
-              <Typography variant="h6" color="primary" gutterBottom align="center">
-                Usuários do sistema
-              </Typography>
-              <FormControl fullWidth sx={{ mb: 2 }}>
-                <InputLabel id="role-filtro-label">Filtrar por tipo</InputLabel>
-                <Select
-                  labelId="role-filtro-label"
-                  value={roleFiltro}
-                  label="Filtrar por tipo"
-                  onChange={e => setRoleFiltro(e.target.value)}
-                >
-                  <MenuItem value="todos">Todos</MenuItem>
-                  <MenuItem value="coordenadora">Coordenadora</MenuItem>
-                  <MenuItem value="professora">Professora</MenuItem>
-                  <MenuItem value="pai">Pai</MenuItem>
-                  <MenuItem value="inativo">Inativo</MenuItem>
-                </Select>
-              </FormControl>
-              <TextField
-                 label="Filtrar por nome"
-                 value={filtroNomeUsuario}
-                 onChange={e => setFiltroNomeUsuario(e.target.value)}
-                 placeholder="Digite o nome do usuário"
-                 variant="outlined"
-                 size="small"
-                 fullWidth
-                 sx={{ mb: 2 }}
-               />
-              {loadingUsuarios ? (
-                <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-                  <CircularProgress />
-                </Box>
-              ) : usuarios.length === 0 ? (
-                <Typography align="center" color="text.secondary">Nenhum usuário cadastrado.</Typography>
-              ) : (
-                <List>
-                  {usuarios
-                    .filter(u => roleFiltro === 'todos' ? true : u.role === roleFiltro)
-                    .filter(u =>
-                      !filtroNomeUsuario ||
-                      (u.nome && u.nome.toLowerCase().includes(filtroNomeUsuario.toLowerCase())) ||
-                      (u.email && u.email.toLowerCase().includes(filtroNomeUsuario.toLowerCase()))
-                    )
-                    .map(user => (
-                      <ListItem key={user.uid} divider disablePadding>
-                        <ListItemButton onClick={() => {
-                          setEditUser(user);
-                          setEditRole(user.role || '');
-                          
-                          // Carregar alunos vinculados existentes se houver
-                          const alunosVinculados = user.alunosVinculados || (user.alunoVinculado ? [user.alunoVinculado] : []);
-                          if (alunosVinculados.length > 0) {
-                            const alunosCarregados = alunosVinculados.map(id => 
-                              alunos.find(aluno => aluno.id === id)
-                            ).filter(Boolean); // Remove valores undefined
-                            setAlunosSelecionados(alunosCarregados);
-                          } else {
-                            setAlunosSelecionados([]);
-                          }
-                          
-                          setEditDialogOpen(true);
-                        }}>
-                        <ListItemText
-                          primary={user.nome || user.email}
-                          secondary={
-                            user.email + 
-                            (user.role ? ` • ${user.role}` : ' • (pendente)') +
-                            (user.role === 'pai' ? (() => {
-                              const alunosVinculados = user.alunosVinculados || (user.alunoVinculado ? [user.alunoVinculado] : []);
-                              if (alunosVinculados.length > 0) {
-                                const nomesAlunos = alunosVinculados.map(id => 
-                                  alunos.find(a => a.id === id)?.nome || 'Nome não encontrado'
-                                );
-                                return ` • Filhos: ${nomesAlunos.join(', ')} (${alunosVinculados.length})`;
-                              }
-                              return '';
-                            })() : '')
-                          }
-                        />
-                        </ListItemButton>
-                      </ListItem>
-                    ))}
+
+          {/* Modal de aprovação de usuário */}
+          <UserApprovalDialog
+            open={dialogOpen}
+            onClose={() => setDialogOpen(false)}
+            user={selectedUser || {}}
+            onApprove={handleApprove}
+          />
+
           {/* Modal de edição de usuário */}
           <Dialog open={editDialogOpen} onClose={() => setEditDialogOpen(false)} maxWidth="xs" fullWidth>
             <DialogTitle>Editar usuário</DialogTitle>
@@ -993,6 +1263,26 @@ export default function Configuracoes() {
                   ))}
                 </Select>
               </FormControl>
+
+              {/* Checkbox para atribuir função de suporte */}
+              {isUserSuperAdmin && (
+                <FormControl fullWidth sx={{ mt: 2 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <input
+                      type="checkbox"
+                      checked={editUser?.isSuporte || false}
+                      onChange={(e) => setEditUser({ ...editUser, isSuporte: e.target.checked })}
+                      style={{ width: 20, height: 20, cursor: 'pointer' }}
+                    />
+                    <Typography variant="body1">
+                      👤 Membro da equipe de suporte
+                    </Typography>
+                  </Box>
+                  <Typography variant="caption" color="text.secondary" sx={{ ml: 3.5, mt: 0.5 }}>
+                    Usuários com esta permissão podem visualizar e responder todos os tickets de suporte
+                  </Typography>
+                </FormControl>
+              )}
               
               {/* Seleção de alunos (apenas para role "pai") */}
               {editRole === 'pai' && (
@@ -1112,10 +1402,6 @@ export default function Configuracoes() {
             open={logsDialogOpen} 
             onClose={() => setLogsDialogOpen(false)} 
           />
-                </List>
-              )}
-            </CardContent>
-          </Card>
         </Box>
       </main>
     </div>

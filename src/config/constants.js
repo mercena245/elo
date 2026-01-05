@@ -3,8 +3,15 @@
  * Centralizadas para fácil manutenção
  */
 
-// ID do Super Admin
-export const SUPER_ADMIN_UID = 'qD6UucWtcgPC9GHA41OB8rSaghZ2';
+// Lista de UIDs dos Super Admins
+// Para adicionar um novo super admin, basta adicionar o UID do Firebase Auth aqui
+export const SUPER_ADMIN_UIDS = [
+  'qD6UucWtcgPC9GHA41OB8rSaghZ2', // Mariana - Fundadora
+  'ICzjSyn6hedJDtY81J4iwBjmG683', // Novo Super Admin (adicionado 03/12/2025)
+];
+
+// Mantém compatibilidade com código legado
+export const SUPER_ADMIN_UID = SUPER_ADMIN_UIDS[0];
 
 // Senha temporária do Super Admin (será substituída por 2FA)
 export const SUPER_ADMIN_PASSWORD = '984984';
@@ -23,7 +30,7 @@ export const ROLES = {
 
 // Verificar se um usuário é Super Admin
 export const isSuperAdmin = (uid) => {
-  return uid === SUPER_ADMIN_UID;
+  return SUPER_ADMIN_UIDS.includes(uid);
 };
 
 // Verificar se uma role é de coordenador

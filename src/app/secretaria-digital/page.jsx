@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import HistoricoEscolarPrint from '../../components/HistoricoEscolarPrint';
 import { 
   Container, 
   Typography, 
@@ -34,7 +35,13 @@ import {
   IconButton,
   Tooltip,
   Tab,
-  Tabs
+  Tabs,
+  Radio,
+  RadioGroup,
+  FormControlLabel,
+  FormLabel,
+  Checkbox,
+  FormGroup
 } from '@mui/material';
 import { 
   Description as HistoricoIcon,
@@ -66,7 +73,7 @@ import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
 const SecretariaDigital = () => {
   // Hooks multi-tenant
   const { auditService, financeiroService, LOG_ACTIONS, isReady: servicesReady } = useSchoolServices();
-  const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, storage: schoolStorage } = useSchoolDatabase();
+  const { getData, setData, pushData, removeData, updateData, isReady, error: dbError, currentSchool, storage: schoolStorage, db: schoolDb } = useSchoolDatabase();
 
   const [loading, setLoading] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -80,6 +87,13 @@ const SecretariaDigital = () => {
   const [estatisticas, setEstatisticas] = useState(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
   const [tabValue, setTabValue] = useState(0);
+  
+  // Estados para seleção de períodos no histórico
+  const [anosDisponiveis, setAnosDisponiveis] = useState([]);
+  const [periodosSelecionados, setPeriodosSelecionados] = useState([]);
+  const [selecaoTipo, setSelecaoTipo] = useState('todos'); // 'todos', 'personalizado', 'faixa'
+  const [anoInicio, setAnoInicio] = useState('');
+  const [anoFim, setAnoFim] = useState('');
 
   const { 
     userRole, 
@@ -90,11 +104,130 @@ const SecretariaDigital = () => {
     filtrarAlunosPermitidos
   } = useSecretariaAccess();
 
+  // Helper para obter nome do aluno de forma segura (compatibilidade v2.0 e v3.0)
+  const getNomeAluno = (doc) => {
+    return doc?.aluno?.nome || doc?.dadosAluno?.nome || 'Nome não disponível';
+  };
+
+  const getCpfAluno = (doc) => {
+    return doc?.aluno?.cpf || doc?.dadosAluno?.cpf || 'CPF não disponível';
+  };
+
+  const getRgAluno = (doc) => {
+    return doc?.aluno?.rg || doc?.dadosAluno?.rg || 'RG não disponível';
+  };
+
+  const getDataNascimentoAluno = (doc) => {
+    return doc?.aluno?.dataNascimento || doc?.dadosAluno?.dataNascimento || 'Data não disponível';
+  };
+
+  // Carregar anos disponíveis para um aluno
+  const carregarAnosDisponiveis = async (alunoId) => {
+    if (!isReady || !alunoId) return;
+    
+    try {
+      // Buscar dados do aluno
+      const alunoData = await getData(`alunos/${alunoId}`);
+      
+      if (!alunoData) {
+        console.warn('Aluno não encontrado:', alunoId);
+        setAnosDisponiveis([]);
+        return;
+      }
+
+      // 1. Buscar anos do histórico acadêmico estruturado
+      const historicoAcademico = alunoData.historicoAcademico || {};
+      const anosHistorico = Object.keys(historicoAcademico);
+      
+      // 2. Buscar anos das notas e frequência (fallback/complemento)
+      const notasData = await getData(`notas/${alunoId}`);
+      const frequenciaData = await getData(`frequencia/${alunoId}`);
+      
+      const anosNotas = notasData ? Object.keys(notasData) : [];
+      const anosFrequencia = frequenciaData ? Object.keys(frequenciaData) : [];
+      
+      // Combinar todas as fontes e remover duplicatas
+      const todosAnos = [...new Set([...anosHistorico, ...anosNotas, ...anosFrequencia])].sort();
+      
+      console.log('📅 Anos disponíveis encontrados:', todosAnos);
+      
+      setAnosDisponiveis(todosAnos);
+      
+      // Selecionar todos por padrão
+      setPeriodosSelecionados(todosAnos);
+      setSelecaoTipo('todos');
+      
+      // Definir faixa padrão
+      if (todosAnos.length > 0) {
+        setAnoInicio(todosAnos[0]);
+        setAnoFim(todosAnos[todosAnos.length - 1]);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar anos disponíveis:', error);
+      setAnosDisponiveis([]);
+    }
+  };
+
+  // Atualizar períodos selecionados baseado no tipo de seleção
+  const handleSelecaoTipoChange = (tipo) => {
+    setSelecaoTipo(tipo);
+    
+    if (tipo === 'todos') {
+      setPeriodosSelecionados(anosDisponiveis);
+    } else if (tipo === 'faixa' && anoInicio && anoFim) {
+      const inicio = parseInt(anoInicio);
+      const fim = parseInt(anoFim);
+      const anosSelecionados = anosDisponiveis.filter(ano => {
+        const anoNum = parseInt(ano);
+        return anoNum >= inicio && anoNum <= fim;
+      });
+      setPeriodosSelecionados(anosSelecionados);
+    }
+  };
+
+  // Atualizar quando mudar a faixa
   useEffect(() => {
-    if (!accessLoading && userRole) {
+    if (selecaoTipo === 'faixa' && anoInicio && anoFim) {
+      const inicio = parseInt(anoInicio);
+      const fim = parseInt(anoFim);
+      const anosSelecionados = anosDisponiveis.filter(ano => {
+        const anoNum = parseInt(ano);
+        return anoNum >= inicio && anoNum <= fim;
+      });
+      setPeriodosSelecionados(anosSelecionados);
+    }
+  }, [anoInicio, anoFim, selecaoTipo, anosDisponiveis]);
+
+  // Toggle de seleção individual
+  const togglePeriodo = (ano) => {
+    setPeriodosSelecionados(prev => 
+      prev.includes(ano)
+        ? prev.filter(a => a !== ano)
+        : [...prev, ano].sort()
+    );
+  };
+
+  // Configurar banco da escola no service
+  useEffect(() => {
+    if (isReady && currentSchool) {
+      console.log('🏫 Configurando Secretaria Digital para escola:', currentSchool);
+      secretariaDigitalService.setSchoolDatabaseFunctions({
+        db: schoolDb,
+        getData,
+        setData,
+        pushData,
+        updateData,
+        removeData
+      });
+    }
+  }, [isReady, currentSchool, schoolDb, getData, setData, pushData, updateData, removeData]);
+
+  useEffect(() => {
+    if (!accessLoading && userRole && isReady) {
+      console.log('🔄 [SecretariaDigital] Iniciando carregamento de dados...');
       carregarDados();
     }
-  }, [accessLoading, userRole]);
+  }, [accessLoading, userRole, isReady]);
 
   const carregarDados = async () => {
     if (!isReady) {
@@ -104,36 +237,46 @@ const SecretariaDigital = () => {
 
     setLoading(true);
     try {
-      // Carregar alunos
+      console.log('📚 [SecretariaDigital] Carregando alunos...');
+      
+      // Carregar alunos diretamente do banco da escola
       let todosAlunos = [];
-      const alunosResponse = await fetch('/api/alunos');
-      if (alunosResponse.ok) {
-        const alunosData = await alunosResponse.json();
-        todosAlunos = alunosData;
-      } else {
-        // Fallback para buscar usando useSchoolDatabase
+      try {
         const alunosData = await getData('alunos');
+        console.log('📚 [SecretariaDigital] Dados de alunos:', alunosData ? 'encontrados' : 'não encontrados');
+        
         if (alunosData) {
           todosAlunos = Object.entries(alunosData)
-            .map(([id, aluno]) => ({ id, ...aluno }));
+            .filter(([id, aluno]) => aluno && typeof aluno === 'object')
+            .map(([id, aluno]) => ({ 
+              id, 
+              ...aluno,
+              nome: aluno.nome || aluno.nomeCompleto || 'Nome não informado'
+            }));
+          console.log(`📚 [SecretariaDigital] ${todosAlunos.length} alunos carregados`);
         }
+      } catch (error) {
+        console.error('❌ [SecretariaDigital] Erro ao carregar alunos:', error);
       }
 
       // Filtrar alunos baseado nas permissões
       const alunosPermitidos = filtrarAlunosPermitidos(todosAlunos);
+      console.log(`📚 [SecretariaDigital] ${alunosPermitidos.length} alunos permitidos após filtro`);
       setAlunos(alunosPermitidos);
 
       // Carregar documentos recentes
       const docs = await secretariaDigitalService.listarDocumentos(null, 50);
       const docsPermitidos = filtrarDocumentosPermitidos(docs);
       setDocumentos(docsPermitidos);
+      console.log(`📄 [SecretariaDigital] ${docsPermitidos.length} documentos carregados`);
 
       // Carregar estatísticas
       const stats = await secretariaDigitalService.obterEstatisticas();
       setEstatisticas(stats);
+      console.log('📊 [SecretariaDigital] Estatísticas carregadas:', stats);
 
     } catch (error) {
-      console.error('Erro ao carregar dados:', error);
+      console.error('❌ [SecretariaDigital] Erro ao carregar dados:', error);
       setSnackbar({ 
         open: true, 
         message: 'Erro ao carregar dados da secretaria digital', 
@@ -172,18 +315,55 @@ const SecretariaDigital = () => {
       
       switch (dialogType) {
         case 'historico':
+          // Passar anos letivos selecionados ao invés de um único ano
           documento = await secretariaDigitalService.gerarHistoricoEscolar(
             selectedAluno, 
-            anoLetivo, 
+            periodosSelecionados.length > 0 ? periodosSelecionados : [anoLetivo], 
             observacoes
           );
           break;
+        
         case 'declaracao':
           documento = await secretariaDigitalService.gerarDeclaracaoMatricula(
             selectedAluno, 
             finalidade
           );
           break;
+        
+        case 'certificado':
+          documento = await secretariaDigitalService.gerarCertificado(
+            selectedAluno,
+            'Ensino Fundamental', // TODO: permitir seleção
+            observacoes
+          );
+          break;
+        
+        case 'transferencia':
+          documento = await secretariaDigitalService.gerarTransferencia(
+            selectedAluno,
+            finalidade, // escola destino
+            observacoes, // motivo
+            '' // observações adicionais
+          );
+          break;
+        
+        case 'declaracao_conclusao':
+          documento = await secretariaDigitalService.gerarDeclaracaoConclusao(
+            selectedAluno,
+            'Ensino Fundamental',
+            finalidade
+          );
+          break;
+        
+        case 'declaracao_frequencia':
+          documento = await secretariaDigitalService.gerarDeclaracaoFrequencia(
+            selectedAluno,
+            '01/01/2024', // TODO: permitir seleção
+            '31/12/2024',
+            finalidade
+          );
+          break;
+        
         default:
           throw new Error('Tipo de documento não suportado');
       }
@@ -211,27 +391,28 @@ const SecretariaDigital = () => {
 
   const baixarDocumento = async (documento) => {
     try {
-      const pdf = await secretariaDigitalService.gerarPDF(documento);
-      pdf.save(`${documento.tipo}_${documento.dadosAluno.nome}_${documento.codigoVerificacao}.pdf`);
+      setLoading(true);
+      console.log('📥 [SecretariaDigital] Abrindo visualização para impressão:', documento.id);
       
-      await auditService?.logAction({
-        action: 'DIGITAL_SECRETARY_DOCUMENT_DOWNLOADED',
-        entityId: documento.id,
-        details: `Download do documento ${documento.tipo} do aluno ${documento.dadosAluno.nome}`,
-        changes: {
-          documentoId: documento.id,
-          tipoDocumento: documento.tipo,
-          alunoNome: documento.dadosAluno.nome
-        }
+      // Abrir modal de visualização ao invés de gerar PDF direto
+      setDocumentoVisualizado(documento);
+      setModalVisualizacao(true);
+      
+      setSnackbar({ 
+        open: true, 
+        message: 'Documento aberto para impressão. Use Ctrl+P para imprimir/salvar como PDF', 
+        severity: 'info' 
       });
       
     } catch (error) {
-      console.error('Erro ao baixar documento:', error);
+      console.error('❌ [SecretariaDigital] Erro ao abrir documento:', error);
       setSnackbar({ 
         open: true, 
-        message: 'Erro ao baixar documento', 
+        message: `Erro ao abrir documento: ${error.message}`, 
         severity: 'error' 
       });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -248,6 +429,11 @@ const SecretariaDigital = () => {
   const fecharVisualizacao = () => {
     setModalVisualizacao(false);
     setDocumentoVisualizado(null);
+  };
+
+  // 🆕 Função para imprimir documento
+  const imprimirDocumento = () => {
+    window.print();
   };
 
   const menuCardsCoord = [
@@ -529,7 +715,7 @@ const SecretariaDigital = () => {
                             Turma: {aluno.turma}
                           </Typography>
                           <Chip 
-                            label={`${documentos.filter(d => d.dadosAluno.nome === aluno.nome).length} documentos`}
+                            label={`${documentos.filter(d => getNomeAluno(d) === aluno.nome).length} documentos`}
                             size="small"
                             color="primary"
                             sx={{ mt: 1 }}
@@ -592,7 +778,7 @@ const SecretariaDigital = () => {
                           >
                             <Box component="span" sx={{ display: 'flex', alignItems: 'center' }}>
                               <PersonIcon sx={{ fontSize: 14, mr: 0.5 }} />
-                              {doc.dadosAluno.nome}
+                              {getNomeAluno(doc)}
                             </Box>
                             <Box component="span" sx={{ display: 'flex', alignItems: 'center' }}>
                               <QrCodeIcon sx={{ fontSize: 12, mr: 0.5 }} />
@@ -636,19 +822,30 @@ const SecretariaDigital = () => {
 
         {/* Dialog para Gerar Documentos (apenas coordenadora) */}
         {userRole === 'coordenadora' && (
-          <Dialog open={dialogOpen} onClose={fecharDialog} maxWidth="sm" fullWidth>
-            <DialogTitle>
-              {dialogType === 'historico' && 'Gerar Histórico Escolar'}
-              {dialogType === 'declaracao' && 'Gerar Declaração'}
-              {dialogType === 'certificado' && 'Gerar Certificado'}
-              {dialogType === 'transferencia' && 'Gerar Transferência'}
+          <Dialog open={dialogOpen} onClose={fecharDialog} maxWidth="md" fullWidth>
+            <DialogTitle sx={{ 
+              bgcolor: 'primary.main', 
+              color: 'white',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.12)'
+            }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                {dialogType === 'historico' && <><HistoricoIcon /> Gerar Histórico Escolar</>}
+                {dialogType === 'declaracao' && <><DeclaracaoIcon /> Gerar Declaração</>}
+                {dialogType === 'certificado' && <><CertificadoIcon /> Gerar Certificado</>}
+                {dialogType === 'transferencia' && <><TransferenciaIcon /> Gerar Transferência</>}
+              </Box>
             </DialogTitle>
-            <DialogContent>
+            <DialogContent sx={{ pt: 3 }}>
               <FormControl fullWidth margin="normal">
                 <InputLabel>Aluno</InputLabel>
                 <Select
                   value={selectedAluno}
-                  onChange={(e) => setSelectedAluno(e.target.value)}
+                  onChange={(e) => {
+                    setSelectedAluno(e.target.value);
+                    if (dialogType === 'historico') {
+                      carregarAnosDisponiveis(e.target.value);
+                    }
+                  }}
                   label="Aluno"
                 >
                   {alunos.map((aluno) => (
@@ -659,15 +856,145 @@ const SecretariaDigital = () => {
                 </Select>
               </FormControl>
 
-              {dialogType === 'historico' && (
-                <TextField
-                  fullWidth
-                  margin="normal"
-                  label="Ano Letivo"
-                  value={anoLetivo}
-                  onChange={(e) => setAnoLetivo(e.target.value)}
-                  type="number"
-                />
+              {dialogType === 'historico' && selectedAluno && anosDisponiveis.length > 0 && (
+                <Paper elevation={2} sx={{ mt: 3, p: 3, bgcolor: '#f8fafc' }}>
+                  <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold', color: 'primary.main', mb: 2 }}>
+                    📅 Selecionar Períodos do Histórico
+                  </Typography>
+                  
+                  <RadioGroup
+                    value={selecaoTipo}
+                    onChange={(e) => handleSelecaoTipoChange(e.target.value)}
+                  >
+                    <FormControlLabel 
+                      value="todos" 
+                      control={<Radio color="primary" />} 
+                      label={
+                        <Box>
+                          <Typography variant="body1" fontWeight={500}>Todos os períodos disponíveis</Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            Incluir todo o histórico acadêmico do aluno
+                          </Typography>
+                        </Box>
+                      }
+                      sx={{ mb: 1, p: 1.5, borderRadius: 1, '&:hover': { bgcolor: 'action.hover' } }}
+                    />
+                    <FormControlLabel 
+                      value="faixa" 
+                      control={<Radio color="primary" />} 
+                      label={
+                        <Box>
+                          <Typography variant="body1" fontWeight={500}>Selecionar faixa de anos</Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            Escolher um período específico (ex: 2020 a 2023)
+                          </Typography>
+                        </Box>
+                      }
+                      sx={{ mb: 1, p: 1.5, borderRadius: 1, '&:hover': { bgcolor: 'action.hover' } }}
+                    />
+                    <FormControlLabel 
+                      value="personalizado" 
+                      control={<Radio color="primary" />} 
+                      label={
+                        <Box>
+                          <Typography variant="body1" fontWeight={500}>Selecionar anos específicos</Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            Escolher manualmente quais anos incluir
+                          </Typography>
+                        </Box>
+                      }
+                      sx={{ p: 1.5, borderRadius: 1, '&:hover': { bgcolor: 'action.hover' } }}
+                    />
+                  </RadioGroup>
+
+                  {selecaoTipo === 'faixa' && (
+                    <Box sx={{ mt: 3, p: 2, bgcolor: 'white', borderRadius: 1, border: '1px solid #e2e8f0' }}>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                        Selecione o intervalo de anos:
+                      </Typography>
+                      <Grid container spacing={2}>
+                        <Grid item xs={6}>
+                          <FormControl fullWidth size="small">
+                            <InputLabel>Ano Início</InputLabel>
+                            <Select
+                              value={anoInicio}
+                              onChange={(e) => setAnoInicio(e.target.value)}
+                              label="Ano Início"
+                            >
+                              {anosDisponiveis.map((ano) => (
+                                <MenuItem key={ano} value={ano}>{ano}</MenuItem>
+                              ))}
+                            </Select>
+                          </FormControl>
+                        </Grid>
+                        <Grid item xs={6}>
+                          <FormControl fullWidth size="small">
+                            <InputLabel>Ano Fim</InputLabel>
+                            <Select
+                              value={anoFim}
+                              onChange={(e) => setAnoFim(e.target.value)}
+                              label="Ano Fim"
+                            >
+                              {anosDisponiveis.map((ano) => (
+                                <MenuItem key={ano} value={ano}>{ano}</MenuItem>
+                              ))}
+                            </Select>
+                          </FormControl>
+                        </Grid>
+                      </Grid>
+                    </Box>
+                  )}
+
+                  {selecaoTipo === 'personalizado' && (
+                    <Box sx={{ mt: 3, p: 2, bgcolor: 'white', borderRadius: 1, border: '1px solid #e2e8f0' }}>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                        Marque os anos que deseja incluir:
+                      </Typography>
+                      <FormGroup>
+                        <Grid container spacing={1}>
+                          {anosDisponiveis.map((ano) => (
+                            <Grid item xs={6} sm={4} key={ano}>
+                              <FormControlLabel
+                                control={
+                                  <Checkbox
+                                    checked={periodosSelecionados.includes(ano)}
+                                    onChange={() => togglePeriodo(ano)}
+                                    color="primary"
+                                  />
+                                }
+                                label={`Ano ${ano}`}
+                                sx={{ 
+                                  m: 0,
+                                  p: 1,
+                                  borderRadius: 1,
+                                  '&:hover': { bgcolor: 'action.hover' }
+                                }}
+                              />
+                            </Grid>
+                          ))}
+                        </Grid>
+                      </FormGroup>
+                    </Box>
+                  )}
+
+                  <Alert 
+                    severity={periodosSelecionados.length > 0 ? "success" : "warning"} 
+                    icon={periodosSelecionados.length > 0 ? "✓" : "⚠️"}
+                    sx={{ mt: 2 }}
+                  >
+                    <Typography variant="body2" fontWeight={500}>
+                      {periodosSelecionados.length > 0 
+                        ? `${periodosSelecionados.length} período(s) selecionado(s): ${periodosSelecionados.join(', ')}` 
+                        : 'Nenhum período selecionado'}
+                    </Typography>
+                  </Alert>
+                </Paper>
+              )}
+
+              {dialogType === 'historico' && selectedAluno && anosDisponiveis.length === 0 && (
+                <Alert severity="warning" sx={{ mt: 2 }}>
+                  Nenhum histórico acadêmico encontrado para este aluno.
+                </Alert>
               )}
 
               {dialogType === 'declaracao' && (
@@ -724,10 +1051,10 @@ const SecretariaDigital = () => {
         <Dialog 
           open={modalVisualizacao} 
           onClose={fecharVisualizacao}
-          maxWidth="md"
+          maxWidth="lg"
           fullWidth
           PaperProps={{
-            sx: { minHeight: '80vh' }
+            sx: { minHeight: '90vh', maxHeight: '90vh' }
           }}
         >
           <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -737,7 +1064,7 @@ const SecretariaDigital = () => {
               </Typography>
               {documentoVisualizado && (
                 <Typography variant="body2" color="text.secondary">
-                  {getDocumentTypeLabel(documentoVisualizado.tipo)} - {documentoVisualizado.dadosAluno.nome}
+                  {getDocumentTypeLabel(documentoVisualizado.tipo)} - {getNomeAluno(documentoVisualizado)}
                 </Typography>
               )}
             </Box>
@@ -746,121 +1073,9 @@ const SecretariaDigital = () => {
             </IconButton>
           </DialogTitle>
           
-          <DialogContent dividers>
+          <DialogContent dividers sx={{ overflow: 'auto' }}>
             {documentoVisualizado && (
-              <Box sx={{ p: 2 }}>
-                {/* Cabeçalho do Documento */}
-                <Paper elevation={1} sx={{ p: 3, mb: 3, textAlign: 'center' }}>
-                  <Typography variant="h5" gutterBottom color="primary">
-                    {documentoVisualizado.dadosInstituicao?.nome || 'ESCOLA ELO'}
-                  </Typography>
-                  <Typography variant="h6" gutterBottom>
-                    {getDocumentTypeLabel(documentoVisualizado.tipo).toUpperCase()}
-                  </Typography>
-                  <Chip 
-                    label={documentoVisualizado.status} 
-                    color={getStatusColor(documentoVisualizado.status)}
-                    sx={{ mt: 1 }}
-                  />
-                </Paper>
-
-                {/* Dados do Aluno */}
-                <Paper elevation={1} sx={{ p: 3, mb: 3 }}>
-                  <Typography variant="h6" gutterBottom color="primary">
-                    Dados do Aluno
-                  </Typography>
-                  <Grid container spacing={2}>
-                    <Grid item xs={12} sm={6}>
-                      <Typography variant="body2" color="text.secondary">Nome:</Typography>
-                      <Typography variant="body1">{documentoVisualizado.dadosAluno.nome}</Typography>
-                    </Grid>
-                    <Grid item xs={12} sm={6}>
-                      <Typography variant="body2" color="text.secondary">CPF:</Typography>
-                      <Typography variant="body1">{documentoVisualizado.dadosAluno.cpf}</Typography>
-                    </Grid>
-                    <Grid item xs={12} sm={6}>
-                      <Typography variant="body2" color="text.secondary">RG:</Typography>
-                      <Typography variant="body1">{documentoVisualizado.dadosAluno.rg}</Typography>
-                    </Grid>
-                    <Grid item xs={12} sm={6}>
-                      <Typography variant="body2" color="text.secondary">Data de Nascimento:</Typography>
-                      <Typography variant="body1">{documentoVisualizado.dadosAluno.dataNascimento}</Typography>
-                    </Grid>
-                  </Grid>
-                </Paper>
-
-                {/* Histórico Acadêmico */}
-                {documentoVisualizado.historicoCompleto?.periodosAcademicos && (
-                  <Paper elevation={1} sx={{ p: 3, mb: 3 }}>
-                    <Typography variant="h6" gutterBottom color="primary">
-                      Histórico Acadêmico
-                    </Typography>
-                    {documentoVisualizado.historicoCompleto.periodosAcademicos.map((periodo, index) => (
-                      <Box key={index} sx={{ mb: 3 }}>
-                        <Typography variant="subtitle1" fontWeight="bold">
-                          {periodo.anoLetivo} - {periodo.periodoLetivo}
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                          Situação: {periodo.resultadoFinal || 'Em andamento'}
-                        </Typography>
-                        
-                        {periodo.disciplinas && periodo.disciplinas.length > 0 && (
-                          <Box sx={{ mt: 2 }}>
-                            <Typography variant="body2" fontWeight="bold" gutterBottom>
-                              Disciplinas:
-                            </Typography>
-                            <Grid container spacing={1}>
-                              {periodo.disciplinas.map((disciplina, discIndex) => (
-                                <Grid item xs={12} sm={6} key={discIndex}>
-                                  <Box sx={{ p: 1, border: '1px solid #e0e0e0', borderRadius: 1 }}>
-                                    <Typography variant="body2" fontWeight="bold">
-                                      {disciplina.nome}
-                                    </Typography>
-                                    <Typography variant="caption" display="block">
-                                      Média: {disciplina.mediaFinal || 'N/A'} | 
-                                      Frequência: {disciplina.frequencia || 'N/A'}% | 
-                                      Situação: {disciplina.situacao || 'Pendente'}
-                                    </Typography>
-                                  </Box>
-                                </Grid>
-                              ))}
-                            </Grid>
-                          </Box>
-                        )}
-                      </Box>
-                    ))}
-                  </Paper>
-                )}
-
-                {/* Informações do Documento */}
-                <Paper elevation={1} sx={{ p: 3 }}>
-                  <Typography variant="h6" gutterBottom color="primary">
-                    Informações do Documento
-                  </Typography>
-                  <Grid container spacing={2}>
-                    <Grid item xs={12} sm={6}>
-                      <Typography variant="body2" color="text.secondary">Código de Verificação:</Typography>
-                      <Typography variant="body1" fontFamily="monospace">
-                        {documentoVisualizado.codigoVerificacao}
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={12} sm={6}>
-                      <Typography variant="body2" color="text.secondary">Data de Emissão:</Typography>
-                      <Typography variant="body1">
-                        {new Date(documentoVisualizado.dataEmissao).toLocaleDateString('pt-BR')}
-                      </Typography>
-                    </Grid>
-                    {documentoVisualizado.totalRematriculas > 0 && (
-                      <Grid item xs={12}>
-                        <Typography variant="body2" color="text.secondary">Rematrículas:</Typography>
-                        <Typography variant="body1">
-                          {documentoVisualizado.totalRematriculas} rematrícula(s) registrada(s)
-                        </Typography>
-                      </Grid>
-                    )}
-                  </Grid>
-                </Paper>
-              </Box>
+              <HistoricoEscolarPrint documento={documentoVisualizado} />
             )}
           </DialogContent>
           
@@ -868,18 +1083,14 @@ const SecretariaDigital = () => {
             <Button onClick={fecharVisualizacao}>
               Fechar
             </Button>
-            {documentoVisualizado && (
-              <Button 
-                variant="contained" 
-                startIcon={<DownloadIcon />}
-                onClick={() => {
-                  baixarDocumento(documentoVisualizado);
-                  fecharVisualizacao();
-                }}
-              >
-                Baixar PDF
-              </Button>
-            )}
+            <Button 
+              variant="contained" 
+              color="primary"
+              startIcon={<DownloadIcon />}
+              onClick={imprimirDocumento}
+            >
+              Imprimir / Salvar PDF
+            </Button>
           </DialogActions>
         </Dialog>
       </Container>

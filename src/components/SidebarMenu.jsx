@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FaBars, FaHome, FaUserFriends, FaSchool, FaSignOutAlt, FaStore, FaUsers, FaCalendarAlt, FaCashRegister, FaEnvelope, FaPrint, FaImages, FaUserCircle, FaCog, FaGraduationCap, FaCertificate, FaChalkboardTeacher } from 'react-icons/fa';
+import { FaBars, FaHome, FaUserFriends, FaSchool, FaSignOutAlt, FaStore, FaUsers, FaCalendarAlt, FaCashRegister, FaEnvelope, FaPrint, FaImages, FaUserCircle, FaCog, FaGraduationCap, FaCertificate, FaChalkboardTeacher, FaHeadset } from 'react-icons/fa';
 import { auth, onAuthStateChanged } from '../firebase';
 import { signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
@@ -527,6 +527,49 @@ const SidebarMenu = () => {
                 </ListItemButton>
               </ListItem>
             )}
+
+            {/* Suporte - Disponível para todos */}
+            <ListItem disablePadding sx={{ mb: 0.5 }}>
+              <ListItemButton 
+                onClick={() => go('/suporte')}
+                sx={{
+                  borderRadius: 2,
+                  mx: 1,
+                  transition: 'all 0.3s ease',
+                  '&:hover': {
+                    bgcolor: 'rgba(255, 255, 255, 0.1)',
+                    transform: 'translateX(4px)',
+                    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.1)'
+                  }
+                }}
+              >
+                <ListItemIcon sx={{ minWidth: 40 }}>
+                  <Box sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: 32,
+                    height: 32,
+                    borderRadius: '8px',
+                    bgcolor: '#10B981',
+                    color: 'white',
+                    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)'
+                  }}>
+                    <FaHeadset size={16} />
+                  </Box>
+                </ListItemIcon>
+                <ListItemText 
+                  primary="Suporte"
+                  primaryTypographyProps={{
+                    sx: { 
+                      fontWeight: 500,
+                      fontSize: '0.95rem',
+                      color: 'white'
+                    }
+                  }}
+                />
+              </ListItemButton>
+            </ListItem>
 
             {/* Logout */}
             <ListItem disablePadding>

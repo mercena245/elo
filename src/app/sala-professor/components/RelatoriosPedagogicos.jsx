@@ -84,23 +84,152 @@ const RelatoriosPedagogicos = () => {
     desenvolvimento: {
       nome: 'Desenvolvimento Geral',
       descricao: 'Relatório de desenvolvimento baseado nas competências gerais da BNCC',
-      prompt: `Gere um relatório pedagógico detalhado baseado na BNCC sobre o desenvolvimento do aluno. 
-      Inclua: aspectos cognitivos, socioemocionais, participação em atividades, evolução acadêmica, 
-      pontos de destaque e sugestões de desenvolvimento. Use linguagem profissional e educativa.`
+      prompt: `Elabore um relatório pedagógico ABRANGENTE focado no desenvolvimento integral do aluno.
+
+ASPECTOS OBRIGATÓRIOS A ABORDAR:
+
+1. **DESENVOLVIMENTO COGNITIVO:**
+   - Capacidade de compreensão e assimilação de novos conhecimentos
+   - Raciocínio lógico e resolução de problemas
+   - Memória e atenção durante as atividades
+   - Criatividade e pensamento crítico
+   
+2. **DESENVOLVIMENTO SOCIOEMOCIONAL (BNCC - Competências Gerais 8, 9 e 10):**
+   - Autoconhecimento e autocuidado
+   - Empatia e cooperação
+   - Responsabilidade e cidadania
+   - Gestão de emoções e resiliência
+
+3. **PARTICIPAÇÃO E ENGAJAMENTO:**
+   - Interesse e motivação pelas atividades propostas
+   - Frequência e pontualidade
+   - Participação em aulas e discussões
+   - Envolvimento em projetos e trabalhos em grupo
+
+4. **EVOLUÇÃO ACADÊMICA:**
+   - Progressos observados ao longo do período
+   - Conquistas e avanços significativos
+   - Comparação com expectativas de aprendizagem da série/ano
+   - Apropriação de conteúdos trabalhados
+
+5. **PONTOS DE DESTAQUE:**
+   - Habilidades e talentos identificados
+   - Áreas de maior facilidade e interesse
+   - Potencialidades a serem estimuladas
+
+6. **ÁREAS PARA DESENVOLVIMENTO:**
+   - Aspectos que necessitam maior atenção
+   - Dificuldades observadas (sempre de forma construtiva)
+   - Estratégias que estão sendo aplicadas
+
+Use as 10 Competências Gerais da BNCC como referência para análise integral do desenvolvimento.`
     },
     comportamental: {
       nome: 'Comportamental e Social',
       descricao: 'Foco em aspectos comportamentais e sociais do aluno',
-      prompt: `Elabore um relatório pedagógico focado nos aspectos comportamentais e sociais do aluno, 
-      considerando as competências socioemocionais da BNCC. Analise: relacionamentos interpessoais, 
-      autorregulação, participação em grupos, resolução de conflitos e desenvolvimento da autonomia.`
+      prompt: `Elabore um relatório pedagógico DETALHADO sobre os aspectos COMPORTAMENTAIS e SOCIAIS do aluno.
+
+ASPECTOS OBRIGATÓRIOS A ABORDAR:
+
+1. **RELACIONAMENTOS INTERPESSOAIS:**
+   - Interação com colegas (cooperação, respeito, amizade)
+   - Relacionamento com professores e funcionários
+   - Habilidade de comunicação verbal e não-verbal
+   - Capacidade de trabalhar em equipe
+   - Empatia e consideração pelos sentimentos alheios
+
+2. **AUTORREGULAÇÃO (BNCC - Competência Geral 8):**
+   - Controle emocional em diferentes situações
+   - Capacidade de lidar com frustrações
+   - Persistência diante de desafios
+   - Paciência e espera de sua vez
+   - Gerenciamento do tempo e organização pessoal
+
+3. **PARTICIPAÇÃO EM GRUPOS:**
+   - Liderança e iniciativa
+   - Escuta ativa das opiniões dos colegas
+   - Contribuição em trabalhos coletivos
+   - Respeito às regras de convivência
+   - Adaptação a diferentes contextos sociais
+
+4. **RESOLUÇÃO DE CONFLITOS:**
+   - Estratégias utilizadas para resolver divergências
+   - Capacidade de diálogo e negociação
+   - Reações diante de situações desafiadoras
+   - Pedidos de ajuda quando necessário
+   - Mediação entre pares
+
+5. **DESENVOLVIMENTO DA AUTONOMIA (BNCC - Competência Geral 10):**
+   - Independência em tarefas cotidianas
+   - Tomada de decisões responsáveis
+   - Autocuidado e responsabilidade pessoal
+   - Iniciativa e proatividade
+   - Consciência de direitos e deveres
+
+6. **VALORES E ATITUDES:**
+   - Respeito à diversidade
+   - Honestidade e integridade
+   - Solidariedade e colaboração
+   - Responsabilidade social e ambiental
+
+Conecte as observações com as competências socioemocionais da BNCC e contexto escolar.`
     },
     aprendizagem: {
       nome: 'Aprendizagem Específica',
       descricao: 'Relatório focado em habilidades específicas de aprendizagem',
-      prompt: `Desenvolva um relatório pedagógico sobre as habilidades específicas de aprendizagem do aluno, 
-      alinhado com a BNCC. Aborde: compreensão de conceitos, aplicação prática, dificuldades identificadas, 
-      estratégias utilizadas e progressos observados nas áreas de conhecimento.`
+      prompt: `Desenvolva um relatório pedagógico ESPECÍFICO sobre as HABILIDADES DE APRENDIZAGEM do aluno.
+
+ASPECTOS OBRIGATÓRIOS A ABORDAR:
+
+1. **COMPREENSÃO DE CONCEITOS:**
+   - Capacidade de entender conceitos novos
+   - Estabelecimento de relações entre conteúdos
+   - Profundidade de compreensão (superficial/aprofundada)
+   - Transferência de conhecimento entre diferentes contextos
+   - Questionamentos e curiosidade intelectual
+
+2. **ÁREAS DE CONHECIMENTO (BNCC):**
+   - Linguagens (Língua Portuguesa, Arte, Educação Física)
+   - Matemática (raciocínio lógico, resolução de problemas)
+   - Ciências da Natureza (investigação, experimentação)
+   - Ciências Humanas (compreensão social e histórica)
+   - Ensino Religioso (se aplicável)
+
+3. **APLICAÇÃO PRÁTICA:**
+   - Uso de conhecimentos em situações reais
+   - Resolução de problemas cotidianos
+   - Criatividade na aplicação de conceitos
+   - Conexão teoria-prática
+   - Produção de trabalhos e projetos
+
+4. **HABILIDADES ESPECÍFICAS OBSERVADAS:**
+   - Leitura: fluência, compreensão, interpretação
+   - Escrita: ortografia, coerência, expressão
+   - Cálculo: operações, raciocínio matemático
+   - Oralidade: expressão, argumentação
+   - Pesquisa: busca, seleção, organização de informações
+
+5. **DIFICULDADES IDENTIFICADAS:**
+   - Áreas específicas que apresentam desafios
+   - Natureza das dificuldades (conceitual, procedimental, motivacional)
+   - Hipóteses sobre as causas
+   - Impacto no processo de aprendizagem geral
+
+6. **ESTRATÉGIAS E INTERVENÇÕES:**
+   - Metodologias que têm funcionado bem
+   - Recursos didáticos mais eficazes
+   - Adaptações realizadas
+   - Apoios necessários (reforço, acompanhamento)
+   - Parceria escola-família
+
+7. **PROGRESSOS OBSERVADOS:**
+   - Avanços em relação ao ponto de partida
+   - Conquistas específicas do período
+   - Comparação com objetivos de aprendizagem
+   - Ritmo de evolução
+   - Indicadores de desenvolvimento
+
+Relacione as observações com as habilidades específicas da BNCC para a série/ano do aluno.`
     }
   };
 
@@ -246,7 +375,8 @@ const RelatoriosPedagogicos = () => {
 
       if (resultado.sucesso) {
         console.log('✅ Relatório gerado com sucesso!');
-        setRelatorioGerado(resultado.relatorio);
+        const relatorioProcessado = processarMarkdown(resultado.relatorio);
+        setRelatorioGerado(relatorioProcessado);
       } else {
         throw new Error(resultado.erro || 'Erro desconhecido na geração do relatório');
       }
@@ -298,12 +428,15 @@ const RelatoriosPedagogicos = () => {
         'relatorio_pedagogico_create',
         user.uid,
         {
-          description: `Criou relatório pedagógico para aluno ${alunos[selectedAlunos[0]]?.nome}`,
+          description: `Criou relatório pedagógico para aluno ${alunos[selectedAlunos[0]]?.nomeCompleto || alunos[selectedAlunos[0]]?.nome}`,
           alunoId: selectedAlunos[0],
           template: templateSelecionado
         }
       );
 
+      // Recarregar dados para exibir o novo relatório
+      await carregarDados();
+      
       alert('Relatório salvo com sucesso!');
       setGeradorOpen(false);
       limparCamposGerador();
@@ -327,18 +460,20 @@ const RelatoriosPedagogicos = () => {
   // Função para aprovar relatório
   const aprovarRelatorio = async (relatorio) => {
     try {
-      await updateData('relatorios-pedagogicos/${relatorio.id}', {
+      await updateData(`relatorios-pedagogicos/${relatorio.id}`, {
         statusAprovacao: 'aprovado',
         atualizadoEm: new Date().toISOString(),
       });
       await auditService.logAction('relatorio_pedagogico_aprovar', user.uid, {
-        description: `Aprovou relatório pedagógico para aluno ${alunos[relatorio.alunoId]?.nome}`,
+        description: `Aprovou relatório pedagógico para aluno ${alunos[relatorio.alunoId]?.nomeCompleto || alunos[relatorio.alunoId]?.nome}`,
         alunoId: relatorio.alunoId,
         relatorioId: relatorio.id
       });
+      await carregarDados();
       setFeedback('Relatório aprovado com sucesso!');
     } catch (error) {
-      setFeedback('Erro ao aprovar relatório.');
+      console.error('Erro ao aprovar relatório:', error);
+      setFeedback('Erro ao aprovar relatório. Tente novamente.');
     }
   };
 
@@ -375,20 +510,40 @@ const RelatoriosPedagogicos = () => {
         atualizadoEm: new Date().toISOString(),
       });
       await auditService.logAction('relatorio_pedagogico_editar', user.uid, {
-        description: `Editou relatório pedagógico para aluno ${alunos[editandoRelatorio.alunoId]?.nome}`,
+        description: `Editou relatório pedagógico para aluno ${alunos[editandoRelatorio.alunoId]?.nomeCompleto || alunos[editandoRelatorio.alunoId]?.nome}`,
         alunoId: editandoRelatorio.alunoId,
         relatorioId: editandoRelatorio.id
       });
+      await carregarDados();
       setFeedback('Relatório editado com sucesso!');
       setEditandoRelatorio(null);
       setConteudoEditado('');
     } catch (error) {
-      setFeedback('Erro ao editar relatório.');
+      console.error('Erro ao editar relatório:', error);
+      setFeedback('Erro ao editar relatório. Tente novamente.');
     }
   };
 
   // Função para fechar feedback
   const fecharFeedback = () => setFeedback('');
+
+  // Função para processar markdown e formatar o relatório
+  const processarMarkdown = (texto) => {
+    if (!texto) return '';
+    
+    return texto
+      // Remover múltiplas hashtags (## ou ### ou ####)
+      .replace(/^#{1,6}\s+/gm, '')
+      // Remover ** (negrito)
+      .replace(/\*\*([^*]+)\*\*/g, '$1')
+      // Remover * simples (itálico)
+      .replace(/\*([^*]+)\*/g, '$1')
+      // Remover --- (separadores)
+      .replace(/^---$/gm, '')
+      // Limpar linhas vazias excessivas (mais de 2 seguidas)
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+  };
 
   return (
     <Box sx={{ p: { xs: 1, sm: 2, md: 3 } }}>
@@ -510,8 +665,8 @@ const RelatoriosPedagogicos = () => {
                     </Box>
                   </AccordionSummary>
                   <AccordionDetails>
-                    <Box sx={{ whiteSpace: 'pre-line', lineHeight: 1.6 }}>
-                      {relatorio.conteudo}
+                    <Box sx={{ whiteSpace: 'pre-line', lineHeight: 1.8, fontSize: '0.95rem' }}>
+                      {processarMarkdown(relatorio.conteudo)}
                     </Box>
                     <Box sx={{ mt: 2, display: 'flex', gap: 1 }}>
                       <Button size="small" startIcon={<DownloadIcon />} onClick={() => baixarPDF(relatorio)}>
@@ -638,12 +793,27 @@ const RelatoriosPedagogicos = () => {
 
           {relatorioGerado && (
             <Box sx={{ mt: 3 }}>
-              <Typography variant="h6" gutterBottom>
-                Relatório Gerado:
+              <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                ✏️ Relatório Gerado (Editável):
               </Typography>
-              <Paper sx={{ p: 2, maxHeight: 400, overflow: 'auto', whiteSpace: 'pre-line' }}>
-                {relatorioGerado}
-              </Paper>
+              <TextField
+                fullWidth
+                multiline
+                minRows={12}
+                maxRows={20}
+                value={relatorioGerado}
+                onChange={(e) => setRelatorioGerado(e.target.value)}
+                variant="outlined"
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    fontFamily: 'inherit',
+                    fontSize: '0.95rem',
+                    lineHeight: 1.8,
+                    bgcolor: '#f9fafb'
+                  }
+                }}
+                helperText="💡 Você pode editar o texto acima antes de salvar"
+              />
             </Box>
           )}
         </DialogContent>

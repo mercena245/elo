@@ -11,7 +11,9 @@ import {
   Button,
   Tabs,
   Tab,
-  Alert
+  Alert,
+  Paper,
+  Avatar
 } from '@mui/material';
 import { auth, onAuthStateChanged } from '../../firebase';
 import { useRouter } from 'next/navigation';
@@ -162,28 +164,78 @@ const NotasFrequencia = () => {
       <SidebarMenu />
       <main className="dashboard-main">
         <Box sx={{ maxWidth: 1400, mx: 'auto', mt: 4 }}>
-          {/* Cabeçalho */}
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-            <Box>
-              <Typography
-                variant="h4"
-                color="primary"
-                fontWeight={700}
-                gutterBottom
-              >
-                📊 Notas & Frequência
-              </Typography>
-              <Typography variant="subtitle1" color="text.secondary">
-                Sistema acadêmico integrado - {userRole === 'pai' ? 'Responsável' : userRole === 'professora' ? 'Professora' : userRole}
-              </Typography>
+          {/* Cabeçalho Centralizado */}
+          <Paper 
+            elevation={0}
+            sx={{ 
+              p: { xs: 2, sm: 2.5, md: 3 },
+              mb: 3,
+              borderRadius: 3,
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              color: 'white',
+              position: 'relative',
+              overflow: 'hidden'
+            }}
+          >
+            {/* Padrão decorativo */}
+            <Box sx={{
+              position: 'absolute',
+              top: -30,
+              right: -30,
+              width: '250px',
+              height: '250px',
+              background: 'radial-gradient(circle, rgba(255,255,255,0.12) 0%, transparent 70%)',
+              pointerEvents: 'none',
+              display: { xs: 'none', md: 'block' }
+            }} />
+            
+            <Box sx={{ 
+              position: 'relative', 
+              zIndex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              textAlign: 'center',
+              gap: 1.5
+            }}>
+              <Avatar sx={{ 
+                width: { xs: 60, sm: 70, md: 80 }, 
+                height: { xs: 60, sm: 70, md: 80 }, 
+                bgcolor: 'rgba(255,255,255,0.25)',
+                backdropFilter: 'blur(10px)',
+                border: '3px solid rgba(255,255,255,0.3)',
+                boxShadow: '0 6px 24px rgba(0,0,0,0.2)',
+                fontSize: { xs: '2rem', sm: '2.5rem', md: '3rem' }
+              }}>
+                📊
+              </Avatar>
+              
+              <Box>
+                <Typography 
+                  variant="h4" 
+                  fontWeight={700}
+                  sx={{
+                    fontSize: { xs: '1.5rem', sm: '1.75rem', md: '2rem' },
+                    textShadow: '0 2px 10px rgba(0,0,0,0.3)',
+                    letterSpacing: '-0.01em'
+                  }}
+                >
+                  Notas & Frequência
+                </Typography>
+                <Typography 
+                  variant="body1" 
+                  sx={{ 
+                    opacity: 0.92,
+                    fontSize: { xs: '0.875rem', sm: '0.95rem', md: '1rem' },
+                    textShadow: '0 1px 5px rgba(0,0,0,0.2)',
+                    mt: 0.5
+                  }}
+                >
+                  Sistema acadêmico integrado - {userRole === 'pai' ? 'Responsável' : userRole === 'professora' ? 'Professora' : userRole}
+                </Typography>
+              </Box>
             </Box>
-            <Button 
-              variant="outlined" 
-              onClick={() => router.push('/escola')}
-            >
-              ← Voltar para Escola
-            </Button>
-          </Box>
+          </Paper>
 
           {/* Alert informativo baseado no papel */}
           {userRole === 'coordenadora' && (

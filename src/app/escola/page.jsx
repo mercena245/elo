@@ -1156,12 +1156,12 @@ const Escola = () => {
       <main className="dashboard-main">
         <Box sx={{ maxWidth: 1200, mx: 'auto', mt: { xs: 2, md: 4 }, px: { xs: 2, sm: 3 } }}>
           
-          {/* Header Moderno com Gradiente */}
+          {/* Header Centralizado */}
           <Box
             sx={{
               mb: 4,
-              p: { xs: 3, sm: 4, md: 5 },
-              borderRadius: 4,
+              p: { xs: 2, sm: 2.5, md: 3 },
+              borderRadius: 3,
               background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
               color: 'white',
               position: 'relative',
@@ -1169,79 +1169,77 @@ const Escola = () => {
               boxShadow: '0 10px 30px rgba(102, 126, 234, 0.3)'
             }}
           >
-            {/* Elementos decorativos de fundo */}
+            {/* Padrão decorativo */}
             <Box
               sx={{
                 position: 'absolute',
-                top: -50,
-                right: -50,
-                width: 200,
-                height: 200,
-                borderRadius: '50%',
-                background: 'rgba(255, 255, 255, 0.1)',
-                opacity: 0.5
-              }}
-            />
-            <Box
-              sx={{
-                position: 'absolute',
-                bottom: -30,
-                left: -30,
-                width: 150,
-                height: 150,
-                borderRadius: '50%',
-                background: 'rgba(255, 255, 255, 0.1)',
-                opacity: 0.5
+                top: -30,
+                right: -30,
+                width: '250px',
+                height: '250px',
+                background: 'radial-gradient(circle, rgba(255,255,255,0.12) 0%, transparent 70%)',
+                pointerEvents: 'none',
+                display: { xs: 'none', md: 'block' }
               }}
             />
 
-            {/* Conteúdo do Header */}
-            <Box sx={{ position: 'relative', zIndex: 1 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                <Box
+            {/* Conteúdo Centralizado */}
+            <Box sx={{ 
+              position: 'relative', 
+              zIndex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              textAlign: 'center',
+              gap: 1.5
+            }}>
+              {/* Ícone */}
+              <Box
+                sx={{
+                  width: { xs: 60, sm: 70, md: 80 },
+                  height: { xs: 60, sm: 70, md: 80 },
+                  borderRadius: '50%',
+                  bgcolor: 'rgba(255,255,255,0.25)',
+                  backdropFilter: 'blur(10px)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  border: '3px solid rgba(255,255,255,0.3)',
+                  boxShadow: '0 6px 24px rgba(0,0,0,0.2)',
+                  fontSize: { xs: '2rem', sm: '2.5rem', md: '3rem' }
+                }}
+              >
+                🏫
+              </Box>
+              
+              {/* Textos */}
+              <Box>
+                <Typography
+                  variant="h4"
+                  fontWeight={700}
                   sx={{
-                    width: { xs: 50, md: 70 },
-                    height: { xs: 50, md: 70 },
-                    borderRadius: 3,
-                    background: 'rgba(255, 255, 255, 0.2)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    mr: 3,
-                    backdropFilter: 'blur(10px)',
-                    fontSize: { xs: '28px', md: '40px' }
+                    fontSize: { xs: '1.5rem', sm: '1.75rem', md: '2rem' },
+                    textShadow: '0 2px 10px rgba(0,0,0,0.3)',
+                    letterSpacing: '-0.01em'
                   }}
                 >
-                  🏫
-                </Box>
-                <Box>
-                  <Typography
-                    variant="h3"
-                    fontWeight={800}
-                    sx={{
-                      fontSize: { xs: '1.75rem', sm: '2.25rem', md: '3rem' },
-                      textShadow: '0 2px 10px rgba(0,0,0,0.2)',
-                      lineHeight: 1.2
-                    }}
-                  >
-                    Gestão Escolar
-                  </Typography>
-                  <Typography
-                    variant="h6"
-                    sx={{
-                      opacity: 0.9,
-                      fontSize: { xs: '0.875rem', sm: '1rem', md: '1.125rem' },
-                      fontWeight: 400,
-                      mt: 0.5
-                    }}
-                  >
-                    Configurações e Administração da Escola
-                  </Typography>
-                </Box>
+                  Gestão Escolar
+                </Typography>
+                <Typography
+                  variant="body1"
+                  sx={{
+                    opacity: 0.92,
+                    fontSize: { xs: '0.875rem', sm: '0.95rem', md: '1rem' },
+                    textShadow: '0 1px 5px rgba(0,0,0,0.2)',
+                    mt: 0.5
+                  }}
+                >
+                  Configurações e Administração da Escola
+                </Typography>
               </Box>
 
-              {/* Stats Cards */}
-              <Grid container spacing={2} sx={{ mt: 3 }}>
+              {/* Stats Cards Compactos */}
+              <Grid container spacing={1.5} sx={{ mt: 1, maxWidth: 600 }}>
                 <Grid item xs={6} sm={4}>
                   <Box
                     sx={{

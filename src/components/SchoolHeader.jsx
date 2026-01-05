@@ -17,7 +17,9 @@ import {
   School,
   Palette,
   PhotoCamera,
-  Lightbulb
+  Lightbulb,
+  ViewCompact,
+  ViewAgenda
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 import { useSchoolDatabase } from '../hooks/useSchoolDatabase';
@@ -27,10 +29,11 @@ import SchoolSelector from './SchoolSelector';
  * Header Personalizável da Escola
  * Permite que a coordenadora customize cores, logo, imagem de fundo, etc
  */
-const SchoolHeader = ({ userName, userRole, onOpenSettings }) => {
+const SchoolHeader = ({ userName, userRole, onOpenSettings, viewMode = 'full', onViewModeChange }) => {
   console.log('🎨 [SchoolHeader] Componente renderizando...');
   console.log('🎨 [SchoolHeader] userName:', userName);
   console.log('🎨 [SchoolHeader] userRole:', userRole);
+  console.log('🎨 [SchoolHeader] viewMode:', viewMode);
   console.log('🎨 [SchoolHeader] onOpenSettings:', typeof onOpenSettings);
 
   const { currentSchool } = useAuth();
@@ -122,14 +125,21 @@ const SchoolHeader = ({ userName, userRole, onOpenSettings }) => {
 
   // Estilos baseados na configuração
   const getHeaderStyle = () => {
+    const minHeight = viewMode === 'slim' 
+      ? { xs: '100px', sm: '120px', md: '140px' }
+      : { xs: '280px', sm: '320px', md: '360px' };
+
     const baseStyle = {
-      p: { xs: 3, sm: 3.5, md: 4 },
+      p: viewMode === 'slim' 
+        ? { xs: 2, sm: 2, md: 2.5 }
+        : { xs: 3, sm: 3.5, md: 4 },
       mb: { xs: 2, sm: 2.5, md: 3 },
       borderRadius: { xs: 2, md: 3 },
       position: 'relative',
       overflow: 'hidden',
       color: headerConfig.textColor,
-      minHeight: { xs: '280px', sm: '320px', md: '360px' }
+      minHeight,
+      transition: 'all 0.3s ease'
     };
 
     switch (headerConfig.style) {
@@ -202,9 +212,38 @@ const SchoolHeader = ({ userName, userRole, onOpenSettings }) => {
           }}
         />
 
-        {/* Botão de Configurações (apenas coordenadora/coordenador) */}
-        {(userRole === 'coordenadora' || userRole === 'coordenador') && onOpenSettings && (
-          <Box sx={{ position: 'absolute', top: { xs: 12, md: 20 }, right: { xs: 12, md: 20 }, zIndex: 10 }}>
+        {/* Botões de Controle no topo */}
+        <Box sx={{ 
+          position: 'absolute', 
+          top: { xs: 12, md: 20 }, 
+          right: { xs: 12, md: 20 }, 
+          zIndex: 10,
+          display: 'flex',
+          gap: 1
+        }}>
+          {/* Botão de alternar visualização */}
+          {onViewModeChange && (
+            <IconButton
+              onClick={() => onViewModeChange(viewMode === 'full' ? 'slim' : 'full')}
+              sx={{
+                bgcolor: 'rgba(255,255,255,0.25)',
+                backdropFilter: 'blur(10px)',
+                color: headerConfig.textColor,
+                boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                '&:hover': {
+                  bgcolor: 'rgba(255,255,255,0.35)',
+                  transform: 'scale(1.08)',
+                  transition: 'all 0.3s ease'
+                }
+              }}
+              title={viewMode === 'full' ? 'Visualização Compacta' : 'Visualização Completa'}
+            >
+              {viewMode === 'full' ? <ViewCompact /> : <ViewAgenda />}
+            </IconButton>
+          )}
+
+          {/* Botão de Configurações (apenas coordenadora/coordenador) */}
+          {(userRole === 'coordenadora' || userRole === 'coordenador') && onOpenSettings && (
             <IconButton
               onClick={() => {
                 console.log('⚙️ [SchoolHeader] Abrindo configurações...');
@@ -226,8 +265,8 @@ const SchoolHeader = ({ userName, userRole, onOpenSettings }) => {
             >
               <Settings />
             </IconButton>
-          </Box>
-        )}
+          )}
+        </Box>
 
         {/* Container Principal */}
         <Box sx={{ 
@@ -237,69 +276,84 @@ const SchoolHeader = ({ userName, userRole, onOpenSettings }) => {
           {/* Seção Superior - Logo e Nome da Escola (Centralizado) */}
           <Box sx={{ 
             display: 'flex',
-            flexDirection: 'column',
+            flexDirection: viewMode === 'slim' ? 'row' : 'column',
             alignItems: 'center',
-            textAlign: 'center',
-            mb: 3
+            justifyContent: viewMode === 'slim' ? 'flex-start' : 'center',
+            textAlign: viewMode === 'slim' ? 'left' : 'center',
+            mb: viewMode === 'slim' ? 0 : 3,
+            gap: viewMode === 'slim' ? 2 : 0
           }}>
             {headerConfig.showLogo && (
               <Avatar
                 src={headerConfig.logoUrl}
                 sx={{
-                  width: { xs: 80, sm: 100, md: 120 },
-                  height: { xs: 80, sm: 100, md: 120 },
+                  width: viewMode === 'slim' 
+                    ? { xs: 50, sm: 60, md: 70 }
+                    : { xs: 80, sm: 100, md: 120 },
+                  height: viewMode === 'slim'
+                    ? { xs: 50, sm: 60, md: 70 }
+                    : { xs: 80, sm: 100, md: 120 },
                   bgcolor: 'rgba(255,255,255,0.2)',
                   border: '4px solid rgba(255,255,255,0.3)',
-                  fontSize: { xs: '2rem', md: '3rem' },
+                  fontSize: viewMode === 'slim' 
+                    ? { xs: '1.5rem', md: '2rem' }
+                    : { xs: '2rem', md: '3rem' },
                   fontWeight: 700,
                   boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
-                  mb: 2
+                  mb: viewMode === 'slim' ? 0 : 2
                 }}
               >
                 {!headerConfig.logoUrl && (headerConfig.schoolName?.[0] || '🏫')}
               </Avatar>
             )}
 
-            {headerConfig.showSchoolName && (
-              <Typography 
-                variant="h2" 
-                fontWeight={800} 
-                sx={{ 
-                  fontSize: { xs: '1.75rem', sm: '2.25rem', md: '3rem' },
-                  textShadow: '0 3px 15px rgba(0,0,0,0.3)',
-                  mb: 0.5,
-                  letterSpacing: '-0.02em'
-                }}
-              >
-                {headerConfig.schoolName || currentSchool?.nome || 'Sistema ELO'}
-              </Typography>
-            )}
-            
-            {headerConfig.showMotto && headerConfig.motto && (
-              <Typography 
-                variant="h6" 
-                sx={{ 
-                  opacity: 0.92, 
-                  fontWeight: 400,
-                  fontSize: { xs: '0.95rem', sm: '1.1rem', md: '1.25rem' },
-                  fontStyle: 'italic',
-                  textShadow: '0 2px 8px rgba(0,0,0,0.2)',
-                  maxWidth: '600px'
-                }}
-              >
-                "{headerConfig.motto}"
-              </Typography>
-            )}
+            <Box>
+              {headerConfig.showSchoolName && (
+                <Typography 
+                  variant="h2" 
+                  fontWeight={800} 
+                  sx={{ 
+                    fontSize: viewMode === 'slim'
+                      ? { xs: '1.25rem', sm: '1.5rem', md: '1.75rem' }
+                      : { xs: '1.75rem', sm: '2.25rem', md: '3rem' },
+                    textShadow: '0 3px 15px rgba(0,0,0,0.3)',
+                    mb: 0.5,
+                    letterSpacing: '-0.02em'
+                  }}
+                >
+                  {headerConfig.schoolName || currentSchool?.nome || 'Sistema ELO'}
+                </Typography>
+              )}
+              
+              {viewMode === 'full' && headerConfig.showMotto && headerConfig.motto && (
+                <Typography 
+                  variant="h6" 
+                  sx={{ 
+                    opacity: 0.92, 
+                    fontWeight: 400,
+                    fontSize: { xs: '0.95rem', sm: '1.1rem', md: '1.25rem' },
+                    fontStyle: 'italic',
+                    textShadow: '0 2px 8px rgba(0,0,0,0.2)',
+                    maxWidth: '600px'
+                  }}
+                >
+                  "{headerConfig.motto}"
+                </Typography>
+              )}
+            </Box>
           </Box>
 
-          {/* Divider Decorativo */}
-          <Box sx={{ 
-            width: { xs: '80%', sm: '60%', md: '400px' },
-            height: '2px',
-            background: `linear-gradient(90deg, transparent, ${headerConfig.textColor}40, transparent)`,
-            margin: '0 auto',
-            mb: 3
-          }} />
+          {/* Seção Inferior - Saudação e Info do Usuário (Lado a lado) */}
+          {viewMode === 'full' && (
+            <>
+              {/* Divider Decorativo */}
+              <Box sx={{ 
+                width: { xs: '80%', sm: '60%', md: '400px' },
+                height: '2px',
+                background: `linear-gradient(90deg, transparent, ${headerConfig.textColor}40, transparent)`,
+                margin: '0 auto',
+                mb: 3
+              }} />
 
           {/* Seção Inferior - Informações do Usuário e Controles */}
           <Box sx={{ 
@@ -380,6 +434,8 @@ const SchoolHeader = ({ userName, userRole, onOpenSettings }) => {
               </Box>
             </Box>
           </Box>
+          </>
+          )}
         </Box>
       </Paper>
     </Fade>

@@ -11,6 +11,7 @@ import SchoolHeader from '../../components/SchoolHeader';
 import HeaderSettingsDialog from '../../components/HeaderSettingsDialog';
 import { useAuth } from '../../context/AuthContext';
 import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
+import { isSuperAdmin } from '../../config/constants';
 // Importações do Swiper
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Navigation, Pagination, Autoplay, EffectCoverflow } from 'swiper/modules';
@@ -34,7 +35,13 @@ import {
   Badge,
   Fade,
   Zoom,
-  Button
+  Button,
+  Tooltip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Collapse
 } from '@mui/material';
 import { auth, onAuthStateChanged } from '../../firebase';
 import { 
@@ -66,7 +73,15 @@ import {
   Chat,
   Store,
   AttachMoney,
-  Mail
+  Mail,
+  Edit as EditIcon,
+  Save as SaveIcon,
+  Close as CloseIcon,
+  DragIndicator,
+  ExpandMore,
+  ExpandLess,
+  Campaign,
+  Image
 } from '@mui/icons-material';
 import '../../styles/Dashboard.css';
 import '../../styles/AvisosCarousel.css';
@@ -74,7 +89,7 @@ import '../../styles/AvisosCarousel.css';
 const Dashboard = () => {
   // Hooks para banco de dados da escola
   const { user: authUser, currentSchool } = useAuth();
-  const { isReady, isLoading, error, getData, currentSchool: schoolData } = useSchoolDatabase();
+  const { isReady, isLoading, error, getData, setData, currentSchool: schoolData } = useSchoolDatabase();
   const currentSchoolId = typeof currentSchool === 'string' ? currentSchool : currentSchool?.id;
   const mensagensPath = currentSchoolId ? `escolas/${currentSchoolId}/mensagens` : 'mensagens';
 
@@ -98,6 +113,12 @@ const Dashboard = () => {
   const [headerConfig, setHeaderConfig] = useState(null);
   const [totalPendencias, setTotalPendencias] = useState(0);
   const [totalMensagensNaoLidas, setTotalMensagensNaoLidas] = useState(0);
+  const [editandoAcoes, setEditandoAcoes] = useState(false);
+  const [acoesPersonalizadas, setAcoesPersonalizadas] = useState([]);
+  const [draggedIndex, setDraggedIndex] = useState(null);
+  const [viewMode, setViewMode] = useState('full'); // 'full' ou 'slim'
+  const [avisosExpanded, setAvisosExpanded] = useState(true);
+  const [galeriaExpanded, setGaleriaExpanded] = useState(true);
   const router = useRouter();
 
   // Verificar autenticação
@@ -160,47 +181,270 @@ const Dashboard = () => {
   const getQuickActions = () => {
     const roleActions = {
       coordenadora: [
-        { titulo: 'Pendências', icon: Notifications, rota: '/pendencias', cor: '#EF4444', badgeCount: totalPendencias },
-        { titulo: 'Mensagens', icon: Mail, rota: '/agenda', cor: '#3B82F6', badgeCount: totalMensagensNaoLidas },
-        { titulo: 'Gerenciar Alunos', icon: PersonAdd, rota: '/alunos', cor: '#3B82F6' },
-        { titulo: 'Colaboradores', icon: Group, rota: '/colaboradores', cor: '#8B5CF6' },
-        { titulo: 'Relatórios & Notas', icon: Assessment, rota: '/notas-frequencia', cor: '#10B981' },
-        { titulo: 'Financeiro', icon: Assessment, rota: '/financeiro', cor: '#059669' },
-        { titulo: 'Loja ELO', icon: Store, rota: '/loja', cor: '#DC2626' },
-        { titulo: 'Configurações', icon: Settings, rota: '/configuracoes', cor: '#EF4444' },
-        { titulo: 'Grade Horária', icon: Schedule, rota: '/grade-horaria', cor: '#F59E0B' },
-        { titulo: 'Galeria de Fotos', icon: PhotoLibrary, rota: '/galeriafotos', cor: '#06B6D4' }
+        { id: 'pendencias', titulo: 'Pendências', icon: Notifications, rota: '/pendencias', cor: '#EF4444', badgeCount: totalPendencias },
+        { id: 'mensagens', titulo: 'Mensagens', icon: Mail, rota: '/agenda', cor: '#3B82F6', badgeCount: totalMensagensNaoLidas },
+        { id: 'gerenciar-alunos', titulo: 'Gerenciar Alunos', icon: PersonAdd, rota: '/alunos', cor: '#3B82F6' },
+        { id: 'colaboradores', titulo: 'Colaboradores', icon: Group, rota: '/colaboradores', cor: '#8B5CF6' },
+        { id: 'relatorios-notas', titulo: 'Relatórios & Notas', icon: Assessment, rota: '/notas-frequencia', cor: '#10B981' },
+        { id: 'financeiro', titulo: 'Financeiro', icon: Assessment, rota: '/financeiro', cor: '#059669' },
+        { id: 'loja-elo', titulo: 'Loja ELO', icon: Store, rota: '/loja', cor: '#DC2626' },
+        { id: 'configuracoes', titulo: 'Configurações', icon: Settings, rota: '/configuracoes', cor: '#EF4444' },
+        { id: 'grade-horaria', titulo: 'Grade Horária', icon: Schedule, rota: '/grade-horaria', cor: '#F59E0B' },
+        { id: 'galeria-fotos', titulo: 'Galeria de Fotos', icon: PhotoLibrary, rota: '/galeriafotos', cor: '#06B6D4' }
       ],
       professora: [
-        { titulo: 'Mensagens', icon: Mail, rota: '/agenda', cor: '#3B82F6', badgeCount: totalMensagensNaoLidas },
-        { titulo: 'Agenda da Turma', icon: CalendarToday, rota: '/agenda', cor: '#3B82F6' },
-        { titulo: 'Lançar Notas', icon: Grade, rota: '/notas-frequencia', cor: '#10B981' },
-        { titulo: 'Controle Médico', icon: LocalHospital, rota: '/agenda', cor: '#EF4444' },
-        { titulo: 'Frequência', icon: EventBusy, rota: '/notas-frequencia', cor: '#F59E0B' },
-        { titulo: 'Meus Alunos', icon: People, rota: '/alunos', cor: '#8B5CF6' },
-        { titulo: 'Criar Aviso', icon: Announcement, rota: '/avisos', cor: '#06B6D4' }
+        { id: 'mensagens', titulo: 'Mensagens', icon: Mail, rota: '/agenda', cor: '#3B82F6', badgeCount: totalMensagensNaoLidas },
+        { id: 'agenda-turma', titulo: 'Agenda da Turma', icon: CalendarToday, rota: '/agenda', cor: '#3B82F6' },
+        { id: 'lancar-notas', titulo: 'Lançar Notas', icon: Grade, rota: '/notas-frequencia', cor: '#10B981' },
+        { id: 'controle-medico', titulo: 'Controle Médico', icon: LocalHospital, rota: '/agenda', cor: '#EF4444' },
+        { id: 'frequencia', titulo: 'Frequência', icon: EventBusy, rota: '/notas-frequencia', cor: '#F59E0B' },
+        { id: 'meus-alunos', titulo: 'Meus Alunos', icon: People, rota: '/alunos', cor: '#8B5CF6' },
+        { id: 'criar-aviso', titulo: 'Criar Aviso', icon: Announcement, rota: '/avisos', cor: '#06B6D4' }
       ],
       pai: [
-        { titulo: 'Mensagens', icon: Mail, rota: '/agenda', cor: '#3B82F6', badgeCount: totalMensagensNaoLidas },
-        { titulo: 'Agenda Médica', icon: MedicalServices, rota: '/agenda', cor: '#EF4444' },
-        { titulo: 'Boletim do Filho', icon: Assessment, rota: '/notas-frequencia', cor: '#10B981' },
-        { titulo: 'Financeiro', icon: AttachMoney, rota: '/financeiro', cor: '#059669' },
-        { titulo: 'Loja ELO', icon: Store, rota: '/loja', cor: '#DC2626' },
-        { titulo: 'Galeria de Fotos', icon: PhotoLibrary, rota: '/galeriafotos', cor: '#F59E0B' },
-        { titulo: 'Avisos da Escola', icon: Notifications, rota: '/avisos', cor: '#3B82F6' },
-        { titulo: 'Cardápio', icon: MenuBook, rota: '/escola', cor: '#8B5CF6' },
-        { titulo: 'Contato Escola', icon: Chat, rota: '/escola', cor: '#06B6D4' }
+        { id: 'mensagens', titulo: 'Mensagens', icon: Mail, rota: '/agenda', cor: '#3B82F6', badgeCount: totalMensagensNaoLidas },
+        { id: 'agenda-medica', titulo: 'Agenda Médica', icon: MedicalServices, rota: '/agenda', cor: '#EF4444' },
+        { id: 'boletim-filho', titulo: 'Boletim do Filho', icon: Assessment, rota: '/notas-frequencia', cor: '#10B981' },
+        { id: 'financeiro', titulo: 'Financeiro', icon: AttachMoney, rota: '/financeiro', cor: '#059669' },
+        { id: 'loja-elo', titulo: 'Loja ELO', icon: Store, rota: '/loja', cor: '#DC2626' },
+        { id: 'galeria-fotos', titulo: 'Galeria de Fotos', icon: PhotoLibrary, rota: '/galeriafotos', cor: '#F59E0B' },
+        { id: 'avisos-escola', titulo: 'Avisos da Escola', icon: Notifications, rota: '/avisos', cor: '#3B82F6' },
+        { id: 'cardapio', titulo: 'Cardápio', icon: MenuBook, rota: '/escola', cor: '#8B5CF6' },
+        { id: 'contato-escola', titulo: 'Contato Escola', icon: Chat, rota: '/escola', cor: '#06B6D4' }
       ],
       aluno: [
-        { titulo: 'Mensagens', icon: Mail, rota: '/agenda', cor: '#3B82F6', badgeCount: totalMensagensNaoLidas },
-        { titulo: 'Minhas Notas', icon: Grade, rota: '/notas-frequencia', cor: '#10B981' },
-        { titulo: 'Minha Agenda', icon: CalendarToday, rota: '/agenda', cor: '#3B82F6' },
-        { titulo: 'Galeria de Fotos', icon: PhotoLibrary, rota: '/galeriafotos', cor: '#F59E0B' },
-        { titulo: 'Avisos', icon: Notifications, rota: '/avisos', cor: '#8B5CF6' },
-        { titulo: 'Meu Perfil', icon: AccountCircle, rota: '/profile', cor: '#06B6D4' }
+        { id: 'mensagens', titulo: 'Mensagens', icon: Mail, rota: '/agenda', cor: '#3B82F6', badgeCount: totalMensagensNaoLidas },
+        { id: 'minhas-notas', titulo: 'Minhas Notas', icon: Grade, rota: '/notas-frequencia', cor: '#10B981' },
+        { id: 'minha-agenda', titulo: 'Minha Agenda', icon: CalendarToday, rota: '/agenda', cor: '#3B82F6' },
+        { id: 'galeria-fotos', titulo: 'Galeria de Fotos', icon: PhotoLibrary, rota: '/galeriafotos', cor: '#F59E0B' },
+        { id: 'avisos', titulo: 'Avisos', icon: Notifications, rota: '/avisos', cor: '#8B5CF6' },
+        { id: 'meu-perfil', titulo: 'Meu Perfil', icon: AccountCircle, rota: '/profile', cor: '#06B6D4' }
       ]
     };
     return roleActions[userRole] || [];
+  };
+
+  // Obter ações ordenadas
+  const getAcoesOrdenadas = () => {
+    const acoes = getQuickActions();
+    if (acoesPersonalizadas.length === 0) return acoes;
+
+    // Ordenar baseado na personalização salva
+    const acoesMap = new Map(acoes.map(acao => [acao.id, acao]));
+    const ordenadas = [];
+    
+    // Primeiro, adicionar as ações na ordem personalizada
+    acoesPersonalizadas.forEach(id => {
+      if (acoesMap.has(id)) {
+        ordenadas.push(acoesMap.get(id));
+        acoesMap.delete(id);
+      }
+    });
+    
+    // Adicionar ações restantes (novas que não estavam na personalização)
+    acoesMap.forEach(acao => ordenadas.push(acao));
+    
+    return ordenadas;
+  };
+
+  // Salvar personalização
+  const salvarPersonalizacao = async (novaOrdem) => {
+    if (!isReady || !userId || !currentSchoolId) {
+      console.error('❌ Não pode salvar - isReady:', isReady, 'userId:', userId, 'schoolId:', currentSchoolId);
+      return;
+    }
+    
+    try {
+      console.log('💾 Salvando personalização...');
+      console.log('   userId:', userId);
+      console.log('   schoolId:', currentSchoolId);
+      console.log('   ordem:', novaOrdem);
+      
+      const caminho = `usuarios/${userId}/dashboard-config/acoes-rapidas`;
+      console.log('   caminho:', caminho);
+      
+      await setData(caminho, {
+        ordem: novaOrdem,
+        atualizadoEm: new Date().toISOString(),
+        usuarioId: userId,
+        escolaId: currentSchoolId
+      });
+      
+      setAcoesPersonalizadas(novaOrdem);
+      console.log('✅ Personalização salva com sucesso!');
+      
+      // Verificar se salvou
+      const verificacao = await getData(caminho);
+      console.log('🔍 Verificação após salvar:', verificacao);
+    } catch (error) {
+      console.error('❌ Erro ao salvar personalização:', error);
+    }
+  };
+
+  // Handlers de drag and drop (desktop e mobile)
+  const handleDragStart = (e, index) => {
+    setDraggedIndex(index);
+    if (e.dataTransfer) {
+      e.dataTransfer.effectAllowed = 'move';
+    }
+  };
+
+  const handleTouchStart = (e, index) => {
+    setDraggedIndex(index);
+    // Adiciona feedback visual imediato no mobile
+    e.currentTarget.style.opacity = '0.5';
+    e.currentTarget.style.transform = 'scale(0.95)';
+  };
+
+  const handleDragOver = (e, index) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === index) return;
+
+    const acoes = getAcoesOrdenadas();
+    const novaOrdem = [...acoes];
+    const [removed] = novaOrdem.splice(draggedIndex, 1);
+    novaOrdem.splice(index, 0, removed);
+
+    const novaOrdemIds = novaOrdem.map(a => a.id);
+    setAcoesPersonalizadas(novaOrdemIds);
+    setDraggedIndex(index);
+  };
+
+  const handleTouchMove = (e, currentIndex) => {
+    if (draggedIndex === null) return;
+
+    const touch = e.touches[0];
+    const elementAtPoint = document.elementFromPoint(touch.clientX, touch.clientY);
+    
+    // Encontrar o card mais próximo
+    const cardElement = elementAtPoint?.closest('[data-card-index]');
+    if (cardElement) {
+      const newIndex = parseInt(cardElement.getAttribute('data-card-index'));
+      
+      if (newIndex !== draggedIndex && !isNaN(newIndex)) {
+        const acoes = getAcoesOrdenadas();
+        const novaOrdem = [...acoes];
+        const [removed] = novaOrdem.splice(draggedIndex, 1);
+        novaOrdem.splice(newIndex, 0, removed);
+
+        const novaOrdemIds = novaOrdem.map(a => a.id);
+        setAcoesPersonalizadas(novaOrdemIds);
+        setDraggedIndex(newIndex);
+      }
+    }
+  };
+
+  const handleDragEnd = (e) => {
+    // Não salva automaticamente aqui, apenas ao clicar em Salvar
+    if (e.currentTarget) {
+      e.currentTarget.style.opacity = '1';
+      e.currentTarget.style.transform = 'scale(1)';
+    }
+    setDraggedIndex(null);
+  };
+
+  const handleTouchEnd = (e) => {
+    // Remove feedback visual
+    if (e.currentTarget) {
+      e.currentTarget.style.opacity = '1';
+      e.currentTarget.style.transform = 'scale(1)';
+    }
+    setDraggedIndex(null);
+  };
+
+  const handleCancelarEdicao = () => {
+    setEditandoAcoes(false);
+    // Recarregar a ordem original
+    const carregarPersonalizacao = async () => {
+      try {
+        const personalizacao = await getData(`usuarios/${userId}/dashboard-config/acoes-rapidas`);
+        if (personalizacao && personalizacao.ordem) {
+          setAcoesPersonalizadas(personalizacao.ordem);
+        }
+      } catch (error) {
+        console.error('Erro ao recarregar personalização:', error);
+      }
+    };
+    carregarPersonalizacao();
+  };
+
+  const handleSalvarEdicao = () => {
+    const acoes = getAcoesOrdenadas();
+    const novaOrdemIds = acoes.map(a => a.id);
+    console.log('🎯 Salvando ordem ao clicar no botão:', novaOrdemIds);
+    salvarPersonalizacao(novaOrdemIds);
+    setEditandoAcoes(false);
+  };
+
+  // Função para alterar e salvar o view mode
+  const handleViewModeChange = async (newMode) => {
+    if (!isReady || !userId || !currentSchoolId) {
+      console.error('❌ Não pode alterar view mode - isReady:', isReady, 'userId:', userId, 'schoolId:', currentSchoolId);
+      return;
+    }
+
+    try {
+      console.log('🎨 Alterando view mode para:', newMode);
+      setViewMode(newMode);
+      
+      const caminho = `usuarios/${userId}/dashboard-config/view-mode`;
+      await setData(caminho, {
+        mode: newMode,
+        atualizadoEm: new Date().toISOString()
+      });
+      
+      console.log('✅ View mode salvo com sucesso!');
+    } catch (error) {
+      console.error('❌ Erro ao salvar view mode:', error);
+    }
+  };
+
+  // Função para alternar e salvar estado de expansão dos avisos
+  const handleToggleAvisos = async () => {
+    if (!isReady || !userId || !currentSchoolId) {
+      console.error('❌ Não pode alterar estado de avisos');
+      return;
+    }
+
+    try {
+      const novoEstado = !avisosExpanded;
+      console.log('📋 Alterando estado de avisos para:', novoEstado);
+      setAvisosExpanded(novoEstado);
+      
+      const caminho = `usuarios/${userId}/dashboard-config/avisos-expanded`;
+      await setData(caminho, {
+        expanded: novoEstado,
+        atualizadoEm: new Date().toISOString()
+      });
+      
+      console.log('✅ Estado de avisos salvo com sucesso!');
+    } catch (error) {
+      console.error('❌ Erro ao salvar estado de avisos:', error);
+    }
+  };
+
+  // Função para alternar e salvar estado de expansão da galeria
+  const handleToggleGaleria = async () => {
+    if (!isReady || !userId || !currentSchoolId) {
+      console.error('❌ Não pode alterar estado de galeria');
+      return;
+    }
+
+    try {
+      const novoEstado = !galeriaExpanded;
+      console.log('📸 Alterando estado de galeria para:', novoEstado);
+      setGaleriaExpanded(novoEstado);
+      
+      const caminho = `usuarios/${userId}/dashboard-config/galeria-expanded`;
+      await setData(caminho, {
+        expanded: novoEstado,
+        atualizadoEm: new Date().toISOString()
+      });
+      
+      console.log('✅ Estado de galeria salvo com sucesso!');
+    } catch (error) {
+      console.error('❌ Erro ao salvar estado de galeria:', error);
+    }
   };
 
   useEffect(() => {
@@ -242,7 +486,11 @@ const Dashboard = () => {
           relatoriosData,
           titulosData,
           mensagensData,
-          cronogramaData
+          cronogramaData,
+          personalizacaoData,
+          viewModeData,
+          avisosExpandedData,
+          galeriaExpandedData
         ] = await Promise.all([
           getData('alunos'),
           getData('colaboradores'),
@@ -256,8 +504,52 @@ const Dashboard = () => {
           getData('relatorios-pedagogicos'),
           getData('titulos_financeiros'),
           getData(mensagensPath),
-          getData('cronograma-academico')
+          getData('cronograma-academico'),
+          userId ? getData(`usuarios/${userId}/dashboard-config/acoes-rapidas`) : Promise.resolve(null),
+          userId ? getData(`usuarios/${userId}/dashboard-config/view-mode`) : Promise.resolve(null),
+          userId ? getData(`usuarios/${userId}/dashboard-config/avisos-expanded`) : Promise.resolve(null),
+          userId ? getData(`usuarios/${userId}/dashboard-config/galeria-expanded`) : Promise.resolve(null)
         ]);
+
+        // Carregar personalização das ações rápidas
+        console.log('📦 Carregando personalização...');
+        console.log('   userId:', userId);
+        console.log('   personalizacaoData:', personalizacaoData);
+        
+        if (personalizacaoData && personalizacaoData.ordem) {
+          console.log('✅ Personalização carregada do Firebase:', personalizacaoData.ordem);
+          setAcoesPersonalizadas(personalizacaoData.ordem);
+        } else {
+          console.log('ℹ️ Nenhuma personalização encontrada, usando ordem padrão');
+          setAcoesPersonalizadas([]);
+        }
+
+        // Carregar modo de visualização
+        if (viewModeData && viewModeData.mode) {
+          console.log('✅ View mode carregado:', viewModeData.mode);
+          setViewMode(viewModeData.mode);
+        } else {
+          console.log('ℹ️ Usando view mode padrão: full');
+          setViewMode('full');
+        }
+
+        // Carregar estado de expansão dos avisos
+        if (avisosExpandedData && typeof avisosExpandedData.expanded === 'boolean') {
+          console.log('✅ Estado de avisos carregado:', avisosExpandedData.expanded);
+          setAvisosExpanded(avisosExpandedData.expanded);
+        } else {
+          console.log('ℹ️ Usando estado padrão de avisos: true');
+          setAvisosExpanded(true);
+        }
+
+        // Carregar estado de expansão da galeria
+        if (galeriaExpandedData && typeof galeriaExpandedData.expanded === 'boolean') {
+          console.log('✅ Estado de galeria carregado:', galeriaExpandedData.expanded);
+          setGaleriaExpanded(galeriaExpandedData.expanded);
+        } else {
+          console.log('ℹ️ Usando estado padrão de galeria: true');
+          setGaleriaExpanded(true);
+        }
 
         // Processar alunos
         const totalAlunos = alunosData ? Object.keys(alunosData).length : 0;
@@ -354,6 +646,20 @@ const Dashboard = () => {
           console.log('📊 [Dashboard] Eventos filtrados:', eventosPendentes);
         } else {
           console.log('❌ [Dashboard] Nenhum dado de cronograma encontrado');
+        }
+
+        // Contar usuários aguardando aprovação
+        if (usuariosData) {
+          const usuariosPendentes = Object.entries(usuariosData).filter(([uid, u]) => {
+            if (!u.role) {
+              if (uid === userId) return false; // Não contar o próprio usuário
+              if (isSuperAdmin(uid)) return false; // Não contar super admin
+              if (!u.nome && !u.email) return false; // Não contar sem dados
+              return true;
+            }
+            return false;
+          });
+          totalPendenciasCount += usuariosPendentes.length;
         }
 
         setTotalPendencias(totalPendenciasCount);
@@ -591,6 +897,8 @@ const Dashboard = () => {
                   <SchoolHeader 
                     userName={userName}
                     userRole={userRole}
+                    viewMode={viewMode}
+                    onViewModeChange={handleViewModeChange}
                     onOpenSettings={() => {
                       console.log('🔧 [Dashboard] Abrindo settings modal...');
                       console.log('🔧 [Dashboard] userRole no momento:', userRole);
@@ -619,110 +927,273 @@ const Dashboard = () => {
             <Fade in timeout={1000}>
               <Grid container spacing={{ xs: 2, sm: 3 }} sx={{ mb: 3 }}>
                 <Grid item xs={12}>
-                  <Typography variant="h6" fontWeight={600} gutterBottom sx={{ mb: 2, color: '#374151', fontSize: { xs: '1.1rem', md: '1.25rem' } }}>
-                    ⚡ Ações Rápidas
-                  </Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                    <Typography variant="h6" fontWeight={600} sx={{ color: '#374151', fontSize: { xs: '1.1rem', md: '1.25rem' } }}>
+                      ⚡ Ações Rápidas
+                    </Typography>
+                    <Tooltip title={editandoAcoes ? "Salvar ordem" : "Personalizar ordem"}>
+                      <IconButton 
+                        onClick={() => editandoAcoes ? handleSalvarEdicao() : setEditandoAcoes(true)}
+                        sx={{ 
+                          background: editandoAcoes ? 'linear-gradient(135deg, #10b981, #059669)' : 'linear-gradient(135deg, #667eea, #764ba2)',
+                          color: 'white',
+                          '&:hover': {
+                            background: editandoAcoes ? 'linear-gradient(135deg, #059669, #047857)' : 'linear-gradient(135deg, #764ba2, #667eea)',
+                            transform: 'scale(1.05)'
+                          },
+                          transition: 'all 0.3s ease'
+                        }}
+                      >
+                        {editandoAcoes ? <SaveIcon /> : <EditIcon />}
+                      </IconButton>
+                    </Tooltip>
+                  </Box>
+                  
+                  {editandoAcoes && (
+                    <Box sx={{ mb: 2, p: 2, background: '#eff6ff', borderRadius: 2, border: '1px solid #3b82f6' }}>
+                      <Typography variant="body2" color="primary" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <DragIndicator fontSize="small" />
+                        {window.innerWidth < 768 
+                          ? 'Toque e segure para arrastar os cards'
+                          : 'Arraste os cards para reorganizar a ordem das ações rápidas'
+                        }
+                      </Typography>
+                      <Button 
+                        startIcon={<CloseIcon />}
+                        onClick={handleCancelarEdicao}
+                        size="small"
+                        sx={{ mt: 1 }}
+                      >
+                        Cancelar
+                      </Button>
+                    </Box>
+                  )}
                   
                   {/* Carrossel de Ações Rápidas */}
                   <Box sx={{ position: 'relative', px: { xs: 0, sm: 1 } }}>
-                    <Swiper
-                      modules={[Navigation, Pagination]}
-                      spaceBetween={16}
-                      navigation={{
-                        enabled: getQuickActions().length > 4,
-                        nextEl: '.swiper-button-next-actions',
-                        prevEl: '.swiper-button-prev-actions'
-                      }}
-                      pagination={{
-                        clickable: true,
-                        dynamicBullets: true,
-                        enabled: getQuickActions().length > 4
-                      }}
-                      breakpoints={{
-                        320: {
-                          slidesPerView: 2.2,
-                          spaceBetween: 12
-                        },
-                        480: {
-                          slidesPerView: 3,
-                          spaceBetween: 14
-                        },
-                        768: {
-                          slidesPerView: 4,
-                          spaceBetween: 16
-                        },
-                        1024: {
-                          slidesPerView: Math.min(5, getQuickActions().length),
-                          spaceBetween: 18
-                        },
-                        1280: {
-                          slidesPerView: Math.min(getQuickActions().length, 7),
-                          spaceBetween: 20
-                        }
-                      }}
-                      style={{
-                        paddingLeft: '6px',
-                        paddingRight: '6px',
-                        paddingBottom: getQuickActions().length > 4 ? '35px' : '8px'
-                      }}
-                    >
-                      {getQuickActions().map((acao, idx) => (
-                        <SwiperSlide key={idx} style={{ width: 'auto' }}>
-                          <Zoom in timeout={1200 + (idx * 150)}>
-                            <Badge 
-                              badgeContent={acao.badgeCount || 0}
-                              color="error"
-                              overlap="circular"
-                              sx={{
-                                '& .MuiBadge-badge': {
-                                  fontSize: '0.75rem',
-                                  fontWeight: 'bold',
-                                  height: 22,
-                                  minWidth: 22,
-                                  borderRadius: '50%'
-                                }
-                              }}
-                            >
-                              <Card 
+                    {editandoAcoes ? (
+                      // Modo de edição - Grid com drag and drop
+                      <Grid container spacing={2}>
+                        {getAcoesOrdenadas().map((acao, idx) => (
+                          <Grid item xs={6} sm={4} md={3} lg={2} key={acao.id}>
+                            <Zoom in timeout={800 + (idx * 100)}>
+                              <Box
+                                data-card-index={idx}
+                                draggable
+                                onDragStart={(e) => handleDragStart(e, idx)}
+                                onDragOver={(e) => handleDragOver(e, idx)}
+                                onDragEnd={handleDragEnd}
+                                onTouchStart={(e) => handleTouchStart(e, idx)}
+                                onTouchMove={(e) => handleTouchMove(e, idx)}
+                                onTouchEnd={handleTouchEnd}
                                 sx={{ 
-                                  cursor: 'pointer',
-                                  background: `linear-gradient(135deg, ${acao.cor}15, ${acao.cor}08)`,
-                                  border: `2px solid ${acao.cor}25`,
-                                  borderRadius: 3,
-                                  transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-                                  width: { xs: 130, sm: 140, md: 150 },
-                                  height: { xs: 90, sm: 100, md: 110 },
-                                  position: 'relative',
-                                  overflow: 'hidden',
-                                  '&:hover': {
-                                    transform: 'translateY(-6px) scale(1.02)',
-                                    boxShadow: `0 15px 30px ${acao.cor}30`,
-                                    '& .action-icon': {
-                                      transform: 'scale(1.2) rotate(5deg)'
-                                    },
-                                    '& .action-bg': {
-                                      transform: 'scale(1.1)',
-                                      opacity: 0.3
+                                  cursor: 'move',
+                                  touchAction: 'none',
+                                  userSelect: 'none',
+                                  WebkitUserSelect: 'none',
+                                  transition: 'opacity 0.2s ease, transform 0.2s ease'
+                                }}
+                              >
+                                <Badge 
+                                  badgeContent={acao.badgeCount || 0}
+                                  color="error"
+                                  overlap="circular"
+                                  sx={{
+                                    width: '100%',
+                                    '& .MuiBadge-badge': {
+                                      fontSize: '0.75rem',
+                                      fontWeight: 'bold',
+                                      height: 22,
+                                      minWidth: 22,
+                                      borderRadius: '50%'
                                     }
+                                  }}
+                                >
+                                  <Card 
+                                    sx={{ 
+                                      background: `linear-gradient(135deg, ${acao.cor}15, ${acao.cor}08)`,
+                                      border: draggedIndex === idx ? `3px dashed ${acao.cor}` : `2px solid ${acao.cor}25`,
+                                      borderRadius: 3,
+                                      transition: 'all 0.3s ease',
+                                      width: '100%',
+                                      height: 110,
+                                      position: 'relative',
+                                      overflow: 'hidden',
+                                      opacity: draggedIndex === idx ? 0.5 : 1,
+                                      transform: draggedIndex === idx ? 'scale(0.95)' : 'scale(1)',
+                                      '&:hover': {
+                                        transform: 'scale(1.02)',
+                                        boxShadow: `0 8px 16px ${acao.cor}30`
+                                      }
+                                    }}
+                                  >
+                                    <Box 
+                                      sx={{
+                                        position: 'absolute',
+                                        top: 4,
+                                        left: 4,
+                                        zIndex: 1,
+                                        background: 'rgba(255,255,255,0.9)',
+                                        borderRadius: 1,
+                                        p: 0.5,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 0.5
+                                      }}
+                                    >
+                                      <DragIndicator fontSize="small" sx={{ color: acao.cor }} />
+                                      <Typography variant="caption" fontWeight={600} sx={{ color: acao.cor }}>
+                                        {idx + 1}
+                                      </Typography>
+                                    </Box>
+                                    
+                                    <CardContent sx={{ 
+                                      textAlign: 'center', 
+                                      p: 2,
+                                      height: '100%',
+                                      display: 'flex',
+                                      flexDirection: 'column',
+                                      justifyContent: 'center',
+                                      alignItems: 'center',
+                                      gap: 1
+                                    }}>
+                                      <Avatar 
+                                        className="action-icon"
+                                        sx={{ 
+                                          width: 40,
+                                          height: 40,
+                                          background: `linear-gradient(135deg, ${acao.cor}, ${acao.cor}CC)`,
+                                          boxShadow: `0 4px 12px ${acao.cor}40`,
+                                          transition: 'all 0.3s ease'
+                                        }}
+                                      >
+                                        {React.createElement(acao.icon, { sx: { fontSize: 24 } })}
+                                      </Avatar>
+                                      
+                                      <Typography 
+                                        variant="body2" 
+                                        fontWeight={600}
+                                        sx={{ 
+                                          fontSize: { xs: '0.7rem', sm: '0.75rem' },
+                                          color: '#1f2937',
+                                          lineHeight: 1.2,
+                                          overflow: 'hidden',
+                                          textOverflow: 'ellipsis',
+                                          display: '-webkit-box',
+                                          WebkitLineClamp: 2,
+                                          WebkitBoxOrient: 'vertical'
+                                        }}
+                                      >
+                                        {acao.titulo}
+                                      </Typography>
+                                    </CardContent>
+                                  </Card>
+                                </Badge>
+                              </Box>
+                            </Zoom>
+                          </Grid>
+                        ))}
+                      </Grid>
+                    ) : (
+                      // Modo normal - Swiper
+                      <Swiper
+                        modules={[Navigation, Pagination]}
+                        spaceBetween={16}
+                        navigation={{
+                          enabled: getAcoesOrdenadas().length > 4,
+                          nextEl: '.swiper-button-next-actions',
+                          prevEl: '.swiper-button-prev-actions'
+                        }}
+                        pagination={{
+                          clickable: true,
+                          dynamicBullets: true,
+                          enabled: getAcoesOrdenadas().length > 4
+                        }}
+                        breakpoints={{
+                          320: {
+                            slidesPerView: 2.2,
+                            spaceBetween: 12
+                          },
+                          480: {
+                            slidesPerView: 3,
+                            spaceBetween: 14
+                          },
+                          768: {
+                            slidesPerView: 4,
+                            spaceBetween: 16
+                          },
+                          1024: {
+                            slidesPerView: Math.min(5, getAcoesOrdenadas().length),
+                            spaceBetween: 18
+                          },
+                          1280: {
+                            slidesPerView: Math.min(getAcoesOrdenadas().length, 7),
+                            spaceBetween: 20
+                          }
+                        }}
+                        style={{
+                          paddingLeft: '6px',
+                          paddingRight: '6px',
+                          paddingBottom: getAcoesOrdenadas().length > 4 ? '35px' : '8px'
+                        }}
+                      >
+                        {getAcoesOrdenadas().map((acao, idx) => (
+                          <SwiperSlide key={acao.id} style={{ width: 'auto' }}>
+                            <Zoom in timeout={1200 + (idx * 150)}>
+                              <Badge 
+                                badgeContent={acao.badgeCount || 0}
+                                color="error"
+                                overlap="circular"
+                                sx={{
+                                  '& .MuiBadge-badge': {
+                                    fontSize: '0.75rem',
+                                    fontWeight: 'bold',
+                                    height: 22,
+                                    minWidth: 22,
+                                    borderRadius: '50%'
                                   }
                                 }}
-                                onClick={() => router.push(acao.rota)}
                               >
-                              {/* Background decorativo */}
-                              <Box 
-                                className="action-bg"
-                                sx={{
-                                  position: 'absolute',
-                                  top: -15,
-                                  right: -15,
-                                  width: 60,
-                                  height: 60,
-                                  borderRadius: '50%',
-                                  background: `linear-gradient(135deg, ${acao.cor}20, ${acao.cor}10)`,
-                                  transition: 'all 0.4s ease',
-                                  opacity: 0.2
-                                }}
-                              />
+                                <Card 
+                                  sx={{ 
+                                    cursor: 'pointer',
+                                    background: `linear-gradient(135deg, ${acao.cor}15, ${acao.cor}08)`,
+                                    border: `2px solid ${acao.cor}25`,
+                                    borderRadius: 3,
+                                    transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                                    width: { xs: 130, sm: 140, md: 150 },
+                                    height: { xs: 90, sm: 100, md: 110 },
+                                    position: 'relative',
+                                    overflow: 'hidden',
+                                    '&:hover': {
+                                      transform: 'translateY(-6px) scale(1.02)',
+                                      boxShadow: `0 15px 30px ${acao.cor}30`,
+                                      '& .action-icon': {
+                                        transform: 'scale(1.2) rotate(5deg)'
+                                      },
+                                      '& .action-bg': {
+                                        transform: 'scale(1.1)',
+                                        opacity: 0.3
+                                      }
+                                    }
+                                  }}
+                                  onClick={() => router.push(acao.rota)}
+                                >
+                                  {/* Background decorativo */}
+                                  <Box 
+                                    className="action-bg"
+                                    sx={{
+                                      position: 'absolute',
+                                      top: -15,
+                                      right: -15,
+                                      width: 60,
+                                      height: 60,
+                                      borderRadius: '50%',
+                                      background: `linear-gradient(135deg, ${acao.cor}20, ${acao.cor}10)`,
+                                      transition: 'all 0.4s ease',
+                                      opacity: 0.2
+                                    }}
+                                  />
                               
                               <CardActionArea sx={{ height: '100%' }}>
                                 <CardContent sx={{ 
@@ -777,6 +1248,7 @@ const Dashboard = () => {
                         </SwiperSlide>
                       ))}
                     </Swiper>
+                    )}
                     
                     {/* Botões de navegação customizados */}
                     <Box
@@ -857,26 +1329,107 @@ const Dashboard = () => {
             <Grid container spacing={{ xs: 2, sm: 3 }}>
               {/* Quadro de Avisos - Primeiro lugar com largura completa */}
               <Grid item xs={12}>
-                <Card sx={{ position: 'relative', overflow: 'hidden', mb: 2 }}>
+                <Card 
+                  sx={{ 
+                    position: 'relative', 
+                    overflow: 'hidden', 
+                    mb: 2,
+                    background: 'linear-gradient(135deg, #667eea15 0%, #764ba215 100%)',
+                    border: '1px solid #667eea30',
+                    borderRadius: 3,
+                    transition: 'all 0.3s ease',
+                    '&:hover': {
+                      boxShadow: '0 8px 24px rgba(102, 126, 234, 0.15)',
+                      transform: 'translateY(-2px)'
+                    }
+                  }}
+                >
+                  {/* Decoração de fundo */}
                   <Box 
                     sx={{ 
                       position: 'absolute', 
-                      top: 0, 
-                      right: 0, 
-                      width: { xs: 40, md: 60 }, 
-                      height: { xs: 40, md: 60 }, 
-                      background: 'linear-gradient(135deg, #FF6B6B, #4ECDC4)', 
-                      borderRadius: '0 0 0 100%' 
+                      top: -30, 
+                      right: -30, 
+                      width: 150, 
+                      height: 150, 
+                      background: 'radial-gradient(circle, rgba(102, 126, 234, 0.1) 0%, transparent 70%)',
+                      borderRadius: '50%'
                     }} 
                   />
+                  
                   <CardContent sx={{ position: 'relative', zIndex: 1, p: { xs: 2, sm: 3 } }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                      <Notifications sx={{ color: '#FF6B6B', mr: 1, fontSize: { xs: 20, md: 24 } }} />
-                      <Typography variant="h6" fontWeight={600} sx={{ fontSize: { xs: '1rem', md: '1.25rem' } }}>
-                        📢 Quadro de Avisos
-                      </Typography>
+                    {/* Header do Card com botão de expandir */}
+                    <Box sx={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'space-between',
+                      mb: avisosExpanded ? 2 : 0
+                    }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                        <Badge 
+                          badgeContent={!avisosExpanded && avisos.length > 0 ? avisos.length : 0}
+                          color="error"
+                          sx={{
+                            '& .MuiBadge-badge': {
+                              fontSize: '0.75rem',
+                              fontWeight: 700,
+                              minWidth: '22px',
+                              height: '22px',
+                              borderRadius: '11px',
+                              boxShadow: '0 2px 8px rgba(239, 68, 68, 0.3)'
+                            }
+                          }}
+                        >
+                          <Avatar
+                            sx={{
+                              background: 'linear-gradient(135deg, #667eea, #764ba2)',
+                              width: 40,
+                              height: 40,
+                              boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)'
+                            }}
+                          >
+                            <Campaign />
+                          </Avatar>
+                        </Badge>
+                        <Box>
+                          <Typography 
+                            variant="h6" 
+                            fontWeight={700} 
+                            sx={{ 
+                              fontSize: { xs: '1.1rem', md: '1.25rem' },
+                              background: 'linear-gradient(135deg, #667eea, #764ba2)',
+                              WebkitBackgroundClip: 'text',
+                              WebkitTextFillColor: 'transparent',
+                              backgroundClip: 'text'
+                            }}
+                          >
+                            Quadro de Avisos
+                          </Typography>
+                          {!avisosExpanded && avisos.length > 0 && (
+                            <Typography variant="caption" color="text.secondary">
+                              {avisos.length} {avisos.length === 1 ? 'aviso' : 'avisos'}
+                            </Typography>
+                          )}
+                        </Box>
+                      </Box>
+                      
+                      <IconButton 
+                        onClick={handleToggleAvisos}
+                        sx={{ 
+                          bgcolor: 'rgba(102, 126, 234, 0.1)',
+                          '&:hover': {
+                            bgcolor: 'rgba(102, 126, 234, 0.2)',
+                            transform: 'scale(1.1)'
+                          },
+                          transition: 'all 0.3s ease'
+                        }}
+                      >
+                        {avisosExpanded ? <ExpandLess /> : <ExpandMore />}
+                      </IconButton>
                     </Box>
-                    <Divider sx={{ mb: 3 }} />
+                    
+                    <Collapse in={avisosExpanded} timeout="auto">
+                      <Divider sx={{ mb: 3, opacity: 0.6 }} />
                     
                     {avisos.length > 0 ? (
                       <Box className="avisos-carousel">
@@ -1133,234 +1686,10 @@ const Dashboard = () => {
                         </Typography>
                       </Box>
                     )}
+                    </Collapse>
                   </CardContent>
                 </Card>
               </Grid>
-
-              {/* Estatísticas Principais */}
-              {userRole === 'coordenadora' && (
-                <Grid item xs={12}>
-                  <Fade in timeout={1000}>
-                    <Typography variant="h6" fontWeight={600} gutterBottom sx={{ mb: 3, color: '#374151', fontSize: { xs: '1.1rem', md: '1.25rem' } }}>
-                      📊 Visão Geral da Escola
-                    </Typography>
-                  </Fade>
-                  
-                  {/* Container Centralizado para Grid de Estatísticas */}
-                  <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3 }}>
-                    <Card 
-                      sx={{ 
-                        background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
-                        borderRadius: 4,
-                        border: '1px solid rgba(148, 163, 184, 0.2)',
-                        boxShadow: '0 10px 25px rgba(0, 0, 0, 0.08)',
-                        p: { xs: 2, sm: 3 },
-                        width: '100%',
-                        maxWidth: { xs: '100%', sm: 600, md: 700 },
-                        display: 'flex',
-                        justifyContent: 'center',
-                        alignItems: 'center'
-                      }}
-                    >
-                      <Box sx={{ width: '100%', maxWidth: { xs: '100%', sm: 500, md: 600 } }}>
-                        <Grid container spacing={{ xs: 2, sm: 3 }} sx={{ justifyContent: 'center' }}>
-                        {[
-                          { titulo: 'Total de Alunos', valor: stats.totalAlunos, icon: People, cor: '#3B82F6', rota: '/alunos' },
-                          { titulo: 'Professores', valor: stats.totalProfessores, icon: School, cor: '#10B981', rota: '/colaboradores' },
-                          { titulo: 'Turmas Ativas', valor: stats.totalTurmas, icon: CalendarToday, cor: '#F59E0B', rota: '/turmas' },
-                          { titulo: 'Notas Lançadas', valor: stats.notasLancadas, icon: Grade, cor: '#8B5CF6', rota: '/notas-frequencia' }
-                        ].map((item, idx) => (
-                          <Grid item xs={6} key={idx}>
-                            <Zoom in timeout={1000 + (idx * 200)}>
-                              <Card 
-                                sx={{ 
-                                  cursor: 'pointer',
-                                  background: `linear-gradient(135deg, ${item.cor}15, ${item.cor}08)`,
-                                  border: `2px solid ${item.cor}25`,
-                                  borderRadius: 3,
-                                  transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-                                  height: { xs: 140, sm: 150, md: 160 },
-                                  width: '100%',
-                                  minHeight: { xs: 140, sm: 150, md: 160 },
-                                  maxHeight: { xs: 140, sm: 150, md: 160 },
-                                  position: 'relative',
-                                  overflow: 'hidden',
-                                  aspectRatio: '1',
-                                  '&:hover': {
-                                    transform: 'translateY(-6px) scale(1.02)',
-                                    boxShadow: `0 15px 30px ${item.cor}30`,
-                                    '& .stat-icon': {
-                                      transform: 'scale(1.15) rotate(5deg)'
-                                    },
-                                    '& .stat-bg': {
-                                      transform: 'scale(1.1)',
-                                      opacity: 0.3
-                                    }
-                                  }
-                                }}
-                                onClick={() => router.push(item.rota)}
-                              >
-                                {/* Background decorativo */}
-                                <Box 
-                                  className="stat-bg"
-                                  sx={{
-                                    position: 'absolute',
-                                    top: -15,
-                                    right: -15,
-                                    width: 60,
-                                    height: 60,
-                                    borderRadius: '50%',
-                                    background: `linear-gradient(135deg, ${item.cor}20, ${item.cor}10)`,
-                                    transition: 'all 0.4s ease',
-                                    opacity: 0.2
-                                  }}
-                                />
-                                
-                                <CardActionArea sx={{ height: '100%' }}>
-                                  <CardContent sx={{ 
-                                    textAlign: 'center', 
-                                    p: { xs: 1.5, sm: 2, md: 2.5 },
-                                    height: '100%',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    justifyContent: 'center',
-                                    alignItems: 'center',
-                                    position: 'relative'
-                                  }}>
-                                    <Box 
-                                      className="stat-icon"
-                                      sx={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        width: { xs: 36, sm: 42, md: 48 },
-                                        height: { xs: 36, sm: 42, md: 48 },
-                                        borderRadius: '16px',
-                                        background: `linear-gradient(135deg, ${item.cor}, ${item.cor}dd)`,
-                                        mb: { xs: 1, sm: 1.5 },
-                                        boxShadow: `0 8px 20px ${item.cor}40`,
-                                        transition: 'all 0.4s ease'
-                                      }}
-                                    >
-                                      <item.icon sx={{ 
-                                        fontSize: { xs: 18, sm: 22, md: 26 }, 
-                                        color: 'white'
-                                      }} />
-                                    </Box>
-                                    
-                                    <Typography 
-                                      variant="h5" 
-                                      fontWeight={700} 
-                                      sx={{ 
-                                        fontSize: { xs: '1.25rem', sm: '1.5rem', md: '1.75rem' },
-                                        lineHeight: 1,
-                                        color: item.cor,
-                                        mb: { xs: 0.5, sm: 1 }
-                                      }}
-                                    >
-                                      {item.valor}
-                                    </Typography>
-                                    
-                                    <Typography 
-                                      variant="body2" 
-                                      sx={{ 
-                                        fontSize: { xs: '0.75rem', sm: '0.85rem', md: '0.9rem' },
-                                        lineHeight: 1.2,
-                                        textAlign: 'center',
-                                        color: '#6B7280',
-                                        letterSpacing: '0.3px',
-                                        fontWeight: 500
-                                      }}
-                                    >
-                                      {item.titulo}
-                                    </Typography>
-                                  </CardContent>
-                                </CardActionArea>
-                              </Card>
-                            </Zoom>
-                          </Grid>
-                        ))}
-                      </Grid>
-                      </Box>
-                    </Card>
-                  </Box>
-                  
-                  {/* Métricas de Performance */}
-                  <Box sx={{ display: 'flex', justifyContent: 'center', mb: 4 }}>
-                    <Box sx={{ width: '100%', maxWidth: { xs: '100%', sm: 550, md: 650 } }}>
-                      <Grid container spacing={{ xs: 2, sm: 3 }} sx={{ justifyContent: 'center' }}>
-                        <Grid item xs={12} sm={6}>
-                          <Card 
-                            sx={{ 
-                              p: { xs: 2.5, sm: 3.5 }, 
-                              height: '100%',
-                              background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
-                              border: '1px solid rgba(148, 163, 184, 0.15)',
-                              borderRadius: 3,
-                              transition: 'all 0.3s ease',
-                              '&:hover': {
-                                transform: 'translateY(-2px)',
-                                boxShadow: '0 8px 25px rgba(0,0,0,0.1)'
-                              }
-                            }}
-                          >
-                            <Typography variant="h6" gutterBottom color="primary" sx={{ fontSize: { xs: '1rem', md: '1.1rem' }, fontWeight: 600 }}>
-                              📈 Média Geral das Notas
-                            </Typography>
-                            <Box sx={{ display: 'flex', alignItems: 'center', mt: 3, flexDirection: { xs: 'column', sm: 'row' } }}>
-                              <Box sx={{ width: '100%', mr: { xs: 0, sm: 2 }, mb: { xs: 2, sm: 0 } }}>
-                                <LinearProgress 
-                                  variant="determinate" 
-                                  value={(stats.mediaGeral / 10) * 100} 
-                                  sx={{ height: 10, borderRadius: 8 }}
-                                  color={stats.mediaGeral >= 7 ? 'success' : stats.mediaGeral >= 5 ? 'warning' : 'error'}
-                                />
-                              </Box>
-                              <Typography variant="h5" color="primary" fontWeight={700} sx={{ fontSize: { xs: '1.5rem', md: '1.75rem' } }}>
-                                {stats.mediaGeral.toFixed(1)}
-                              </Typography>
-                            </Box>
-                          </Card>
-                        </Grid>
-                        
-                        <Grid item xs={12} sm={6}>
-                          <Card 
-                            sx={{ 
-                              p: { xs: 2.5, sm: 3.5 }, 
-                              height: '100%',
-                              background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
-                              border: '1px solid rgba(148, 163, 184, 0.15)',
-                              borderRadius: 3,
-                              transition: 'all 0.3s ease',
-                              '&:hover': {
-                                transform: 'translateY(-2px)',
-                                boxShadow: '0 8px 25px rgba(0,0,0,0.1)'
-                              }
-                            }}
-                          >
-                            <Typography variant="h6" gutterBottom color="primary" sx={{ fontSize: { xs: '1rem', md: '1.1rem' }, fontWeight: 600 }}>
-                              📅 Frequência Média
-                            </Typography>
-                            <Box sx={{ display: 'flex', alignItems: 'center', mt: 3, flexDirection: { xs: 'column', sm: 'row' } }}>
-                              <Box sx={{ width: '100%', mr: { xs: 0, sm: 2 }, mb: { xs: 2, sm: 0 } }}>
-                                <LinearProgress 
-                                  variant="determinate" 
-                                  value={stats.frequenciaMedia} 
-                                  sx={{ height: 10, borderRadius: 8 }}
-                                  color={stats.frequenciaMedia >= 75 ? 'success' : 'warning'}
-                                />
-                              </Box>
-                              <Typography variant="h5" color="primary" fontWeight={700} sx={{ fontSize: { xs: '1.5rem', md: '1.75rem' } }}>
-                                {stats.frequenciaMedia.toFixed(1)}%
-                              </Typography>
-                            </Box>
-                          </Card>
-                        </Grid>
-                      </Grid>
-                    </Box>
-                  </Box>
-                </Grid>
-              )}
 
               {/* Ações Rápidas movidas para cima */}
 
@@ -1369,26 +1698,107 @@ const Dashboard = () => {
                 <Grid container spacing={{ xs: 2, sm: 3 }}>
                   {/* Carrossel da Galeria de Fotos */}
                   <Grid item xs={12}>
-                    <Card sx={{ height: '100%', position: 'relative', overflow: 'hidden' }}>
+                    <Card 
+                      sx={{ 
+                        height: '100%', 
+                        position: 'relative', 
+                        overflow: 'hidden',
+                        background: 'linear-gradient(135deg, #f59e0b15 0%, #f9731615 100%)',
+                        border: '1px solid #f59e0b30',
+                        borderRadius: 3,
+                        transition: 'all 0.3s ease',
+                        '&:hover': {
+                          boxShadow: '0 8px 24px rgba(245, 158, 11, 0.15)',
+                          transform: 'translateY(-2px)'
+                        }
+                      }}
+                    >
+                      {/* Decoração de fundo */}
                       <Box 
                         sx={{ 
                           position: 'absolute', 
-                          top: 0, 
-                          right: 0, 
-                          width: { xs: 40, md: 60 }, 
-                          height: { xs: 40, md: 60 }, 
-                          background: 'linear-gradient(135deg, #F59E0B, #F97316)', 
-                          borderRadius: '0 0 0 100%' 
+                          top: -30, 
+                          right: -30, 
+                          width: 150, 
+                          height: 150, 
+                          background: 'radial-gradient(circle, rgba(245, 158, 11, 0.1) 0%, transparent 70%)',
+                          borderRadius: '50%'
                         }} 
                       />
+                      
                       <CardContent sx={{ position: 'relative', zIndex: 1, p: { xs: 2, sm: 3 } }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                          <PhotoLibrary sx={{ color: '#F59E0B', mr: 1, fontSize: { xs: 20, md: 24 } }} />
-                          <Typography variant="h6" fontWeight={600} sx={{ fontSize: { xs: '1rem', md: '1.25rem' } }}>
-                            📸 Galeria de Fotos
-                          </Typography>
+                        {/* Header do Card com botão de expandir */}
+                        <Box sx={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'space-between',
+                          mb: galeriaExpanded ? 2 : 0
+                        }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                            <Badge 
+                              badgeContent={!galeriaExpanded && fotosVisiveis.length > 0 ? fotosVisiveis.length : 0}
+                              color="warning"
+                              sx={{
+                                '& .MuiBadge-badge': {
+                                  fontSize: '0.75rem',
+                                  fontWeight: 700,
+                                  minWidth: '22px',
+                                  height: '22px',
+                                  borderRadius: '11px',
+                                  boxShadow: '0 2px 8px rgba(245, 158, 11, 0.3)'
+                                }
+                              }}
+                            >
+                              <Avatar
+                                sx={{
+                                  background: 'linear-gradient(135deg, #F59E0B, #F97316)',
+                                  width: 40,
+                                  height: 40,
+                                  boxShadow: '0 4px 12px rgba(245, 158, 11, 0.3)'
+                                }}
+                              >
+                                <Image />
+                              </Avatar>
+                            </Badge>
+                            <Box>
+                              <Typography 
+                                variant="h6" 
+                                fontWeight={700} 
+                                sx={{ 
+                                  fontSize: { xs: '1.1rem', md: '1.25rem' },
+                                  background: 'linear-gradient(135deg, #F59E0B, #F97316)',
+                                  WebkitBackgroundClip: 'text',
+                                  WebkitTextFillColor: 'transparent',
+                                  backgroundClip: 'text'
+                                }}
+                              >
+                                Galeria de Fotos
+                              </Typography>
+                              {!galeriaExpanded && fotosVisiveis.length > 0 && (
+                                <Typography variant="caption" color="text.secondary">
+                                  {fotosVisiveis.length} {fotosVisiveis.length === 1 ? 'foto' : 'fotos'}
+                                </Typography>
+                              )}
+                            </Box>
+                          </Box>
+                          
+                          <IconButton 
+                            onClick={handleToggleGaleria}
+                            sx={{ 
+                              bgcolor: 'rgba(245, 158, 11, 0.1)',
+                              '&:hover': {
+                                bgcolor: 'rgba(245, 158, 11, 0.2)',
+                                transform: 'scale(1.1)'
+                              },
+                              transition: 'all 0.3s ease'
+                            }}
+                          >
+                            {galeriaExpanded ? <ExpandLess /> : <ExpandMore />}
+                          </IconButton>
                         </Box>
-                        <Divider sx={{ mb: 3 }} />
+                        
+                        <Collapse in={galeriaExpanded} timeout="auto">
+                          <Divider sx={{ mb: 3, opacity: 0.6 }} />
                         
                         {fotosVisiveis.length > 0 ? (
                           <Box sx={{ position: 'relative', px: { xs: 0, sm: 1 } }}>
@@ -1690,6 +2100,7 @@ const Dashboard = () => {
                             </Button>
                           </Box>
                         )}
+                        </Collapse>
                       </CardContent>
                     </Card>
                   </Grid>

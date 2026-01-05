@@ -614,28 +614,104 @@ const LojaPage = () => {
       <SidebarMenu />
       <Box sx={{ bgcolor: '#f5f5f5', minHeight: '100vh', pb: 8 }}>
         <Container maxWidth="lg" sx={{ pt: 3 }}>
-          {/* Header */}
-          <Paper sx={{ p: 3, mb: 3, background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: 'white' }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                <Store sx={{ fontSize: 40 }} />
+          {/* Header Centralizado */}
+          <Paper sx={{ 
+            p: { xs: 2, sm: 2.5, md: 3 }, 
+            mb: 3, 
+            borderRadius: 3,
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            position: 'relative',
+            overflow: 'hidden'
+          }}>
+            {/* Padrão decorativo */}
+            <Box sx={{
+              position: 'absolute',
+              top: -30,
+              right: -30,
+              width: '250px',
+              height: '250px',
+              background: 'radial-gradient(circle, rgba(255,255,255,0.12) 0%, transparent 70%)',
+              pointerEvents: 'none',
+              display: { xs: 'none', md: 'block' }
+            }} />
+            
+            <Box sx={{ 
+              position: 'relative',
+              zIndex: 1,
+              display: 'flex',
+              flexDirection: { xs: 'column', md: 'row' },
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              color: 'white',
+              gap: 2
+            }}>
+              {/* Conteúdo Central */}
+              <Box sx={{ 
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                textAlign: 'center',
+                flex: 1,
+                gap: 1.5
+              }}>
+                <Box sx={{
+                  width: { xs: 60, sm: 70, md: 80 },
+                  height: { xs: 60, sm: 70, md: 80 },
+                  borderRadius: '50%',
+                  bgcolor: 'rgba(255,255,255,0.25)',
+                  backdropFilter: 'blur(10px)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  border: '3px solid rgba(255,255,255,0.3)',
+                  boxShadow: '0 6px 24px rgba(0,0,0,0.2)'
+                }}>
+                  <Store sx={{ fontSize: { xs: '2rem', sm: '2.5rem', md: '3rem' } }} />
+                </Box>
+                
                 <Box>
-                  <Typography variant="h4" fontWeight="bold">
+                  <Typography 
+                    variant="h4" 
+                    fontWeight={700}
+                    sx={{
+                      fontSize: { xs: '1.5rem', sm: '1.75rem', md: '2rem' },
+                      textShadow: '0 2px 10px rgba(0,0,0,0.3)',
+                      letterSpacing: '-0.01em'
+                    }}
+                  >
                     🛍️ Loja ELO
                   </Typography>
-                  <Typography variant="subtitle1" sx={{ opacity: 0.9 }}>
+                  <Typography 
+                    variant="body1" 
+                    sx={{ 
+                      opacity: 0.92,
+                      fontSize: { xs: '0.875rem', sm: '0.95rem', md: '1rem' },
+                      textShadow: '0 1px 5px rgba(0,0,0,0.2)',
+                      mt: 0.5
+                    }}
+                  >
                     {isCoordenador() && 'Gerencie produtos e vendas'}
                     {isPai() && 'Produtos disponíveis para compra'}
                   </Typography>
                 </Box>
               </Box>
               
+              {/* Botão Carrinho */}
               {isPai() && (
                 <Badge badgeContent={carrinho.length} color="error">
                   <Fab
                     color="secondary"
                     onClick={() => setCarrinhoDialog(true)}
-                    sx={{ bgcolor: 'rgba(255,255,255,0.2)', '&:hover': { bgcolor: 'rgba(255,255,255,0.3)' } }}
+                    sx={{ 
+                      bgcolor: 'rgba(255,255,255,0.25)', 
+                      backdropFilter: 'blur(10px)',
+                      border: '2px solid rgba(255,255,255,0.3)',
+                      '&:hover': { 
+                        bgcolor: 'rgba(255,255,255,0.35)',
+                        transform: 'scale(1.05)'
+                      },
+                      transition: 'all 0.3s ease'
+                    }}
                   >
                     <ShoppingCart />
                   </Fab>

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { managementDB, ref, get, auth } from '../firebase';
 import { signOut } from 'firebase/auth';
+import { isSuperAdmin as checkIsSuperAdmin } from '../config/constants';
 
 export default function AccessTypeSelector({ user, onSchoolSelect, onManagementSelect }) {
   const [availableSchools, setAvailableSchools] = useState([]);
@@ -19,9 +20,9 @@ export default function AccessTypeSelector({ user, onSchoolSelect, onManagementS
     try {
       console.log('🔍 Verificando acesso do usuário:', user?.email);
       
-      // Verificar se é super admin
-      const superAdminId = 'qD6UucWtcgPC9GHA41OB8rSaghZ2';
-      const isSuper = user?.uid === superAdminId;
+      // Verificar se é super admin usando a função centralizada
+      const isSuper = checkIsSuperAdmin(user?.uid);
+      console.log('👑 [checkUserAccess] É Super Admin?', isSuper, 'UID:', user?.uid);
       setIsSuperAdmin(isSuper);
 
       // Se for super admin, buscar todas as escolas

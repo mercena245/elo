@@ -22,7 +22,8 @@ import {
   Button,
   Accordion,
   AccordionSummary,
-  AccordionDetails
+  AccordionDetails,
+  Paper
 } from '@mui/material';
 import {
   Assignment as AssignmentIcon,
@@ -41,19 +42,22 @@ import {
 import SidebarMenu from '../../components/SidebarMenu';
 import { useAuthUser } from '../../hooks/useAuthUser';
 import { useSchoolDatabase } from '../../hooks/useSchoolDatabase';
+import { isSuperAdmin } from '../../config/constants';
 
 const PendenciasPage = () => {
   const router = useRouter();
-  const { userRole } = useAuthUser();
+  const { userRole, user } = useAuthUser();
   const { getData, isReady, currentSchool } = useSchoolDatabase();
   const currentSchoolId = typeof currentSchool === 'string' ? currentSchool : currentSchool?.id;
   const mensagensPath = currentSchoolId ? `escolas/${currentSchoolId}/mensagens` : 'mensagens';
+  const isUserSuperAdmin = isSuperAdmin(user?.uid);
 
   const [loading, setLoading] = useState(true);
   const [planosPendentes, setPlanosPendentes] = useState([]);
   const [relatoriosPendentes, setRelatoriosPendentes] = useState([]);
   const [titulosEmAnalise, setTitulosEmAnalise] = useState([]);
   const [eventosPendentes, setEventosPendentes] = useState([]);
+  const [usuariosPendentes, setUsuariosPendentes] = useState([]);
   const [turmas, setTurmas] = useState({});
   const [disciplinas, setDisciplinas] = useState({});
   const [alunos, setAlunos] = useState({});
@@ -62,7 +66,8 @@ const PendenciasPage = () => {
   const [totalTitulos, setTotalTitulos] = useState(0);
   const [totalMensagensPendentes, setTotalMensagensPendentes] = useState(0);
   const [totalEventos, setTotalEventos] = useState(0);
-  const totalPendenciasPagina = totalPendencias + totalRelatorios + totalTitulos + totalMensagensPendentes + totalEventos;
+  const [totalUsuarios, setTotalUsuarios] = useState(0);
+  const totalPendenciasPagina = totalPendencias + totalRelatorios + totalTitulos + totalMensagensPendentes + totalEventos + totalUsuarios;
 
   useEffect(() => {
     // Aguardar até que userRole esteja definido
@@ -90,7 +95,8 @@ const PendenciasPage = () => {
         disciplinasData,
         alunosData,
         mensagensData,
-        cronogramaData
+        cronogramaData,
+        usuariosData
       ] = await Promise.all([
         getData('planos-aula'),
         getData('relatorios-pedagogicos'),
@@ -99,7 +105,8 @@ const PendenciasPage = () => {
         getData('disciplinas'),
         getData('alunos'),
         getData(mensagensPath),
-        getData('cronograma-academico')
+        getData('cronograma-academico'),
+        getData('usuarios')
       ]);
 
       setTurmas(turmasData || {});
@@ -247,6 +254,33 @@ const PendenciasPage = () => {
         setTotalEventos(0);
       }
 
+      // Processar usuários pendentes de aprovação
+      if (usuariosData) {
+        console.log('👥 [Pendências] Dados de usuários:', usuariosData);
+        const usuariosList = Object.entries(usuariosData)
+          .filter(([uid, u]) => {
+            // Filtrar usuários sem role (pendentes de aprovação)
+            if (!u.role) {
+              // Não mostrar o próprio usuário logado
+              if (uid === user?.uid) return false;
+              // Não mostrar super admin
+              if (uid === superAdminId) return false;
+              // Não mostrar sem dados válidos
+              if (!u.nome && !u.email) return false;
+              return true;
+            }
+            return false;
+          })
+          .map(([uid, u]) => ({ uid, ...u }));
+
+        console.log('⚠️ [Pendências] Usuários pendentes encontrados:', usuariosList.length);
+        setUsuariosPendentes(usuariosList);
+        setTotalUsuarios(usuariosList.length);
+      } else {
+        setUsuariosPendentes([]);
+        setTotalUsuarios(0);
+      }
+
     } catch (error) {
       console.error('Erro ao carregar pendências:', error);
     } finally {
@@ -319,47 +353,95 @@ const PendenciasPage = () => {
       <SidebarMenu />
       
       <Box sx={{ flexGrow: 1, p: 3 }}>
-        {/* Cabeçalho */}
-        <Box sx={{ mb: 4 }}>
-          <Button
-            startIcon={<ArrowBackIcon />}
-            onClick={() => router.push('/dashboard')}
-            sx={{ mb: 2 }}
-          >
-            Voltar ao Dashboard
-          </Button>
+        {/* Cabeçalho Centralizado */}
+        <Paper 
+          elevation={0}
+          sx={{ 
+            mb: 4,
+            p: { xs: 2, sm: 2.5, md: 3 },
+            borderRadius: 3,
+            background: 'linear-gradient(135deg, #EF4444 0%, #DC2626 100%)',
+            color: 'white',
+            position: 'relative',
+            overflow: 'hidden'
+          }}
+        >
+          {/* Padrão decorativo */}
+          <Box sx={{
+            position: 'absolute',
+            top: -30,
+            right: -30,
+            width: '250px',
+            height: '250px',
+            background: 'radial-gradient(circle, rgba(255,255,255,0.12) 0%, transparent 70%)',
+            pointerEvents: 'none',
+            display: { xs: 'none', md: 'block' }
+          }} />
           
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-            <WarningIcon sx={{ fontSize: 48, color: '#EF4444' }} />
+          <Box sx={{ 
+            position: 'relative', 
+            zIndex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            textAlign: 'center',
+            gap: 1.5
+          }}>
+            <Avatar sx={{ 
+              width: { xs: 60, sm: 70, md: 80 }, 
+              height: { xs: 60, sm: 70, md: 80 }, 
+              bgcolor: 'rgba(255,255,255,0.25)',
+              backdropFilter: 'blur(10px)',
+              border: '3px solid rgba(255,255,255,0.3)',
+              boxShadow: '0 6px 24px rgba(0,0,0,0.2)'
+            }}>
+              <WarningIcon sx={{ fontSize: { xs: '2rem', sm: '2.5rem', md: '3rem' } }} />
+            </Avatar>
+            
             <Box>
-              <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#1f2937' }}>
+              <Typography 
+                variant="h4" 
+                fontWeight={700}
+                sx={{
+                  fontSize: { xs: '1.5rem', sm: '1.75rem', md: '2rem' },
+                  textShadow: '0 2px 10px rgba(0,0,0,0.3)',
+                  letterSpacing: '-0.01em'
+                }}
+              >
                 Central de Pendências
               </Typography>
-              <Typography variant="body1" color="text.secondary">
+              <Typography 
+                variant="body1" 
+                sx={{ 
+                  opacity: 0.92,
+                  fontSize: { xs: '0.875rem', sm: '0.95rem', md: '1rem' },
+                  textShadow: '0 1px 5px rgba(0,0,0,0.2)',
+                  mt: 0.5
+                }}
+              >
                 Acompanhe e gerencie todas as pendências da coordenação
               </Typography>
             </Box>
+            
+            {totalPendenciasPagina > 0 && (
+              <Chip 
+                icon={<WarningIcon />}
+                label={`${totalPendenciasPagina} pendência(s) aguardando ação`}
+                size="small"
+                sx={{ 
+                  bgcolor: 'rgba(255,255,255,0.25)',
+                  backdropFilter: 'blur(10px)',
+                  color: 'white',
+                  fontWeight: 600,
+                  fontSize: '0.75rem',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                  '& .MuiChip-icon': { color: 'white', fontSize: '1rem' },
+                  mt: 0.5
+                }} 
+              />
+            )}
           </Box>
-
-          {totalPendenciasPagina > 0 && (
-            <Alert
-              severity="warning"
-              icon={<WarningIcon />}
-              sx={{
-                borderLeft: '4px solid #f97316',
-                bgcolor: '#FEF3C7',
-                color: '#92400E'
-              }}
-            >
-              <Typography variant="subtitle1" fontWeight={600}>
-                {totalPendenciasPagina} pendência(s) aguardando ação.
-              </Typography>
-              <Typography variant="body2">
-                Planos: {totalPendencias} · Relatórios: {totalRelatorios} · Pagamentos: {totalTitulos} · Mensagens: {totalMensagensPendentes} · Eventos: {totalEventos}
-              </Typography>
-            </Alert>
-          )}
-        </Box>
+        </Paper>
 
         {/* Resumo de Pendências */}
         <Grid container spacing={3} sx={{ mb: 4 }}>
@@ -478,6 +560,37 @@ const PendenciasPage = () => {
           </Grid>
 
           <Grid item xs={12} md={3}>
+            <Card 
+              sx={{ 
+                bgcolor: '#E0F2FE', 
+                borderLeft: '4px solid #0EA5E9',
+                boxShadow: 2,
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                '&:hover': {
+                  boxShadow: 4,
+                  transform: 'translateY(-2px)'
+                }
+              }}
+              onClick={() => router.push('/configuracoes?aba=1')}
+            >
+              <CardContent>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <PersonIcon sx={{ fontSize: 40, color: '#0EA5E9' }} />
+                  <Box>
+                    <Typography variant="h3" sx={{ fontWeight: 'bold', color: '#075985' }}>
+                      {totalUsuarios}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Usuários aguardando aprovação
+                    </Typography>
+                  </Box>
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          <Grid item xs={12} md={3}>
             <Card sx={{ 
               bgcolor: '#D1FAE5', 
               borderLeft: '4px solid #10B981',
@@ -488,7 +601,7 @@ const PendenciasPage = () => {
                   <CheckCircleIcon sx={{ fontSize: 40, color: '#10B981' }} />
                   <Box>
                     <Typography variant="h3" sx={{ fontWeight: 'bold', color: '#065F46' }}>
-                      {totalPendencias + totalRelatorios + totalTitulos + totalMensagensPendentes + totalEventos}
+                      {totalPendencias + totalRelatorios + totalTitulos + totalMensagensPendentes + totalEventos + totalUsuarios}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
                       Total de Pendências
@@ -907,6 +1020,85 @@ const PendenciasPage = () => {
                       />
                       
                       <IconButton edge="end" sx={{ color: '#EC4899' }}>
+                        <ChevronRightIcon />
+                      </IconButton>
+                    </ListItem>
+                  </React.Fragment>
+                ))}
+              </List>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Usuários Aguardando Aprovação */}
+        <Card sx={{ mt: 3 }}>
+          <CardContent>
+            <Typography variant="h6" sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 1 }}>
+              <PersonIcon sx={{ color: '#0EA5E9' }} />
+              Usuários Aguardando Aprovação de Acesso
+            </Typography>
+
+            {totalUsuarios === 0 ? (
+              <Alert severity="info" sx={{ mt: 2 }}>
+                <Typography variant="h6">✅ Tudo certo!</Typography>
+                <Typography>Não há usuários aguardando aprovação de acesso no momento.</Typography>
+              </Alert>
+            ) : (
+              <List>
+                {usuariosPendentes.map((usuario, index) => (
+                  <React.Fragment key={usuario.uid}>
+                    {index > 0 && <Divider />}
+                    <ListItem
+                      sx={{ 
+                        py: 2,
+                        '&:hover': { 
+                          bgcolor: '#f0f9ff',
+                          cursor: 'pointer'
+                        },
+                        transition: 'background-color 0.2s'
+                      }}
+                      onClick={() => router.push('/configuracoes?aba=1')}
+                    >
+                      <ListItemAvatar>
+                        <Avatar sx={{ 
+                          bgcolor: '#E0F2FE',
+                          color: '#0EA5E9'
+                        }}>
+                          <PersonIcon />
+                        </Avatar>
+                      </ListItemAvatar>
+                      
+                      <ListItemText
+                        primary={
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                            <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
+                              {usuario.nome || usuario.email || 'Usuário sem identificação'}
+                            </Typography>
+                            <Chip 
+                              label="Aguardando Aprovação" 
+                              color="info"
+                              size="small"
+                            />
+                          </Box>
+                        }
+                        secondary={
+                          <Box sx={{ mt: 1 }}>
+                            <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                              📧 <strong>Email:</strong> {usuario.email || 'Não informado'}
+                            </Typography>
+                            {usuario.telefone && (
+                              <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                                📱 <strong>Telefone:</strong> {usuario.telefone}
+                              </Typography>
+                            )}
+                            <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.85rem', fontStyle: 'italic', mt: 1 }}>
+                              💡 Clique para aprovar ou rejeitar acesso
+                            </Typography>
+                          </Box>
+                        }
+                      />
+                      
+                      <IconButton edge="end" sx={{ color: '#0EA5E9' }}>
                         <ChevronRightIcon />
                       </IconButton>
                     </ListItem>

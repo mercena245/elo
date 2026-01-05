@@ -213,11 +213,25 @@ const CalendarioGrade = ({
     const horaInicio = periodo?.inicio || '';
     const horaFim = periodo?.fim || '';
     
+    // Formatar data no timezone local (YYYY-MM-DD) sem conversão UTC
+    const ano = data.getFullYear();
+    const mes = String(data.getMonth() + 1).padStart(2, '0');
+    const dia = String(data.getDate()).padStart(2, '0');
+    const dataFormatada = `${ano}-${mes}-${dia}`;
+    
+    console.log('📅 [CalendarioGrade] Criando plano para data:', {
+      dataOriginal: data,
+      ano,
+      mes,
+      dia,
+      dataFormatada
+    });
+    
     // Dados que o EditorPlanoAula espera receber
     const dadosPlano = {
       turmaId: aula.turmaId,
       disciplinaId: aula.disciplinaId,
-      data: data.toISOString().split('T')[0], // YYYY-MM-DD
+      data: dataFormatada, // YYYY-MM-DD no timezone local
       gradeHorariaId: aula.id,
       diaSemana: aula.diaSemana,
       periodoAula: aula.periodoAula,
@@ -226,6 +240,8 @@ const CalendarioGrade = ({
       horaInicio: horaInicio,
       horaFim: horaFim
     };
+    
+    console.log('📤 [CalendarioGrade] Dados do plano a serem enviados:', dadosPlano);
     
     if (onCriarPlano) {
       onCriarPlano(dadosPlano);

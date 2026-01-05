@@ -41,6 +41,7 @@ import {
 } from '@mui/icons-material';
 import { useSchoolDatabase } from '../../../../hooks/useSchoolDatabase';
 import { FAIXAS_ETARIAS, obterCompetenciasFlat } from './competenciasBNCC';
+import FileUploadZone from '../../../../components/FileUploadZone';
 
 const EditorPlanoDiario = ({
   open,
@@ -266,9 +267,19 @@ const EditorPlanoDiario = ({
       } else {
         // Modo criação: resetar para novo plano
         const hoje = new Date();
-        const dataLocal = new Date(hoje.getTime() - (hoje.getTimezoneOffset() * 60000))
-          .toISOString()
-          .split('T')[0];
+        // Formatar data no timezone local sem conversão UTC
+        const ano = hoje.getFullYear();
+        const mes = String(hoje.getMonth() + 1).padStart(2, '0');
+        const dia = String(hoje.getDate()).padStart(2, '0');
+        const dataLocal = `${ano}-${mes}-${dia}`;
+        
+        console.log('📅 [EditorPlanoDiario] Inicializando com data de hoje:', {
+          hoje,
+          ano,
+          mes,
+          dia,
+          dataLocal
+        });
         
         setFormData({
           tipo_plano: 'diario',
@@ -289,6 +300,10 @@ const EditorPlanoDiario = ({
   }, [open, plano, isEditing, user]);
 
   const handleChange = async (field, value) => {
+    if (field === 'data') {
+      console.log('📅 [EditorPlanoDiario] Data alterada:', value);
+    }
+    
     // Se mudou a data ou turma, buscar aulas do dia
     if (field === 'data' && formData.turmaId) {
       const aulasDoDia = await buscarAulasDoDia(value, formData.turmaId);
@@ -434,8 +449,11 @@ const EditorPlanoDiario = ({
       isCoordinator: isCoordinator(),
       planoId: plano?.id,
       tipo_plano: formData.tipo_plano,
+      data: formData.data,
       formDataKeys: Object.keys(formData)
     });
+    
+    console.log('📅 [handleSave] DATA DO FORM:', formData.data);
     
     const dadosPlano = {
       ...formData,
@@ -447,7 +465,9 @@ const EditorPlanoDiario = ({
       professorUid: user?.uid
     };
     
-    console.log('📦 [handleSave] Aulas detalhadas sendo salvas:', {
+    console.log('� [handleSave] DATA NO DADOS PLANO:', dadosPlano.data);
+    
+    console.log('�📦 [handleSave] Aulas detalhadas sendo salvas:', {
       numAulas: dadosPlano.aulasDetalhadas?.length || 0,
       aulas: dadosPlano.aulasDetalhadas
     });
@@ -455,6 +475,7 @@ const EditorPlanoDiario = ({
     console.log('🔍 [handleSave] Dados do plano a salvar:', {
       id: dadosPlano.id,
       tipo_plano: dadosPlano.tipo_plano,
+      data: dadosPlano.data,
       hasAulasDetalhadas: !!dadosPlano.aulasDetalhadas,
       numAulas: dadosPlano.aulasDetalhadas?.length
     });
@@ -487,9 +508,8 @@ const EditorPlanoDiario = ({
   };
 
   // Função para fazer upload de arquivo para uma aula específica
-  const handleFileUpload = async (event, aulaIndex) => {
-    const files = Array.from(event.target.files);
-    if (files.length === 0) return;
+  const handleFileUpload = async (files, aulaIndex) => {
+    if (!files || files.length === 0) return;
 
     setUploadingImage(true);
 
@@ -836,18 +856,23 @@ const EditorPlanoDiario = ({
                     </Box>
                   </AccordionSummary>
                   
-                  <AccordionDetails>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  <AccordionDetails onClick={(e) => e.stopPropagation()}>
+                    <Box 
+                      sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       {/* Seletor de Faixa Etária */}
-                      <FormControl fullWidth>
+                      <FormControl fullWidth onClick={(e) => e.stopPropagation()}>
                         <InputLabel>Faixa Etária / Nível de Ensino *</InputLabel>
                         <Select
                           value={aula.faixaEtaria || ''}
                           label="Faixa Etária / Nível de Ensino *"
                           onChange={(e) => {
+                            e.stopPropagation();
                             handleAulaChange(index, 'faixaEtaria', e.target.value);
                             handleAulaChange(index, 'competenciasBNCC', []); // Limpa competências
                           }}
+                          onClick={(e) => e.stopPropagation()}
                           disabled={!canEdit()}
                         >
                           <MenuItem value="">
@@ -916,6 +941,8 @@ const EditorPlanoDiario = ({
                         label="Objetivos de Aprendizagem *"
                         value={aula.objetivosAprendizagem || ''}
                         onChange={(e) => handleAulaChange(index, 'objetivosAprendizagem', e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
+                        onFocus={(e) => e.stopPropagation()}
                         error={!!errors[`aula_${index}_objetivos`]}
                         helperText={errors[`aula_${index}_objetivos`] || "O que os alunos devem aprender nesta aula?"}
                         placeholder="Ex: Identificar e diferenciar figuras geométricas planas..."
@@ -929,6 +956,8 @@ const EditorPlanoDiario = ({
                         label="Conteúdo *"
                         value={aula.conteudo || ''}
                         onChange={(e) => handleAulaChange(index, 'conteudo', e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
+                        onFocus={(e) => e.stopPropagation()}
                         error={!!errors[`aula_${index}_conteudo`]}
                         helperText={errors[`aula_${index}_conteudo`] || "Descreva o conteúdo que será trabalhado"}
                         placeholder="Ex: Formas geométricas: círculo, quadrado, triângulo..."
@@ -942,6 +971,8 @@ const EditorPlanoDiario = ({
                         label="Metodologia"
                         value={aula.metodologia || ''}
                         onChange={(e) => handleAulaChange(index, 'metodologia', e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
+                        onFocus={(e) => e.stopPropagation()}
                         helperText="Como você vai ensinar? Estratégias e atividades"
                         placeholder="Ex: Aula expositiva com uso de materiais concretos..."
                         disabled={!canEdit()}
@@ -954,6 +985,8 @@ const EditorPlanoDiario = ({
                         label="Tarefa de Casa"
                         value={aula.tarefaCasa || ''}
                         onChange={(e) => handleAulaChange(index, 'tarefaCasa', e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
+                        onFocus={(e) => e.stopPropagation()}
                         helperText="Atividade para os alunos fazerem em casa"
                         placeholder="Ex: Desenhar 3 objetos de cada forma geométrica estudada..."
                         disabled={!canEdit()}
@@ -966,27 +999,21 @@ const EditorPlanoDiario = ({
                         </Typography>
                         
                         {canEdit() && (
-                          <Button
-                            variant="outlined"
-                            component="label"
-                            startIcon={<UploadIcon />}
-                            disabled={uploadingImage}
-                            fullWidth
-                            sx={{ mb: 2 }}
-                          >
-                            {uploadingImage ? `Enviando... ${Math.round(uploadProgress)}%` : 'Adicionar Arquivos'}
-                            <input
-                              type="file"
-                              hidden
-                              multiple
-                              accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
-                              onChange={(e) => handleFileUpload(e, index)}
-                            />
-                          </Button>
+                          <FileUploadZone
+                            onFilesSelected={(files) => handleFileUpload(files, index)}
+                            files={aula.recursos || []}
+                            onRemoveFile={(fileIndex) => handleRemoveFile(index, fileIndex)}
+                            uploading={uploadingImage}
+                            progress={uploadProgress}
+                            disabled={!canEdit()}
+                            accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
+                            multiple={true}
+                            showPreview={true}
+                          />
                         )}
 
-                        {/* Preview dos arquivos */}
-                        {aula.recursos && aula.recursos.length > 0 && (
+                        {/* Preview dos arquivos quando não pode editar */}
+                        {!canEdit() && aula.recursos && aula.recursos.length > 0 && (
                           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                             {aula.recursos.map((arquivo, fileIndex) => (
                               <Card key={fileIndex} variant="outlined" sx={{ p: 2 }}>
@@ -1034,17 +1061,6 @@ const EditorPlanoDiario = ({
                                       </Typography>
                                     </Box>
                                   </Box>
-
-                                  {/* Botão para remover */}
-                                  {canEdit() && (
-                                    <IconButton
-                                      color="error"
-                                      size="small"
-                                      onClick={() => handleRemoveFile(index, fileIndex)}
-                                    >
-                                      <DeleteIcon />
-                                    </IconButton>
-                                  )}
                                 </Box>
                               </Card>
                             ))}
